@@ -26,10 +26,27 @@
   cursor: pointer;
   padding: 5px;
   border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .topic-item:hover {
   background-color: #f0f0f0;
+}
+
+.read-toggle {
+  margin-left: 10px;
+  padding: 2px 8px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.read-toggle:hover {
+  background-color: #0056b3;
 }
 
 .text-display h2 {
