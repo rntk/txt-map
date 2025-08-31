@@ -1,7 +1,15 @@
 import React from 'react';
 
-function TextDisplay({ sentences, selectedTopic }) {
-  const highlightedIndices = selectedTopic ? new Set(selectedTopic.sentences.map(num => num - 1)) : new Set();
+function TextDisplay({ sentences, selectedTopics, hoveredTopic }) {
+  const fadedIndices = new Set();
+  selectedTopics.forEach(topic => {
+    topic.sentences.forEach(num => fadedIndices.add(num - 1));
+  });
+
+  const highlightedIndices = new Set();
+  if (hoveredTopic) {
+    hoveredTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
+  }
 
   return (
     <div className="text-display">
@@ -10,7 +18,7 @@ function TextDisplay({ sentences, selectedTopic }) {
         {sentences.map((sentence, index) => (
           <span
             key={index}
-            className={highlightedIndices.has(index) ? 'highlighted' : ''}
+            className={fadedIndices.has(index) ? 'faded' : highlightedIndices.has(index) ? 'highlighted' : ''}
           >
             {sentence}{' '}
           </span>

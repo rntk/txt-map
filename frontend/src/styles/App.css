@@ -43,3 +43,7 @@
 .highlighted {
   background-color: yellow;
 }
+
+.faded {
+  opacity: 0.1;
+}

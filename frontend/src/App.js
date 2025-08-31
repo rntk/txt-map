@@ -5,7 +5,8 @@ import './styles/App.css';
 
 function App() {
   const [data, setData] = useState(null);
-  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedTopics, setSelectedTopics] = useState([]);
+  const [hoveredTopic, setHoveredTopic] = useState(null);
 
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/themed-post')
@@ -13,6 +14,14 @@ function App() {
       .then(data => setData(data))
       .catch(error => console.error('Error fetching data:', error));
   }, []);
+
+  const toggleTopic = (topic) => {
+    setSelectedTopics(prev => 
+      prev.includes(topic) 
+        ? prev.filter(t => t !== topic) 
+        : [...prev, topic]
+    );
+  };
 
   if (!data) {
     return <div>Loading...</div>;
@@ -22,10 +31,10 @@ function App() {
     <div className="app">
       <div className="container">
         <div className="left-column">
-          <TopicList topics={data.topics} onTopicSelect={setSelectedTopic} />
+          <TopicList topics={data.topics} selectedTopics={selectedTopics} onToggleTopic={toggleTopic} onHoverTopic={setHoveredTopic} />
         </div>
         <div className="right-column">
-          <TextDisplay sentences={data.sentences} selectedTopic={selectedTopic} />
+          <TextDisplay sentences={data.sentences} selectedTopics={selectedTopics} hoveredTopic={hoveredTopic} />
         </div>
       </div>
     </div>
