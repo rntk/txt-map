@@ -30,7 +30,11 @@ def get_themed_post():
 Group the following sentences by topic/theme. 
 For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
 
-If a sentence doesn't fit any clear topic, group it under 'no_topic'.
+Guidelines for topic naming:
+- Keep topics specific but not overly detailed. Prefer more specific terms over general ones (e.g., if sentences mention both "sport" and "hockey", use "hockey" as the topic).
+- Use concise topic names that capture the core theme without unnecessary elaboration.
+- Aim for 3-7 topics in total, merging similar themes where possible to avoid fragmentation.
+- If a sentence doesn't fit any clear topic, group it under 'no_topic'.
 
 Output format:
 topic_1: 1,3
