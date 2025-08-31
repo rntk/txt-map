@@ -26,26 +26,45 @@ def get_themed_post():
     # LLM client
     llm = LLamaCPP("http://192.168.178.26:8989")
     
-    prompt = f"""Group the following sentences by topic/theme. For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
+    prompt = f"""
+Group the following sentences by topic/theme. 
+For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
 
-Sentences:
-{numbered_text}
+If a sentence doesn't fit any clear topic, group it under 'no_topic'.
 
 Output format:
 topic_1: 1,3
 topic_2: 2,4
+no_topic: 5
+
+Sentences:
+{numbered_text}
 """
     
     response = llm.call([prompt])
     
     # Parse response
     topics = []
+    assigned_sentences = set()
     for line in response.strip().split('\n'):
         if ':' in line:
             topic_name, nums = line.split(':', 1)
             topic_name = topic_name.strip()
             nums = [int(n.strip()) for n in nums.split(',') if n.strip().isdigit()]
             topics.append({"name": topic_name, "sentences": nums})
+            assigned_sentences.update(nums)
+    
+    # Check for unassigned sentences and add to "no_topic"
+    total_sentences = len(sentences)
+    unassigned = [i+1 for i in range(total_sentences) if i+1 not in assigned_sentences]
+    if unassigned:
+        # Check if "no_topic" already exists
+        no_topic = next((t for t in topics if t["name"] == "no_topic"), None)
+        if no_topic:
+            no_topic["sentences"].extend(unassigned)
+            no_topic["sentences"].sort()
+        else:
+            topics.append({"name": "no_topic", "sentences": sorted(unassigned)})
     
     return {
         "sentences": sentences,
