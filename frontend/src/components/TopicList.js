@@ -3,7 +3,6 @@ import React from 'react';
 function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead }) {
   return (
     <div className="topic-list">
-      <h2>Topics</h2>
       <ul>
         {topics.map((topic, index) => (
           <li key={index} className="topic-item" onMouseEnter={() => onHoverTopic(topic)} onMouseLeave={() => onHoverTopic(null)}>

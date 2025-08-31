@@ -1,6 +1,6 @@
 import React from 'react';
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleIndex }) {
   const fadedIndices = new Set();
   readTopics.forEach(topic => {
     topic.sentences.forEach(num => fadedIndices.add(num - 1));
@@ -16,16 +16,17 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics }) {
 
   return (
     <div className="text-display">
-      <h2>Text</h2>
       <div className="text-content">
-        {sentences.map((sentence, index) => (
-          <span
-            key={index}
-            className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
-          >
-            {sentence}{' '}
-          </span>
-        ))}
+        <p className="article-text">
+          {sentences.map((sentence, index) => (
+            <span
+              key={index}
+              className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
+            >
+              {sentence}{' '}
+            </span>
+          ))}
+        </p>
       </div>
     </div>
   );
