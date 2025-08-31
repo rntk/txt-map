@@ -11,7 +11,11 @@ function App() {
   const [readTopics, setReadTopics] = useState(new Set());
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/themed-post')
+    const pathname = window.location.pathname;
+    const pathParts = pathname.split('/');
+    const tag = pathParts.length > 3 ? pathParts[3] : null;
+    const url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}` : 'http://127.0.0.1:8000/api/themed-post';
+    fetch(url)
       .then(response => response.json())
       .then(data => {
         setArticles(data);

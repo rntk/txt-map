@@ -1,24 +1,46 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 import json
 import re
+import gzip
 import os
 from lib.llamacpp import LLamaCPP
+from lib.storage.posts import PostsStorage
+from lib.html_cleaner import HTMLCleaner
 
 router = APIRouter()
 
+def get_posts_storage(request: Request) -> PostsStorage:
+    return request.app.state.posts_storage
+
+@router.get("/themed-post/{tag}")
 @router.get("/themed-post")
-def get_themed_post():
-    post_file = os.path.join(os.path.dirname(__file__), '..', 'post.txt')
-    if not os.path.exists(post_file):
-        return {"error": "post.txt not found"}
+def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_posts_storage)):
+    user = posts_storage._db.users.find_one()
+    if not user:
+        return {"error": "No users found"}
+    owner = user['sid']
+    print(owner, tag)
+    if tag:
+        posts = list(posts_storage.get_by_tags(owner, [tag]))
+    else:
+        posts = list(posts_storage.get_all(owner))
     
-    # Read file line by line to avoid loading large files into memory
     articles = []
-    with open(post_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                articles.append(line)
+    cleaner = HTMLCleaner()
+    reg = re.compile(r"\s+")
+    for post in posts:
+        cleaner.purge()
+        text = (
+            post["content"]["title"]
+            + " "
+            + gzip.decompress(post["content"]["content"]).decode("utf-8", "replace")
+        )
+        cleaner.feed(text)
+        text = " ".join(cleaner.get_content())
+        text = reg.sub(" ", text)
+        articles.append(text.strip())
+
+    print(articles)
 
     results = []
     for article in articles:
@@ -36,6 +58,7 @@ def get_themed_post():
         # LLM client
         llm = LLamaCPP("http://192.168.178.26:8989")
         
+        focus = f"Focus on the theme '{tag}' when grouping the sentences. \n" if tag else ""
         prompt = f"""
 Group the following sentences by topic/theme. 
 For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
@@ -50,6 +73,8 @@ Output format:
 topic_1: 1,3
 topic_2: 2,4
 no_topic: 5
+
+{focus}But do not ignore other potential themes.
 
 Sentences:
 {numbered_text}
