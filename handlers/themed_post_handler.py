@@ -8,7 +8,6 @@ router = APIRouter()
 
 @router.get("/themed-post")
 def get_themed_post():
-    # Read post.txt file
     post_file = os.path.join(os.path.dirname(__file__), '..', 'post.txt')
     if not os.path.exists(post_file):
         return {"error": "post.txt not found"}

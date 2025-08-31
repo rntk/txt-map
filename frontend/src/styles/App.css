@@ -1,0 +1,45 @@
+.app {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+}
+
+.container {
+  display: flex;
+  gap: 20px;
+}
+
+.left-column {
+  flex: 1;
+  border-right: 1px solid #ccc;
+  padding-right: 20px;
+}
+
+.right-column {
+  flex: 2;
+}
+
+.topic-list h2 {
+  margin-top: 0;
+}
+
+.topic-item {
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.topic-item:hover {
+  background-color: #f0f0f0;
+}
+
+.text-display h2 {
+  margin-top: 0;
+}
+
+.text-content {
+  line-height: 1.6;
+}
+
+.highlighted {
+  background-color: yellow;
+}
