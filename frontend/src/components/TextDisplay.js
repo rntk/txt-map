@@ -1,17 +1,26 @@
 import React from 'react';
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleIndex }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex }) {
   const fadedIndices = new Set();
   readTopics.forEach(topic => {
-    topic.sentences.forEach(num => fadedIndices.add(num - 1));
+    const relatedTopic = articleTopics.find(t => t.name === topic.name);
+    if (relatedTopic) {
+      relatedTopic.sentences.forEach(num => fadedIndices.add(num - 1));
+    }
   });
 
   const highlightedIndices = new Set();
   selectedTopics.forEach(topic => {
-    topic.sentences.forEach(num => highlightedIndices.add(num - 1));
+    const relatedTopic = articleTopics.find(t => t.name === topic.name);
+    if (relatedTopic) {
+      relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
+    }
   });
   if (hoveredTopic) {
-    hoveredTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
+    const relatedTopic = articleTopics.find(t => t.name === hoveredTopic.name);
+    if (relatedTopic) {
+      relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
+    }
   }
 
   return (
