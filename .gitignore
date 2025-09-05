@@ -4,3 +4,4 @@ __pycache__
 post.txt
 node_modules/
 frontend/build
+.idea
