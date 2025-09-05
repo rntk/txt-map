@@ -114,7 +114,7 @@ function App() {
 
                   // Sort sentence indices to maintain original order
                   const sortedIndices = [...relatedTopic.sentences].sort((a, b) => a - b);
-                  
+
                   return (
                     <div key={index} className="article-section">
                       <h3 
@@ -127,7 +127,7 @@ function App() {
                         {sortedIndices.map((sentenceIndex, idx) => {
                           const sentence = article.sentences[sentenceIndex - 1];
                           const isGap = idx > 0 && sortedIndices[idx] !== sortedIndices[idx - 1] + 1;
-                          
+
                           return (
                             <React.Fragment key={sentenceIndex}>
                               {isGap && <div className="sentence-gap">...</div>}
@@ -144,7 +144,37 @@ function App() {
           )}
           {articles.map((article, index) => (
             <div key={index} id={`article-${index}`} className="article-section">
-              <h1>Article {index + 1}</h1>
+              <div className="article-header">
+                <h1>Article {index + 1}</h1>
+                <label className="highlight-topics-checkbox">
+                  <input
+                    type="checkbox"
+                    onChange={() => {
+                      // Toggle all topics associated with this article
+                      const articleTopics = article.topics;
+                      if (articleTopics.some(topic => selectedTopics.includes(topic))) {
+                        // If any topics are already selected, deselect them
+                        setSelectedTopics(prev => 
+                          prev.filter(topic => !articleTopics.some(t => t.name === topic.name))
+                        );
+                      } else {
+                        // Otherwise, select all topics for this article
+                        setSelectedTopics(prev => {
+                          const newTopics = [...prev];
+                          articleTopics.forEach(topic => {
+                            if (!newTopics.some(t => t.name === topic.name)) {
+                              newTopics.push(topic);
+                            }
+                          });
+                          return newTopics;
+                        });
+                      }
+                    }}
+                    checked={article.topics.some(topic => selectedTopics.includes(topic))}
+                  />
+                  Highlight topics
+                </label>
+              </div>
               <TextDisplay 
                 sentences={article.sentences} 
                 selectedTopics={selectedTopics} 

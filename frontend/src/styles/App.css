@@ -9,9 +9,28 @@
   padding-bottom: 20px;
 }
 
+.article-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .article-section h1 {
   color: #333;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+.highlight-topics-checkbox {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+}
+
+.highlight-topics-checkbox input {
+  margin-right: 5px;
 }
 
 .container {
