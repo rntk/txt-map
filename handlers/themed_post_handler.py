@@ -9,6 +9,22 @@ from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
 
+def normalize_topic(topic_name):
+    """
+    Normalize topic name to avoid duplicates due to case, spaces vs underscores, etc.
+    """
+    # Convert to lowercase
+    normalized = topic_name.lower()
+    # Replace spaces with underscores
+    normalized = re.sub(r'\s+', '_', normalized)
+    # Remove special characters except underscores
+    normalized = re.sub(r'[^\w_]', '', normalized)
+    # Remove multiple consecutive underscores
+    normalized = re.sub(r'_+', '_', normalized)
+    # Remove leading/trailing underscores
+    normalized = normalized.strip('_')
+    return normalized
+
 router = APIRouter()
 
 def get_posts_storage(request: Request) -> PostsStorage:
@@ -111,13 +127,28 @@ Sentences:
 
         # Parse response
         topics = []
+        normalized_topics_map = {}  # Dictionary to track normalized topic names
         assigned_sentences = set()
         for line in response.strip().split('\n'):
             if ':' in line:
                 topic_name, nums = line.split(':', 1)
                 topic_name = topic_name.strip()
+                # Normalize the topic name
+                normalized_name = normalize_topic(topic_name)
                 nums = [int(n.strip()) for n in nums.split(',') if n.strip().isdigit()]
-                topics.append({"name": topic_name, "sentences": nums})
+
+                # Check if this normalized topic already exists
+                if normalized_name in normalized_topics_map:
+                    # Add sentences to existing topic
+                    existing_topic_index = normalized_topics_map[normalized_name]
+                    topics[existing_topic_index]["sentences"].extend(nums)
+                    topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
+                else:
+                    # Create new topic with normalized name
+                    topic = {"name": normalized_name, "sentences": nums}
+                    topics.append(topic)
+                    normalized_topics_map[normalized_name] = len(topics) - 1
+
                 assigned_sentences.update(nums)
 
         # Check for unassigned sentences and add to "no_topic"
@@ -125,12 +156,17 @@ Sentences:
         unassigned = [i+1 for i in range(total_sentences) if i+1 not in assigned_sentences]
         if unassigned:
             # Check if "no_topic" already exists
-            no_topic = next((t for t in topics if t["name"] == "no_topic"), None)
-            if no_topic:
-                no_topic["sentences"].extend(unassigned)
-                no_topic["sentences"].sort()
+            normalized_no_topic = normalize_topic("no_topic")
+            if normalized_no_topic in normalized_topics_map:
+                # Add sentences to existing no_topic
+                existing_topic_index = normalized_topics_map[normalized_no_topic]
+                topics[existing_topic_index]["sentences"].extend(unassigned)
+                topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
             else:
-                topics.append({"name": "no_topic", "sentences": sorted(unassigned)})
+                # Create new no_topic
+                no_topic = {"name": normalized_no_topic, "sentences": sorted(unassigned)}
+                topics.append(no_topic)
+                normalized_topics_map[normalized_no_topic] = len(topics) - 1
 
         results.append({
             "sentences": sentences,
