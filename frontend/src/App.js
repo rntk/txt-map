@@ -9,12 +9,14 @@ function App() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [readTopics, setReadTopics] = useState(new Set());
+  const [showPanel, setShowPanel] = useState(false);
+  const [panelTopic, setPanelTopic] = useState(null);
 
   useEffect(() => {
     const pathname = window.location.pathname;
     const pathParts = pathname.split('/');
     const tag = pathParts.length > 3 ? pathParts[3] : null;
-    const url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}` : 'http://127.0.0.1:8000/api/themed-post';
+    const url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/themed-post?limit=10';
     fetch(url)
       .then(response => response.json())
       .then(data => {
@@ -57,6 +59,26 @@ function App() {
     });
   };
 
+  const toggleShowPanel = (topic) => {
+    if (showPanel && panelTopic === topic) {
+      setShowPanel(false);
+      setPanelTopic(null);
+    } else {
+      setShowPanel(true);
+      setPanelTopic(topic);
+    }
+  };
+
+  const scrollToArticle = (articleIndex) => {
+    const articleElement = document.getElementById(`article-${articleIndex}`);
+    if (articleElement) {
+      articleElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }
+  };
+
   if (!articles.length) {
     return <div>Loading...</div>;
   }
@@ -72,12 +94,56 @@ function App() {
             onToggleTopic={toggleTopic} 
             onHoverTopic={handleHoverTopic} 
             readTopics={readTopics} 
-            onToggleRead={toggleRead} 
+            onToggleRead={toggleRead}
+            showPanel={showPanel}
+            panelTopic={panelTopic}
+            onToggleShowPanel={toggleShowPanel}
           />
         </div>
         <div className="right-column">
+          {showPanel && panelTopic && (
+            <div className="overlay-panel">
+              <div className="overlay-header">
+                <h2>Sentences for topic: {panelTopic.name}</h2>
+                <button onClick={() => toggleShowPanel(panelTopic)} className="close-panel">×</button>
+              </div>
+              <div className="overlay-content">
+                {articles.map((article, index) => {
+                  const relatedTopic = article.topics.find(t => t.name === panelTopic.name);
+                  if (!relatedTopic) return null;
+
+                  // Sort sentence indices to maintain original order
+                  const sortedIndices = [...relatedTopic.sentences].sort((a, b) => a - b);
+                  
+                  return (
+                    <div key={index} className="article-section">
+                      <h3 
+                        className="article-link" 
+                        onClick={() => scrollToArticle(index)}
+                      >
+                        Article {index + 1}
+                      </h3>
+                      <div className="article-text">
+                        {sortedIndices.map((sentenceIndex, idx) => {
+                          const sentence = article.sentences[sentenceIndex - 1];
+                          const isGap = idx > 0 && sortedIndices[idx] !== sortedIndices[idx - 1] + 1;
+                          
+                          return (
+                            <React.Fragment key={sentenceIndex}>
+                              {isGap && <div className="sentence-gap">...</div>}
+                              <span className="sentence-block">{sentence} </span>
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {articles.map((article, index) => (
-            <div key={index} className="article-section">
+            <div key={index} id={`article-${index}`} className="article-section">
               <h1>Article {index + 1}</h1>
               <TextDisplay 
                 sentences={article.sentences} 

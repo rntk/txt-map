@@ -1,6 +1,6 @@
 import React from 'react';
 
-function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead }) {
+function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead, showPanel, panelTopic, onToggleShowPanel }) {
   return (
     <div className="topic-list">
       <ul>
@@ -14,9 +14,14 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
               />
               {topic.name}
             </label>
-            <button onClick={() => onToggleRead(topic)} className="read-toggle">
-              {readTopics.has(topic) ? 'Readed' : 'Unreaded'}
-            </button>
+            <div className="topic-buttons">
+              <button onClick={() => onToggleRead(topic)} className="read-toggle">
+                {readTopics.has(topic) ? 'Readed' : 'Unreaded'}
+              </button>
+              <button onClick={() => onToggleShowPanel(topic)} className="show-toggle">
+                {showPanel && panelTopic === topic ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </li>
         ))}
       </ul>
