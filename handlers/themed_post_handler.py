@@ -3,6 +3,8 @@ import json
 import re
 import gzip
 import os
+import hashlib
+import datetime
 from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
@@ -15,6 +17,11 @@ def get_posts_storage(request: Request) -> PostsStorage:
 @router.get("/themed-post/{tag}")
 @router.get("/themed-post")
 def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_posts_storage)):
+    # Ensure the LLM cache collection exists with proper indexes
+    if "llm_cache" not in posts_storage._db.list_collection_names():
+        posts_storage._db.create_collection("llm_cache")
+        posts_storage._db.llm_cache.create_index("prompt_hash", unique=True)
+
     user = posts_storage._db.users.find_one()
     if not user:
         return {"error": "No users found"}
@@ -24,7 +31,7 @@ def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_p
         posts = list(posts_storage.get_by_tags(owner, [tag]))
     else:
         posts = list(posts_storage.get_all(owner))
-    
+
     articles = []
     cleaner = HTMLCleaner()
     reg = re.compile(r"\s+")
@@ -47,17 +54,17 @@ def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_p
         # Split into sentences
         sentences = re.split(r'(?<=[.!?])\s+', article.strip())
         sentences = [s.strip() for s in sentences if s.strip()]
-        
+
         if not sentences:
             continue
-        
+
         # Join with numbers
         numbered_sentences = [f"{i+1}. {s}" for i, s in enumerate(sentences)]
         numbered_text = '\n'.join(numbered_sentences)
-        
+
         # LLM client
         llm = LLamaCPP("http://192.168.178.26:8989")
-        
+
         focus = f"Focus on the theme '{tag}' when grouping the sentences. \n" if tag else ""
         prompt = f"""
 Group the following sentences by topic/theme. 
@@ -79,9 +86,29 @@ no_topic: 5
 Sentences:
 {numbered_text}
 """
-        
-        response = llm.call([prompt])
-        
+
+        # Create a hash of the prompt for caching
+        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+
+        # Check if we have a cached response
+        cache_collection = posts_storage._db.llm_cache
+        cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+
+        if cached_response:
+            # Use cached response
+            response = cached_response["response"]
+        else:
+            # Make LLM call and cache the result
+            response = llm.call([prompt])
+
+            # Store in cache
+            cache_collection.insert_one({
+                "prompt_hash": prompt_hash,
+                "prompt": prompt,
+                "response": response,
+                "created_at": datetime.datetime.now()
+            })
+
         # Parse response
         topics = []
         assigned_sentences = set()
@@ -92,7 +119,7 @@ Sentences:
                 nums = [int(n.strip()) for n in nums.split(',') if n.strip().isdigit()]
                 topics.append({"name": topic_name, "sentences": nums})
                 assigned_sentences.update(nums)
-        
+
         # Check for unassigned sentences and add to "no_topic"
         total_sentences = len(sentences)
         unassigned = [i+1 for i in range(total_sentences) if i+1 not in assigned_sentences]
@@ -104,10 +131,10 @@ Sentences:
                 no_topic["sentences"].sort()
             else:
                 topics.append({"name": "no_topic", "sentences": sorted(unassigned)})
-        
+
         results.append({
             "sentences": sentences,
             "topics": topics
         })
-    
+
     return results
