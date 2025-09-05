@@ -32,7 +32,7 @@ def get_posts_storage(request: Request) -> PostsStorage:
 
 @router.get("/themed-post/{tag}")
 @router.get("/themed-post")
-def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_posts_storage)):
+def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorage = Depends(get_posts_storage)):
     # Ensure the LLM cache collection exists with proper indexes
     if "llm_cache" not in posts_storage._db.list_collection_names():
         posts_storage._db.create_collection("llm_cache")
@@ -47,6 +47,9 @@ def get_themed_post(tag: str = None, posts_storage: PostsStorage = Depends(get_p
         posts = list(posts_storage.get_by_tags(owner, [tag]))
     else:
         posts = list(posts_storage.get_all(owner))
+
+    # Apply the limit to the number of posts
+    posts = posts[:limit]
 
     articles = []
     cleaner = HTMLCleaner()
