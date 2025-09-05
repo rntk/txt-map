@@ -23,6 +23,14 @@
   flex: 1;
   border-right: 1px solid #ccc;
   padding-right: 20px;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+  height: calc(100vh - 40px);
+  overflow: hidden;
+  background-color: #fff;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+  z-index: 10;
 }
 
 .left-column h1 {
@@ -31,6 +39,18 @@
 
 .right-column {
   flex: 2;
+}
+
+.topic-list {
+  height: calc(100% - 60px); /* Subtract space for the heading */
+  overflow-y: auto;
+  padding-right: 5px;
+  margin-right: -5px;
+}
+
+.topic-list ul {
+  padding-left: 20px;
+  margin: 0;
 }
 
 .topic-list h2 {
