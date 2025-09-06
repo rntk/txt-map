@@ -120,13 +120,17 @@ Sentences:
             # Make LLM call and cache the result
             response = llm.call([prompt])
 
-            # Store in cache
-            cache_collection.insert_one({
-                "prompt_hash": prompt_hash,
-                "prompt": prompt,
-                "response": response,
-                "created_at": datetime.datetime.now()
-            })
+            # Store in cache (using upsert to avoid duplicates)
+            cache_collection.update_one(
+                {"prompt_hash": prompt_hash},
+                {"$set": {
+                    "prompt_hash": prompt_hash,
+                    "prompt": prompt,
+                    "response": response,
+                    "created_at": datetime.datetime.now()
+                }},
+                upsert=True
+            )
 
         # Parse response
         topics = []
