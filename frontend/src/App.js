@@ -9,6 +9,7 @@ function App() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [readTopics, setReadTopics] = useState(new Set());
+  const [readArticles, setReadArticles] = useState(new Set());
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
 
@@ -55,6 +56,37 @@ function App() {
       } else {
         newSet.add(topic);
       }
+      return newSet;
+    });
+  };
+
+  const toggleArticleRead = (articleIndex) => {
+    const article = articles[articleIndex];
+    const isCurrentlyRead = readArticles.has(articleIndex);
+
+    setReadArticles(prev => {
+      const newSet = new Set(prev);
+      if (isCurrentlyRead) {
+        newSet.delete(articleIndex);
+      } else {
+        newSet.add(articleIndex);
+      }
+      return newSet;
+    });
+
+    // Sync with topics - when article is marked as read, mark all its topics as read
+    // When article is marked as unread, mark all its topics as unread
+    setReadTopics(prev => {
+      const newSet = new Set(prev);
+      article.topics.forEach(topic => {
+        if (isCurrentlyRead) {
+          // Article was read, now marking as unread - remove topic from read topics
+          newSet.delete(topic);
+        } else {
+          // Article was unread, now marking as read - add topic to read topics
+          newSet.add(topic);
+        }
+      });
       return newSet;
     });
   };
@@ -145,7 +177,17 @@ function App() {
           {articles.map((article, index) => (
             <div key={index} id={`article-${index}`} className="article-section">
               <div className="article-header">
-                <h1>Article {index + 1}</h1>
+                <div className="article-title-section">
+                  <h1>Article {index + 1}</h1>
+                </div>
+                <label className="article-read-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={readArticles.has(index)}
+                    onChange={() => toggleArticleRead(index)}
+                  />
+                  Mark as read
+                </label>
                 <label className="highlight-topics-checkbox">
                   <input
                     type="checkbox"

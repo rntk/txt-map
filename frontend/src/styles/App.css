@@ -16,6 +16,25 @@
   margin-bottom: 20px;
 }
 
+.article-title-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.article-read-checkbox {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.article-read-checkbox input {
+  margin-right: 5px;
+}
+
 .article-section h1 {
   color: #333;
   margin-bottom: 0;
