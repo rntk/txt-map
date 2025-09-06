@@ -12,7 +12,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                 checked={selectedTopics.includes(topic)}
                 onChange={() => onToggleTopic(topic)}
               />
-              {topic.name}
+              {topic.name} ({topic.totalSentences} sentences)
             </label>
             <div className="topic-buttons">
               <button onClick={() => onToggleRead(topic)} className="read-toggle">

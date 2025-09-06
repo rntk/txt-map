@@ -16,18 +16,31 @@ function App() {
   useEffect(() => {
     const pathname = window.location.pathname;
     const pathParts = pathname.split('/');
-    const tag = pathParts.length > 3 ? pathParts[3] : null;
-    const url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/themed-post?limit=10';
+    const apiType = pathParts[1]; // 'clustered' or 'themed'
+    const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
+
+    let url;
+    if (apiType === 'themed') {
+      url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/themed-post?limit=10';
+    } else {
+      // Default to clustered
+      url = tag ? `http://127.0.0.1:8000/api/clustered-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/clustered-post?limit=10';
+    }
+    
     fetch(url)
       .then(response => response.json())
       .then(data => {
         setArticles(data);
-        // Collect all unique topics
+        // Collect all unique topics with sentence counts
         const topicMap = new Map();
         data.forEach((article, index) => {
           article.topics.forEach(topic => {
             if (!topicMap.has(topic.name)) {
-              topicMap.set(topic.name, topic);
+              topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
+            } else {
+              // Add to existing topic's sentence count
+              const existing = topicMap.get(topic.name);
+              existing.totalSentences += topic.sentences.length;
             }
           });
         });
@@ -136,7 +149,7 @@ function App() {
           {showPanel && panelTopic && (
             <div className="overlay-panel">
               <div className="overlay-header">
-                <h2>Sentences for topic: {panelTopic.name}</h2>
+                <h2>Sentences for topic: {panelTopic.name} ({panelTopic.totalSentences} sentences)</h2>
                 <button onClick={() => toggleShowPanel(panelTopic)} className="close-panel">×</button>
               </div>
               <div className="overlay-content">
@@ -178,7 +191,7 @@ function App() {
             <div key={index} id={`article-${index}`} className="article-section">
               <div className="article-header">
                 <div className="article-title-section">
-                  <h1>Article {index + 1}</h1>
+                  <h1>Article {index + 1} ({article.topics.length} topics)</h1>
                 </div>
                 <label className="article-read-checkbox">
                   <input
