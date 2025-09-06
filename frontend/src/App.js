@@ -16,11 +16,12 @@ function App() {
   useEffect(() => {
     const pathname = window.location.pathname;
     const pathParts = pathname.split('/');
-    const apiType = pathParts[1]; // 'clustered' or 'themed'
+    const apiType = pathParts[2]; // 'clustered' or 'themed'
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
 
     let url;
-    if (apiType === 'themed') {
+    console.log(pathParts, apiType );
+    if (apiType === 'themed-post') {
       url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/themed-post?limit=10';
     } else {
       // Default to clustered
