@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017/
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:8.0
+    ports:
+      - "27017:27017"  # Standard MongoDB port
+    environment:
+      - MONGO_INITDB_DATABASE=rss
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Optional: LlamaCPP server (if you want to run it locally)
+  # Uncomment the section below if you want to include LlamaCPP server
+  # llamacpp:
+  #   image: ghcr.io/ggerganov/llama.cpp:server
+  #   ports:
+  #     - "8989:8080"
+  #   volumes:
+  #     - ./models:/models
+  #   command: ["--model", "/models/your-model.gguf", "--port", "8080", "--host", "0.0.0.0"]
+  #   restart: unless-stopped
+  #   networks:
+  #     - app-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  app-network:
+    driver: bridge
