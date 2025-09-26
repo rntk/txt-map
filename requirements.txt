@@ -1,3 +1,6 @@
 fastapi
 uvicorn[standard]
 pymongo
+scikit-learn
+numpy
+requests

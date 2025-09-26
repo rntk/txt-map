@@ -82,7 +82,8 @@ def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorag
         numbered_text = '\n'.join(numbered_sentences)
 
         # LLM client
-        llm = LLamaCPP("http://192.168.178.26:8989")
+        #llm = LLamaCPP("http://192.168.178.26:8989")
+        llm = LLamaCPP("http://127.0.0.1:8989")
 
         focus = f"Focus on the theme '{tag}' when grouping the sentences. \n" if tag else ""
         prompt = f"""
