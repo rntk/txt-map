@@ -100,8 +100,19 @@
   padding: 5px;
   border-radius: 4px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  min-width: 0; /* Allow flex item to shrink */
+}
+
+.topic-item label {
+  flex: 1;
+  min-width: 0; /* Allow flex item to shrink */
+  margin-right: 10px;
+  word-wrap: break-word;
+  word-break: break-word;
+  display: flex;
+  align-items: flex-start;
+  line-height: 1.4;
 }
 
 .topic-item-read {
@@ -115,6 +126,9 @@
 .topic-buttons {
   display: flex;
   gap: 5px;
+  flex-shrink: 0; /* Prevent buttons from shrinking */
+  align-self: flex-start;
+  margin-top: 2px; /* Small offset to align with first line of text */
 }
 
 .read-toggle {
