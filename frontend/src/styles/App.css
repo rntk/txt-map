@@ -104,6 +104,10 @@
   align-items: center;
 }
 
+.topic-item-read {
+  background-color: #e5e5e5;
+}
+
 .topic-item:hover {
   background-color: #f0f0f0;
 }

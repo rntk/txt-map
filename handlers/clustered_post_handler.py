@@ -68,8 +68,8 @@ def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsSt
     print(articles)
 
     results = []
-    #llm = LLamaCPP("http://192.168.178.26:9876")
-    llm = LLamaCPP("http://127.0.0.1:8989")
+    llm = LLamaCPP("http://192.168.178.26:8989")
+    #llm = LLamaCPP("http://127.0.0.1:8989")
     for article in articles:
         # Split into sentences
         sentences = re.split(r'(?<=[.!?])\s+', article.strip())

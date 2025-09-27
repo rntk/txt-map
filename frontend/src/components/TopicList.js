@@ -5,7 +5,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
     <div className="topic-list">
       <ul>
         {topics.map((topic, index) => (
-          <li key={index} className="topic-item" onMouseEnter={() => onHoverTopic(topic)} onMouseLeave={() => onHoverTopic(null)}>
+          <li key={index} className={`topic-item ${readTopics.has(topic) ? 'topic-item-read' : ''}`} onMouseEnter={() => onHoverTopic(topic)} onMouseLeave={() => onHoverTopic(null)}>
             <label>
               <input
                 type="checkbox"
