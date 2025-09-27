@@ -107,3 +107,7 @@ For production deployment:
 4. Configure proper logging and monitoring
 5. Set up SSL/TLS termination
 6. Use a production-grade LLM inference server
+
+
+sudo docker build -t rsstag-tests -f Dockerfile.web ./
+sudo docker run --rm -it --network=host -v $(pwd):/app --name rsstag-tests rsstag-tests 
