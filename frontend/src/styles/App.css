@@ -1,6 +1,6 @@
 .app {
   font-family: Arial, sans-serif;
-  margin: 20px;
+  margin: 5px;
 }
 
 .article-section {
@@ -87,7 +87,7 @@
 }
 
 .topic-list ul {
-  padding-left: 20px;
+  padding-left: 5px;
   margin: 0;
 }
 
