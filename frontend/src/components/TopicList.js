@@ -15,7 +15,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
               {topic.name} ({topic.totalSentences} sentences)
             </label>
             <div className="topic-buttons">
-              <button onClick={() => onToggleRead(topic)} className="read-toggle">
+              <button onClick={() => onToggleRead(topic)} className={`read-toggle ${readTopics.has(topic) ? 'readed' : ''}`}>
                 {readTopics.has(topic) ? 'Readed' : 'Unreaded'}
               </button>
               <button onClick={() => onToggleShowPanel(topic)} className="show-toggle">

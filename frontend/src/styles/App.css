@@ -105,7 +105,7 @@
 }
 
 .topic-item-read {
-  background-color: #e5e5e5;
+  background-color: #f0f0f0;
 }
 
 .topic-item:hover {
@@ -128,6 +128,15 @@
 
 .read-toggle:hover {
   background-color: #0056b3;
+}
+
+.read-toggle.readed {
+  background-color: #e5e5e5;
+  color: #333;
+}
+
+.read-toggle.readed:hover {
+  background-color: #d0d0d0;
 }
 
 .show-toggle {
