@@ -1,0 +1,40 @@
+{
+  "manifest_version": 2,
+  "name": "RSS Tag Theme Analyzer",
+  "version": "1.0",
+  "description": "Extract page content and analyze topics/themes",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "notifications",
+    "<all_urls>",
+    "http://127.0.0.1:8000/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    },
+    "default_title": "Analyze Page Topics"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    "overlay.html",
+    "app-bundle.js",
+    "app-bundle.css"
+  ],
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  }
+}

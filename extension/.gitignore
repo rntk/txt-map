@@ -1,0 +1,5 @@
+node_modules/
+app-bundle.js
+app-bundle.css
+*.log
+.DS_Store

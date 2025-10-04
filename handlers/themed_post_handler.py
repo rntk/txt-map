@@ -8,6 +8,7 @@ import datetime
 from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
+from pydantic import BaseModel
 
 def normalize_topic(topic_name):
     """
@@ -24,6 +25,9 @@ def normalize_topic(topic_name):
     # Remove leading/trailing underscores
     normalized = normalized.strip('_')
     return normalized
+
+class ArticleRequest(BaseModel):
+    article: str
 
 router = APIRouter()
 
@@ -182,3 +186,130 @@ Sentences:
         })
 
     return results
+
+@router.post("/themed-post")
+def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depends(get_posts_storage)):
+    # Ensure the LLM cache collection exists with proper indexes
+    if "llm_cache" not in posts_storage._db.list_collection_names():
+        posts_storage._db.create_collection("llm_cache")
+        posts_storage._db.llm_cache.create_index("prompt_hash", unique=True)
+
+    # Use the provided article text
+    article = request.article
+
+    # Clean the text
+    cleaner = HTMLCleaner()
+    cleaner.purge()
+    cleaner.feed(article)
+    text = " ".join(cleaner.get_content())
+    reg = re.compile(r"\s+")
+    text = reg.sub(" ", text)
+    text = text.strip()
+
+    # Split into sentences
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    if not sentences:
+        return {"sentences": [], "topics": []}
+
+    # Join with numbers
+    numbered_sentences = [f"{i+1}. {s}" for i, s in enumerate(sentences)]
+    numbered_text = '\n'.join(numbered_sentences)
+
+    # LLM client
+    llm = LLamaCPP("http://192.168.178.26:8989")
+    #llm = LLamaCPP("http://127.0.0.1:8989")
+
+    prompt = f"""
+Group the following sentences by topic/theme. 
+For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
+
+Guidelines for topic naming:
+- Keep topics specific but not overly detailed. Prefer more specific terms over general ones (e.g., if sentences mention both "sport" and "hockey", use "hockey" as the topic).
+- Use concise topic names that capture the core theme without unnecessary elaboration.
+- Aim for 3-7 topics in total, merging similar themes where possible to avoid fragmentation.
+- If a sentence doesn't fit any clear topic, group it under 'no_topic'.
+
+Output format:
+topic_1: 1,3
+topic_2: 2,4
+no_topic: 5
+
+Sentences:
+{numbered_text}
+"""
+
+    # Create a hash of the prompt for caching
+    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+
+    # Check if we have a cached response
+    cache_collection = posts_storage._db.llm_cache
+    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+
+    if cached_response:
+        # Use cached response
+        response = cached_response["response"]
+    else:
+        # Make LLM call and cache the result
+        response = llm.call([prompt])
+
+        # Store in cache (using upsert to avoid duplicates)
+        cache_collection.update_one(
+            {"prompt_hash": prompt_hash},
+            {"$set": {
+                "prompt_hash": prompt_hash,
+                "prompt": prompt,
+                "response": response,
+                "created_at": datetime.datetime.now()
+            }},
+            upsert=True
+        )
+
+    # Parse response
+    topics = []
+    normalized_topics_map = {}  # Dictionary to track normalized topic names
+    assigned_sentences = set()
+    for line in response.strip().split('\n'):
+        if ':' in line:
+            topic_name, nums = line.split(':', 1)
+            topic_name = topic_name.strip()
+            # Normalize the topic name
+            normalized_name = normalize_topic(topic_name)
+            nums = [int(n.strip()) for n in nums.split(',') if n.strip().isdigit()]
+
+            # Check if this normalized topic already exists
+            if normalized_name in normalized_topics_map:
+                # Add sentences to existing topic
+                existing_topic_index = normalized_topics_map[normalized_name]
+                topics[existing_topic_index]["sentences"].extend(nums)
+                topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
+            else:
+                # Create new topic with normalized name
+                topic = {"name": normalized_name, "sentences": nums}
+                topics.append(topic)
+                normalized_topics_map[normalized_name] = len(topics) - 1
+
+            assigned_sentences.update(nums)
+
+    # Check for unassigned sentences and add to "no_topic"
+    total_sentences = len(sentences)
+    unassigned = [i+1 for i in range(total_sentences) if i+1 not in assigned_sentences]
+    if unassigned:
+        # Check if "no_topic" already exists
+        normalized_no_topic = normalize_topic("no_topic")
+        if normalized_no_topic in normalized_topics_map:
+            # Add sentences to existing no_topic
+            existing_topic_index = normalized_topics_map[normalized_no_topic]
+            topics[existing_topic_index]["sentences"].extend(unassigned)
+            topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
+        else:
+            # Create new no_topic
+            no_topic = {"name": normalized_no_topic, "sentences": sorted(unassigned)}
+            topics.append(no_topic)
+            normalized_topics_map[normalized_no_topic] = len(topics) - 1
+
+    return {
+        "sentences": sentences,
+        "topics": topics
+    }
