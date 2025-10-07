@@ -19,13 +19,20 @@ function App() {
     const apiType = pathParts[2]; // 'clustered' or 'themed'
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
 
+    // Determine limit from current URL ?limit=, default 10
+    const searchParams = new URLSearchParams(window.location.search);
+    let limitParam = parseInt(searchParams.get('limit'), 10);
+    if (Number.isNaN(limitParam) || limitParam <= 0) {
+      limitParam = 10;
+    }
+
     let url;
-    console.log(pathParts, apiType );
+    console.log(pathParts, apiType, 'limit=', limitParam);
     if (apiType === 'themed-post') {
-      url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${tag}?limit=10` : 'http://127.0.0.1:8000/api/math-reasoning-example?limit=10';
+      url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/sgr-topics?limit=${limitParam}`;
     } else {
       // Default to clustered
-      url = tag ? `http://127.0.0.1:8000/api/clustered-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/clustered-post?limit=10';
+      url = tag ? `http://127.0.0.1:8000/api/clustered-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/clustered-post?limit=${limitParam}`;
     }
     
     fetch(url)
