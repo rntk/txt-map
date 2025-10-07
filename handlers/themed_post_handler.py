@@ -5,6 +5,8 @@ import gzip
 import os
 import hashlib
 import datetime
+from urllib.parse import unquote
+import html
 from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
@@ -41,6 +43,10 @@ def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorag
     if "llm_cache" not in posts_storage._db.list_collection_names():
         posts_storage._db.create_collection("llm_cache")
         posts_storage._db.llm_cache.create_index("prompt_hash", unique=True)
+
+    # Decode/unescape tag if provided
+    if tag is not None:
+        tag = html.unescape(unquote(tag))
 
     user = posts_storage._db.users.find_one()
     if not user:

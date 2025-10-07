@@ -6,6 +6,8 @@ import gzip
 import os
 import hashlib
 import datetime
+from urllib.parse import unquote
+import html
 from lib.llamacpp import LLamaCPP
 from lib.html_cleaner import HTMLCleaner
 from lib.storage.posts import PostsStorage
@@ -30,6 +32,9 @@ def get_posts_storage(request: Request) -> PostsStorage:
 @router.get("/sgr-topics")
 @router.get("/sgr-topics/{tag}")
 def get_sgr_topics(tag: str = None, limit: int = 10, posts_storage: PostsStorage = Depends(get_posts_storage)):
+    # Decode/unescape tag if provided
+    if tag is not None:
+        tag = html.unescape(unquote(tag))
     user = posts_storage._db.users.find_one()
     if not user:
         return {"error": "No users found"}
@@ -90,6 +95,25 @@ def get_sgr_topics(tag: str = None, limit: int = 10, posts_storage: PostsStorage
         schema = TopicsReasoning.model_json_schema()
         schema_str = json.dumps(schema, indent=2)
         
+        # Collect topics from previous articles processed in this request (if any)
+        prev_topic_names: list[str] = []
+        for r in results:
+            for t in r.get("topics", []) or []:
+                name = t.get("name") if isinstance(t, dict) else None
+                if name and name not in prev_topic_names:
+                    prev_topic_names.append(name)
+        
+        if prev_topic_names:
+            topics_xml = "\n".join(f"<topic>{name}</topic>" for name in prev_topic_names)
+            prev_topics_block = f"""
+Previously identified topics (for alignment):
+<previous_topics>
+{topics_xml}
+</previous_topics>
+When proposing new topics, try to align with or reuse names from <previous_topics> when appropriate. Only create new topics if none of the existing ones fit."""
+        else:
+            prev_topics_block = ""
+        
         prompt = f"""
 Analyze the following sentences and group them by topic/theme. Provide reasoning steps and final topic mappings.
 
@@ -99,8 +123,12 @@ The "steps" field should be an array of reasoning steps, each with "topic_summar
 The "final_answer" field should be an array of topic mappings, each with "topic" (string) and "sentences" (array of integers).
 Return only the JSON object, no additional text.
 
+If a list of <previous_topics> is provided below, pay special attention to these topics and try to align or reuse them when naming or grouping topics for the current sentences.
+
 Schema reference:
 {schema_str}
+
+{prev_topics_block}
 
 Sentences:
 {numbered_text}

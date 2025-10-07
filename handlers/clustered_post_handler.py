@@ -5,6 +5,8 @@ import gzip
 import os
 import hashlib
 import datetime
+from urllib.parse import unquote
+import html
 from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
@@ -37,6 +39,9 @@ def get_posts_storage(request: Request) -> PostsStorage:
 @router.get("/clustered-post/{tag}")
 @router.get("/clustered-post")
 def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsStorage = Depends(get_posts_storage)):
+    # Decode/unescape tag if provided
+    if tag is not None:
+        tag = html.unescape(unquote(tag))
     user = posts_storage._db.users.find_one()
     if not user:
         return {"error": "No users found"}
