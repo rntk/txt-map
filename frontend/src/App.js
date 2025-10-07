@@ -22,7 +22,7 @@ function App() {
     let url;
     console.log(pathParts, apiType );
     if (apiType === 'themed-post') {
-      url = tag ? `http://127.0.0.1:8000/api/themed-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/themed-post?limit=10';
+      url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${tag}?limit=10` : 'http://127.0.0.1:8000/api/math-reasoning-example?limit=10';
     } else {
       // Default to clustered
       url = tag ? `http://127.0.0.1:8000/api/clustered-post/${tag}?limit=10` : 'http://127.0.0.1:8000/api/clustered-post?limit=10';

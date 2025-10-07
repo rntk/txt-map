@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from handlers import themed_post_handler, clustered_post_handler
+from handlers import sgr_topics_handler, themed_post_handler, clustered_post_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 
@@ -11,6 +11,7 @@ app.mount("/static", StaticFiles(directory="frontend/build/static"), name="stati
 
 app.include_router(themed_post_handler.router, prefix="/api")
 app.include_router(clustered_post_handler.router, prefix="/api")
+app.include_router(sgr_topics_handler.router, prefix="/api")
 
 import os
 client = MongoClient(os.getenv("MONGODB_URL", "mongodb://localhost:8765/"))
