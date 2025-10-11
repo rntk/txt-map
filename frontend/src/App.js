@@ -29,7 +29,8 @@ function App() {
     let url;
     console.log(pathParts, apiType, 'limit=', limitParam);
     if (apiType === 'themed-post') {
-      url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/sgr-topics?limit=${limitParam}`;
+      // url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/sgr-topics?limit=${limitParam}`;
+      url = tag ? `http://127.0.0.1:8000/api/themed-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/themed-post?limit=${limitParam}`;
     } else {
       // Default to clustered
       url = tag ? `http://127.0.0.1:8000/api/clustered-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/clustered-post?limit=${limitParam}`;
