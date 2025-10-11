@@ -30,6 +30,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           {sentences.map((sentence, index) => (
             <span
               key={index}
+              id={`sentence-${articleIndex}-${index}`}
+              data-article-index={articleIndex}
+              data-sentence-index={index}
               className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
             >
               {sentence}{' '}

@@ -138,6 +138,80 @@ function App() {
     }
   };
 
+  const navigateTopicSentence = (topic, direction = 'next') => {
+    if (!topic || !topic.name) return;
+    // Build list of targets across all articles
+    const targets = [];
+    articles.forEach((article, aIdx) => {
+      const related = article.topics.find(t => t.name === topic.name);
+      if (related && Array.isArray(related.sentences)) {
+        related.sentences.forEach(num => {
+          const sIdx0 = (num || 1) - 1; // convert to 0-based index
+          targets.push({ aIdx, sIdx0, id: `sentence-${aIdx}-${sIdx0}` });
+        });
+      }
+    });
+    if (targets.length === 0) return;
+    targets.sort((x, y) => x.aIdx - y.aIdx || x.sIdx0 - y.sIdx0);
+
+    // Determine current position relative to targets
+    const viewportTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const viewportBottom = viewportTop + (window.innerHeight || document.documentElement.clientHeight || 0);
+
+    // Find index of the target to go to
+    let targetIndex = -1;
+    if (direction === 'next') {
+      // choose first target whose element top is below current scrollTop + small epsilon
+      for (let i = 0; i < targets.length; i++) {
+        const el = document.getElementById(targets[i].id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const absTop = rect.top + window.scrollY;
+          if (absTop > viewportTop + 4) { // a bit below current top
+            targetIndex = i;
+            break;
+          }
+        }
+      }
+      if (targetIndex === -1) targetIndex = 0; // wrap
+    } else {
+      // prev: choose last target whose bottom is above current scrollTop - epsilon
+      for (let i = targets.length - 1; i >= 0; i--) {
+        const el = document.getElementById(targets[i].id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const absBottom = rect.bottom + window.scrollY;
+          if (absBottom < viewportBottom - (window.innerHeight || 0) + 4) {
+            // effectively above the top
+            if (absBottom < viewportTop - 4) {
+              targetIndex = i;
+              break;
+            }
+          } else if (rect.top + window.scrollY < viewportTop - 4) {
+            targetIndex = i;
+            break;
+          }
+        }
+      }
+      if (targetIndex === -1) targetIndex = targets.length - 1; // wrap
+    }
+
+    const target = targets[targetIndex];
+    if (!target) return;
+    const targetEl = document.getElementById(target.id);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Ensure element is visible; avoid imperatively changing classes to not conflict with React-controlled highlighting
+    } else {
+      // If target element not in DOM yet, scroll to its article first
+      scrollToArticle(target.aIdx);
+      setTimeout(() => {
+        const el2 = document.getElementById(target.id);
+        if (el2) el2.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  };
+
   if (!articles.length) {
     return <div>Loading...</div>;
   }
@@ -157,6 +231,7 @@ function App() {
             showPanel={showPanel}
             panelTopic={panelTopic}
             onToggleShowPanel={toggleShowPanel}
+            onNavigateTopic={navigateTopicSentence}
           />
         </div>
         <div className="right-column">
@@ -238,25 +313,25 @@ function App() {
                     onChange={() => {
                       // Toggle all topics associated with this article
                       const articleTopics = article.topics;
-                      if (articleTopics.some(topic => selectedTopics.includes(topic))) {
-                        // If any topics are already selected, deselect them
-                        setSelectedTopics(prev => 
-                          prev.filter(topic => !articleTopics.some(t => t.name === topic.name))
-                        );
+                      const isAnySelected = articleTopics.some(topic => selectedTopics.some(t => t.name === topic.name));
+                      if (isAnySelected) {
+                        // Deselect all related to this article (by name)
+                        setSelectedTopics(prev => prev.filter(topic => !articleTopics.some(t => t.name === topic.name)));
                       } else {
-                        // Otherwise, select all topics for this article
+                        // Select all topics for this article using canonical topic objects from allTopics
                         setSelectedTopics(prev => {
                           const newTopics = [...prev];
                           articleTopics.forEach(topic => {
-                            if (!newTopics.some(t => t.name === topic.name)) {
-                              newTopics.push(topic);
+                            const canonical = allTopics.find(t => t.name === topic.name) || topic;
+                            if (!newTopics.some(t => t.name === canonical.name)) {
+                              newTopics.push(canonical);
                             }
                           });
                           return newTopics;
                         });
                       }
                     }}
-                    checked={article.topics.some(topic => selectedTopics.includes(topic))}
+                    checked={article.topics.some(topic => selectedTopics.some(t => t.name === topic.name))}
                   />
                   Highlight topics
                 </label>

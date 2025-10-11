@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
-function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead, showPanel, panelTopic, onToggleShowPanel }) {
+function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead, showPanel, panelTopic, onToggleShowPanel, onNavigateTopic }) {
   const [expandedRoots, setExpandedRoots] = useState(new Set());
 
   // Group topics by their root (first word before space or underscore)
@@ -161,6 +161,20 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                           className="show-toggle"
                         >
                           {showPanel && panelTopic === topic ? 'Hide' : 'Show'}
+                        </button>
+                        <button
+                          onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
+                          className="nav-toggle prev-toggle"
+                          title="Scroll to previous sentence for this topic"
+                        >
+                          Prev
+                        </button>
+                        <button
+                          onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
+                          className="nav-toggle next-toggle"
+                          title="Scroll to next sentence for this topic"
+                        >
+                          Next
                         </button>
                       </div>
                     </div>
