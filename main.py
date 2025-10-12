@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from handlers import sgr_topics_handler, themed_post_handler, clustered_post_handler
+from handlers import sgr_topics_handler, themed_post_handler, clustered_post_handler, topics_handler, themed_topic_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 
@@ -12,6 +12,8 @@ app.mount("/static", StaticFiles(directory="frontend/build/static"), name="stati
 app.include_router(themed_post_handler.router, prefix="/api")
 app.include_router(clustered_post_handler.router, prefix="/api")
 app.include_router(sgr_topics_handler.router, prefix="/api")
+app.include_router(topics_handler.router, prefix="/api")
+app.include_router(themed_topic_handler.router, prefix="/api")
 
 import os
 client = MongoClient(os.getenv("MONGODB_URL", "mongodb://localhost:8765/"))
@@ -33,6 +35,18 @@ def serve_clustered_post_page():
 
 @app.get("/page/clustered-post/{tag}")
 def serve_clustered_post_page_with_tag(tag: str):
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/topics")
+def serve_topics_page():
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/themed-topic")
+def serve_themed_topic_page():
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/themed-topic/{topic}")
+def serve_themed_topic_page_with_topic(topic: str):
     return FileResponse("frontend/build/index.html")
 
 if __name__ == "__main__":

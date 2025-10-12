@@ -12,12 +12,15 @@ function App() {
   const [readArticles, setReadArticles] = useState(new Set());
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
+  const [pageType, setPageType] = useState(null); // 'themed-post' | 'clustered-post' | 'topics'
+  const [topics, setTopics] = useState([]);
 
   useEffect(() => {
     const pathname = window.location.pathname;
     const pathParts = pathname.split('/');
-    const apiType = pathParts[2]; // 'clustered' or 'themed'
+    const apiType = pathParts[2]; // 'clustered-post', 'themed-post', or 'topics'
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
+    setPageType(apiType);
 
     // Determine limit from current URL ?limit=, default 10
     const searchParams = new URLSearchParams(window.location.search);
@@ -26,11 +29,25 @@ function App() {
       limitParam = 10;
     }
 
+    // If topics page, fetch topics list and stop
+    if (apiType === 'topics') {
+      const url = `http://127.0.0.1:8000/api/topics?limit=${limitParam}`;
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          // data items: { name, totalPosts, totalSentences }
+          setTopics(data || []);
+        })
+        .catch(error => console.error('Error fetching topics:', error));
+      return;
+    }
+
     let url;
     console.log(pathParts, apiType, 'limit=', limitParam);
     if (apiType === 'themed-post') {
-      // url = tag ? `http://127.0.0.1:8000/api/sgr-topics/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/sgr-topics?limit=${limitParam}`;
       url = tag ? `http://127.0.0.1:8000/api/themed-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/themed-post?limit=${limitParam}`;
+    } else if (apiType === 'themed-topic') {
+      url = tag ? `http://127.0.0.1:8000/api/themed-topic/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/themed-topic?limit=${limitParam}`;
     } else {
       // Default to clustered
       url = tag ? `http://127.0.0.1:8000/api/clustered-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/clustered-post?limit=${limitParam}`;
@@ -42,7 +59,7 @@ function App() {
         setArticles(data);
         // Collect all unique topics with sentence counts
         const topicMap = new Map();
-        data.forEach((article, index) => {
+        data.forEach((article) => {
           article.topics.forEach(topic => {
             if (!topicMap.has(topic.name)) {
               topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
@@ -211,6 +228,54 @@ function App() {
       }, 100);
     }
   };
+
+  // Loading state handling
+  if (pageType === 'topics') {
+    if (!topics.length) {
+      return <div>Loading...</div>;
+    }
+    // Word cloud rendering
+    const totals = topics.map(t => t.totalPosts || 0);
+    const min = Math.min(...totals, 0);
+    const max = Math.max(...totals, 1);
+    const scale = (val) => {
+      // font size between 12 and 40 px
+      const minSize = 12;
+      const maxSize = 40;
+      const ratio = max === min ? 0.5 : (val - min) / (max - min);
+      return Math.round(minSize + ratio * (maxSize - minSize));
+    };
+    return (
+      <div className="app">
+        <div className="container">
+          <div className="right-column" style={{ width: '100%' }}>
+            <h1>Topics Cloud</h1>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {topics.map((t) => {
+                const fontSize = scale(t.totalPosts || t.totalSentences || 0);
+                const href = `/page/themed-topic/${encodeURIComponent(t.name)}`;
+                return (
+                  <a
+                    key={t.name}
+                    href={href}
+                    title={`${t.name} • Posts: ${t.totalPosts ?? 0} • Sentences: ${t.totalSentences ?? 0}`}
+                    style={{
+                      fontSize: `${fontSize}px`,
+                      lineHeight: 1.1,
+                      textDecoration: 'none',
+                      color: '#3366cc',
+                    }}
+                  >
+                    {t.name}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!articles.length) {
     return <div>Loading...</div>;
