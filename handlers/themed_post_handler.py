@@ -95,7 +95,7 @@ def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorag
         llm = LLamaCPP("http://192.168.178.26:8989")
         #llm = LLamaCPP("http://127.0.0.1:8989")
 
-        focus = f"Focus on the theme '{tag}' when grouping the sentences. \n" if tag else ""
+        focus = f"Focus on the theme '{tag}' when grouping the sentences. But do not ignore other potential themes.\n" if tag else ""
         prompt = f"""
 Group the following sentences by topic/theme. 
 For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
@@ -105,13 +105,16 @@ Guidelines for topic naming:
 - Use concise topic names that capture the core theme without unnecessary elaboration.
 - Aim for 3-7 topics in total, merging similar themes where possible to avoid fragmentation.
 - If a sentence doesn't fit any clear topic, group it under 'no_topic'.
+- Use the exact sentence numbers as provided (e.g., if the text lists "1.", "2.", etc., use those numbers in your output).
+- Merge closely related themes into a single topic if they strongly overlap.
+- Avoid creating multiple topics that differ only slightly in phrasing.
 
-Output format:
+Output your result **exactly** in the following format (without additional text):
 topic_1: 1,3
 topic_2: 2,4
 no_topic: 5
 
-{focus}But do not ignore other potential themes.
+{focus}
 
 Sentences:
 {numbered_text}
