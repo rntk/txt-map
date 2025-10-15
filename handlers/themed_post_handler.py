@@ -97,22 +97,25 @@ def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorag
 
         focus = f"Focus on the theme '{tag}' when grouping the sentences. But do not ignore other potential themes.\n" if tag else ""
         prompt = f"""
-Group the following sentences by topic/theme. 
-For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
+Group the following sentences into a hierarchy of chapters and subchapters.
+- First, determine a small set of main, general chapters that summarize the article's high-level themes.
+- Then, under each main chapter, create more detailed subchapters that are specific and coherent.
 
-Guidelines for topic naming:
-- Keep topics specific but not overly detailed. Prefer more specific terms over general ones (e.g., if sentences mention both "sport" and "hockey", use "hockey" as the topic).
-- Use concise topic names that capture the core theme without unnecessary elaboration.
-- Aim for 3-7 topics in total, merging similar themes where possible to avoid fragmentation.
-- If a sentence doesn't fit any clear topic, group it under 'no_topic'.
-- Use the exact sentence numbers as provided (e.g., if the text lists "1.", "2.", etc., use those numbers in your output).
-- Merge closely related themes into a single topic if they strongly overlap.
-- Avoid creating multiple topics that differ only slightly in phrasing.
-
-Output your result **exactly** in the following format (without additional text):
-topic_1: 1,3
-topic_2: 2,4
+Output format MUST remain exactly as following (no extra text):
+<topic_name>: <comma-separated sentence numbers>
+Examples:
+Sport - Hockey: 1,3
+Travel - Budget Tips: 2,4
 no_topic: 5
+
+Important instructions:
+- Encode hierarchy in the topic name using "Chapter - Subchapter" (use a hyphen and a single space on both sides). Do NOT use a colon in topic names because the colon separates the name from the numbers.
+- Keep chapters general and subchapters specific; merge closely related themes to avoid fragmentation.
+- Aim for 3-7 main chapters total. You may have multiple subchapters per chapter.
+- Every line must map a topic (chapter or chapter - subchapter) to sentence numbers.
+- Use the exact sentence numbers as provided (e.g., if the text lists "1.", "2.", etc., use those numbers in your output).
+- If a sentence doesn't fit any clear topic, assign it to 'no_topic'.
+- Avoid creating multiple topics that differ only slightly in phrasing.
 
 {focus}
 
