@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopicList from '../frontend/src/components/TopicList';
 import TextDisplay from '../frontend/src/components/TextDisplay';
 import '../frontend/src/styles/App.css';
@@ -13,39 +13,86 @@ function ExtensionApp() {
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use refs to track if component is mounted
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    // Listen for data from content script
-    const handleMessage = (event) => {
-      if (event.data.type === 'RSSTAG_DATA') {
-        console.log('Received data in overlay:', event.data.data);
-        const data = [event.data.data]; // Wrap single article in array
-        setArticles(data);
+  // Define handler with useCallback
+  const handleMessage = useCallback((event) => {
+    if (!isMountedRef.current) return;
+    
+    console.log('Message received:', event.data?.type);
+    
+    if (event.data?.type === 'RSSTAG_DATA') {
+      try {
+        console.log('Processing RSSTAG_DATA:', event.data.data);
+        const apiData = event.data.data;
+        
+        if (!isMountedRef.current) return;
+        
+        // Ensure data has required fields
+        if (!apiData || !Array.isArray(apiData.sentences)) {
+          console.error('Invalid data structure - missing sentences:', apiData);
+          setLoading(false);
+          return;
+        }
+        
+        if (!Array.isArray(apiData.topics)) {
+          console.error('Invalid data structure - missing topics:', apiData);
+          setLoading(false);
+          return;
+        }
+        
+        const data = [apiData]; // Wrap single article in array
         
         // Collect all unique topics with sentence counts
         const topicMap = new Map();
         data.forEach((article, index) => {
-          article.topics.forEach(topic => {
-            if (!topicMap.has(topic.name)) {
-              topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
-            } else {
-              // Add to existing topic's sentence count
-              const existing = topicMap.get(topic.name);
-              existing.totalSentences += topic.sentences.length;
-            }
-          });
+          if (article.topics && Array.isArray(article.topics)) {
+            article.topics.forEach(topic => {
+              if (topic && topic.name && Array.isArray(topic.sentences)) {
+                if (!topicMap.has(topic.name)) {
+                  topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
+                } else {
+                  // Add to existing topic's sentence count
+                  const existing = topicMap.get(topic.name);
+                  existing.totalSentences += topic.sentences.length;
+                }
+              }
+            });
+          }
         });
-        setAllTopics(Array.from(topicMap.values()));
-        setLoading(false);
+        
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
+          setArticles(data);
+          setAllTopics(Array.from(topicMap.values()));
+          console.log('Data processing complete, state updated');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error processing data:', error, error.stack);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
-    };
+    }
+  }, []);
 
+  useEffect(() => {
+    console.log('ExtensionApp mounted');
+    isMountedRef.current = true;
+    
+    // Add listener
     window.addEventListener('message', handleMessage);
+    console.log('Message listener attached');
     
     return () => {
+      console.log('ExtensionApp cleanup - removing listener');
+      isMountedRef.current = false;
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [handleMessage]);
 
   const toggleTopic = (topic) => {
     setSelectedTopics(prev => 

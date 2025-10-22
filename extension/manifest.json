@@ -6,6 +6,7 @@
   "permissions": [
     "activeTab",
     "tabs",
+    "storage",
     "notifications",
     "<all_urls>",
     "http://127.0.0.1:8000/*",
@@ -29,6 +30,8 @@
     }
   ],
   "web_accessible_resources": [
+    "results.html",
+    "results-loader.js",
     "overlay.html",
     "app-bundle.js",
     "app-bundle.css"

@@ -230,8 +230,8 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     numbered_text = '\n'.join(numbered_sentences)
 
     # LLM client
-    llm = LLamaCPP("http://192.168.178.26:8989")
-    #llm = LLamaCPP("http://127.0.0.1:8989")
+    #llm = LLamaCPP("http://192.168.178.26:8989")
+    llm = LLamaCPP("http://127.0.0.1:8989")
 
     prompt = f"""
 Group the following sentences by topic/theme. 

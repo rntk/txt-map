@@ -20,7 +20,7 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      z-index: 10000;
+      z-index: 999999;
       background: #ff4444;
       color: white;
       border: none;
@@ -33,6 +33,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      pointer-events: auto;
     }
     
     #close-button:hover {
@@ -53,9 +54,28 @@
   <script src="app-bundle.js"></script>
   <script>
     // Close button handler
-    document.getElementById('close-button').addEventListener('click', () => {
-      window.parent.postMessage({ type: 'RSSTAG_CLOSE' }, '*');
-    });
+    const closeButton = document.getElementById('close-button');
+    console.log('Close button element:', closeButton);
+    
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        console.log('Close button clicked', e);
+        console.log('Sending RSSTAG_CLOSE message to parent');
+        console.log('window.parent:', window.parent);
+        console.log('window.top:', window.top);
+        
+        // Try both parent and top
+        if (window.parent) {
+          window.parent.postMessage({ type: 'RSSTAG_CLOSE' }, '*');
+        }
+        if (window.top && window.top !== window.parent) {
+          window.top.postMessage({ type: 'RSSTAG_CLOSE' }, '*');
+        }
+      });
+      console.log('Close button event listener attached');
+    } else {
+      console.error('Close button not found!');
+    }
   </script>
 </body>
 </html>

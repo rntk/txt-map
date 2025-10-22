@@ -7,11 +7,12 @@ A Firefox extension that analyzes the content of any web page and extracts topic
 - Click the extension icon to analyze the current page
 - Extracts all text content from the page
 - Sends content to the local API for theme analysis
-- Displays results in a full-page overlay with:
+- Opens results in a new browser tab with:
   - Topic list on the left
   - Full text with highlighted topics on the right
   - Interactive topic filtering and selection
   - Mark topics and articles as read
+- No modification to the original page content
 
 ## Installation
 
@@ -56,20 +57,21 @@ A Firefox extension that analyzes the content of any web page and extracts topic
 1. Navigate to any web page you want to analyze
 2. Click the extension icon in the toolbar
 3. Wait for the analysis to complete
-4. An overlay will appear showing:
+4. A new tab will open showing:
    - Topics extracted from the page (left panel)
    - The full content with interactive highlighting (right panel)
 5. Click topics to highlight them in the text
-6. Click the red × button to close the overlay
+6. Close the tab when finished
 
 ## Architecture
 
 ### Files
 
 - **manifest.json**: Extension configuration and permissions
-- **background.js**: Handles extension icon clicks
-- **content.js**: Extracts page content and creates overlay
-- **overlay.html**: Full-page overlay container
+- **background.js**: Handles extension icon clicks and opens results tab
+- **content.js**: Extracts page content and calls API
+- **results.html**: Standalone results page (opens in new tab)
+- **overlay.html**: Legacy overlay (kept for compatibility)
 - **ExtensionApp.js**: Modified React app for extension use
 - **index.js**: React app entry point
 - **webpack.config.js**: Bundles React app for extension
@@ -82,8 +84,11 @@ A Firefox extension that analyzes the content of any web page and extracts topic
 3. content.js extracts page content
 4. content.js sends POST to `/api/themed-post`
 5. API returns analyzed data (sentences + topics)
-6. content.js creates iframe overlay
-7. ExtensionApp renders the UI with the data
+6. content.js sends results to background.js
+7. background.js stores results in local storage
+8. background.js opens results.html in new tab
+9. results.html loads data from storage and displays it
+10. ExtensionApp renders the UI with the data
 
 ## Development
 
@@ -134,5 +139,7 @@ Response:
 
 - The extension uses the React components from `../frontend/src`
 - All styling is inherited from the main app's CSS
-- The overlay runs in an isolated iframe for security
+- The results page runs in a separate tab, avoiding any interference with the original page
+- Results are stored temporarily in browser local storage (cleared after loading)
 - Extension only works on http/https pages (not on about: or file: URLs)
+- Results expire after 5 minutes for security

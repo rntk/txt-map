@@ -9,7 +9,7 @@ browser.browserAction.onClicked.addListener((tab) => {
     return;
   }
 
-  // Send message to content script
+  // Send message to content script to extract content
   sendMessageWithRetry(tab.id, { action: "extractContent" }, 3);
 });
 
@@ -31,6 +31,29 @@ function sendMessageWithRetry(tabId, message, retriesLeft) {
       }
     });
 }
+
+// Listen for messages from content script with API results
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "openResultsTab") {
+    // Store the API results in local storage
+    browser.storage.local.set({ 
+      analysisResults: message.data,
+      timestamp: Date.now()
+    }).then(() => {
+      // Open results page in new tab
+      browser.tabs.create({
+        url: browser.runtime.getURL('results.html'),
+        active: true
+      }).then(() => {
+        sendResponse({ status: "tab_opened" });
+      });
+    }).catch(error => {
+      console.error("Error storing results:", error);
+      sendResponse({ status: "error", error: error.message });
+    });
+    return true; // Keep message channel open for async response
+  }
+});
 
 // Cross-browser notification helper
 function showNotification(title, message) {
