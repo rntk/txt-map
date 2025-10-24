@@ -218,7 +218,7 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     text = reg.sub(" ", text)
     text = text.strip()
 
-    # Split text into words and add markers
+    # Split text into words and add numbered markers
     words = text.split()
     if not words:
         return {"sentences": [], "topics": []}
@@ -226,8 +226,8 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     print(f"\n=== DEBUG: Total words: {len(words)} ===")
     print(f"First 10 words: {words[:10]}")
     
-    # Create marked text with numbered boundary markers between each word
-    # Using |#N#| format where N is the position number
+    # Create marked text with numbered markers between each word
+    # Using |#N#| format where N is the position number (0-indexed positions between words)
     marked_parts = []
     for i, word in enumerate(words):
         marked_parts.append(word)
@@ -243,185 +243,129 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     #llm = LLamaCPP("http://192.168.178.26:8989")
     llm = LLamaCPP("http://127.0.0.1:8989")
 
-    # Step 1: Ask LLM to identify sentence boundaries
-    sentence_split_prompt = f"""
+    # Ask LLM to group text by topics and provide sentence boundaries
+    prompt = f"""
 You are given text where words are separated by numbered markers in the format |#N#| (where N is the position number).
-Your task is to identify where sentence boundaries should be placed.
 
-Output ONLY the marker numbers where a sentence should END, separated by commas.
-For example, if sentence 1 ends after marker |#5#| and sentence 2 ends after marker |#10#|, output: 5,10
+Your task is to:
+1. Identify topics/themes in the text
+2. For each topic, specify which parts of the text belong to it by listing the marker numbers where sentences START and END
 
-Important:
-- The markers already contain their position numbers - just copy those numbers to your output
-- Only output numbers separated by commas, nothing else
-- A sentence typically ends after words with periods, question marks, or exclamation points
-- The last sentence should end at the final marker
+Output format (one topic per line):
+topic_name: start1-end1, start2-end2, start3-end3
+
+Example:
+hockey: 0-5, 12-18
+travel: 6-11
+no_topic: 19-25
+
+Important instructions:
+- Use the marker numbers that are already in the text (e.g., |#5#| means marker 5)
+- Each range is start-end (inclusive). A range "0-5" means from the beginning to marker |#5#|
+- Use 0 as the start marker for text that begins at the start of the document
+- Use the last marker number for text that extends to the end
+- Keep topics specific but not overly detailed
+- Aim for 3-7 topics total, merging similar themes where possible
+- If text doesn't fit any clear topic, assign it to 'no_topic'
+- Ranges for the same topic can be non-contiguous (separated by commas)
 
 Text with numbered markers:
 {marked_text}
 """
 
     # Create a hash of the prompt for caching
-    split_prompt_hash = hashlib.md5(sentence_split_prompt.encode()).hexdigest()
-
-    # Check if we have a cached response for sentence splitting
-    cache_collection = posts_storage._db.llm_cache
-    cached_split_response = cache_collection.find_one({"prompt_hash": split_prompt_hash})
-
-    if cached_split_response:
-        split_response = cached_split_response["response"]
-        print("\n=== DEBUG: Using CACHED sentence split response ===")
-    else:
-        print("\n=== DEBUG: Making NEW LLM call for sentence splitting ===")
-        split_response = llm.call([sentence_split_prompt])
-        cache_collection.update_one(
-            {"prompt_hash": split_prompt_hash},
-            {"$set": {
-                "prompt_hash": split_prompt_hash,
-                "prompt": sentence_split_prompt,
-                "response": split_response,
-                "created_at": datetime.datetime.now()
-            }},
-            upsert=True
-        )
-
-    print(f"\n=== DEBUG: LLM sentence split response ===")
-    print(split_response)
-
-    # Parse boundary positions
-    boundary_positions = []
-    split_response_clean = split_response.strip()
-    for num in split_response_clean.split(','):
-        num = num.strip()
-        if num.isdigit():
-            boundary_positions.append(int(num))
-    
-    # Sort and ensure boundaries are valid
-    boundary_positions = sorted(set(boundary_positions))
-    
-    print(f"\n=== DEBUG: Parsed boundary positions ===")
-    print(f"Boundaries: {boundary_positions}")
-    
-    # Build sentences from boundaries
-    sentences = []
-    start_pos = 0
-    for end_pos in boundary_positions:
-        if end_pos <= len(words) and end_pos > start_pos:
-            sentence_words = words[start_pos:end_pos]
-            sentences.append(" ".join(sentence_words))
-            start_pos = end_pos
-    
-    # Add any remaining words as the last sentence
-    if start_pos < len(words):
-        sentences.append(" ".join(words[start_pos:]))
-    
-    # Filter empty sentences
-    sentences = [s.strip() for s in sentences if s.strip()]
-    
-    print(f"\n=== DEBUG: Built {len(sentences)} sentences ===")
-    for i, sent in enumerate(sentences[:5]):  # Show first 5 sentences
-        print(f"Sentence {i+1}: {sent[:100]}{'...' if len(sent) > 100 else ''}")
-    if len(sentences) > 5:
-        print(f"... and {len(sentences) - 5} more sentences")
-    
-    if not sentences:
-        return {"sentences": [], "topics": []}
-
-    # Step 2: Now group sentences by topic
-    numbered_sentences = [f"{i+1}. {s}" for i, s in enumerate(sentences)]
-    numbered_text = '\n'.join(numbered_sentences)
-
-    print(f"\n=== DEBUG: Numbered text for topic grouping (first 500 chars) ===")
-    print(numbered_text[:500])
-
-    topic_prompt = f"""
-Group the following sentences by topic/theme. 
-For each topic, write the topic name followed by a colon and the list of sentence numbers separated by commas.
-
-Guidelines for topic naming:
-- Keep topics specific but not overly detailed. Prefer more specific terms over general ones (e.g., if sentences mention both "sport" and "hockey", use "hockey" as the topic).
-- Use concise topic names that capture the core theme without unnecessary elaboration.
-- Aim for 3-7 topics in total, merging similar themes where possible to avoid fragmentation.
-- If a sentence doesn't fit any clear topic, group it under 'no_topic'.
-
-Output format:
-topic_1: 1,3
-topic_2: 2,4
-no_topic: 5
-
-Sentences:
-{numbered_text}
-"""
-
-    # Create a hash of the prompt for caching
-    topic_prompt_hash = hashlib.md5(topic_prompt.encode()).hexdigest()
+    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
 
     # Check if we have a cached response
-    cached_topic_response = cache_collection.find_one({"prompt_hash": topic_prompt_hash})
+    cache_collection = posts_storage._db.llm_cache
+    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
 
-    if cached_topic_response:
-        response = cached_topic_response["response"]
-        print("\n=== DEBUG: Using CACHED topic grouping response ===")
+    if cached_response:
+        response = cached_response["response"]
+        print("\n=== DEBUG: Using CACHED response ===")
     else:
-        print("\n=== DEBUG: Making NEW LLM call for topic grouping ===")
-        response = llm.call([topic_prompt])
+        print("\n=== DEBUG: Making NEW LLM call ===")
+        response = llm.call([prompt])
         cache_collection.update_one(
-            {"prompt_hash": topic_prompt_hash},
+            {"prompt_hash": prompt_hash},
             {"$set": {
-                "prompt_hash": topic_prompt_hash,
-                "prompt": topic_prompt,
+                "prompt_hash": prompt_hash,
+                "prompt": prompt,
                 "response": response,
                 "created_at": datetime.datetime.now()
             }},
             upsert=True
         )
 
-    print(f"\n=== DEBUG: LLM topic grouping response ===")
+    print(f"\n=== DEBUG: LLM response ===")
     print(response)
 
-    # Parse response
+    # Parse response to extract topics and sentence ranges
     topics = []
-    normalized_topics_map = {}  # Dictionary to track normalized topic names
-    assigned_sentences = set()
+    normalized_topics_map = {}
+    all_ranges = []  # Collect all ranges to build sentences later
+    
     for line in response.strip().split('\n'):
         if ':' in line:
-            topic_name, nums = line.split(':', 1)
+            topic_name, ranges_str = line.split(':', 1)
             topic_name = topic_name.strip()
-            # Normalize the topic name
             normalized_name = normalize_topic(topic_name)
-            nums = [int(n.strip()) for n in nums.split(',') if n.strip().isdigit()]
+            
+            # Parse ranges (e.g., "0-5, 12-18")
+            ranges = []
+            for range_str in ranges_str.split(','):
+                range_str = range_str.strip()
+                if '-' in range_str:
+                    parts = range_str.split('-')
+                    if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                        start = int(parts[0].strip())
+                        end = int(parts[1].strip())
+                        ranges.append((start, end))
+                        all_ranges.append((start, end))
+            
+            if ranges:
+                # Check if this normalized topic already exists
+                if normalized_name in normalized_topics_map:
+                    # Add ranges to existing topic
+                    existing_topic_index = normalized_topics_map[normalized_name]
+                    topics[existing_topic_index]["ranges"].extend(ranges)
+                else:
+                    # Create new topic
+                    topic = {"name": normalized_name, "ranges": ranges}
+                    topics.append(topic)
+                    normalized_topics_map[normalized_name] = len(topics) - 1
 
-            # Check if this normalized topic already exists
-            if normalized_name in normalized_topics_map:
-                # Add sentences to existing topic
-                existing_topic_index = normalized_topics_map[normalized_name]
-                topics[existing_topic_index]["sentences"].extend(nums)
-                topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
-            else:
-                # Create new topic with normalized name
-                topic = {"name": normalized_name, "sentences": nums}
-                topics.append(topic)
-                normalized_topics_map[normalized_name] = len(topics) - 1
-
-            assigned_sentences.update(nums)
-
-    # Check for unassigned sentences and add to "no_topic"
-    total_sentences = len(sentences)
-    unassigned = [i+1 for i in range(total_sentences) if i+1 not in assigned_sentences]
-    if unassigned:
-        # Check if "no_topic" already exists
-        normalized_no_topic = normalize_topic("no_topic")
-        if normalized_no_topic in normalized_topics_map:
-            # Add sentences to existing no_topic
-            existing_topic_index = normalized_topics_map[normalized_no_topic]
-            topics[existing_topic_index]["sentences"].extend(unassigned)
-            topics[existing_topic_index]["sentences"] = sorted(list(set(topics[existing_topic_index]["sentences"])))
-        else:
-            # Create new no_topic
-            no_topic = {"name": normalized_no_topic, "sentences": sorted(unassigned)}
-            topics.append(no_topic)
-            normalized_topics_map[normalized_no_topic] = len(topics) - 1
-
+    # Build sentences from all unique ranges
+    unique_ranges = sorted(set(all_ranges))
+    sentences = []
+    sentence_range_map = {}  # Map sentence index to its range
+    
+    for start, end in unique_ranges:
+        if start <= len(words) and end <= len(words) and start < end:
+            sentence_words = words[start:end]
+            sentence = " ".join(sentence_words)
+            if sentence.strip():
+                sentence_idx = len(sentences)
+                sentences.append(sentence.strip())
+                sentence_range_map[sentence_idx] = (start, end)
+    
+    # Convert topic ranges to sentence indices
+    for topic in topics:
+        sentence_indices = []
+        for topic_range in topic["ranges"]:
+            # Find which sentences correspond to this range
+            for sent_idx, sent_range in sentence_range_map.items():
+                if sent_range == topic_range:
+                    sentence_indices.append(sent_idx + 1)  # 1-indexed for output
+        topic["sentences"] = sorted(list(set(sentence_indices)))
+        del topic["ranges"]  # Remove the ranges, keep only sentence numbers
+    
+    print(f"\n=== DEBUG: Built {len(sentences)} sentences ===")
+    for i, sent in enumerate(sentences[:5]):
+        print(f"Sentence {i+1}: {sent[:100]}{'...' if len(sent) > 100 else ''}")
+    if len(sentences) > 5:
+        print(f"... and {len(sentences) - 5} more sentences")
+    
     print(f"\n=== DEBUG: Final topics ===")
     for topic in topics:
         print(f"Topic '{topic['name']}': sentences {topic['sentences']}")
