@@ -5,10 +5,15 @@ from urllib.parse import urlparse
 from http.client import HTTPConnection, HTTPSConnection
 
 class LLamaCPP:
-    def __init__(self, host: str):
+    def __init__(self, host: str, max_context_tokens: int = 11000):
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
+        self.__max_context_tokens = max_context_tokens  # Leave some buffer from the actual context size
+
+    def estimate_tokens(self, text: str) -> int:
+        """Rough estimation: ~4 characters per token on average"""
+        return len(text) // 4
 
     def call(self, user_msgs: List[str], temperature: float=0.0) -> str:
         conn = self.get_connection()

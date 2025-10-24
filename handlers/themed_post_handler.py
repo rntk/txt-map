@@ -96,8 +96,8 @@ def get_themed_post(tag: str = None, limit: int = 10, posts_storage: PostsStorag
         #llm = LLamaCPP("http://127.0.0.1:8989")
 
         focus = f"Focus on the theme '{tag}' when grouping the sentences. But do not ignore other potential themes.\n" if tag else ""
-        prompt = f"""
-Group the following sentences into a hierarchy of chapters and subchapters.
+        
+        prompt_template = """Group the following sentences into a hierarchy of chapters and subchapters.
 - First, determine a small set of main, general chapters that summarize the article's high-level themes.
 - Then, under each main chapter, create more detailed subchapters that are specific and coherent.
 
@@ -117,43 +117,89 @@ Important instructions:
 - If a sentence doesn't fit any clear topic, assign it to 'no_topic'.
 - Avoid creating multiple topics that differ only slightly in phrasing.
 
-{focus}
+{focus_text}
 
 Sentences:
-{numbered_text}
-"""
+{sentences_text}"""
 
-        # Create a hash of the prompt for caching
-        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
-
-        # Check if we have a cached response
-        cache_collection = posts_storage._db.llm_cache
-        cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
-
-        if cached_response:
-            # Use cached response
-            response = cached_response["response"]
+        # Calculate token budget
+        template_tokens = llm.estimate_tokens(prompt_template.replace("{focus_text}", focus).replace("{sentences_text}", ""))
+        max_text_tokens = llm._LLamaCPP__max_context_tokens - template_tokens - 500
+        
+        # Check if we need to chunk
+        estimated_text_tokens = llm.estimate_tokens(numbered_text)
+        
+        chunks = []
+        chunk_sentence_ranges = []  # Track which sentence indices belong to each chunk
+        
+        if estimated_text_tokens <= max_text_tokens:
+            chunks = [numbered_text]
+            chunk_sentence_ranges = [(0, len(sentences))]
         else:
-            # Make LLM call and cache the result
-            response = llm.call([prompt])
+            # Split sentences into chunks
+            current_chunk_sentences = []
+            current_chunk_size = 0
+            chunk_start_idx = 0
+            
+            for i, sent in enumerate(numbered_sentences):
+                sent_tokens = llm.estimate_tokens(sent)
+                
+                if current_chunk_size + sent_tokens > max_text_tokens and current_chunk_sentences:
+                    # Save current chunk
+                    chunks.append('\n'.join(current_chunk_sentences))
+                    chunk_sentence_ranges.append((chunk_start_idx, chunk_start_idx + len(current_chunk_sentences)))
+                    
+                    # Start new chunk
+                    current_chunk_sentences = [sent]
+                    current_chunk_size = sent_tokens
+                    chunk_start_idx = i
+                else:
+                    current_chunk_sentences.append(sent)
+                    current_chunk_size += sent_tokens
+            
+            # Add last chunk
+            if current_chunk_sentences:
+                chunks.append('\n'.join(current_chunk_sentences))
+                chunk_sentence_ranges.append((chunk_start_idx, chunk_start_idx + len(current_chunk_sentences)))
+        
+        # Process each chunk
+        all_responses = []
+        cache_collection = posts_storage._db.llm_cache
+        
+        for chunk_idx, (chunk, (start_idx, end_idx)) in enumerate(zip(chunks, chunk_sentence_ranges)):
+            prompt = prompt_template.replace("{focus_text}", focus).replace("{sentences_text}", chunk)
+            prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+            
+            cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+            
+            if cached_response:
+                response = cached_response["response"]
+            else:
+                response = llm.call([prompt])
+                cache_collection.update_one(
+                    {"prompt_hash": prompt_hash},
+                    {"$set": {
+                        "prompt_hash": prompt_hash,
+                        "prompt": prompt,
+                        "response": response,
+                        "created_at": datetime.datetime.now()
+                    }},
+                    upsert=True
+                )
+            
+            all_responses.append(response)
+        
+        # Combine responses
+        combined_response = "\n".join(all_responses)
 
-            # Store in cache (using upsert to avoid duplicates)
-            cache_collection.update_one(
-                {"prompt_hash": prompt_hash},
-                {"$set": {
-                    "prompt_hash": prompt_hash,
-                    "prompt": prompt,
-                    "response": response,
-                    "created_at": datetime.datetime.now()
-                }},
-                upsert=True
-            )
+        # Combine responses
+        combined_response = "\n".join(all_responses)
 
         # Parse response
         topics = []
         normalized_topics_map = {}  # Dictionary to track normalized topic names
         assigned_sentences = set()
-        for line in response.strip().split('\n'):
+        for line in combined_response.strip().split('\n'):
             if ':' in line:
                 topic_name, nums = line.split(':', 1)
                 topic_name = topic_name.strip()
@@ -240,12 +286,11 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     print(f"... (total length: {len(marked_text)} chars)")
     
     # LLM client
-    #llm = LLamaCPP("http://192.168.178.26:8989")
-    llm = LLamaCPP("http://127.0.0.1:8989")
+    llm = LLamaCPP("http://192.168.178.26:8989", max_context_tokens=32000)
+    #llm = LLamaCPP("http://127.0.0.1:8989")
 
-    # Ask LLM to group text by topics and provide sentence boundaries
-    prompt = f"""
-You are given text where words are separated by numbered markers in the format |#N#| (where N is the position number).
+    # Define the prompt template
+    prompt_template = """You are given text where words are separated by numbered markers in the format |#N#| (where N is the position number).
 
 Your task is to:
 1. Identify topics/themes in the text
@@ -270,42 +315,104 @@ Important instructions:
 - Ranges for the same topic can be non-contiguous (separated by commas)
 
 Text with numbered markers:
-{marked_text}
-"""
+{text_chunk}"""
 
-    # Create a hash of the prompt for caching
-    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
-
-    # Check if we have a cached response
-    cache_collection = posts_storage._db.llm_cache
-    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
-
-    if cached_response:
-        response = cached_response["response"]
-        print("\n=== DEBUG: Using CACHED response ===")
+    # Calculate how much space we have for text (leaving room for the prompt template)
+    template_tokens = llm.estimate_tokens(prompt_template.replace("{text_chunk}", ""))
+    max_text_tokens = llm._LLamaCPP__max_context_tokens - template_tokens - 500  # 500 token buffer for response
+    
+    # Split marked_text into chunks if needed
+    estimated_text_tokens = llm.estimate_tokens(marked_text)
+    print(f"\n=== DEBUG: Estimated tokens - template: {template_tokens}, text: {estimated_text_tokens}, max for text: {max_text_tokens} ===")
+    
+    chunks = []
+    if estimated_text_tokens <= max_text_tokens:
+        # Text fits in one chunk
+        chunks = [marked_text]
+        print(f"=== DEBUG: Text fits in one chunk ===")
     else:
-        print("\n=== DEBUG: Making NEW LLM call ===")
-        response = llm.call([prompt])
-        cache_collection.update_one(
-            {"prompt_hash": prompt_hash},
-            {"$set": {
-                "prompt_hash": prompt_hash,
-                "prompt": prompt,
-                "response": response,
-                "created_at": datetime.datetime.now()
-            }},
-            upsert=True
-        )
-
-    print(f"\n=== DEBUG: LLM response ===")
-    print(response)
+        # Need to split text into chunks
+        # Calculate chunk size in characters (rough approximation)
+        chunk_char_size = max_text_tokens * 4  # ~4 chars per token
+        
+        # Split by markers to ensure we don't break markers
+        marker_positions = []
+        i = 0
+        while True:
+            pos = marked_text.find('|#', i)
+            if pos == -1:
+                break
+            marker_positions.append(pos)
+            i = pos + 1
+        
+        print(f"=== DEBUG: Found {len(marker_positions)} markers, need to split into chunks ===")
+        
+        # Create chunks based on character size, but split at marker boundaries
+        current_chunk_start = 0
+        chunk_start_marker_idx = 0
+        
+        for i, marker_pos in enumerate(marker_positions):
+            if marker_pos - current_chunk_start >= chunk_char_size:
+                # Time to create a chunk
+                chunk = marked_text[current_chunk_start:marker_pos].strip()
+                if chunk:
+                    chunks.append(chunk)
+                    print(f"=== DEBUG: Created chunk {len(chunks)}: {len(chunk)} chars, markers {chunk_start_marker_idx} to ~{i} ===")
+                current_chunk_start = marker_pos
+                chunk_start_marker_idx = i
+        
+        # Add the last chunk
+        if current_chunk_start < len(marked_text):
+            chunk = marked_text[current_chunk_start:].strip()
+            if chunk:
+                chunks.append(chunk)
+                print(f"=== DEBUG: Created final chunk {len(chunks)}: {len(chunk)} chars ===")
+    
+    print(f"\n=== DEBUG: Processing {len(chunks)} chunk(s) ===")
+    
+    # Process each chunk and collect responses
+    all_responses = []
+    cache_collection = posts_storage._db.llm_cache
+    
+    for chunk_idx, chunk in enumerate(chunks):
+        prompt = prompt_template.replace("{text_chunk}", chunk)
+        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+        
+        # Check cache
+        cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+        
+        if cached_response:
+            response = cached_response["response"]
+            print(f"\n=== DEBUG: Chunk {chunk_idx + 1}/{len(chunks)} - Using CACHED response ===")
+        else:
+            print(f"\n=== DEBUG: Chunk {chunk_idx + 1}/{len(chunks)} - Making NEW LLM call ===")
+            response = llm.call([prompt])
+            cache_collection.update_one(
+                {"prompt_hash": prompt_hash},
+                {"$set": {
+                    "prompt_hash": prompt_hash,
+                    "prompt": prompt,
+                    "response": response,
+                    "created_at": datetime.datetime.now()
+                }},
+                upsert=True
+            )
+        
+        print(f"=== DEBUG: Chunk {chunk_idx + 1} response (first 200 chars): {response[:200]} ===")
+        all_responses.append(response)
+    
+    # Combine all responses
+    combined_response = "\n".join(all_responses)
+    print(f"\n=== DEBUG: Combined LLM response from {len(chunks)} chunk(s) ===")
+    print(combined_response)
 
     # Parse response to extract topics and sentence ranges
     topics = []
     normalized_topics_map = {}
     all_ranges = []  # Collect all ranges to build sentences later
     
-    for line in response.strip().split('\n'):
+    # Process the combined response from all chunks
+    for line in combined_response.strip().split('\n'):
         if ':' in line:
             topic_name, ranges_str = line.split(':', 1)
             topic_name = topic_name.strip()
