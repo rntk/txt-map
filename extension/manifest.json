@@ -26,6 +26,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "css": ["content.css"],
       "run_at": "document_idle"
     }
   ],
@@ -33,8 +34,11 @@
     "results.html",
     "results-loader.js",
     "overlay.html",
+    "overlay.js",
     "app-bundle.js",
-    "app-bundle.css"
+    "app-bundle.css",
+    "overlay.css",
+    "results.css"
   ],
   "icons": {
     "48": "icons/icon-48.png",

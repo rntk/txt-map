@@ -170,11 +170,11 @@ function ExtensionApp() {
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', fontSize: '18px' }}>Loading and analyzing page content...</div>;
+    return <div className="page-message">Loading and analyzing page content...</div>;
   }
 
   if (!articles.length) {
-    return <div style={{ padding: '20px', fontSize: '18px' }}>No content to analyze.</div>;
+    return <div className="page-message">No content to analyze.</div>;
   }
 
   return (
