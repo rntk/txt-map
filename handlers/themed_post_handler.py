@@ -238,10 +238,12 @@ Sentences:
                 topics.append(no_topic)
                 normalized_topics_map[normalized_no_topic] = len(topics) - 1
 
+
         results.append({
             "sentences": sentences,
             "topics": topics
         })
+        print(results)
 
     return results
 
@@ -479,7 +481,85 @@ Text with numbered markers:
 
     print(f"\n=== DEBUG: Returning result with {len(sentences)} sentences and {len(topics)} topics ===\n")
 
+    # Build a summary by chunking sentences and summarizing each chunk via LLM (do not send whole post at once)
+    def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
+        chunks = []
+        current = []
+        current_indices = []  # Track which sentence indices are in each chunk
+        current_tokens = 0
+        prompt_template = (
+            "Summarize the following sentences into a concise paragraph focusing on key points and main ideas.\n"
+            "- Keep it objective and avoid repetition.\n"
+            "- Do not exceed 3-4 sentences.\n"
+            "- Number each sentence in your summary as [1], [2], [3], etc.\n\n"
+            "Sentences:\n{sentences}\n\nSummary:"
+        )
+        template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentences}", ""))
+        max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer
+        max_text_tokens = max(512, max_text_tokens)
+        for idx, s in enumerate(sent_list):
+            t = llm_client.estimate_tokens(s)
+            if current and (current_tokens + t) > max_text_tokens:
+                chunks.append((current, current_indices))
+                current = [s]
+                current_indices = [idx]
+                current_tokens = t
+            else:
+                current.append(s)
+                current_indices.append(idx)
+                current_tokens += t
+        if current:
+            chunks.append((current, current_indices))
+
+        summaries = []
+        summary_mappings = []  # List of mappings for each summary sentence
+        
+        for ch, indices in chunks:
+            sentences_text = "\n".join(f"- {s}" for s in ch)
+            prompt = prompt_template.replace("{sentences}", sentences_text)
+            prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+            cached = cache_collection.find_one({"prompt_hash": prompt_hash})
+            if cached:
+                resp = cached["response"]
+            else:
+                resp = llm_client.call([prompt])
+                cache_collection.update_one(
+                    {"prompt_hash": prompt_hash},
+                    {"$set": {
+                        "prompt_hash": prompt_hash,
+                        "prompt": prompt,
+                        "response": resp,
+                        "created_at": datetime.datetime.now()
+                    }},
+                    upsert=True
+                )
+            
+            # Parse the numbered summary sentences
+            summary_text = resp.strip()
+            summaries.append(summary_text)
+            
+            # Extract individual summary sentences (look for [N] markers)
+            # Each summary sentence maps to all source sentence indices in this chunk
+            summary_sentences = re.split(r'\[\d+\]\s*', summary_text)
+            summary_sentences = [s.strip() for s in summary_sentences if s.strip()]
+            
+            # Map each summary sentence to the source sentences (1-indexed for output)
+            for sum_sent in summary_sentences:
+                if sum_sent:
+                    summary_mappings.append({
+                        "summary_sentence": sum_sent,
+                        "source_sentences": [i + 1 for i in indices]  # 1-indexed
+                    })
+        
+        combined_summary = "\n\n".join(summaries).strip()
+        return combined_summary, summary_mappings
+
+    combined_summary, summary_mappings = summarize_by_sentence_groups(sentences, llm, cache_collection)
+    print(f"\n=== DEBUG: Final summary: {combined_summary} ===\n")
+    print(f"\n=== DEBUG: Summary mappings: {summary_mappings} ===\n")
     return {
         "sentences": sentences,
-        "topics": topics
+        "topics": topics,
+        "summary": combined_summary,
+        "summary_mappings": summary_mappings
     }

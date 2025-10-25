@@ -13,6 +13,8 @@ function ExtensionApp() {
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary'
+  const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
@@ -169,6 +171,19 @@ function ExtensionApp() {
     }
   };
 
+  const handleSummaryClick = (mapping, article) => {
+    if (mapping && mapping.source_sentences) {
+      setSummaryModalData({
+        sentences: mapping.source_sentences.map(idx => article.sentences[idx - 1]),
+        summarySentence: mapping.summary_sentence
+      });
+    }
+  };
+
+  const closeSummaryModal = () => {
+    setSummaryModalData(null);
+  };
+
   if (loading) {
     return <div className="page-message">Loading and analyzing page content...</div>;
   }
@@ -242,51 +257,128 @@ function ExtensionApp() {
                 <div className="article-title-section">
                   <h1>Analyzed Page ({article.topics.length} topics)</h1>
                 </div>
-                <label className="article-read-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={readArticles.has(index)}
-                    onChange={() => toggleArticleRead(index)}
-                  />
-                  Mark as read
-                </label>
-                <label className="highlight-topics-checkbox">
-                  <input
-                    type="checkbox"
-                    onChange={() => {
-                      // Toggle all topics associated with this article
-                      const articleTopics = article.topics;
-                      if (articleTopics.some(topic => selectedTopics.includes(topic))) {
-                        // If any topics are already selected, deselect them
-                        setSelectedTopics(prev => 
-                          prev.filter(topic => !articleTopics.some(t => t.name === topic.name))
-                        );
-                      } else {
-                        // Otherwise, select all topics for this article
-                        setSelectedTopics(prev => {
-                          const newTopics = [...prev];
-                          articleTopics.forEach(topic => {
-                            if (!newTopics.some(t => t.name === topic.name)) {
-                              newTopics.push(topic);
-                            }
+                <div className="article-controls">
+                  <div className="tabs">
+                    <button
+                      className={activeTab === 'article' ? 'active' : ''}
+                      onClick={() => setActiveTab('article')}
+                    >
+                      Article
+                    </button>
+                    <button
+                      className={activeTab === 'summary' ? 'active' : ''}
+                      onClick={() => setActiveTab('summary')}
+                    >
+                      Summary
+                    </button>
+                  </div>
+                  <label className="article-read-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={readArticles.has(index)}
+                      onChange={() => toggleArticleRead(index)}
+                    />
+                    Mark as read
+                  </label>
+                  <label className="highlight-topics-checkbox">
+                    <input
+                      type="checkbox"
+                      onChange={() => {
+                        // Toggle all topics associated with this article
+                        const articleTopics = article.topics;
+                        if (articleTopics.some(topic => selectedTopics.includes(topic))) {
+                          // If any topics are already selected, deselect them
+                          setSelectedTopics(prev => 
+                            prev.filter(topic => !articleTopics.some(t => t.name === topic.name))
+                          );
+                        } else {
+                          // Otherwise, select all topics for this article
+                          setSelectedTopics(prev => {
+                            const newTopics = [...prev];
+                            articleTopics.forEach(topic => {
+                              if (!newTopics.some(t => t.name === topic.name)) {
+                                newTopics.push(topic);
+                              }
+                            });
+                            return newTopics;
                           });
-                          return newTopics;
-                        });
-                      }
-                    }}
-                    checked={article.topics.some(topic => selectedTopics.includes(topic))}
-                  />
-                  Highlight topics
-                </label>
+                        }
+                      }}
+                      checked={article.topics.some(topic => selectedTopics.includes(topic))}
+                    />
+                    Highlight topics
+                  </label>
+                </div>
               </div>
-              <TextDisplay 
-                sentences={article.sentences} 
-                selectedTopics={selectedTopics} 
-                hoveredTopic={hoveredTopic} 
-                readTopics={readTopics} 
-                articleTopics={article.topics}
-                articleIndex={index}
-              />
+              {activeTab === 'summary' ? (
+                <div className="summary-content">
+                  <h2>Summary</h2>
+                  <div className="summary-text">
+                    {article.summary && article.summary.trim() ? (
+                      article.summary_mappings && article.summary_mappings.length > 0 ? (
+                        // Render with click functionality if mappings available
+                        article.summary_mappings.map((mapping, idx) => (
+                          <span key={idx} className="summary-sentence-wrapper">
+                            <span className="summary-sentence-text">
+                              {mapping.summary_sentence}
+                            </span>
+                            {' '}
+                            <button
+                              className="summary-source-link"
+                              onClick={() => handleSummaryClick(mapping, article)}
+                              title="View source sentences"
+                            >
+                              [source]
+                            </button>
+                            {' '}
+                          </span>
+                        ))
+                      ) : (
+                        // Fallback to plain paragraph rendering
+                        article.summary.split('\n').map((p, i) => (
+                          <p key={i}>{p}</p>
+                        ))
+                      )
+                    ) : (
+                      <p>No summary available for this article.</p>
+                    )}
+                  </div>
+                  {summaryModalData && (
+                    <div className="summary-modal-overlay" onClick={closeSummaryModal}>
+                      <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                          <h3>Source Sentences</h3>
+                          <button className="modal-close" onClick={closeSummaryModal}>×</button>
+                        </div>
+                        <div className="modal-body">
+                          <div className="modal-summary-sentence">
+                            <strong>Summary:</strong> {summaryModalData.summarySentence}
+                          </div>
+                          <div className="modal-divider"></div>
+                          <div className="modal-source-sentences">
+                            <strong>Original sentences:</strong>
+                            {summaryModalData.sentences.map((sent, idx) => (
+                              <div key={idx} className="modal-sentence">
+                                <span className="sentence-number">{idx + 1}.</span>
+                                <span className="sentence-text">{sent}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <TextDisplay 
+                  sentences={article.sentences} 
+                  selectedTopics={selectedTopics} 
+                  hoveredTopic={hoveredTopic} 
+                  readTopics={readTopics} 
+                  articleTopics={article.topics}
+                  articleIndex={index}
+                />
+              )}
             </div>
           ))}
         </div>
