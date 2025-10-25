@@ -61,7 +61,7 @@ function sanitizeHTML(html) {
   return template.innerHTML;
 }
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary }) {
   const fadedIndices = new Set();
   readTopics.forEach(topic => {
     const relatedTopic = articleTopics.find(t => t.name === topic.name);
@@ -97,20 +97,46 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     );
   }
 
+  // Build a map of sentence index to topics that end at that sentence
+  const sentenceToTopicsEnding = new Map();
+  articleTopics.forEach(topic => {
+    if (topic.sentences && topic.sentences.length > 0) {
+      // Find the last sentence index for this topic (1-indexed, so subtract 1)
+      const lastSentenceIndex = Math.max(...topic.sentences) - 1;
+      if (!sentenceToTopicsEnding.has(lastSentenceIndex)) {
+        sentenceToTopicsEnding.set(lastSentenceIndex, []);
+      }
+      sentenceToTopicsEnding.get(lastSentenceIndex).push(topic);
+    }
+  });
+
   return (
     <div className="text-display">
       <div className="text-content">
         <p className="article-text">
           {sentences.map((sentence, index) => (
-            <span
-              key={index}
-              id={`sentence-${articleIndex}-${index}`}
-              data-article-index={articleIndex}
-              data-sentence-index={index}
-              className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
-            >
-              {sentence}{' '}
-            </span>
+            <React.Fragment key={index}>
+              <span
+                id={`sentence-${articleIndex}-${index}`}
+                data-article-index={articleIndex}
+                data-sentence-index={index}
+                className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
+              >
+                {sentence}{' '}
+              </span>
+              {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
+                sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                  <button
+                    key={`${index}-${tIdx}`}
+                    className="topic-summary-link"
+                    onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
+                    title={`View summary for topic: ${topic.name}`}
+                  >
+                    [📝 {topic.name}]
+                  </button>
+                ))
+              )}
+            </React.Fragment>
           ))}
         </p>
       </div>

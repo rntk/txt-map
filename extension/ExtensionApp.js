@@ -15,6 +15,7 @@ function ExtensionApp() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
+  const [topicSummaryModalData, setTopicSummaryModalData] = useState(null); // For topic summary modal
   
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
@@ -182,6 +183,17 @@ function ExtensionApp() {
 
   const closeSummaryModal = () => {
     setSummaryModalData(null);
+  };
+
+  const handleShowTopicSummary = (topic, summary) => {
+    setTopicSummaryModalData({
+      topicName: topic.name,
+      summary: summary
+    });
+  };
+
+  const closeTopicSummaryModal = () => {
+    setTopicSummaryModalData(null);
   };
 
   if (loading) {
@@ -377,14 +389,38 @@ function ExtensionApp() {
                   readTopics={readTopics} 
                   articleTopics={article.topics}
                   articleIndex={index}
+                  topicSummaries={article.topic_summaries}
+                  onShowTopicSummary={handleShowTopicSummary}
                 />
               )}
             </div>
           ))}
         </div>
       </div>
+      {topicSummaryModalData && (
+        <div className="summary-modal-overlay" onClick={closeTopicSummaryModal}>
+          <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Topic Summary: {topicSummaryModalData.topicName}</h3>
+              <button className="modal-close" onClick={closeTopicSummaryModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="modal-summary-content">
+                {topicSummaryModalData.summary ? (
+                  topicSummaryModalData.summary.split('\n\n').map((paragraph, idx) => (
+                    <p key={idx} className="summary-paragraph">{paragraph}</p>
+                  ))
+                ) : (
+                  <p>No summary available for this topic.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default ExtensionApp;
+

@@ -557,9 +557,23 @@ Text with numbered markers:
     combined_summary, summary_mappings = summarize_by_sentence_groups(sentences, llm, cache_collection)
     print(f"\n=== DEBUG: Final summary: {combined_summary} ===\n")
     print(f"\n=== DEBUG: Summary mappings: {summary_mappings} ===\n")
+    
+    # Generate summaries for each topic
+    topic_summaries = {}
+    for topic in topics:
+        if topic["sentences"]:
+            # Get the sentences for this topic
+            topic_sentences = [sentences[idx - 1] for idx in topic["sentences"]]
+            
+            # Generate summary for this topic using the same function
+            topic_summary, _ = summarize_by_sentence_groups(topic_sentences, llm, cache_collection)
+            topic_summaries[topic["name"]] = topic_summary
+            print(f"\n=== DEBUG: Summary for topic '{topic['name']}': {topic_summary} ===\n")
+    
     return {
         "sentences": sentences,
         "topics": topics,
         "summary": combined_summary,
-        "summary_mappings": summary_mappings
+        "summary_mappings": summary_mappings,
+        "topic_summaries": topic_summaries
     }
