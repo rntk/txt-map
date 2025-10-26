@@ -7,7 +7,7 @@ import hashlib
 import datetime
 from urllib.parse import unquote
 import html
-from lib.llamacpp import LLamaCPP
+from lib.llm.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
 from sklearn.metrics.pairwise import cosine_similarity
@@ -36,9 +36,12 @@ router = APIRouter()
 def get_posts_storage(request: Request) -> PostsStorage:
     return request.app.state.posts_storage
 
+def get_llamacpp(request: Request) -> LLamaCPP:
+    return request.app.state.llamacpp
+
 @router.get("/clustered-post/{tag}")
 @router.get("/clustered-post")
-def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsStorage = Depends(get_posts_storage)):
+def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsStorage = Depends(get_posts_storage), llamacpp: LLamaCPP = Depends(get_llamacpp)):
     # Decode/unescape tag if provided
     if tag is not None:
         tag = html.unescape(unquote(tag))
@@ -73,7 +76,7 @@ def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsSt
     print(articles)
 
     results = []
-    llm = LLamaCPP("http://192.168.178.26:8989")
+    llm = llamacpp
     #llm = LLamaCPP("http://127.0.0.1:8989")
     for article in articles:
         # Split into sentences
