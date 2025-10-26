@@ -1,0 +1,100 @@
+/* Styles for selection toolbar and element highlighting injected by content script */
+#rsstag-selection-toolbar {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  animation: rsstag-slideDown 0.3s ease-out;
+}
+
+@keyframes rsstag-slideDown {
+  from {
+    transform: translateX(-50%) translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+#rsstag-selection-toolbar button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+#rsstag-select-btn {
+  background: white;
+  color: #667eea;
+}
+
+#rsstag-select-btn:hover {
+  background: #f0f0f0;
+  transform: scale(1.05);
+}
+
+#rsstag-select-btn.active {
+  background: #ffd700;
+  color: #333;
+}
+
+#rsstag-fullpage-btn {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid white;
+}
+
+#rsstag-fullpage-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+#rsstag-cancel-btn {
+  background: rgba(255,0,0,0.8);
+  color: white;
+}
+
+#rsstag-cancel-btn:hover {
+  background: rgba(255,0,0,1);
+  transform: scale(1.05);
+}
+
+#rsstag-toolbar-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rsstag-element-highlight {
+  outline: 3px solid #667eea !important;
+  outline-offset: 2px;
+  background: rgba(102, 126, 234, 0.1) !important;
+  cursor: pointer !important;
+  transition: all 0.2s;
+}
+
+.rsstag-element-highlight:hover {
+  outline-color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.2) !important;
+}
+
+.rsstag-selected {
+  outline: 4px solid #ffd700 !important;
+  outline-offset: 2px;
+  background: rgba(255, 215, 0, 0.3) !important;
+}
