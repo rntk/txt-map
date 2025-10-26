@@ -5,7 +5,7 @@ sudo docker run --rm -it --network=host -v $(pwd):/app --name rsstag-tests rssta
 
 cd extension
 docker build -t rsstag-extension .
-docker run -v $(pwd)/..:/workspace rsstag-extension
+docker run --rm -v $(pwd)/..:/workspace rsstag-extension
 
 docker build -f Dockerfile.cli -t rsstag_tests_cli .
 
