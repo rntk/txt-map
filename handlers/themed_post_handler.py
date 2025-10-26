@@ -10,6 +10,7 @@ import html
 from lib.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
+from lib.summarizer import summarize_by_sentence_groups
 from pydantic import BaseModel
 
 def normalize_topic(topic_name):
@@ -480,61 +481,6 @@ Text with numbered markers:
         print(f"Topic '{topic['name']}': sentences {topic['sentences']}")
 
     print(f"\n=== DEBUG: Returning result with {len(sentences)} sentences and {len(topics)} topics ===\n")
-
-    # Build a summary by chunking sentences and summarizing each chunk via LLM (do not send whole post at once)
-    def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
-        """
-        Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
-        summaries equals the number of sentence groups. Each summary gets a mapping to its single
-        source sentence index. This aligns the UI with expectations: N groups -> N summaries.
-        """
-        prompt_template = (
-            "Summarize the following text into a concise paragraph focusing on key points and main ideas.\n"
-            "- Keep it objective and avoid repetition.\n"
-            "- Do not exceed 3-4 sentences.\n\n"
-            "Text:\n{sentence}\n\nSummary:"
-        )
-
-        template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
-        max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer
-        print(f"\n=== DEBUG: Summarization (per-group) - max_text_tokens: {max_text_tokens}, total groups: {len(sent_list)} ===")
-
-        all_summary_sentences = []
-        summary_mappings = []
-
-        for idx, s in enumerate(sent_list):
-            # If a single group is too large, we still try to summarize it directly and rely on the model's ability
-            # to handle long inputs up to max_text_tokens. For extremely long texts, the model/server may truncate.
-            sentences_text = s
-            prompt = prompt_template.replace("{sentence}", sentences_text)
-            prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
-            cached = cache_collection.find_one({"prompt_hash": prompt_hash})
-            if cached:
-                resp = cached["response"]
-            else:
-                resp = llm_client.call([prompt])
-                cache_collection.update_one(
-                    {"prompt_hash": prompt_hash},
-                    {"$set": {
-                        "prompt_hash": prompt_hash,
-                        "prompt": prompt,
-                        "response": resp,
-                        "created_at": datetime.datetime.now()
-                    }},
-                    upsert=True
-                )
-
-            summary_text = resp.strip()
-            if summary_text:
-                summary_idx = len(all_summary_sentences)
-                all_summary_sentences.append(summary_text)
-                summary_mappings.append({
-                    "summary_index": summary_idx,
-                    "summary_sentence": summary_text,
-                    "source_sentences": [idx + 1]  # 1-indexed mapping to the group sentence
-                })
-
-        return all_summary_sentences, summary_mappings
 
     summary_sentences, summary_mappings = summarize_by_sentence_groups(sentences, llm, cache_collection)
     print(f"\n=== DEBUG: Final summary sentences: {summary_sentences} ===\n")
