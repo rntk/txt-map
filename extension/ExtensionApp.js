@@ -326,28 +326,33 @@ function ExtensionApp() {
                 <div className="summary-content">
                   <h2>Summary</h2>
                   <div className="summary-text">
-                    {article.summary && article.summary.trim() ? (
+                    {Array.isArray(article.summary) && article.summary.length > 0 ? (
+                      // Prefer mapping if available to provide [source] links; otherwise render plain summaries
                       article.summary_mappings && article.summary_mappings.length > 0 ? (
-                        // Render with click functionality if mappings available
-                        article.summary_mappings.map((mapping, idx) => (
-                          <span key={idx} className="summary-sentence-wrapper">
-                            <span className="summary-sentence-text">
-                              {mapping.summary_sentence}
-                            </span>
-                            {' '}
-                            <button
-                              className="summary-source-link"
-                              onClick={() => handleSummaryClick(mapping, article)}
-                              title="View source sentences"
-                            >
-                              [source]
-                            </button>
-                            {' '}
-                          </span>
-                        ))
+                        article.summary.map((summaryText, i) => {
+                          const mapping = article.summary_mappings.find(m => m.summary_index === i);
+                          return (
+                            <div key={i} className="summary-paragraph-wrapper">
+                              <p className="summary-paragraph-text">
+                                {summaryText}
+                                {mapping && (
+                                  <>
+                                    {' '}
+                                    <button
+                                      className="summary-source-link"
+                                      onClick={() => handleSummaryClick(mapping, article)}
+                                      title="View source sentences"
+                                    >
+                                      [source]
+                                    </button>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          );
+                        })
                       ) : (
-                        // Fallback to plain paragraph rendering
-                        article.summary.split('\n').map((p, i) => (
+                        article.summary.map((p, i) => (
                           <p key={i}>{p}</p>
                         ))
                       )

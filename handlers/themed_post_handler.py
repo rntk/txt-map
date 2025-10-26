@@ -483,40 +483,30 @@ Text with numbered markers:
 
     # Build a summary by chunking sentences and summarizing each chunk via LLM (do not send whole post at once)
     def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
-        chunks = []
-        current = []
-        current_indices = []  # Track which sentence indices are in each chunk
-        current_tokens = 0
+        """
+        Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
+        summaries equals the number of sentence groups. Each summary gets a mapping to its single
+        source sentence index. This aligns the UI with expectations: N groups -> N summaries.
+        """
         prompt_template = (
-            "Summarize the following sentences into a concise paragraph focusing on key points and main ideas.\n"
+            "Summarize the following text into a concise paragraph focusing on key points and main ideas.\n"
             "- Keep it objective and avoid repetition.\n"
-            "- Do not exceed 3-4 sentences.\n"
-            "- Number each sentence in your summary as [1], [2], [3], etc.\n\n"
-            "Sentences:\n{sentences}\n\nSummary:"
+            "- Do not exceed 3-4 sentences.\n\n"
+            "Text:\n{sentence}\n\nSummary:"
         )
-        template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentences}", ""))
-        max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer
-        max_text_tokens = max(512, max_text_tokens)
-        for idx, s in enumerate(sent_list):
-            t = llm_client.estimate_tokens(s)
-            if current and (current_tokens + t) > max_text_tokens:
-                chunks.append((current, current_indices))
-                current = [s]
-                current_indices = [idx]
-                current_tokens = t
-            else:
-                current.append(s)
-                current_indices.append(idx)
-                current_tokens += t
-        if current:
-            chunks.append((current, current_indices))
 
-        summaries = []
-        summary_mappings = []  # List of mappings for each summary sentence
-        
-        for ch, indices in chunks:
-            sentences_text = "\n".join(f"- {s}" for s in ch)
-            prompt = prompt_template.replace("{sentences}", sentences_text)
+        template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
+        max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer
+        print(f"\n=== DEBUG: Summarization (per-group) - max_text_tokens: {max_text_tokens}, total groups: {len(sent_list)} ===")
+
+        all_summary_sentences = []
+        summary_mappings = []
+
+        for idx, s in enumerate(sent_list):
+            # If a single group is too large, we still try to summarize it directly and rely on the model's ability
+            # to handle long inputs up to max_text_tokens. For extremely long texts, the model/server may truncate.
+            sentences_text = s
+            prompt = prompt_template.replace("{sentence}", sentences_text)
             prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
             cached = cache_collection.find_one({"prompt_hash": prompt_hash})
             if cached:
@@ -533,30 +523,26 @@ Text with numbered markers:
                     }},
                     upsert=True
                 )
-            
-            # Parse the numbered summary sentences
-            summary_text = resp.strip()
-            summaries.append(summary_text)
-            
-            # Extract individual summary sentences (look for [N] markers)
-            # Each summary sentence maps to all source sentence indices in this chunk
-            summary_sentences = re.split(r'\[\d+\]\s*', summary_text)
-            summary_sentences = [s.strip() for s in summary_sentences if s.strip()]
-            
-            # Map each summary sentence to the source sentences (1-indexed for output)
-            for sum_sent in summary_sentences:
-                if sum_sent:
-                    summary_mappings.append({
-                        "summary_sentence": sum_sent,
-                        "source_sentences": [i + 1 for i in indices]  # 1-indexed
-                    })
-        
-        combined_summary = "\n\n".join(summaries).strip()
-        return combined_summary, summary_mappings
 
-    combined_summary, summary_mappings = summarize_by_sentence_groups(sentences, llm, cache_collection)
-    print(f"\n=== DEBUG: Final summary: {combined_summary} ===\n")
-    print(f"\n=== DEBUG: Summary mappings: {summary_mappings} ===\n")
+            summary_text = resp.strip()
+            if summary_text:
+                summary_idx = len(all_summary_sentences)
+                all_summary_sentences.append(summary_text)
+                summary_mappings.append({
+                    "summary_index": summary_idx,
+                    "summary_sentence": summary_text,
+                    "source_sentences": [idx + 1]  # 1-indexed mapping to the group sentence
+                })
+
+        return all_summary_sentences, summary_mappings
+
+    summary_sentences, summary_mappings = summarize_by_sentence_groups(sentences, llm, cache_collection)
+    print(f"\n=== DEBUG: Final summary sentences: {summary_sentences} ===\n")
+    print(f"\n=== DEBUG: Summary mappings ({len(summary_mappings)} summary sentences): ===")
+    for idx, mapping in enumerate(summary_mappings):
+        print(f"  {idx+1}. Summary: '{mapping['summary_sentence'][:80]}...'")
+        print(f"     Source sentences: {mapping['source_sentences']}")
+    print()
     
     # Generate summaries for each topic
     topic_summaries = {}
@@ -566,14 +552,18 @@ Text with numbered markers:
             topic_sentences = [sentences[idx - 1] for idx in topic["sentences"]]
             
             # Generate summary for this topic using the same function
-            topic_summary, _ = summarize_by_sentence_groups(topic_sentences, llm, cache_collection)
-            topic_summaries[topic["name"]] = topic_summary
-            print(f"\n=== DEBUG: Summary for topic '{topic['name']}': {topic_summary} ===\n")
+            topic_summary_sentences, _ = summarize_by_sentence_groups(topic_sentences, llm, cache_collection)
+            topic_summaries[topic["name"]] = " ".join(topic_summary_sentences)
+            print(f"\n=== DEBUG: Summary for topic '{topic['name']}': {topic_summaries[topic['name']]} ===\n")
     
+    print(summary_mappings)
+
     return {
         "sentences": sentences,
         "topics": topics,
-        "summary": combined_summary,
+        # Keep 'summary' as a list of summary sentences (do not join)
+        "summary": summary_sentences,
+        # Each mapping includes the summary_index (0-based) referencing the 'summary' list
         "summary_mappings": summary_mappings,
         "topic_summaries": topic_summaries
     }

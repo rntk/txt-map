@@ -475,6 +475,17 @@
   display: inline;
 }
 
+.summary-paragraph-wrapper {
+  margin-bottom: 0.8em;
+  padding-left: 0;
+}
+
+.summary-paragraph-text {
+  margin: 0;
+  line-height: 1.8;
+  display: block;
+}
+
 .summary-source-link {
   display: inline;
   padding: 2px 6px;
