@@ -453,7 +453,14 @@ Text with numbered markers:
     sentences = []
     sentence_range_map = {}  # Map sentence index to its range
     
+    print(f"\n=== DEBUG: Found {len(unique_ranges)} unique range(s): {unique_ranges} ===")
+    
     for start, end in unique_ranges:
+        # Ensure each range includes at least 2 words (extend by +1 if needed)
+        if end - start < 2 and end < len(words):
+            print(f"=== DEBUG: Extending single-word range ({start}, {end}) to ({start}, {end + 1}) ===")
+            end = end + 1
+        
         if start <= len(words) and end <= len(words) and start < end:
             sentence_words = words[start:end]
             sentence = " ".join(sentence_words)
