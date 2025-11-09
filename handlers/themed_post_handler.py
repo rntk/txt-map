@@ -17,17 +17,8 @@ def normalize_topic(topic_name):
     """
     Normalize topic name to avoid duplicates due to case, spaces vs underscores, etc.
     """
-    # Convert to lowercase
-    normalized = topic_name.lower()
-    # Replace spaces with underscores
-    normalized = re.sub(r'\s+', '_', normalized)
-    # Remove special characters except underscores
-    normalized = re.sub(r'[^\w_]', '', normalized)
-    # Remove multiple consecutive underscores
-    normalized = re.sub(r'_+', '_', normalized)
-    # Remove leading/trailing underscores
-    normalized = normalized.strip('_')
-    return normalized
+    # Single regex: convert to lowercase, replace non-alphanumeric with underscores, strip edges
+    return re.sub(r'[^a-z0-9]+', '_', topic_name.lower()).strip('_')
 
 class ArticleRequest(BaseModel):
     article: str
@@ -193,9 +184,6 @@ Sentences:
             
             all_responses.append(response)
         
-        # Combine responses
-        combined_response = "\n".join(all_responses)
-
         # Combine responses
         combined_response = "\n".join(all_responses)
 
