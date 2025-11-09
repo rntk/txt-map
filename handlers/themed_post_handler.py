@@ -266,17 +266,39 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     print(f"\n=== DEBUG: Total words: {len(words)} ===")
     print(f"First 10 words: {words[:10]}")
     
-    # Create marked text with numbered markers between each word
-    # Using |#N#| format where N is the position number (0-indexed positions between words)
+    # Create marked text with hybrid marker approach:
+    # - Add marker after punctuation characters
+    # - Add marker every N words if no punctuation encountered (backup)
+    # Using |#N#| format where N is the marker position number
+    WORDS_PER_MARKER = 15  # Backup marker interval
+    PUNCTUATION_CHARS = {'.', ',', ';', ':', '!', '?', ')', ']', '}'}
+    
     marked_parts = []
+    marker_count = 0
+    words_since_last_marker = 0
+    
     for i, word in enumerate(words):
         marked_parts.append(word)
-        if i < len(words) - 1:  # Don't add marker after the last word
-            marked_parts.append(f"|#{i+1}#|")
+        words_since_last_marker += 1
+        
+        # Check if word ends with punctuation
+        has_punctuation = any(word.rstrip().endswith(p) for p in PUNCTUATION_CHARS)
+        
+        # Add marker if:
+        # 1. Word has punctuation, OR
+        # 2. We've passed N words without a marker
+        if has_punctuation or words_since_last_marker >= WORDS_PER_MARKER:
+            if i < len(words) - 1:  # Don't add marker after the last word
+                marker_count += 1
+                marked_parts.append(f"|#{marker_count}#|")
+                words_since_last_marker = 0
+    
     marked_text = " ".join(marked_parts)
     
-    print(f"\n=== DEBUG: Marked text (first 500 chars) ===")
-    print(marked_text[:500])
+    print(f"\n=== DEBUG: Hybrid marker approach ===")
+    print(f"Total markers added: {marker_count} (vs {len(words)-1} with per-word marking)")
+    print(f"Marker reduction: {((len(words)-1-marker_count)/(len(words)-1)*100):.1f}%")
+    print(f"Marked text (first 500 chars): {marked_text[:500]}")
     print(f"... (total length: {len(marked_text)} chars)")
     
     # LLM client
