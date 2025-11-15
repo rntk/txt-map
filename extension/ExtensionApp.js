@@ -396,6 +396,7 @@ function ExtensionApp() {
                   articleIndex={index}
                   topicSummaries={article.topic_summaries}
                   onShowTopicSummary={handleShowTopicSummary}
+                  paragraphMap={article.paragraph_map}
                 />
               )}
             </div>

@@ -426,6 +426,20 @@
   line-height: 1.6;
 }
 
+.article-paragraph {
+  margin-bottom: 1em;
+  line-height: 1.6;
+  text-align: justify;
+}
+
+.article-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.article-text {
+  line-height: 1.6;
+}
+
 .highlighted {
   background-color: yellow;
 }

@@ -61,7 +61,7 @@ function sanitizeHTML(html) {
   return template.innerHTML;
 }
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary, paragraphMap }) {
   const fadedIndices = new Set();
   readTopics.forEach(topic => {
     const relatedTopic = articleTopics.find(t => t.name === topic.name);
@@ -110,6 +110,62 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     }
   });
 
+  // Group sentences by paragraph if paragraph_map is provided
+  if (paragraphMap && Object.keys(paragraphMap).length > 0) {
+    // Build a map of paragraph index -> array of {text, index}
+    const paragraphGroups = new Map();
+    
+    sentences.forEach((sentence, idx) => {
+      const sentenceParagraphIdx = paragraphMap[idx] !== undefined ? paragraphMap[idx] : 0;
+      
+      if (!paragraphGroups.has(sentenceParagraphIdx)) {
+        paragraphGroups.set(sentenceParagraphIdx, []);
+      }
+      
+      paragraphGroups.get(sentenceParagraphIdx).push({ text: sentence, index: idx });
+    });
+    
+    // Sort paragraph indices and build ordered array
+    const sortedParagraphIndices = Array.from(paragraphGroups.keys()).sort((a, b) => a - b);
+    const paragraphs = sortedParagraphIndices.map(paraIdx => paragraphGroups.get(paraIdx));
+    
+    return (
+      <div className="text-display">
+        <div className="text-content">
+          {paragraphs.map((para, paraIdx) => (
+            <p key={paraIdx} className="article-paragraph">
+              {para.map(({ text, index }) => (
+                <React.Fragment key={index}>
+                  <span
+                    id={`sentence-${articleIndex}-${index}`}
+                    data-article-index={articleIndex}
+                    data-sentence-index={index}
+                    className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
+                  >
+                    {text}{' '}
+                  </span>
+                  {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
+                    sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                      <button
+                        key={`${index}-${tIdx}`}
+                        className="topic-summary-link"
+                        onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
+                        title={`View summary for topic: ${topic.name}`}
+                      >
+                        [📝 {topic.name}]
+                      </button>
+                    ))
+                  )}
+                </React.Fragment>
+              ))}
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: render as single paragraph if no paragraph_map provided
   return (
     <div className="text-display">
       <div className="text-content">

@@ -17,11 +17,22 @@ app.include_router(topics_handler.router, prefix="/api")
 app.include_router(themed_topic_handler.router, prefix="/api")
 
 import os
-client = MongoClient(os.getenv("MONGODB_URL", "mongodb://localhost:8765/"))
+mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
+llamacpp_url = os.getenv("LLAMACPP_URL", "http://localhost:8989")
+token = os.getenv("TOKEN")
+
+print(f"MONGODB_URL: {mongodb_url}")
+print(f"LLAMACPP_URL: {llamacpp_url}")
+if token:
+    print(f"TOKEN: {token[:10]}...")
+else:
+    print("TOKEN: not set")
+
+client = MongoClient(mongodb_url)
 posts_storage = PostsStorage(client["rss"])
 posts_storage.prepare()
 app.state.posts_storage = posts_storage
-app.state.llamacpp = LLamaCPP(host=os.getenv("LLAMACPP_URL", "http://localhost:8989"))
+app.state.llamacpp = LLamaCPP(host=llamacpp_url, token=token)
 
 @app.get("/page/themed-post")
 def serve_themed_post_page():

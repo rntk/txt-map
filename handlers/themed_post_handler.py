@@ -10,6 +10,7 @@ import html
 from lib.llm.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
+from lib.html_formatter import FormattingPreserver
 from lib.summarizer import summarize_by_sentence_groups
 from pydantic import BaseModel
 
@@ -249,15 +250,24 @@ def post_themed_post(request: ArticleRequest, posts_storage: PostsStorage = Depe
     # Use the provided article text
     article = request.article
 
-    # Clean the text
-    cleaner = HTMLCleaner()
-    cleaner.purge()
-    cleaner.feed(article)
-    text = " ".join(cleaner.get_content())
-    reg = re.compile(r"\s+")
-    text = reg.sub(" ", text)
-    text = text.strip()
-
+    # Extract both formatted and plain text
+    formatter = FormattingPreserver()
+    formatter.feed(article)
+    formatted_text = formatter.get_formatted_text()
+    plain_text = formatter.get_plain_text()
+    
+    # Use plain text for LLM analysis
+    text = plain_text
+    
+    # Split formatted text into paragraphs for tracking
+    paragraphs = []
+    paragraph_texts = []
+    for para in formatted_text.split('\n\n'):
+        para = para.strip()
+        if para:
+            paragraphs.append(para)
+            paragraph_texts.append(para)
+    
     # Split text into words and add numbered markers
     words = text.split()
     if not words:
@@ -485,13 +495,11 @@ Text with numbered markers:
 
     # Build sentences from all unique MARKER ranges
     unique_ranges = sorted(set(all_ranges))
-    sentences = []
-    sentence_range_map = {}  # Map sentence index -> (start_marker, end_marker)
-    covered = [False] * len(words)  # Track covered words to fill gaps later
-
+    
     print(f"\n=== DEBUG: Found {len(unique_ranges)} unique marker range(s): {unique_ranges} ===")
 
-    valid_unique_ranges = []
+    # First pass: validate ranges and convert to word positions
+    valid_ranges_with_positions = []
     for start_marker, end_marker in unique_ranges:
         # Validate range against marker bounds
         if start_marker < 0 or end_marker < 0:
@@ -506,34 +514,50 @@ Text with numbered markers:
         word_end = marker_to_word_end(end_marker)
 
         if 0 <= word_start <= word_end < len(words):
-            sentence = " ".join(words[word_start:word_end + 1]).strip()
-            if sentence:
-                sentence_idx = len(sentences)
-                sentences.append(sentence)
-                sentence_range_map[sentence_idx] = (start_marker, end_marker)
-                valid_unique_ranges.append((start_marker, end_marker))
-                # Mark coverage
-                for wi in range(word_start, word_end + 1):
-                    covered[wi] = True
+            valid_ranges_with_positions.append((word_start, word_end, start_marker, end_marker))
+    
+    print(f"\n=== DEBUG: Valid ranges before sorting: ===")
+    for word_start, word_end, start_marker, end_marker in valid_ranges_with_positions:
+        print(f"  Markers ({start_marker}-{end_marker}) -> Words [{word_start}:{word_end+1}] = '{' '.join(words[word_start:min(word_end+1, word_start+5)])}...'")
+    
+    # Sort by word_start position to maintain document order
+    valid_ranges_with_positions.sort(key=lambda x: x[0])
+    
+    print(f"\n=== DEBUG: Valid ranges after sorting by word position: ===")
+    for word_start, word_end, start_marker, end_marker in valid_ranges_with_positions:
+        print(f"  Words [{word_start}:{word_end+1}] = '{' '.join(words[word_start:min(word_end+1, word_start+5)])}...'")
+    
+    # Second pass: build sentences in correct order by interleaving gaps and covered ranges
+    sentences = []
+    sentence_range_map = {}  # Map sentence index -> (start_marker, end_marker) or None for gaps
+    sentence_start_word = {}  # Map sentence index -> starting word index
 
-    # Fill in uncovered gaps as additional sentences and assign them to no_topic
+    merged_segments = []  # each: (word_start, word_end, (start_marker, end_marker) | None)
+    cursor = 0
+    for word_start, word_end, start_marker, end_marker in valid_ranges_with_positions:
+        if word_start > cursor:
+            # gap before this covered range
+            merged_segments.append((cursor, word_start - 1, None))
+        # covered range
+        merged_segments.append((word_start, word_end, (start_marker, end_marker)))
+        cursor = word_end + 1
+    # trailing gap
+    if cursor <= len(words) - 1:
+        merged_segments.append((cursor, len(words) - 1, None))
+
     gap_sentence_indices = []
-    in_gap = False
-    gap_start = 0
-    for i, is_cov in enumerate(covered + [True]):  # sentinel True to flush last gap
-        if not is_cov and not in_gap:
-            in_gap = True
-            gap_start = i
-        elif is_cov and in_gap:
-            in_gap = False
-            gap_end = i - 1
-            gap_sentence = " ".join(words[gap_start:gap_end + 1]).strip()
-            if gap_sentence:
-                gap_idx = len(sentences)
-                sentences.append(gap_sentence)
-                # We don't have explicit marker ranges for gaps; store None
-                sentence_range_map[gap_idx] = None
-                gap_sentence_indices.append(gap_idx + 1)  # 1-indexed for topic mapping
+    for seg_word_start, seg_word_end, seg_range in merged_segments:
+        if seg_word_start > seg_word_end:
+            continue
+        sentence = " ".join(words[seg_word_start:seg_word_end + 1]).strip()
+        if not sentence:
+            continue
+        sentence_idx = len(sentences)
+        sentences.append(sentence)
+        sentence_range_map[sentence_idx] = seg_range  # None for gaps
+        sentence_start_word[sentence_idx] = seg_word_start
+        if seg_range is None:
+            gap_sentence_indices.append(sentence_idx + 1)  # 1-indexed for topic mapping
 
     # Convert topic ranges to sentence indices by exact marker-range match
     for topic in topics:
@@ -545,7 +569,7 @@ Text with numbered markers:
                     sentence_indices.append(sent_idx + 1)  # 1-indexed for output
         topic["sentences"] = sorted(list(set(sentence_indices)))
         del topic["ranges"]  # Remove the ranges, keep only sentence numbers
-
+    
     # Ensure uncovered text is not lost: add to no_topic
     if gap_sentence_indices:
         normalized_no_topic = normalize_topic("no_topic")
@@ -556,6 +580,23 @@ Text with numbered markers:
             no_topic = {"name": normalized_no_topic, "sentences": sorted(gap_sentence_indices)}
             topics.append(no_topic)
             normalized_topics_map[normalized_no_topic] = len(topics) - 1
+    
+    # Build paragraph mapping: map each sentence to its paragraph index
+    paragraph_map = {}
+    
+    # Create word-to-paragraph mapping from formatted text
+    word_to_paragraph = []
+    for para_idx, para_text in enumerate(paragraph_texts):
+        para_words = para_text.split()
+        word_to_paragraph.extend([para_idx] * len(para_words))
+    
+    # Map sentences to paragraphs based on their start word positions (works for gaps too)
+    for sent_idx in range(len(sentences)):
+        start_word = sentence_start_word.get(sent_idx, 0)
+        if start_word < len(word_to_paragraph):
+            paragraph_map[sent_idx] = word_to_paragraph[start_word]
+        else:
+            paragraph_map[sent_idx] = len(paragraph_texts) - 1 if paragraph_texts else 0
     
     print(f"\n=== DEBUG: Built {len(sentences)} sentences ===")
     for i, sent in enumerate(sentences[:5]):
@@ -598,5 +639,7 @@ Text with numbered markers:
         "summary": summary_sentences,
         # Each mapping includes the summary_index (0-based) referencing the 'summary' list
         "summary_mappings": summary_mappings,
-        "topic_summaries": topic_summaries
+        "topic_summaries": topic_summaries,
+        "paragraph_map": paragraph_map,  # Map sentence_idx -> paragraph_idx
+        "formatted": True  # Signal that formatting is preserved
     }
