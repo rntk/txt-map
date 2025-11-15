@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../frontend/src/styles/App.css';
 
 // Recursive component to render tree nodes
-function TreeNode({ nodeKey, children, level = 0, expandMode }) {
+function TreeNode({ nodeKey, children, level = 0, expandMode, onTopicClick, selectedTopic }) {
   const [isExpanded, setIsExpanded] = useState(false); // All branches folded by default
   const hasChildren = children && Object.keys(children).length > 0;
 
@@ -31,11 +31,12 @@ function TreeNode({ nodeKey, children, level = 0, expandMode }) {
   return (
     <div className="tree-node" style={{ marginLeft: `${level * 24}px` }}>
       <div
-        className="node-content"
+        className={`node-content ${selectedTopic === nodeKey ? 'selected' : ''}`}
         style={{
           backgroundColor: color,
           borderLeft: `4px solid ${color}`,
         }}
+        onClick={() => onTopicClick && onTopicClick(nodeKey)}
       >
         {hasChildren && (
           <button
@@ -59,6 +60,8 @@ function TreeNode({ nodeKey, children, level = 0, expandMode }) {
               children={childChildren}
               level={level + 1}
               expandMode={expandMode}
+              onTopicClick={onTopicClick}
+              selectedTopic={selectedTopic}
             />
           ))}
         </div>
@@ -71,6 +74,7 @@ function MindmapResults({ mindmapData }) {
   const [showRawData, setShowRawData] = useState(false);
   const [activeTab, setActiveTab] = useState('tree'); // 'tree' | 'list' | 'details'
   const [expandMode, setExpandMode] = useState('default'); // 'default', 'all', 'none'
+  const [selectedTopic, setSelectedTopic] = useState(null); // Track selected topic for showing sentences
 
   if (!mindmapData) {
     return (
@@ -101,6 +105,18 @@ function MindmapResults({ mindmapData }) {
   };
 
   const totalTopics = countTopics(structure);
+
+  // Function to get sentences for a specific topic
+  const getSentencesForTopic = (topicName) => {
+    if (!mindmapResults || !Array.isArray(mindmapResults)) return [];
+    
+    return mindmapResults.filter(result => 
+      result.mindmap_topics && 
+      result.mindmap_topics.some(hierarchy => 
+        hierarchy.some(topic => topic === topicName)
+      )
+    );
+  };
 
   return (
     <div className="mindmap-container">
@@ -170,6 +186,8 @@ function MindmapResults({ mindmapData }) {
                     children={children}
                     level={0}
                     expandMode={expandMode}
+                    onTopicClick={setSelectedTopic}
+                    selectedTopic={selectedTopic}
                   />
                 ))}
               </div>
@@ -180,6 +198,42 @@ function MindmapResults({ mindmapData }) {
                 <p>The analysis didn't identify any topic hierarchies.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {selectedTopic && (
+          <div className="topic-sentences-panel">
+            <h3>Sentences for topic: "{selectedTopic}"</h3>
+            <button 
+              className="close-panel-btn"
+              onClick={() => setSelectedTopic(null)}
+              title="Close panel"
+            >
+              ×
+            </button>
+            <div className="topic-sentences-list">
+              {getSentencesForTopic(selectedTopic).map((result, idx) => (
+                <div key={idx} className="topic-sentence-item">
+                  <div className="sentence-number">Sentence {result.sentence_index}</div>
+                  <div className="sentence-text">{result.sentence}</div>
+                  {result.mindmap_topics && result.mindmap_topics.length > 0 && (
+                    <div className="sentence-topics">
+                      <strong>Topic hierarchies:</strong>
+                      <ul>
+                        {result.mindmap_topics.map((hierarchy, topicIdx) => (
+                          <li key={topicIdx} className="topic-hierarchy">
+                            {hierarchy.join(' > ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {getSentencesForTopic(selectedTopic).length === 0 && (
+                <div className="no-sentences">No sentences found for this topic.</div>
+              )}
+            </div>
           </div>
         )}
 
@@ -400,6 +454,13 @@ function MindmapResults({ mindmapData }) {
         .node-content:hover {
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           transform: translateX(2px);
+        }
+
+        .node-content.selected {
+          box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+          transform: translateX(4px);
+          border-left-width: 6px;
+          font-weight: bold;
         }
 
         .expand-btn {
@@ -633,6 +694,87 @@ function MindmapResults({ mindmapData }) {
         .placeholder p {
           color: #666;
           margin: 10px 0;
+          font-size: 16px;
+        }
+
+        .topic-sentences-panel {
+          background-color: #f0f8ff;
+          border-radius: 8px;
+          padding: 20px;
+          margin-top: 20px;
+          max-width: 1200px;
+          border: 2px solid #667eea;
+          position: relative;
+        }
+
+        .topic-sentences-panel h3 {
+          margin-top: 0;
+          color: #333;
+          font-size: 18px;
+          border-bottom: 2px solid #667eea;
+          padding-bottom: 10px;
+          margin-bottom: 15px;
+        }
+
+        .close-panel-btn {
+          position: absolute;
+          top: 15px;
+          right: 15px;
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #666;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: background-color 0.2s ease;
+        }
+
+        .close-panel-btn:hover {
+          background-color: #e0e0e0;
+          color: #333;
+        }
+
+        .topic-sentences-list {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        .topic-sentence-item {
+          background-color: white;
+          border-left: 4px solid #667eea;
+          padding: 15px;
+          border-radius: 6px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .sentence-topics {
+          margin-top: 10px;
+          font-size: 13px;
+        }
+
+        .sentence-topics strong {
+          color: #667eea;
+        }
+
+        .sentence-topics ul {
+          margin: 8px 0 0 0;
+          padding-left: 20px;
+          list-style: none;
+        }
+
+        .no-sentences {
+          text-align: center;
+          color: #999;
+          font-style: italic;
+          padding: 40px;
           font-size: 16px;
         }
 
