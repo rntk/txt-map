@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from handlers import sgr_topics_handler, themed_post_handler, clustered_post_handler, topics_handler, themed_topic_handler
+from handlers import sgr_topics_handler, themed_post_handler, clustered_post_handler, topics_handler, themed_topic_handler, mindmap_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 from lib.llm.llamacpp import LLamaCPP
@@ -15,6 +15,7 @@ app.include_router(clustered_post_handler.router, prefix="/api")
 app.include_router(sgr_topics_handler.router, prefix="/api")
 app.include_router(topics_handler.router, prefix="/api")
 app.include_router(themed_topic_handler.router, prefix="/api")
+app.include_router(mindmap_handler.router, prefix="/api")
 
 import os
 mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")

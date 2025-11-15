@@ -3,7 +3,7 @@
   console.log('Results page loaded');
   
   // Get the results from storage
-  browser.storage.local.get(['analysisResults', 'timestamp']).then(result => {
+  browser.storage.local.get(['analysisResults', 'pageType', 'timestamp']).then(result => {
     console.log('Retrieved from storage:', result);
     
     if (!result.analysisResults) {
@@ -19,14 +19,15 @@
       return;
     }
     
-    // Send the data to the React app
+    // Send the data to the React app with page type
     window.postMessage({
       type: 'RSSTAG_DATA',
-      data: result.analysisResults
+      data: result.analysisResults,
+      pageType: result.pageType || 'topics'
     }, '*');
     
     // Clear the results from storage after loading
-    browser.storage.local.remove(['analysisResults', 'timestamp']);
+    browser.storage.local.remove(['analysisResults', 'pageType', 'timestamp']);
     
   }).catch(error => {
     console.error('Error loading results:', error);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopicList from '../frontend/src/components/TopicList';
 import TextDisplay from '../frontend/src/components/TextDisplay';
+import MindmapResults from './MindmapResults';
 import '../frontend/src/styles/App.css';
 
 function ExtensionApp() {
@@ -16,6 +17,8 @@ function ExtensionApp() {
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [topicSummaryModalData, setTopicSummaryModalData] = useState(null); // For topic summary modal
+  const [pageType, setPageType] = useState('topics'); // 'topics' or 'mindmap'
+  const [mindmapData, setMindmapData] = useState(null); // Store mindmap data
   
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
@@ -30,9 +33,20 @@ function ExtensionApp() {
       try {
         console.log('Processing RSSTAG_DATA:', event.data.data);
         const apiData = event.data.data;
+        const pageTypeReceived = event.data.pageType || 'topics';
         
         if (!isMountedRef.current) return;
         
+        // Handle mindmap page type
+        if (pageTypeReceived === 'mindmap') {
+          if (!isMountedRef.current) return;
+          setPageType('mindmap');
+          setMindmapData(apiData);
+          setLoading(false);
+          return;
+        }
+        
+        // Handle topics page type (default)
         // Ensure data has required fields
         if (!apiData || !Array.isArray(apiData.sentences)) {
           console.error('Invalid data structure - missing sentences:', apiData);
@@ -68,6 +82,7 @@ function ExtensionApp() {
         
         // Only update state if component is still mounted
         if (isMountedRef.current) {
+          setPageType('topics');
           setArticles(data);
           setAllTopics(Array.from(topicMap.values()));
           console.log('Data processing complete, state updated');
@@ -198,6 +213,11 @@ function ExtensionApp() {
 
   if (loading) {
     return <div className="page-message">Loading and analyzing page content...</div>;
+  }
+
+  // Render mindmap page type
+  if (pageType === 'mindmap') {
+    return <MindmapResults mindmapData={mindmapData} />;
   }
 
   if (!articles.length) {

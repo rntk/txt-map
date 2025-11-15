@@ -1,16 +1,42 @@
-// Background script - handles extension icon clicks
-browser.browserAction.onClicked.addListener((tab) => {
-  // Check if we can inject content scripts into this tab
-  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('about:') ||
-      tab.url.startsWith('moz-extension://') || tab.url.startsWith('chrome-extension://') ||
-      tab.url.startsWith('file://')) {
-    console.warn("Cannot inject content script into this page:", tab.url);
-    showNotification("Cannot analyze this page", "This extension cannot analyze browser internal pages or extension pages.");
-    return;
+// Background script - handles extension icon clicks and messages
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle analysis request from popup
+  if (message.action === "startAnalysis") {
+    const { analysisType, tabId } = message;
+    
+    // Send message to content script with analysis type
+    sendMessageWithRetry(tabId, { 
+      action: "extractContent", 
+      analysisType: analysisType 
+    }, 3);
+    
+    sendResponse({ status: "started" });
+    return true;
   }
-
-  // Send message to content script to extract content
-  sendMessageWithRetry(tab.id, { action: "extractContent" }, 3);
+  
+  // Handle results from content script
+  if (message.action === "openResultsTab") {
+    const { data, pageType } = message;
+    
+    // Store the API results in local storage
+    browser.storage.local.set({ 
+      analysisResults: data,
+      pageType: pageType || 'topics',
+      timestamp: Date.now()
+    }).then(() => {
+      // Open results page in new tab
+      browser.tabs.create({
+        url: browser.runtime.getURL('results.html'),
+        active: true
+      }).then(() => {
+        sendResponse({ status: "tab_opened" });
+      });
+    }).catch(error => {
+      console.error("Error storing results:", error);
+      sendResponse({ status: "error", error: error.message });
+    });
+    return true; // Keep message channel open for async response
+  }
 });
 
 // Helper function to retry sending messages to content script
@@ -31,29 +57,6 @@ function sendMessageWithRetry(tabId, message, retriesLeft) {
       }
     });
 }
-
-// Listen for messages from content script with API results
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "openResultsTab") {
-    // Store the API results in local storage
-    browser.storage.local.set({ 
-      analysisResults: message.data,
-      timestamp: Date.now()
-    }).then(() => {
-      // Open results page in new tab
-      browser.tabs.create({
-        url: browser.runtime.getURL('results.html'),
-        active: true
-      }).then(() => {
-        sendResponse({ status: "tab_opened" });
-      });
-    }).catch(error => {
-      console.error("Error storing results:", error);
-      sendResponse({ status: "error", error: error.message });
-    });
-    return true; // Keep message channel open for async response
-  }
-});
 
 // Cross-browser notification helper
 function showNotification(title, message) {

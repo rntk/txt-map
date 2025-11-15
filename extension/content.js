@@ -4,10 +4,12 @@
   let selectedElement = null;
   let selectionToolbar = null;
   let highlightOverlay = null;
+  let currentAnalysisType = 'topics'; // Default to topics
 
   // Listen for messages from background script
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "extractContent") {
+      currentAnalysisType = message.analysisType || 'topics';
       showSelectionToolbar();
       sendResponse({ status: "started" });
     }
@@ -20,13 +22,17 @@
       selectionToolbar.remove();
     }
 
+    // Set toolbar title based on analysis type
+    const analysisTitle = currentAnalysisType === 'mindmap' ? '🧠 Mindmap Analysis' : '📝 Topics Analysis';
+    const actionText = currentAnalysisType === 'mindmap' ? 'Generate Mindmap' : 'Analyze Topics';
+
     // Create floating toolbar
     selectionToolbar = document.createElement('div');
     selectionToolbar.id = 'rsstag-selection-toolbar';
     selectionToolbar.innerHTML = `
-      <span id="rsstag-toolbar-text">📝 Select content to analyze</span>
+      <span id="rsstag-toolbar-text">${analysisTitle}: Select content</span>
       <button id="rsstag-select-btn">🎯 Select Block</button>
-      <button id="rsstag-fullpage-btn">📄 Analyze Full Page</button>
+      <button id="rsstag-fullpage-btn">📄 ${actionText} (Full Page)</button>
       <button id="rsstag-cancel-btn">✖ Cancel</button>
     `;
     
@@ -115,12 +121,15 @@
     const toolbarText = document.getElementById('rsstag-toolbar-text');
     toolbarText.textContent = '✅ Block selected! Click button to analyze';
     
+    // Determine button text based on analysis type
+    const actionText = currentAnalysisType === 'mindmap' ? 'Generate Mindmap' : 'Analyze Topics';
+    
     // Add analyze button
     let analyzeBtn = document.getElementById('rsstag-analyze-btn');
     if (!analyzeBtn) {
       analyzeBtn = document.createElement('button');
       analyzeBtn.id = 'rsstag-analyze-btn';
-      analyzeBtn.textContent = '🚀 Analyze Selection';
+      analyzeBtn.textContent = `🚀 ${actionText}`;
       analyzeBtn.style.cssText = 'background: #ffd700; color: #333; font-weight: bold;';
       analyzeBtn.addEventListener('click', () => {
         extractAndAnalyze(selectedElement);
@@ -169,8 +178,15 @@
       console.log("Extracting full page content...", pageContent.substring(0, 100));
     }
 
+    // Determine API endpoint based on analysis type
+    const apiEndpoint = currentAnalysisType === 'mindmap' 
+      ? "http://127.0.0.1:8000/api/mindmap" 
+      : "http://127.0.0.1:8000/api/themed-post";
+
+    console.log(`Sending content to ${apiEndpoint} for ${currentAnalysisType} analysis`);
+
     // Send POST request to the API
-    fetch("http://127.0.0.1:8000/api/themed-post", {
+    fetch(apiEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -185,7 +201,8 @@
       // Send results to background script to open in new tab
       browser.runtime.sendMessage({
         action: "openResultsTab",
-        data: data
+        data: data,
+        pageType: currentAnalysisType
       });
     })
     .catch(error => {
