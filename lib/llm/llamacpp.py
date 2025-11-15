@@ -1,15 +1,18 @@
 import json
+import os
 from typing import List, Union, Optional, Dict, Any
 import logging
 from urllib.parse import urlparse
 from http.client import HTTPConnection, HTTPSConnection
 
 class LLamaCPP:
-    def __init__(self, host: str, max_context_tokens: int = 11000):
+    def __init__(self, host: str, max_context_tokens: int = 11000, token: Optional[str] = None):
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
         self.__max_context_tokens = max_context_tokens  # Leave some buffer from the actual context size
+        # Token can be passed in explicitly or read from the environment variable TOKEN
+        self.__token = token or os.getenv("TOKEN")
 
     def estimate_tokens(self, text: str) -> int:
         """Rough estimation: ~4 characters per token on average"""
@@ -19,13 +22,16 @@ class LLamaCPP:
         conn = self.get_connection()
         body = json.dumps(
             {
-                "model": "gpt-3.5-turbo",
+                "model": "openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": user_msgs[0]}],
                 "temperature": temperature,
                 "cache_prompt": True
             }
         )
         headers = {'Content-type': 'application/json'}
+        if self.__token:
+            headers['Authorization'] = f"Bearer {self.__token}"
+        #conn.request("POST", "/openai/v1/chat/completions", body, headers)
         conn.request("POST", "/v1/chat/completions", body, headers)
         res = conn.getresponse()
         resp_body = res.read()
@@ -54,10 +60,9 @@ class LLamaCPP:
                 "input": texts
             }
         )
-        headers = {
-            'Content-type': 'application/json',
-            'Authorization': 'Bearer '
-        }
+        headers = {'Content-type': 'application/json'}
+        if self.__token:
+            headers['Authorization'] = f"Bearer {self.__token}"
         conn.request("POST", "/v1/embeddings", body, headers)
         res = conn.getresponse()
         resp_body = res.read()
@@ -99,10 +104,9 @@ class LLamaCPP:
             request_body["top_n"] = top_n
 
         body = json.dumps(request_body)
-        headers = {
-            'Content-type': 'application/json',
-            'Authorization': 'Bearer '
-        }
+        headers = {'Content-type': 'application/json'}
+        if self.__token:
+            headers['Authorization'] = f"Bearer {self.__token}"
 
         conn.request("POST", "/v1/rerank", body, headers)
         res = conn.getresponse()
