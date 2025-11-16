@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../frontend/src/styles/App.css';
 
 // Recursive component to render tree nodes
@@ -75,6 +75,8 @@ function MindmapResults({ mindmapData }) {
   const [activeTab, setActiveTab] = useState('tree'); // 'tree' | 'list' | 'details'
   const [expandMode, setExpandMode] = useState('default'); // 'default', 'all', 'none'
   const [selectedTopic, setSelectedTopic] = useState(null); // Track selected topic for showing sentences
+  const [panelTop, setPanelTop] = useState(10);
+  const mindmapContentRef = useRef(null);
 
   if (!mindmapData) {
     return (
@@ -105,6 +107,23 @@ function MindmapResults({ mindmapData }) {
   };
 
   const totalTopics = countTopics(structure);
+
+  // Update panel position when selected topic changes
+  useEffect(() => {
+    if (selectedTopic && mindmapContentRef.current) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        const selectedElement = document.querySelector('.node-content.selected');
+        if (selectedElement) {
+          const contentRect = mindmapContentRef.current.getBoundingClientRect();
+          const selectedRect = selectedElement.getBoundingClientRect();
+          setPanelTop(selectedRect.top - contentRect.top);
+        }
+      }, 0);
+    } else {
+      setPanelTop(10);
+    }
+  }, [selectedTopic]);
 
   // Function to get sentences for a specific topic
   const getSentencesForTopic = (topicName) => {
@@ -159,80 +178,94 @@ function MindmapResults({ mindmapData }) {
         </button>
       </div>
 
-      <div className="mindmap-content">
+      <div className="mindmap-content" ref={mindmapContentRef}>
         {activeTab === 'tree' && (
-          <div className="tree-view">
-            {Object.keys(structure).length > 0 ? (
-              <div className="tree-root">
-                <h3>Topic Hierarchy</h3>
-                <div className="tree-controls">
-                  <button
-                    className="tree-control-btn"
-                    onClick={() => setExpandMode('none')}
-                  >
-                    Fold All
-                  </button>
-                  <button
-                    className="tree-control-btn"
-                    onClick={() => setExpandMode('all')}
-                  >
-                    Unfold All
-                  </button>
-                </div>
-                {Object.entries(structure).map(([topicKey, children]) => (
-                  <TreeNode
-                    key={topicKey}
-                    nodeKey={topicKey}
-                    children={children}
-                    level={0}
-                    expandMode={expandMode}
-                    onTopicClick={setSelectedTopic}
-                    selectedTopic={selectedTopic}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="placeholder">
-                <div className="placeholder-icon">📭</div>
-                <h2>No Topics Found</h2>
-                <p>The analysis didn't identify any topic hierarchies.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {selectedTopic && (
-          <div className="topic-sentences-panel">
-            <h3>Sentences for topic: "{selectedTopic}"</h3>
-            <button 
-              className="close-panel-btn"
-              onClick={() => setSelectedTopic(null)}
-              title="Close panel"
-            >
-              ×
-            </button>
-            <div className="topic-sentences-list">
-              {getSentencesForTopic(selectedTopic).map((result, idx) => (
-                <div key={idx} className="topic-sentence-item">
-                  <div className="sentence-number">Sentence {result.sentence_index}</div>
-                  <div className="sentence-text">{result.sentence}</div>
-                  {result.mindmap_topics && result.mindmap_topics.length > 0 && (
-                    <div className="sentence-topics">
-                      <strong>Topic hierarchies:</strong>
-                      <ul>
-                        {result.mindmap_topics.map((hierarchy, topicIdx) => (
-                          <li key={topicIdx} className="topic-hierarchy">
-                            {hierarchy.join(' > ')}
-                          </li>
-                        ))}
-                      </ul>
+          <div className="mindmap-body">
+            <div className="mindmap-left">
+              <div className="tree-view">
+                {Object.keys(structure).length > 0 ? (
+                  <>
+                    <h3>Topic Hierarchy</h3>
+                    <div className="tree-controls">
+                      <button
+                        className="tree-control-btn"
+                        onClick={() => setExpandMode('none')}
+                      >
+                        Fold All
+                      </button>
+                      <button
+                        className="tree-control-btn"
+                        onClick={() => setExpandMode('all')}
+                      >
+                        Unfold All
+                      </button>
                     </div>
+                    <div className="tree-scroller">
+                      <div className="tree-root">
+                        {Object.entries(structure).map(([topicKey, children]) => (
+                          <TreeNode
+                            key={topicKey}
+                            nodeKey={topicKey}
+                            children={children}
+                            level={0}
+                            expandMode={expandMode}
+                            onTopicClick={setSelectedTopic}
+                            selectedTopic={selectedTopic}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="placeholder">
+                    <div className="placeholder-icon">📭</div>
+                    <h2>No Topics Found</h2>
+                    <p>The analysis didn't identify any topic hierarchies.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mindmap-right">
+              <div className="topic-sentences-panel">
+                <h3>{selectedTopic ? `Sentences for topic: "${selectedTopic}"` : 'Topic Sentences'}</h3>
+                {selectedTopic && (
+                  <button
+                    className="close-panel-btn"
+                    onClick={() => setSelectedTopic(null)}
+                    title="Clear selection"
+                  >
+                    ×
+                  </button>
+                )}
+                <div className="topic-sentences-list">
+                  {selectedTopic ? (
+                    getSentencesForTopic(selectedTopic).length > 0 ? (
+                      getSentencesForTopic(selectedTopic).map((result, idx) => (
+                        <div key={idx} className="topic-sentence-item">
+                          <div className="sentence-number">Sentence {result.sentence_index}</div>
+                          <div className="sentence-text">{result.sentence}</div>
+                          {result.mindmap_topics && result.mindmap_topics.length > 0 && (
+                            <div className="sentence-topics">
+                              <strong>Topic hierarchies:</strong>
+                              <ul>
+                                {result.mindmap_topics.map((hierarchy, topicIdx) => (
+                                  <li key={topicIdx} className="topic-hierarchy">
+                                    {hierarchy.join(' > ')}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="no-sentences">No sentences found for this topic.</div>
+                    )
+                  ) : (
+                    <div className="no-sentences">Select a topic on the left to see related sentences.</div>
                   )}
                 </div>
-              ))}
-              {getSentencesForTopic(selectedTopic).length === 0 && (
-                <div className="no-sentences">No sentences found for this topic.</div>
-              )}
+              </div>
             </div>
           </div>
         )}
@@ -398,11 +431,43 @@ function MindmapResults({ mindmapData }) {
           background-color: #ffffff;
         }
 
+        /* Two-column layout for mindmap view */
+        .mindmap-body {
+          display: flex;
+          gap: 16px;
+          align-items: flex-start;
+        }
+
+        .mindmap-left {
+          flex: 1 1 60%;
+          min-width: 320px;
+        }
+
+        .mindmap-right {
+          flex: 0 0 38%;
+          max-width: 38%;
+          min-width: 280px;
+          position: sticky;
+          top: ${panelTop}px;
+          align-self: flex-start;
+        }
+
         .tree-view {
           background-color: #f9f9f9;
           border-radius: 8px;
           padding: 20px;
-          max-width: 1200px;
+          width: 100%;
+        }
+
+        /* Horizontal scrolling support when branches go wide */
+        .tree-scroller {
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding-bottom: 8px;
+        }
+
+        .tree-root {
+          width: max-content; /* expand to needed width so container can scroll */
         }
 
         .tree-root h3 {
@@ -701,8 +766,6 @@ function MindmapResults({ mindmapData }) {
           background-color: #f0f8ff;
           border-radius: 8px;
           padding: 20px;
-          margin-top: 20px;
-          max-width: 1200px;
           border: 2px solid #667eea;
           position: relative;
         }
@@ -776,6 +839,17 @@ function MindmapResults({ mindmapData }) {
           font-style: italic;
           padding: 40px;
           font-size: 16px;
+        }
+
+        @media (max-width: 1024px) {
+          .mindmap-body {
+            flex-direction: column;
+          }
+          .mindmap-right {
+            position: static;
+            flex: 1 1 auto;
+            max-width: 100%;
+          }
         }
 
         @media (max-width: 768px) {
