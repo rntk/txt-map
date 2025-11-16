@@ -185,23 +185,58 @@ def build_sentences_from_ranges(
     if cursor <= len(words) - 1:
         merged_segments.append((cursor, len(words) - 1, None))
 
+    # Minimum sentence length thresholds
+    MIN_SENTENCE_WORDS = 5
+    MIN_SENTENCE_CHARS = 30
+    
+    print(f"\n=== DEBUG: Building sentences with minimum thresholds: {MIN_SENTENCE_WORDS} words, {MIN_SENTENCE_CHARS} chars ===")
+    
     for seg_word_start, seg_word_end, seg_range in merged_segments:
         if seg_word_start > seg_word_end:
             continue
         sentence = " ".join(words[seg_word_start:seg_word_end + 1]).strip()
         if not sentence:
             continue
-        sentence_idx = len(sentences)
-        sentences.append(sentence)
-        sentence_range_map[sentence_idx] = seg_range
-        sentence_start_word[sentence_idx] = seg_word_start
         
-        # Map sentence to paragraph
-        if seg_word_start < len(word_to_paragraph):
-            paragraph_map[sentence_idx] = word_to_paragraph[seg_word_start]
+        # Calculate sentence metrics
+        word_count = seg_word_end - seg_word_start + 1
+        char_count = len(sentence)
+        
+        # Check if this sentence is too short
+        is_too_short = word_count < MIN_SENTENCE_WORDS or char_count < MIN_SENTENCE_CHARS
+        
+        # If sentence is too short and we have a previous sentence, merge with previous
+        if is_too_short and len(sentences) > 0:
+            print(f"=== DEBUG: Merging short sentence ({word_count} words, {char_count} chars): '{sentence[:50]}...' ===")
+            # Merge with previous sentence
+            prev_idx = len(sentences) - 1
+            sentences[prev_idx] = sentences[prev_idx] + " " + sentence
+            
+            # Update the range map if both have ranges
+            if seg_range is not None:
+                prev_range = sentence_range_map[prev_idx]
+                if prev_range is not None:
+                    # Extend the range to include this segment
+                    sentence_range_map[prev_idx] = (prev_range[0], seg_range[1])
+                else:
+                    # Previous was a gap, now it has a range
+                    sentence_range_map[prev_idx] = seg_range
+            # Note: sentence_start_word stays the same (start of previous sentence)
+            # paragraph_map stays the same (paragraph of previous sentence)
         else:
-            paragraph_map[sentence_idx] = len(paragraph_texts) - 1 if paragraph_texts else 0
+            # Add as new sentence
+            sentence_idx = len(sentences)
+            sentences.append(sentence)
+            sentence_range_map[sentence_idx] = seg_range
+            sentence_start_word[sentence_idx] = seg_word_start
+            
+            # Map sentence to paragraph
+            if seg_word_start < len(word_to_paragraph):
+                paragraph_map[sentence_idx] = word_to_paragraph[seg_word_start]
+            else:
+                paragraph_map[sentence_idx] = len(paragraph_texts) - 1 if paragraph_texts else 0
 
+    print(f"=== DEBUG: Built {len(sentences)} sentences after merging short ones ===")
     return sentences, sentence_range_map, sentence_start_word, paragraph_map
 
 
