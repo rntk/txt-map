@@ -202,13 +202,15 @@ The user-provided text to be analyzed is enclosed in <content> tags. It is cruci
         mindmap_prompt = """You are given a sentence where every word is followed by a numbered marker |#N#|.
 Your task is to extract a mind map structure from this text by identifying the word ranges that represent topics and subtopics.
 
-CRITICAL INSTRUCTIONS FOR BREVITY:
+CRITICAL INSTRUCTIONS FOR BREVITY AND DEPTH:
+- Focus on MAIN CONCEPTS and KEY THEMES.
+- Avoid going too deep into details. The last node should still be a general concept, not a specific instance or minor detail.
+- Limit the hierarchy depth. 2 levels are usually sufficient (Topic -> Subtopic). Only use a 3rd level if absolutely necessary for broad categorization.
 - Select ONLY the specific keywords or short phrases (1-4 words) that define the topic.
 - Do NOT include connecting words, articles, or unnecessary adjectives unless essential.
-- The extracted text MUST be as short as possible while remaining intelligible.
 
 Return a hierarchical list of word ranges in the format:
-Topic_Range, Subtopic_Range, Sub-subtopic_Range
+Topic_Range, Subtopic_Range
 
 Format for a range is: start-end
 Where 'start' is the marker number of the first word and 'end' is the marker number of the last word (inclusive).
