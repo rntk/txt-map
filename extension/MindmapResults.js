@@ -76,6 +76,7 @@ function MindmapResults({ mindmapData }) {
   const [expandMode, setExpandMode] = useState('default'); // 'default', 'all', 'none'
   const [selectedTopic, setSelectedTopic] = useState(null); // Track selected topic for showing sentences
   const [panelTop, setPanelTop] = useState(10);
+  const [expandedContexts, setExpandedContexts] = useState({}); // State for expanded contexts
   const mindmapContentRef = useRef(null);
 
   if (!mindmapData) {
@@ -128,13 +129,53 @@ function MindmapResults({ mindmapData }) {
   // Function to get sentences for a specific topic
   const getSentencesForTopic = (topicName) => {
     if (!mindmapResults || !Array.isArray(mindmapResults)) return [];
-    
-    return mindmapResults.filter(result => 
-      result.mindmap_topics && 
-      result.mindmap_topics.some(hierarchy => 
+
+    return mindmapResults.filter(result =>
+      result.mindmap_topics &&
+      result.mindmap_topics.some(hierarchy =>
         hierarchy.some(topic => topic === topicName)
       )
     );
+  };
+
+  // Function to get context sentences
+  const getContext = (index, count = 3) => {
+    if (!mindmapData.sentences) return { prev: [], next: [] };
+
+    // index is 1-based in result.sentence_index, but array is 0-based
+    const arrayIndex = index - 1;
+
+    const prev = [];
+    const next = [];
+
+    // Get previous sentences
+    for (let i = count; i > 0; i--) {
+      if (arrayIndex - i >= 0) {
+        prev.push({
+          index: index - i,
+          text: mindmapData.sentences[arrayIndex - i]
+        });
+      }
+    }
+
+    // Get next sentences
+    for (let i = 1; i <= count; i++) {
+      if (arrayIndex + i < mindmapData.sentences.length) {
+        next.push({
+          index: index + i,
+          text: mindmapData.sentences[arrayIndex + i]
+        });
+      }
+    }
+
+    return { prev, next };
+  };
+
+  const toggleContext = (index) => {
+    setExpandedContexts(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
   };
 
   return (
@@ -241,21 +282,54 @@ function MindmapResults({ mindmapData }) {
                   {selectedTopic ? (
                     getSentencesForTopic(selectedTopic).length > 0 ? (
                       getSentencesForTopic(selectedTopic).map((result, idx) => (
-                        <div key={idx} className="topic-sentence-item">
-                          <div className="sentence-number">Sentence {result.sentence_index}</div>
-                          <div className="sentence-text">{result.sentence}</div>
-                          {result.mindmap_topics && result.mindmap_topics.length > 0 && (
-                            <div className="sentence-topics">
-                              <strong>Topic hierarchies:</strong>
-                              <ul>
-                                {result.mindmap_topics.map((hierarchy, topicIdx) => (
-                                  <li key={topicIdx} className="topic-hierarchy">
-                                    {hierarchy.join(' > ')}
-                                  </li>
-                                ))}
-                              </ul>
+                        <div key={idx} className={`topic-sentence-item ${expandedContexts[result.sentence_index] ? 'expanded-context' : ''}`}>
+                          {/* Context Previous */}
+                          {expandedContexts[result.sentence_index] && (
+                            <div className="context-prev">
+                              {getContext(result.sentence_index).prev.map(ctx => (
+                                <div key={ctx.index} className="context-sentence prev">
+                                  <span className="context-number">{ctx.index}</span> {ctx.text}
+                                </div>
+                              ))}
+                              {getContext(result.sentence_index).prev.length === 0 && <div className="context-empty">No previous context</div>}
                             </div>
                           )}
+
+                          <div className="sentence-main-content">
+                            <div className="sentence-number">Sentence {result.sentence_index}</div>
+                            <div className="sentence-text">{result.sentence}</div>
+                            {result.mindmap_topics && result.mindmap_topics.length > 0 && (
+                              <div className="sentence-topics">
+                                <strong>Topic hierarchies:</strong>
+                                <ul>
+                                  {result.mindmap_topics.map((hierarchy, topicIdx) => (
+                                    <li key={topicIdx} className="topic-hierarchy">
+                                      {hierarchy.join(' > ')}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Context Next */}
+                          {expandedContexts[result.sentence_index] && (
+                            <div className="context-next">
+                              {getContext(result.sentence_index).next.map(ctx => (
+                                <div key={ctx.index} className="context-sentence next">
+                                  <span className="context-number">{ctx.index}</span> {ctx.text}
+                                </div>
+                              ))}
+                              {getContext(result.sentence_index).next.length === 0 && <div className="context-empty">No next context</div>}
+                            </div>
+                          )}
+
+                          <button
+                            className="context-btn"
+                            onClick={() => toggleContext(result.sentence_index)}
+                          >
+                            {expandedContexts[result.sentence_index] ? 'Hide Context' : 'Show Context'}
+                          </button>
                         </div>
                       ))
                     ) : (
@@ -334,6 +408,8 @@ function MindmapResults({ mindmapData }) {
             </div>
           </div>
         )}
+
+        {/* Context Modal Removed */}
       </div>
 
       <style jsx>{`
@@ -880,8 +956,83 @@ function MindmapResults({ mindmapData }) {
             margin-left: 0 !important;
           }
         }
+          .tree-node {
+            margin-left: 0 !important;
+          }
+        }
+
+        /* Inline Context Styles */
+        .topic-sentence-item.expanded-context {
+          border-left: 4px solid #4ECDC4;
+          background-color: #f8fdfd;
+        }
+
+        .context-prev, .context-next {
+          margin: 10px 0;
+          padding: 10px;
+          background-color: #f0f0f0;
+          border-radius: 4px;
+          font-size: 13px;
+          color: #666;
+        }
+
+        .context-prev {
+          border-bottom: 1px dashed #ccc;
+          margin-bottom: 15px;
+        }
+
+        .context-next {
+          border-top: 1px dashed #ccc;
+          margin-top: 15px;
+        }
+
+        .context-sentence {
+          margin-bottom: 6px;
+          line-height: 1.4;
+        }
+
+        .context-sentence:last-child {
+          margin-bottom: 0;
+        }
+
+        .context-number {
+          font-weight: bold;
+          color: #888;
+          margin-right: 5px;
+          font-size: 11px;
+        }
+
+        .context-empty {
+          font-style: italic;
+          color: #aaa;
+          font-size: 12px;
+        }
+
+        .sentence-main-content {
+          position: relative;
+          z-index: 1;
+        }
+
+        .context-btn {
+          margin-top: 12px;
+          padding: 6px 12px;
+          background-color: #fff;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+          color: #555;
+          transition: all 0.2s;
+          display: inline-block;
+        }
+
+        .context-btn:hover {
+          background-color: #f0f0f0;
+          color: #333;
+          border-color: #ccc;
+        }
       `}</style>
-    </div>
+    </div >
   );
 }
 
