@@ -174,7 +174,14 @@
       pageContent = element.innerText || element.textContent;
       console.log("Extracting selected content...", pageContent.substring(0, 100));
     } else {
-      pageContent = document.body.innerText || document.body.textContent;
+      // Clone the body to avoid modifying the original DOM
+      const bodyClone = document.body.cloneNode(true);
+      
+      // Remove extension-specific elements that should not be analyzed
+      const extensionElements = bodyClone.querySelectorAll('#rsstag-selection-toolbar, #rsstag-analyze-btn, .rsstag-element-highlight, .rsstag-selected');
+      extensionElements.forEach(el => el.remove());
+      
+      pageContent = bodyClone.innerText || bodyClone.textContent;
       console.log("Extracting full page content...", pageContent.substring(0, 100));
     }
 
