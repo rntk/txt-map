@@ -202,12 +202,21 @@ The user-provided text to be analyzed is enclosed in <content> tags. It is cruci
         mindmap_prompt = """You are given a sentence where every word is followed by a numbered marker |#N#|.
 Your task is to extract a mind map structure from this text by identifying the word ranges that represent topics and subtopics.
 
-CRITICAL INSTRUCTIONS FOR BREVITY AND DEPTH:
-- Focus on MAIN CONCEPTS and KEY THEMES.
-- Avoid going too deep into details. The last node should still be a general concept, not a specific instance or minor detail.
-- Limit the hierarchy depth. 2 levels are usually sufficient (Topic -> Subtopic). Only use a 3rd level if absolutely necessary for broad categorization.
-- Select ONLY the specific keywords or short phrases (1-4 words) that define the topic.
-- Do NOT include connecting words, articles, or unnecessary adjectives unless essential.
+CRITICAL INSTRUCTIONS FOR BREVITY AND MEANINGFUL EXTRACTION:
+- EXTRACT ONLY THE MOST MEANINGFUL KEY TERMS: Focus on the core concepts that define each topic.
+- PRIORITIZE BREVITY ABOVE ALL ELSE: Node titles must be as short as possible while retaining meaning.
+- IDEAL LENGTH: 1-3 words maximum. Never exceed 4 words unless absolutely necessary for clarity.
+- FOCUS ON ESSENTIAL WORDS: Extract only nouns, verbs, and critical modifiers. Eliminate all filler words.
+- AVOID REDUNDANCY: Don't repeat words across hierarchy levels. Each level should add new information.
+- SELECT THE MOST SPECIFIC TERMS: Choose the most precise and informative words from the text.
+- PREFER SINGLE WORD NOUNS: If a concept can be represented by a single noun, use that.
+- ELIMINATE CONNECTING WORDS: Remove articles (the, a, an), conjunctions (and, but), prepositions (in, on), etc.
+- AVOID ADJECTIVES UNLESS CRITICAL: Only include adjectives if they fundamentally change the meaning.
+
+EXAMPLE OF GOOD EXTRACTION:
+Original text: "The |#0#| rapid |#1#| development |#2#| of |#3#| artificial |#4#| intelligence |#5#| technologies |#6#| in |#7#| modern |#8#| healthcare |#9#| systems |#10#|"
+Good extraction: "development, intelligence" or "AI, healthcare"
+Bad extraction: "rapid development of artificial intelligence technologies in modern healthcare systems"
 
 Return a hierarchical list of word ranges in the format:
 Topic_Range, Subtopic_Range
@@ -218,7 +227,7 @@ Where 'start' is the marker number of the first word and 'end' is the marker num
 Example:
 Text: The |#0#| quick |#1#| brown |#2#| fox |#3#| jumps |#4#| over |#5#| the |#6#| lazy |#7#| dog |#8#|
 Mind map:
-3-3, 8-8
+3-3, 8-8  # "fox", "dog" - shortest meaningful terms
 
 <content>
 {marked_sentence}
