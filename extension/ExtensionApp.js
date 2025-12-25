@@ -26,6 +26,45 @@ function ExtensionApp() {
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
 
+  // Helper to process topics data
+  const processTopicsData = (apiData) => {
+    // Ensure data has required fields
+    if (!apiData || !Array.isArray(apiData.sentences)) {
+      console.error('Invalid data structure - missing sentences:', apiData);
+      return null;
+    }
+
+    if (!Array.isArray(apiData.topics)) {
+      console.error('Invalid data structure - missing topics:', apiData);
+      return null;
+    }
+
+    const data = [apiData]; // Wrap single article in array
+
+    // Collect all unique topics with sentence counts
+    const topicMap = new Map();
+    data.forEach((article) => {
+      if (article.topics && Array.isArray(article.topics)) {
+        article.topics.forEach(topic => {
+          if (topic && topic.name && Array.isArray(topic.sentences)) {
+            if (!topicMap.has(topic.name)) {
+              topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
+            } else {
+              // Add to existing topic's sentence count
+              const existing = topicMap.get(topic.name);
+              existing.totalSentences += topic.sentences.length;
+            }
+          }
+        });
+      }
+    });
+
+    return {
+      articles: data,
+      allTopics: Array.from(topicMap.values())
+    };
+  };
+
   // Define handler with useCallback
   const handleMessage = useCallback((event) => {
     if (!isMountedRef.current) return;
@@ -42,7 +81,6 @@ function ExtensionApp() {
 
         // Handle mindmap page type
         if (pageTypeReceived === 'mindmap') {
-          if (!isMountedRef.current) return;
           setPageType('mindmap');
           setMindmapData(apiData);
           setLoading(false);
@@ -51,7 +89,6 @@ function ExtensionApp() {
 
         // Handle insides page type
         if (pageTypeReceived === 'insides') {
-          if (!isMountedRef.current) return;
           setPageType('insides');
           setInsidesData(apiData);
           setLoading(false);
@@ -59,47 +96,18 @@ function ExtensionApp() {
         }
 
         // Handle topics page type (default)
-        // Ensure data has required fields
-        if (!apiData || !Array.isArray(apiData.sentences)) {
-          console.error('Invalid data structure - missing sentences:', apiData);
-          setLoading(false);
-          return;
-        }
+        const processedData = processTopicsData(apiData);
 
-        if (!Array.isArray(apiData.topics)) {
-          console.error('Invalid data structure - missing topics:', apiData);
-          setLoading(false);
-          return;
-        }
-
-        const data = [apiData]; // Wrap single article in array
-
-        // Collect all unique topics with sentence counts
-        const topicMap = new Map();
-        data.forEach((article, index) => {
-          if (article.topics && Array.isArray(article.topics)) {
-            article.topics.forEach(topic => {
-              if (topic && topic.name && Array.isArray(topic.sentences)) {
-                if (!topicMap.has(topic.name)) {
-                  topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
-                } else {
-                  // Add to existing topic's sentence count
-                  const existing = topicMap.get(topic.name);
-                  existing.totalSentences += topic.sentences.length;
-                }
-              }
-            });
-          }
-        });
-
-        // Only update state if component is still mounted
-        if (isMountedRef.current) {
+        if (processedData && isMountedRef.current) {
           setPageType('topics');
-          setArticles(data);
-          setAllTopics(Array.from(topicMap.values()));
+          setArticles(processedData.articles);
+          setAllTopics(processedData.allTopics);
           console.log('Data processing complete, state updated');
           setLoading(false);
+        } else {
+          setLoading(false);
         }
+
       } catch (error) {
         console.error('Error processing data:', error, error.stack);
         if (isMountedRef.current) {
@@ -477,4 +485,3 @@ function ExtensionApp() {
 }
 
 export default ExtensionApp;
-
