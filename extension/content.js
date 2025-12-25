@@ -23,8 +23,16 @@
     }
 
     // Set toolbar title based on analysis type
-    const analysisTitle = currentAnalysisType === 'mindmap' ? '🧠 Mindmap Analysis' : '📝 Topics Analysis';
-    const actionText = currentAnalysisType === 'mindmap' ? 'Generate Mindmap' : 'Analyze Topics';
+    let analysisTitle = '📝 Topics Analysis';
+    let actionText = 'Analyze Topics';
+
+    if (currentAnalysisType === 'mindmap') {
+      analysisTitle = '🧠 Mindmap Analysis';
+      actionText = 'Generate Mindmap';
+    } else if (currentAnalysisType === 'insides') {
+      analysisTitle = '💡 Insides Analysis';
+      actionText = 'Extract Insides';
+    }
 
     // Create floating toolbar
     selectionToolbar = document.createElement('div');
@@ -122,7 +130,12 @@
     toolbarText.textContent = '✅ Block selected! Click button to analyze';
     
     // Determine button text based on analysis type
-    const actionText = currentAnalysisType === 'mindmap' ? 'Generate Mindmap' : 'Analyze Topics';
+    let actionText = 'Analyze Topics';
+    if (currentAnalysisType === 'mindmap') {
+      actionText = 'Generate Mindmap';
+    } else if (currentAnalysisType === 'insides') {
+      actionText = 'Extract Insides';
+    }
     
     // Add analyze button
     let analyzeBtn = document.getElementById('rsstag-analyze-btn');
@@ -186,9 +199,12 @@
     }
 
     // Determine API endpoint based on analysis type
-    const apiEndpoint = currentAnalysisType === 'mindmap' 
-      ? "http://127.0.0.1:8000/api/mindmap" 
-      : "http://127.0.0.1:8000/api/themed-post";
+    let apiEndpoint = "http://127.0.0.1:8000/api/themed-post";
+    if (currentAnalysisType === 'mindmap') {
+      apiEndpoint = "http://127.0.0.1:8000/api/mindmap";
+    } else if (currentAnalysisType === 'insides') {
+      apiEndpoint = "http://127.0.0.1:8000/api/insides";
+    }
 
     console.log(`Sending content to ${apiEndpoint} for ${currentAnalysisType} analysis`);
 

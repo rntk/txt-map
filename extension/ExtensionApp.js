@@ -3,6 +3,7 @@ import TopicList from '../frontend/src/components/TopicList';
 import TextDisplay from '../frontend/src/components/TextDisplay';
 import TopicsRiverChart from '../frontend/src/components/TopicsRiverChart';
 import MindmapResults from './MindmapResults';
+import InsidesResults from './InsidesResults';
 import '../frontend/src/styles/App.css';
 
 function ExtensionApp() {
@@ -18,8 +19,9 @@ function ExtensionApp() {
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [topicSummaryModalData, setTopicSummaryModalData] = useState(null); // For topic summary modal
-  const [pageType, setPageType] = useState('topics'); // 'topics' or 'mindmap'
+  const [pageType, setPageType] = useState('topics'); // 'topics', 'mindmap' or 'insides'
   const [mindmapData, setMindmapData] = useState(null); // Store mindmap data
+  const [insidesData, setInsidesData] = useState(null); // Store insides data
 
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
@@ -43,6 +45,15 @@ function ExtensionApp() {
           if (!isMountedRef.current) return;
           setPageType('mindmap');
           setMindmapData(apiData);
+          setLoading(false);
+          return;
+        }
+
+        // Handle insides page type
+        if (pageTypeReceived === 'insides') {
+          if (!isMountedRef.current) return;
+          setPageType('insides');
+          setInsidesData(apiData);
           setLoading(false);
           return;
         }
@@ -219,6 +230,11 @@ function ExtensionApp() {
   // Render mindmap page type
   if (pageType === 'mindmap') {
     return <MindmapResults mindmapData={mindmapData} />;
+  }
+
+  // Render insides page type
+  if (pageType === 'insides') {
+    return <InsidesResults insidesData={insidesData} />;
   }
 
   if (!articles.length) {

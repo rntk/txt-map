@@ -2,6 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const topicsButton = document.getElementById('analyze-topics');
   const mindmapButton = document.getElementById('analyze-mindmap');
+  const insidesButton = document.getElementById('analyze-insides');
 
   // Handle Topics Analysis button
   topicsButton.addEventListener('click', () => {
@@ -11,6 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle Mindmap Analysis button
   mindmapButton.addEventListener('click', () => {
     initiateAnalysis('mindmap');
+  });
+
+  // Handle Insides Analysis button
+  insidesButton.addEventListener('click', () => {
+    initiateAnalysis('insides');
   });
 
   function initiateAnalysis(analysisType) {
