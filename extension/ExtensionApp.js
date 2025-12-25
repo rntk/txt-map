@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopicList from '../frontend/src/components/TopicList';
 import TextDisplay from '../frontend/src/components/TextDisplay';
+import TopicsRiverChart from '../frontend/src/components/TopicsRiverChart';
 import MindmapResults from './MindmapResults';
 import '../frontend/src/styles/App.css';
 
@@ -19,24 +20,24 @@ function ExtensionApp() {
   const [topicSummaryModalData, setTopicSummaryModalData] = useState(null); // For topic summary modal
   const [pageType, setPageType] = useState('topics'); // 'topics' or 'mindmap'
   const [mindmapData, setMindmapData] = useState(null); // Store mindmap data
-  
+
   // Use refs to track if component is mounted
   const isMountedRef = useRef(true);
 
   // Define handler with useCallback
   const handleMessage = useCallback((event) => {
     if (!isMountedRef.current) return;
-    
+
     console.log('Message received:', event.data?.type);
-    
+
     if (event.data?.type === 'RSSTAG_DATA') {
       try {
         console.log('Processing RSSTAG_DATA:', event.data.data);
         const apiData = event.data.data;
         const pageTypeReceived = event.data.pageType || 'topics';
-        
+
         if (!isMountedRef.current) return;
-        
+
         // Handle mindmap page type
         if (pageTypeReceived === 'mindmap') {
           if (!isMountedRef.current) return;
@@ -45,7 +46,7 @@ function ExtensionApp() {
           setLoading(false);
           return;
         }
-        
+
         // Handle topics page type (default)
         // Ensure data has required fields
         if (!apiData || !Array.isArray(apiData.sentences)) {
@@ -53,15 +54,15 @@ function ExtensionApp() {
           setLoading(false);
           return;
         }
-        
+
         if (!Array.isArray(apiData.topics)) {
           console.error('Invalid data structure - missing topics:', apiData);
           setLoading(false);
           return;
         }
-        
+
         const data = [apiData]; // Wrap single article in array
-        
+
         // Collect all unique topics with sentence counts
         const topicMap = new Map();
         data.forEach((article, index) => {
@@ -79,7 +80,7 @@ function ExtensionApp() {
             });
           }
         });
-        
+
         // Only update state if component is still mounted
         if (isMountedRef.current) {
           setPageType('topics');
@@ -100,11 +101,11 @@ function ExtensionApp() {
   useEffect(() => {
     console.log('ExtensionApp mounted');
     isMountedRef.current = true;
-    
+
     // Add listener
     window.addEventListener('message', handleMessage);
     console.log('Message listener attached');
-    
+
     return () => {
       console.log('ExtensionApp cleanup - removing listener');
       isMountedRef.current = false;
@@ -113,9 +114,9 @@ function ExtensionApp() {
   }, [handleMessage]);
 
   const toggleTopic = (topic) => {
-    setSelectedTopics(prev => 
-      prev.includes(topic) 
-        ? prev.filter(t => t !== topic) 
+    setSelectedTopics(prev =>
+      prev.includes(topic)
+        ? prev.filter(t => t !== topic)
         : [...prev, topic]
     );
   };
@@ -180,9 +181,9 @@ function ExtensionApp() {
   const scrollToArticle = (articleIndex) => {
     const articleElement = document.getElementById(`article-${articleIndex}`);
     if (articleElement) {
-      articleElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
+      articleElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
       });
     }
   };
@@ -229,12 +230,12 @@ function ExtensionApp() {
       <div className="container">
         <div className="left-column">
           <h1>Topics</h1>
-          <TopicList 
-            topics={allTopics} 
-            selectedTopics={selectedTopics} 
-            onToggleTopic={toggleTopic} 
-            onHoverTopic={handleHoverTopic} 
-            readTopics={readTopics} 
+          <TopicList
+            topics={allTopics}
+            selectedTopics={selectedTopics}
+            onToggleTopic={toggleTopic}
+            onHoverTopic={handleHoverTopic}
+            readTopics={readTopics}
             onToggleRead={toggleRead}
             showPanel={showPanel}
             panelTopic={panelTopic}
@@ -258,8 +259,8 @@ function ExtensionApp() {
 
                   return (
                     <div key={index} className="article-section">
-                      <h3 
-                        className="article-link" 
+                      <h3
+                        className="article-link"
                         onClick={() => scrollToArticle(index)}
                       >
                         Article {index + 1}
@@ -298,10 +299,15 @@ function ExtensionApp() {
                       Article
                     </button>
                     <button
-                      className={activeTab === 'summary' ? 'active' : ''}
                       onClick={() => setActiveTab('summary')}
                     >
                       Summary
+                    </button>
+                    <button
+                      className={activeTab === 'topics_river' ? 'active' : ''}
+                      onClick={() => setActiveTab('topics_river')}
+                    >
+                      Topics River
                     </button>
                   </div>
                   <label className="article-read-checkbox">
@@ -320,7 +326,7 @@ function ExtensionApp() {
                         const articleTopics = article.topics;
                         if (articleTopics.some(topic => selectedTopics.includes(topic))) {
                           // If any topics are already selected, deselect them
-                          setSelectedTopics(prev => 
+                          setSelectedTopics(prev =>
                             prev.filter(topic => !articleTopics.some(t => t.name === topic.name))
                           );
                         } else {
@@ -406,12 +412,18 @@ function ExtensionApp() {
                     </div>
                   )}
                 </div>
+              ) : activeTab === 'topics_river' ? (
+                <div className="topics-river-container" style={{ padding: '20px', height: '500px' }}>
+                  <h2>Topics River</h2>
+                  <p>Visualization of topic density across the article.</p>
+                  <TopicsRiverChart topics={article.topics} articleLength={article.sentences.length} />
+                </div>
               ) : (
-                <TextDisplay 
-                  sentences={article.sentences} 
-                  selectedTopics={selectedTopics} 
-                  hoveredTopic={hoveredTopic} 
-                  readTopics={readTopics} 
+                <TextDisplay
+                  sentences={article.sentences}
+                  selectedTopics={selectedTopics}
+                  hoveredTopic={hoveredTopic}
+                  readTopics={readTopics}
                   articleTopics={article.topics}
                   articleIndex={index}
                   topicSummaries={article.topic_summaries}

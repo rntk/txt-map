@@ -34,7 +34,8 @@ module.exports = {
       '@frontend': path.resolve(__dirname, '../frontend/src'),
       // Force all React imports to use the same instance
       'react': path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom')
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'd3': path.resolve(__dirname, 'node_modules/d3')
     }
   },
   mode: 'production'
