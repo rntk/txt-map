@@ -26,17 +26,41 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             return binData;
         });
 
-        // Simple smoothing (moving average) to make it "river-like"
+        // Selective smoothing that preserves zeros - only smooth where there's actual data nearby
+        // This prevents topics from appearing as constant bars when sentences are scattered
         const smoothedBins = bins.map((bin, i) => {
-            const windowSize = 3;
-            const start = Math.max(0, i - 1);
-            const end = Math.min(bins.length, i + 2);
-            const window = bins.slice(start, end);
-
             const smoothedBin = { x: bin.x };
+            
             topics.forEach(topic => {
-                const sum = window.reduce((acc, curr) => acc + (curr[topic.name] || 0), 0);
-                smoothedBin[topic.name] = sum / window.length;
+                const currentVal = bin[topic.name] || 0;
+                
+                // If current bin has no data, check if neighbors have data
+                // Only apply minimal smoothing to create gentle transitions, not fill gaps
+                if (currentVal === 0) {
+                    // Look at immediate neighbors only
+                    const prevVal = i > 0 ? (bins[i - 1][topic.name] || 0) : 0;
+                    const nextVal = i < bins.length - 1 ? (bins[i + 1][topic.name] || 0) : 0;
+                    
+                    // Only create a small transition value if BOTH neighbors have data
+                    // This creates smooth edges but doesn't fill large gaps
+                    if (prevVal > 0 && nextVal > 0) {
+                        // Small transition value for smooth edges
+                        smoothedBin[topic.name] = Math.min(prevVal, nextVal) * 0.3;
+                    } else if (prevVal > 0 || nextVal > 0) {
+                        // Very small tail for single-sided transitions
+                        smoothedBin[topic.name] = Math.max(prevVal, nextVal) * 0.1;
+                    } else {
+                        // No neighbors with data - keep at zero
+                        smoothedBin[topic.name] = 0;
+                    }
+                } else {
+                    // Current bin has data - apply gentle smoothing with weighted average
+                    const prevVal = i > 0 ? (bins[i - 1][topic.name] || 0) : currentVal;
+                    const nextVal = i < bins.length - 1 ? (bins[i + 1][topic.name] || 0) : currentVal;
+                    
+                    // Weighted average favoring the current value (60% current, 20% each neighbor)
+                    smoothedBin[topic.name] = currentVal * 0.6 + prevVal * 0.2 + nextVal * 0.2;
+                }
             });
             return smoothedBin;
         });
