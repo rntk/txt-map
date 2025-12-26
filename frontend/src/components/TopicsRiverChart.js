@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 
 const TopicsRiverChart = ({ topics, articleLength }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
+    const [activeTopic, setActiveTopic] = useState(null);
 
     // Helper function to calculate bins based on width
     const calculateBins = (containerWidth, topics, effectiveLength) => {
+        // ... (keeping existing logic unchanged)
         // Scale binCount to container width - wider containers get more bins
         // Use ~1 bin per 40px for good visual density
         const binCount = Math.max(15, Math.min(60, Math.floor(containerWidth / 40)));
@@ -30,17 +32,17 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
         // This prevents topics from appearing as constant bars when sentences are scattered
         const smoothedBins = bins.map((bin, i) => {
             const smoothedBin = { x: bin.x };
-            
+
             topics.forEach(topic => {
                 const currentVal = bin[topic.name] || 0;
-                
+
                 // If current bin has no data, check if neighbors have data
                 // Only apply minimal smoothing to create gentle transitions, not fill gaps
                 if (currentVal === 0) {
                     // Look at immediate neighbors only
                     const prevVal = i > 0 ? (bins[i - 1][topic.name] || 0) : 0;
                     const nextVal = i < bins.length - 1 ? (bins[i + 1][topic.name] || 0) : 0;
-                    
+
                     // Only create a small transition value if BOTH neighbors have data
                     // This creates smooth edges but doesn't fill large gaps
                     if (prevVal > 0 && nextVal > 0) {
@@ -57,7 +59,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
                     // Current bin has data - apply gentle smoothing with weighted average
                     const prevVal = i > 0 ? (bins[i - 1][topic.name] || 0) : currentVal;
                     const nextVal = i < bins.length - 1 ? (bins[i + 1][topic.name] || 0) : currentVal;
-                    
+
                     // Weighted average favoring the current value (60% current, 20% each neighbor)
                     smoothedBin[topic.name] = currentVal * 0.6 + prevVal * 0.2 + nextVal * 0.2;
                 }
@@ -69,7 +71,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
         const normalizedBins = smoothedBins.map(bin => {
             const total = topics.reduce((sum, topic) => sum + (bin[topic.name] || 0), 0);
             const normalizedBin = { x: bin.x };
-            
+
             if (total > 0) {
                 topics.forEach(topic => {
                     normalizedBin[topic.name] = (bin[topic.name] || 0) / total;
@@ -87,6 +89,15 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
 
         return normalizedBins;
     };
+
+    // Memoize keys and color scale so they are stable and usable in both Legend and Chart
+    const keys = useMemo(() => topics ? topics.map(t => t.name) : [], [topics]);
+
+    const colorScale = useMemo(() => {
+        return d3.scaleOrdinal()
+            .domain(keys)
+            .range(d3.schemePastel1.concat(d3.schemeSet2));
+    }, [keys]);
 
     // Process data for the streamgraph - compute effective length
     const effectiveLength = useMemo(() => {
@@ -106,6 +117,33 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
         return Math.min(maxSentenceIndex + 5, articleLength);
     }, [topics, articleLength]);
 
+    // Handle styles update when activeTopic changes
+    useEffect(() => {
+        if (!svgRef.current) return;
+
+        const svg = d3.select(svgRef.current);
+        const paths = svg.selectAll(".stream-layer");
+        const tooltips = d3.select("body").selectAll(".river-tooltip");
+
+        if (activeTopic) {
+            // Highlight active, dim others
+            paths.transition().duration(200)
+                .style("opacity", d => d.key === activeTopic ? 1 : 0.2)
+                .style("stroke", d => d.key === activeTopic ? "#333" : "none")
+                .style("stroke-width", d => d.key === activeTopic ? "1px" : "0px");
+        } else {
+            // Reset to default
+            paths.transition().duration(200)
+                .style("opacity", 0.85)
+                .style("stroke", "none");
+
+            // Hide tooltip when not active
+            tooltips.style("opacity", 0);
+        }
+
+    }, [activeTopic]);
+
+    // Draw Chart
     useEffect(() => {
         if (!effectiveLength || !topics || topics.length === 0 || !svgRef.current) return;
 
@@ -136,17 +174,13 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
         const g = svg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // List of groups = topic names
-        const keys = topics.map(t => t.name);
-
         // Calculate total sentences per topic for proper scaling
         const totalSentencesPerTopic = {};
         topics.forEach(topic => {
             totalSentencesPerTopic[topic.name] = topic.sentences ? topic.sentences.length : 0;
         });
 
-        // Stack the data - use stackOffsetWiggle for river-like appearance
-        // or stackOffsetNone for stacked area with clear Y-axis
+        // Stack the data
         const stackedData = d3.stack()
             .offset(d3.stackOffsetWiggle) // Creates the river/streamgraph effect
             .order(d3.stackOrderInsideOut) // Places larger streams in the middle
@@ -157,27 +191,17 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
         const maxVal = d3.max(stackedData, layer => d3.max(layer, d => d[1]));
         const minVal = d3.min(stackedData, layer => d3.min(layer, d => d[0]));
 
-        // Add X axis - scales with container width
+        // Add X axis
         const x = d3.scaleLinear()
             .domain([0, data.length - 1])
             .range([0, innerWidth]);
 
-        // Y axis - properly scaled based on sentence counts
+        // Y axis
         const y = d3.scaleLinear()
             .domain([minVal, maxVal])
             .range([innerHeight, 0]);
 
-        // Calculate the actual max sentence count per bin for Y-axis label
-        const maxSentencesPerBin = d3.max(data, d => {
-            return keys.reduce((sum, key) => sum + (d[key] || 0), 0);
-        });
-
-        // Color palette - use a nice color scheme similar to the example
-        const color = d3.scaleOrdinal()
-            .domain(keys)
-            .range(d3.schemePastel1.concat(d3.schemeSet2));
-
-        // Area generator with smooth curves
+        // Area generator
         const area = d3.area()
             .curve(d3.curveBasis) // Smooth curves for river effect
             .x(d => x(d.data.x))
@@ -190,30 +214,25 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .enter()
             .append("path")
             .attr("class", "stream-layer")
-            .style("fill", d => color(d.key))
+            .style("fill", d => colorScale(d.key))
             .attr("d", area)
             .style("opacity", 0.85)
             .on("mouseover", function (event, d) {
-                d3.select(this)
-                    .style("opacity", 1)
-                    .style("stroke", "#333")
-                    .style("stroke-width", "1.5px");
-                
-                // Show tooltip
+                setActiveTopic(d.key);
+
+                // Show tooltip - we can keep this d3 based for mouse tracking
                 const totalSentences = totalSentencesPerTopic[d.key];
                 tooltip.style("opacity", 1)
                     .html(`<strong>${d.key}</strong><br/>Total: ${totalSentences} sentences`)
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 28) + "px");
             })
-            .on("mousemove", function(event) {
+            .on("mousemove", function (event) {
                 tooltip.style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 28) + "px");
             })
             .on("mouseout", function (event, d) {
-                d3.select(this)
-                    .style("opacity", 0.85)
-                    .style("stroke", "none");
+                setActiveTopic(null);
                 tooltip.style("opacity", 0);
             });
 
@@ -229,7 +248,8 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("font-size", "12px")
             .style("pointer-events", "none")
             .style("opacity", 0)
-            .style("box-shadow", "0 2px 4px rgba(0,0,0,0.1)");
+            .style("box-shadow", "0 2px 4px rgba(0,0,0,0.1)")
+            .style("z-index", "1000"); // Ensure tooltip is on top
 
         // Add X axis at the bottom
         const xAxisScale = d3.scaleLinear()
@@ -322,7 +342,8 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("pointer-events", "none")
             .style("text-shadow", "1px 1px 0px white, -1px -1px 0px white, 1px -1px 0px white, -1px 1px 0px white, 0px 1px 0px white, 0px -1px 0px white");
 
-        // Add chart title
+        // Chart title removed as requested implicitly (or we can keep it, but usually "Agenda" implies a separate section below)
+        // Keeping it for now as "Header"
         svg.append("text")
             .attr("x", width / 2)
             .attr("y", 18)
@@ -332,19 +353,63 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("fill", "#333")
             .text("Topic Distribution Across Article");
 
-    }, [effectiveLength, topics]);
+    }, [effectiveLength, topics, keys, colorScale]); // Added keys and colorScale to deps
 
     return (
-        <div ref={containerRef} className="topics-river-chart" style={{ 
-            width: '100%', 
-            height: '520px', 
+        <div ref={containerRef} className="topics-river-chart" style={{
+            width: '100%',
+            // height is handled by content now
             minWidth: '300px',
             backgroundColor: '#fafafa',
             borderRadius: '8px',
             padding: '10px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column'
         }}>
-            <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>
+            <div style={{ height: '520px', width: '100%' }}>
+                <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>
+            </div>
+
+            {/* Legend / Agenda Section */}
+            <div className="chart-legend" style={{
+                marginTop: '15px',
+                borderTop: '1px solid #eee',
+                paddingTop: '15px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                justifyContent: 'center'
+            }}>
+                {topics && topics.map(topic => (
+                    <div
+                        key={topic.name}
+                        onMouseEnter={() => setActiveTopic(topic.name)}
+                        onMouseLeave={() => setActiveTopic(null)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '4px 8px',
+                            backgroundColor: activeTopic === topic.name ? '#f0f0f0' : 'transparent',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            opacity: activeTopic && activeTopic !== topic.name ? 0.4 : 1
+                        }}
+                    >
+                        <div style={{
+                            width: '12px',
+                            height: '12px',
+                            backgroundColor: colorScale(topic.name),
+                            borderRadius: '2px',
+                            marginRight: '6px'
+                        }}></div>
+                        <span style={{ fontSize: '12px', color: '#333' }}>
+                            {topic.name}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
