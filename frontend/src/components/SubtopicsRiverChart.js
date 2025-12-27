@@ -291,11 +291,10 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
             </div>
 
             <RiverLegend
-                items={allSubtopicNames}
+                items={[...new Set(allSubtopicNames)]}
                 activeItem={activeSubtopic}
                 setActiveItem={setActiveSubtopic}
                 colorScale={colorScale}
-                variant="pill"
             />
         </div>
     );
