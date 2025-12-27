@@ -21,6 +21,148 @@ def normalize_topic(topic_name):
     # Single regex: convert to lowercase, replace non-alphanumeric with underscores, strip edges
     return re.sub(r'[^a-z0-9]+', '_', topic_name.lower()).strip('_')
 
+def refine_no_topic_assignments(sentences, topics, llm, cache_collection):
+    """
+    Refine assignments for sentences marked as 'no_topic' by checking if they
+    actually belong to the previous or next topic.
+    """
+    if not topics:
+        return topics
+    
+    # Sort topics by their first sentence to have them in order
+    topics.sort(key=lambda x: min(x["sentences"]) if x.get("sentences") else 999999)
+    
+    no_topic_index = -1
+    for i, t in enumerate(topics):
+        if t["name"] == normalize_topic("no_topic"):
+            no_topic_index = i
+            break
+            
+    if no_topic_index == -1 or not topics[no_topic_index]["sentences"]:
+        return topics
+        
+    no_topic_sentences = topics[no_topic_index]["sentences"]
+    other_topics = [t for i, t in enumerate(topics) if i != no_topic_index]
+    
+    # Find contiguous ranges in no_topic_sentences
+    ranges = []
+    if no_topic_sentences:
+        start = no_topic_sentences[0]
+        prev = start
+        for n in no_topic_sentences[1:]:
+            if n > prev + 1:
+                ranges.append((start, prev))
+                start = n
+            prev = n
+        ranges.append((start, prev))
+
+    print(f"[DEBUG] refine_no_topic_assignments: Found {len(ranges)} no_topic ranges: {ranges}")
+
+    refined_assignments = [] # List of (range_start, range_end, target_topic_name or None)
+    
+    for r_start, r_end in ranges:
+        prev_topic = None
+        next_topic = None
+        
+        # Find topics containing r_start - 1 and r_end + 1
+        for t in other_topics:
+            if (r_start - 1) in t.get("sentences", []):
+                prev_topic = t
+            if (r_end + 1) in t.get("sentences", []):
+                next_topic = t
+        
+        print(f"[DEBUG] Range {r_start}-{r_end}: prev_topic='{prev_topic['name'] if prev_topic else None}', next_topic='{next_topic['name'] if next_topic else None}'")
+
+        if not prev_topic and not next_topic:
+            print(f"[DEBUG] Range {r_start}-{r_end}: No adjacent topics (at {r_start-1} or {r_end+1}), skipping refinement.")
+            continue
+
+        context_prev = ""
+        if prev_topic:
+            # Get up to 3 last sentences of prev_topic for better context
+            last_indices = prev_topic["sentences"][-3:]
+            context_prev_text = " ".join([sentences[idx-1] for idx in last_indices])
+            context_prev = f"PREVIOUS TOPIC '{prev_topic['name']}' ends with: {context_prev_text}"
+        
+        context_next = ""
+        if next_topic:
+            # Get up to 3 first sentences of next_topic for better context
+            first_indices = next_topic["sentences"][:3]
+            context_next_text = " ".join([sentences[idx-1] for idx in first_indices])
+            context_next = f"NEXT TOPIC '{next_topic['name']}' starts with: {context_next_text}"
+        
+        no_topic_text = " ".join([sentences[idx-1] for idx in range(r_start, r_end + 1)])
+        
+        prompt = f"""You are an assistant helping to group sentences into topics. 
+Some sentences were missed during initial processing and assigned to 'no_topic'.
+Most likely, they belong to either the PREVIOUS topic or the NEXT topic.
+
+{context_prev if context_prev else "PREVIOUS TOPIC: N/A"}
+
+SENTENCES TO RE-ASSIGN:
+{no_topic_text}
+
+{context_next if context_next else "NEXT TOPIC: N/A"}
+
+Decide if the 'SENTENCES TO RE-ASSIGN' belong to the PREVIOUS topic, the NEXT topic, or NEITHER (keep as no_topic).
+Respond with only one word: 'PREVIOUS', 'NEXT', or 'NEITHER'."""
+        
+        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+        cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+        
+        if cached_response:
+            decision = cached_response["response"].strip().upper()
+            print(f"[DEBUG] Range {r_start}-{r_end}: LLM decision (CACHED): {decision}")
+        else:
+            decision = llm.call([prompt]).strip().upper()
+            print(f"[DEBUG] Range {r_start}-{r_end}: LLM decision (NEW): {decision}")
+            cache_collection.update_one(
+                {"prompt_hash": prompt_hash},
+                {"$set": {
+                    "prompt_hash": prompt_hash,
+                    "prompt": prompt,
+                    "response": decision,
+                    "created_at": datetime.datetime.now()
+                }},
+                upsert=True
+            )
+        
+        if "PREVIOUS" in decision and prev_topic:
+            print(f"[DEBUG] Range {r_start}-{r_end}: Merging into PREVIOUS topic '{prev_topic['name']}'")
+            refined_assignments.append((r_start, r_end, prev_topic["name"]))
+        elif "NEXT" in decision and next_topic:
+            print(f"[DEBUG] Range {r_start}-{r_end}: Merging into NEXT topic '{next_topic['name']}'")
+            refined_assignments.append((r_start, r_end, next_topic["name"]))
+        else:
+            print(f"[DEBUG] Range {r_start}-{r_end}: Keeping as no_topic (decision: {decision})")
+            refined_assignments.append((r_start, r_end, None))
+
+    # Apply refined assignments
+    if refined_assignments:
+        new_no_topic_sentences = []
+        assignment_map = { (r_start, r_end): target for r_start, r_end, target in refined_assignments }
+        
+        # We need to rebuild topics
+        for r_start, r_end in ranges:
+            target_name = assignment_map.get((r_start, r_end))
+            if target_name:
+                for t in topics:
+                    if t["name"] == target_name:
+                        t["sentences"].extend(range(r_start, r_end + 1))
+                        t["sentences"] = sorted(list(set(t["sentences"])))
+                        break
+            else:
+                new_no_topic_sentences.extend(range(r_start, r_end + 1))
+        
+        topics[no_topic_index]["sentences"] = sorted(new_no_topic_sentences)
+        
+        # If no_topic became empty, remove it? 
+        # Actually, let's keep it if it's there but empty, or filter later.
+        if not topics[no_topic_index]["sentences"]:
+            topics.pop(no_topic_index)
+
+    return topics
+
 class ArticleRequest(BaseModel):
     article: str
 
@@ -231,6 +373,8 @@ Sentences:
                 topics.append(no_topic)
                 normalized_topics_map[normalized_no_topic] = len(topics) - 1
 
+        # Refine no_topic assignments
+        topics = refine_no_topic_assignments(sentences, topics, llm, cache_collection)
 
         results.append({
             "sentences": sentences,
@@ -380,14 +524,19 @@ Text with numbered markers:
     # Extract gap sentence indices (sentences without topic assignment)
     gap_sentence_indices = [idx + 1 for idx, seg_range in sentence_range_map.items() if seg_range is None]
 
-    # Convert topic ranges to sentence indices by exact marker-range match
+    # Convert topic ranges to sentence indices
     for topic in topics:
         sentence_indices = []
         for topic_range in topic["ranges"]:
             # Find which sentences correspond to this range
             for sent_idx, sent_range in sentence_range_map.items():
-                if sent_range == topic_range:
-                    sentence_indices.append(sent_idx + 1)  # 1-indexed for output
+                if sent_range:
+                    # Check if topic range is within or exactly matches the sentence range
+                    # topic_range is (start, end), sent_range is (start, end)
+                    if topic_range[0] >= sent_range[0] and topic_range[1] <= sent_range[1]:
+                        sentence_indices.append(sent_idx + 1)
+                    # Also handle partial overlap if needed, but being within should be enough
+                    # since sentences are built from these ranges
         topic["sentences"] = sorted(list(set(sentence_indices)))
         del topic["ranges"]  # Remove the ranges, keep only sentence numbers
     
@@ -402,6 +551,9 @@ Text with numbered markers:
             topics.append(no_topic)
             normalized_topics_map[normalized_no_topic] = len(topics) - 1
     
+    # Refine no_topic assignments
+    topics = refine_no_topic_assignments(sentences, topics, llm, cache_collection)
+
     print(f"\n=== DEBUG: Built {len(sentences)} sentences ===")
     for i, sent in enumerate(sentences[:5]):
         print(f"Sentence {i+1}: {sent[:100]}{'...' if len(sent) > 100 else ''}")

@@ -138,7 +138,9 @@ def build_sentences_from_ranges(
     def marker_to_word_start(m: int) -> int:
         if m == 0:
             return 0
-        return (marker_word_indices[m - 1] + 1) if (1 <= m <= marker_count) else 0
+        if 1 <= m <= marker_count:
+            return marker_word_indices[m - 1] + 1
+        return len(words)
 
     def marker_to_word_end(m: int) -> int:
         if m >= marker_count:
