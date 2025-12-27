@@ -286,7 +286,13 @@ Mind map:"""
                             if 0 <= r_start <= r_end < len(sentence_words):
                                 # Extract text
                                 topic_text = " ".join(sentence_words[r_start:r_end+1])
+                                
+                                # Avoid duplicating the parent topic name or consecutive identical topics
+                                if topic_text.lower() == (current_hierarchy[-1].lower() if current_hierarchy else ""):
+                                    continue
+                                    
                                 current_hierarchy.append(topic_text)
+                                line_ranges.append((r_start, r_end))
                             else:
                                 # Index out of bounds
                                 valid_line = False

@@ -97,7 +97,7 @@ function MindmapResults({ mindmapData }) {
   }
 
   const aggregatedMindmap = mindmapData.aggregated_mindmap || {};
-  const structure = aggregatedMindmap.structure || {};
+  const structure = aggregatedMindmap.structure || mindmapData.topic_mindmaps || {};
   const mindmapResults = mindmapData.mindmap_results || [];
   const sentenceCount = mindmapData.sentences ? mindmapData.sentences.length : 0;
 

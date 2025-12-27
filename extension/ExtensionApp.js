@@ -333,6 +333,12 @@ function ExtensionApp() {
                     >
                       Topics River
                     </button>
+                    <button
+                      className={activeTab === 'mindmap' ? 'active' : ''}
+                      onClick={() => setActiveTab('mindmap')}
+                    >
+                      Mindmap
+                    </button>
                   </div>
                   <label className="article-read-checkbox">
                     <input
@@ -441,6 +447,20 @@ function ExtensionApp() {
                   <h2>Topics River</h2>
                   <p>Visualization of topic density across the article.</p>
                   <TopicsRiverChart topics={article.topics} articleLength={article.sentences.length} />
+                </div>
+              ) : activeTab === 'mindmap' ? (
+                <div className="mindmap-container" style={{ padding: '20px' }}>
+                  <h2>Mindmap</h2>
+                  <p>Hierarchical mindmap based on generated topics.</p>
+                  <MindmapResults 
+                    mindmapData={{
+                      aggregated_mindmap: {
+                        structure: article.topic_mindmaps || {}
+                      },
+                      sentences: article.sentences,
+                      mindmap_results: article.mindmap_results || []
+                    }} 
+                  />
                 </div>
               ) : (
                 <TextDisplay
