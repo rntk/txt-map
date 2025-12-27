@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopicList from '../frontend/src/components/TopicList';
 import TextDisplay from '../frontend/src/components/TextDisplay';
 import TopicsRiverChart from '../frontend/src/components/TopicsRiverChart';
+import SubtopicsRiverChart from '../frontend/src/components/SubtopicsRiverChart';
 import MindmapResults from './MindmapResults';
 import InsidesResults from './InsidesResults';
 import '../frontend/src/styles/App.css';
@@ -432,10 +433,25 @@ function ExtensionApp() {
                   )}
                 </div>
               ) : activeTab === 'topics_river' ? (
-                <div className="topics-river-container" style={{ padding: '20px', height: '500px' }}>
-                  <h2>Topics River</h2>
-                  <p>Visualization of topic density across the article.</p>
-                  <TopicsRiverChart topics={article.topics} articleLength={article.sentences.length} />
+                <div className="topics-river-container" style={{ padding: '20px' }}>
+                  <div style={{ marginBottom: '60px' }}>
+                    <h2>Topics River</h2>
+                    <p>Visualization of chapter density across the article.</p>
+                    <TopicsRiverChart topics={article.topics} articleLength={article.sentences.length} />
+                  </div>
+                  <div className="subtopics-river-section">
+                    <h2>Subtopics River</h2>
+                    <p>Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
+                    {article.subtopics ? (
+                      <SubtopicsRiverChart
+                        topics={article.topics}
+                        subtopics={article.subtopics}
+                        articleLength={article.sentences.length}
+                      />
+                    ) : (
+                      <p style={{ fontStyle: 'italic', color: '#666' }}>Generating subtopics...</p>
+                    )}
+                  </div>
                 </div>
               ) : activeTab === 'mindmap' ? (
                 <div className="mindmap-container" style={{ padding: '20px' }}>

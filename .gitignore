@@ -5,3 +5,4 @@ post.txt
 node_modules/
 frontend/build
 .idea
+.vscode
