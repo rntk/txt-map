@@ -8,10 +8,9 @@ def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_gr
     source sentence index. This aligns the UI with expectations: N groups -> N summaries.
     """
     prompt_template = (
-        "Summarize the following text into a concise paragraph focusing on key points and main ideas.\n"
-        "- Keep it objective and avoid repetition.\n"
-        "- Do not exceed 3-4 sentences.\n\n"
-        "Text:\n{sentence}\n\nSummary:"
+        "Summarize the text within the <text> tags into a super brief summary (just a few words).\n"
+        "- Keep it objective and extremely concise.\n\n"
+        "Text:\n<text>{sentence}</text>\n\nSummary:"
     )
 
     template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
