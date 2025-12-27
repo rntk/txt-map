@@ -67,27 +67,24 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             return smoothedBin;
         });
 
-        // Normalize bins so topics compete for space (relative streamgraph)
-        const normalizedBins = smoothedBins.map(bin => {
-            const total = topics.reduce((sum, topic) => sum + (bin[topic.name] || 0), 0);
-            const normalizedBin = { x: bin.x };
-
-            if (total > 0) {
-                topics.forEach(topic => {
-                    normalizedBin[topic.name] = (bin[topic.name] || 0) / total;
-                });
-                // Store the original total for tooltip/reference if needed
-                normalizedBin._total = total;
-            } else {
-                topics.forEach(topic => {
-                    normalizedBin[topic.name] = 0;
-                });
-                normalizedBin._total = 0;
-            }
-            return normalizedBin;
+        // Calculate character counts per bin for each topic
+        // We estimate character count based on sentence count and average sentence length
+        // If topics have charCount data, use it; otherwise estimate ~100 chars per sentence
+        const characterBins = smoothedBins.map(bin => {
+            const charBin = { x: bin.x };
+            
+            topics.forEach(topic => {
+                const sentenceCount = bin[topic.name] || 0;
+                // Use topic's average character per sentence if available, otherwise estimate
+                const avgCharsPerSentence = topic.avgCharsPerSentence || 
+                    (topic.totalChars && topic.sentences?.length ? topic.totalChars / topic.sentences.length : 100);
+                charBin[topic.name] = sentenceCount * avgCharsPerSentence;
+            });
+            
+            return charBin;
         });
 
-        return normalizedBins;
+        return characterBins;
     };
 
     // Memoize keys and color scale so they are stable and usable in both Legend and Chart
@@ -273,18 +270,25 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("text-anchor", "middle")
             .style("font-size", "12px")
             .style("fill", "#666")
-            .text("Sentence Position in Article");
+            .text("Number of Sentences");
 
-        // Add Y axis showing percentage prominence
+        // Add Y axis showing number of characters
+        // Use the full range of the stacked data for proper scaling
         const yAxisScale = d3.scaleLinear()
-            .domain([0, 100])
-            .range([innerHeight / 2, 0]);
+            .domain([minVal, maxVal])
+            .range([innerHeight, 0]);
 
         g.append("g")
             .attr("class", "y-axis")
             .call(d3.axisLeft(yAxisScale)
                 .ticks(5)
-                .tickFormat(d => d > 0 ? `${d}%` : ''))
+                .tickFormat(d => {
+                    const absVal = Math.abs(d);
+                    if (absVal >= 1000) {
+                        return d3.format(".1s")(absVal); // e.g., 1.2k
+                    }
+                    return d3.format(".0f")(absVal);
+                }))
             .selectAll("text")
             .style("font-size", "11px");
 
@@ -297,7 +301,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("text-anchor", "middle")
             .style("font-size", "12px")
             .style("fill", "#666")
-            .text("Topic Prominence (%)");
+            .text("Number of Characters");
 
         // Add labels for topics at the widest point of each stream
         const labelData = stackedData.map(series => {
