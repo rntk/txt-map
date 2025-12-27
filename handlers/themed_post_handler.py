@@ -82,30 +82,34 @@ def refine_no_topic_assignments(sentences, topics, llm, cache_collection):
             # Get up to 3 last sentences of prev_topic for better context
             last_indices = prev_topic["sentences"][-3:]
             context_prev_text = " ".join([sentences[idx-1] for idx in last_indices])
-            context_prev = f"PREVIOUS TOPIC '{prev_topic['name']}' ends with: {context_prev_text}"
+            context_prev = f"<previous_topic name=\"{prev_topic['name']}\">\n{context_prev_text}\n</previous_topic>"
         
         context_next = ""
         if next_topic:
             # Get up to 3 first sentences of next_topic for better context
             first_indices = next_topic["sentences"][:3]
             context_next_text = " ".join([sentences[idx-1] for idx in first_indices])
-            context_next = f"NEXT TOPIC '{next_topic['name']}' starts with: {context_next_text}"
+            context_next = f"<next_topic name=\"{next_topic['name']}\">\n{context_next_text}\n</next_topic>"
         
         no_topic_text = " ".join([sentences[idx-1] for idx in range(r_start, r_end + 1)])
         
+        prev_text = context_prev if context_prev else "<previous_topic>\nN/A\n</previous_topic>"
+        next_text = context_next if context_next else "<next_topic>\nN/A\n</next_topic>"
+
         prompt = f"""You are an assistant helping to group sentences into topics. 
 Some sentences were missed during initial processing and assigned to 'no_topic'.
 Most likely, they belong to either the PREVIOUS topic or the NEXT topic.
-
-{context_prev if context_prev else "PREVIOUS TOPIC: N/A"}
-
-SENTENCES TO RE-ASSIGN:
-{no_topic_text}
-
-{context_next if context_next else "NEXT TOPIC: N/A"}
-
 Decide if the 'SENTENCES TO RE-ASSIGN' belong to the PREVIOUS topic, the NEXT topic, or NEITHER (keep as no_topic).
-Respond with only one word: 'PREVIOUS', 'NEXT', or 'NEITHER'."""
+Respond with only one word: 'PREVIOUS', 'NEXT', or 'NEITHER'.
+
+{prev_text}
+
+<sentences_to_reassign>
+{no_topic_text}
+</sentences_to_reassign>
+
+{next_text}
+"""
         
         prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
         cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
