@@ -79,13 +79,6 @@ function ExtensionApp() {
 
         if (!isMountedRef.current) return;
 
-        // Handle mindmap page type
-        if (pageTypeReceived === 'mindmap') {
-          setPageType('mindmap');
-          setMindmapData(apiData);
-          setLoading(false);
-          return;
-        }
 
         // Handle insides page type
         if (pageTypeReceived === 'insides') {
@@ -235,10 +228,6 @@ function ExtensionApp() {
     return <div className="page-message">Loading and analyzing page content...</div>;
   }
 
-  // Render mindmap page type
-  if (pageType === 'mindmap') {
-    return <MindmapResults mindmapData={mindmapData} />;
-  }
 
   // Render insides page type
   if (pageType === 'insides') {
@@ -452,14 +441,14 @@ function ExtensionApp() {
                 <div className="mindmap-container" style={{ padding: '20px' }}>
                   <h2>Mindmap</h2>
                   <p>Hierarchical mindmap based on generated topics.</p>
-                  <MindmapResults 
+                  <MindmapResults
                     mindmapData={{
                       aggregated_mindmap: {
                         structure: article.topic_mindmaps || {}
                       },
                       sentences: article.sentences,
                       mindmap_results: article.mindmap_results || []
-                    }} 
+                    }}
                   />
                 </div>
               ) : (

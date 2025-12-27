@@ -1,17 +1,11 @@
 // Popup script - handles menu interactions
 document.addEventListener('DOMContentLoaded', () => {
   const topicsButton = document.getElementById('analyze-topics');
-  const mindmapButton = document.getElementById('analyze-mindmap');
   const insidesButton = document.getElementById('analyze-insides');
 
   // Handle Topics Analysis button
   topicsButton.addEventListener('click', () => {
     initiateAnalysis('topics');
-  });
-
-  // Handle Mindmap Analysis button
-  mindmapButton.addEventListener('click', () => {
-    initiateAnalysis('mindmap');
   });
 
   // Handle Insides Analysis button
@@ -24,14 +18,14 @@ document.addEventListener('DOMContentLoaded', () => {
     browser.tabs.query({ active: true, currentWindow: true })
       .then(tabs => {
         const activeTab = tabs[0];
-        
+
         // Check if we can analyze this page
-        if (!activeTab.url || 
-            activeTab.url.startsWith('chrome://') || 
-            activeTab.url.startsWith('about:') ||
-            activeTab.url.startsWith('moz-extension://') || 
-            activeTab.url.startsWith('chrome-extension://') ||
-            activeTab.url.startsWith('file://')) {
+        if (!activeTab.url ||
+          activeTab.url.startsWith('chrome://') ||
+          activeTab.url.startsWith('about:') ||
+          activeTab.url.startsWith('moz-extension://') ||
+          activeTab.url.startsWith('chrome-extension://') ||
+          activeTab.url.startsWith('file://')) {
           showError("Cannot analyze this page. Browser internal pages and extension pages are not supported.");
           return;
         }
