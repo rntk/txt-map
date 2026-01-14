@@ -52,7 +52,7 @@ function App() {
       // Default to clustered
       url = tag ? `http://127.0.0.1:8000/api/clustered-post/${encodeURIComponent(tag)}?limit=${limitParam}` : `http://127.0.0.1:8000/api/clustered-post?limit=${limitParam}`;
     }
-    
+
     fetch(url)
       .then(response => response.json())
       .then(data => {
@@ -61,12 +61,20 @@ function App() {
         const topicMap = new Map();
         data.forEach((article) => {
           article.topics.forEach(topic => {
+            const summary = (article.topic_summaries && article.topic_summaries[topic.name]) || topic.summary;
             if (!topicMap.has(topic.name)) {
-              topicMap.set(topic.name, { ...topic, totalSentences: topic.sentences.length });
+              topicMap.set(topic.name, {
+                ...topic,
+                totalSentences: topic.sentences.length,
+                summary: summary
+              });
             } else {
               // Add to existing topic's sentence count
               const existing = topicMap.get(topic.name);
               existing.totalSentences += topic.sentences.length;
+              if (!existing.summary && summary) {
+                existing.summary = summary;
+              }
             }
           });
         });
@@ -76,9 +84,9 @@ function App() {
   }, []);
 
   const toggleTopic = (topic) => {
-    setSelectedTopics(prev => 
-      prev.includes(topic) 
-        ? prev.filter(t => t !== topic) 
+    setSelectedTopics(prev =>
+      prev.includes(topic)
+        ? prev.filter(t => t !== topic)
         : [...prev, topic]
     );
   };
@@ -135,7 +143,7 @@ function App() {
     const isSameTopic = Array.isArray(topicOrTopics)
       ? Array.isArray(panelTopic) && JSON.stringify(topicOrTopics) === JSON.stringify(panelTopic)
       : panelTopic === topicOrTopics;
-    
+
     if (showPanel && isSameTopic) {
       setShowPanel(false);
       setPanelTopic(null);
@@ -148,9 +156,9 @@ function App() {
   const scrollToArticle = (articleIndex) => {
     const articleElement = document.getElementById(`article-${articleIndex}`);
     if (articleElement) {
-      articleElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
+      articleElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
       });
     }
   };
@@ -286,12 +294,12 @@ function App() {
       <div className="container">
         <div className="left-column">
           <h1>Topics</h1>
-          <TopicList 
-            topics={allTopics} 
-            selectedTopics={selectedTopics} 
-            onToggleTopic={toggleTopic} 
-            onHoverTopic={handleHoverTopic} 
-            readTopics={readTopics} 
+          <TopicList
+            topics={allTopics}
+            selectedTopics={selectedTopics}
+            onToggleTopic={toggleTopic}
+            onHoverTopic={handleHoverTopic}
+            readTopics={readTopics}
             onToggleRead={toggleRead}
             showPanel={showPanel}
             panelTopic={panelTopic}
@@ -305,14 +313,21 @@ function App() {
             const topics = Array.isArray(panelTopic) ? panelTopic : [panelTopic];
             const topicNames = topics.map(t => t.name);
             const totalSentences = topics.reduce((sum, t) => sum + t.totalSentences, 0);
-            const displayName = Array.isArray(panelTopic) 
-              ? `${topics[0].name.split(/[\s_]/)[0]} (${topics.length} topics)` 
+            const displayName = Array.isArray(panelTopic)
+              ? `${topics[0].name.split(/[\s_]/)[0]} (${topics.length} topics)`
               : panelTopic.name;
 
             return (
               <div className="overlay-panel">
                 <div className="overlay-header">
-                  <h2>Sentences for {displayName}: {totalSentences} sentences</h2>
+                  <div className="overlay-title-section">
+                    <h2>Sentences for {displayName}: {totalSentences} sentences</h2>
+                    {!Array.isArray(panelTopic) && panelTopic.summary && (
+                      <div className="overlay-summary-note">
+                        <span className="summary-icon">📝</span> {panelTopic.summary}
+                      </div>
+                    )}
+                  </div>
                   <button onClick={() => toggleShowPanel(panelTopic)} className="close-panel">×</button>
                 </div>
                 <div className="overlay-content">
@@ -332,8 +347,8 @@ function App() {
 
                     return (
                       <div key={index} className="article-section">
-                        <h3 
-                          className="article-link" 
+                        <h3
+                          className="article-link"
                           onClick={() => scrollToArticle(index)}
                         >
                           Article {index + 1} ({relatedTopics.map(t => t.name).join(', ')})
@@ -401,11 +416,11 @@ function App() {
                   Highlight topics
                 </label>
               </div>
-              <TextDisplay 
-                sentences={article.sentences} 
-                selectedTopics={selectedTopics} 
-                hoveredTopic={hoveredTopic} 
-                readTopics={readTopics} 
+              <TextDisplay
+                sentences={article.sentences}
+                selectedTopics={selectedTopics}
+                hoveredTopic={hoveredTopic}
+                readTopics={readTopics}
                 articleTopics={article.topics}
                 articleIndex={index}
               />

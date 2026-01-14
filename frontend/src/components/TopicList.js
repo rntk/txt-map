@@ -6,17 +6,17 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
   // Group topics by their root (first word before space or underscore)
   const hierarchicalTopics = useMemo(() => {
     const grouped = new Map();
-    
+
     topics.forEach(topic => {
       // Split by space or underscore and get the first word
       const root = topic.name.split(/[\s_]/)[0];
-      
+
       if (!grouped.has(root)) {
         grouped.set(root, []);
       }
       grouped.get(root).push(topic);
     });
-    
+
     // Convert to array and sort by root name
     return Array.from(grouped.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -41,7 +41,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
 
   const toggleAllTopicsInRoot = (subTopics) => {
     const allSelected = subTopics.every(topic => selectedTopics.includes(topic));
-    
+
     if (allSelected) {
       // Deselect all
       subTopics.forEach(topic => {
@@ -61,7 +61,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
 
   const toggleReadForRoot = (subTopics) => {
     const allRead = subTopics.every(topic => readTopics.has(topic));
-    
+
     subTopics.forEach(topic => {
       const isRead = readTopics.has(topic);
       if (allRead && isRead) {
@@ -114,14 +114,14 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                 <span className="root-stats">({subTopics.length} topics, {totalSentences} sentences)</span>
               </div>
               <div className="root-buttons" onClick={(e) => e.stopPropagation()}>
-                <button 
-                  onClick={() => toggleReadForRoot(subTopics)} 
+                <button
+                  onClick={() => toggleReadForRoot(subTopics)}
                   className={`read-toggle ${isRootRead(subTopics) ? 'readed' : ''}`}
                 >
                   {isRootRead(subTopics) ? 'Readed' : 'Unreaded'}
                 </button>
-                <button 
-                  onClick={() => toggleShowPanelForRoot(subTopics)} 
+                <button
+                  onClick={() => toggleShowPanelForRoot(subTopics)}
                   className="show-toggle"
                 >
                   Show
@@ -131,10 +131,10 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
             {expandedRoots.has(root) && (
               <ul className="subtopic-list">
                 {subTopics.map((topic, subIndex) => (
-                  <li 
-                    key={subIndex} 
-                    className={`topic-item ${readTopics.has(topic) ? 'topic-item-read' : ''}`} 
-                    onMouseEnter={() => onHoverTopic(topic)} 
+                  <li
+                    key={subIndex}
+                    className={`topic-item ${readTopics.has(topic) ? 'topic-item-read' : ''}`}
+                    onMouseEnter={() => onHoverTopic(topic)}
                     onMouseLeave={() => onHoverTopic(null)}
                   >
                     <div className="topic-item-content">
@@ -146,18 +146,23 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                         />
                         {topic.name}
                       </label>
+                      {topic.summary && (
+                        <div className="topic-summary-note" title={topic.summary}>
+                          {topic.summary}
+                        </div>
+                      )}
                       <div className="topic-metadata">
                         <span className="topic-sentence-count">({topic.totalSentences} sentences)</span>
                       </div>
                       <div className="topic-buttons">
-                        <button 
-                          onClick={() => onToggleRead(topic)} 
+                        <button
+                          onClick={() => onToggleRead(topic)}
                           className={`read-toggle ${readTopics.has(topic) ? 'readed' : ''}`}
                         >
                           {readTopics.has(topic) ? 'Readed' : 'Unreaded'}
                         </button>
-                        <button 
-                          onClick={() => onToggleShowPanel(topic)} 
+                        <button
+                          onClick={() => onToggleShowPanel(topic)}
                           className="show-toggle"
                         >
                           {showPanel && panelTopic === topic ? 'Hide' : 'Show'}

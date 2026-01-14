@@ -10,6 +10,7 @@ import html
 from lib.llm.llamacpp import LLamaCPP
 from lib.storage.posts import PostsStorage
 from lib.html_cleaner import HTMLCleaner
+from lib.summarizer import summarize_by_sentence_groups
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import normalize
@@ -130,9 +131,24 @@ def get_clustered_posts(tag: str = None, limit: int = 10, posts_storage: PostsSt
                     "sentences": sorted(sentence_nums)
                 })
 
+        # Ensure the LLM cache collection exists with proper indexes
+        if "llm_cache" not in posts_storage._db.list_collection_names():
+            posts_storage._db.create_collection("llm_cache")
+            posts_storage._db.llm_cache.create_index("prompt_hash", unique=True)
+        cache_collection = posts_storage._db.llm_cache
+
+        # Generate summaries for each topic
+        topic_summaries = {}
+        for topic in topics:
+            if topic["sentences"]:
+                topic_sentences = [sentences[idx - 1] for idx in topic["sentences"]]
+                topic_summary_sentences, _ = summarize_by_sentence_groups(topic_sentences, llm, cache_collection)
+                topic_summaries[topic["name"]] = " ".join(topic_summary_sentences)
+
         results.append({
             "sentences": sentences,
-            "topics": topics
+            "topics": topics,
+            "topic_summaries": topic_summaries
         })
 
     return results
