@@ -688,12 +688,12 @@ Your task is to:
 2. For each topic, specify which parts of the text belong to it by listing the marker numbers where logical segments START and END.
 
 Output format (exactly one topic per line):
-topic_name: start-end, start-end, ...
+Topic name: start-end, start-end, ...
 
 Example:
-Technology: 0-15, 30-35
-CPU Features: 16-29
-No Topic: 36-40
+Artificial Intelligence: 0-15, 30-35
+Machine Learning: 16-29
+no_topic: 36-40
 
 CRITICAL INSTRUCTIONS:
 - Use ONLY the marker numbers that are already in the text (e.g., |#5#| means marker 5).
