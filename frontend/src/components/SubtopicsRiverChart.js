@@ -239,18 +239,24 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
                 if (thick > maxT) { maxT = thick; maxIdx = i; }
             });
             if (maxT < 0.2) return null;
+
+            const bin = bins[maxIdx];
             return {
                 key: series.key,
+                x: x((bin.rangeStart + bin.rangeEnd) / 2),
                 y: y((series[maxIdx][0] + series[maxIdx][1]) / 2),
-                x: x(maxIdx),
                 thickness: maxT
             };
         }).filter(d => d !== null)
-            .sort((a, b) => b.thickness - a.thickness)
-            .slice(0, 15);
+            .sort((a, b) => b.thickness - a.thickness);
+
+        // Show more labels, filtered by relative thickness
+        const topLabels = labelData
+            .filter(d => d.thickness > (maxVal - minVal) * 0.01)
+            .slice(0, 25);
 
         g.selectAll(".sub-label")
-            .data(labelData)
+            .data(topLabels)
             .enter()
             .append("text")
             .attr("class", "sub-label")

@@ -189,16 +189,21 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
                 }
             });
             if (series.length === 0 || maxThickness < 0.1) return null;
+
+            const bin = data[maxIndex];
             return {
                 key: series.key,
-                x: x(data[maxIndex].x),
+                x: x((bin.rangeStart + bin.rangeEnd) / 2),
                 y: y((series[maxIndex][0] + series[maxIndex][1]) / 2),
                 thickness: maxThickness
             };
         }).filter(d => d !== null);
 
         labelData.sort((a, b) => b.thickness - a.thickness);
-        const topLabels = labelData.slice(0, Math.min(8, labelData.length));
+        // Increase limit to show more labels, and filter by minimal thickness to avoid clutter
+        const topLabels = labelData
+            .filter(d => d.thickness > (maxVal - minVal) * 0.01)
+            .slice(0, 20);
 
         g.selectAll(".stream-label")
             .data(topLabels)
