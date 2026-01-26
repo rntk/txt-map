@@ -42,7 +42,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY workers.py .
-COPY get_themed_posts_for_all_tags.py .
 COPY post.txt .
 COPY handlers/ ./handlers/
 COPY lib/ ./lib/
