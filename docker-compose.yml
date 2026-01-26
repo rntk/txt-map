@@ -7,7 +7,8 @@ services:
       - "8000:8000"
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
-      - LLAMACPP_URL=http://llamacpp:8080
+      - LLAMACPP_URL=${LLAMACPP_URL}
+      - TOKEN=${TOKEN}
     depends_on:
       - mongodb
     restart: unless-stopped
@@ -19,7 +20,8 @@ services:
     build: .
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
-      - LLAMACPP_URL=http://llamacpp:8080
+      - LLAMACPP_URL=${LLAMACPP_URL}
+      - TOKEN=${TOKEN}
     depends_on:
       - mongodb
       - api
@@ -31,7 +33,7 @@ services:
       replicas: 1  # Scale up for more parallel processing
 
   mongodb:
-    image: mongo:8.0
+    image: mongo:8
     ports:
       - "27017:27017"  # Standard MongoDB port
     environment:
