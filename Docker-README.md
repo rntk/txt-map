@@ -23,12 +23,18 @@ This guide explains how to run the FastAPI RSS Content Analysis application usin
    This will:
    - Build the FastAPI application
    - Start MongoDB database
-   - Expose the API on `http://localhost:8000`
+   - Start API server on `http://localhost:8000`
+   - Start background worker for task processing
 
 3. **Access the application**:
    - API Documentation: http://localhost:8000/docs
-   - Themed Posts Page: http://localhost:8000/page/themed-post
-   - Clustered Posts Page: http://localhost:8000/page/clustered-post
+   - Submit content via browser extension or API
+   - View results at: http://localhost:8000/page/text/{submission_id}
+
+4. **Scale workers** for more processing power:
+   ```bash
+   docker-compose up --scale worker=3
+   ```
 
 ## Manual Docker Build
 
@@ -57,15 +63,17 @@ If you prefer to build and run manually:
 The application supports the following environment variables:
 
 - `MONGODB_URL`: MongoDB connection string (default: `mongodb://localhost:8765/`)
+- `LLAMACPP_URL`: LLamaCPP server URL (default: `http://localhost:8989`)
+- `TOKEN`: Optional authentication token for LLamaCPP server
 
 ## LlamaCPP Integration
 
-The application expects a LlamaCPP server running on `http://127.0.0.1:8989`. For Docker deployment:
+The application requires a LlamaCPP server for LLM processing. For Docker deployment:
 
 1. **Uncomment the LlamaCPP service** in `docker-compose.yml`
 2. **Add your model** to a `models` directory
 3. **Update the model path** in the compose file
-4. **Modify the application code** to use `http://llamacpp:8080` instead of `127.0.0.1:8989`
+4. The services will automatically use `http://llamacpp:8080` when running in Docker
 
 ## Data Persistence
 
@@ -79,9 +87,12 @@ For development with hot reloading:
 # Run only MongoDB
 docker-compose up mongodb
 
-# Run the app locally with auto-reload
+# Terminal 1: Run the API locally with auto-reload
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2: Run the worker
+python workers.py
 ```
 
 ## Troubleshooting

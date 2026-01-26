@@ -175,12 +175,13 @@
   }
 
   function extractAndAnalyze(element = null) {
-    // Extract text content from selected element or full page
-    let pageContent;
+    // Extract HTML content from selected element or full page
+    let htmlContent;
+    const sourceUrl = window.location.href;
 
     if (element) {
-      pageContent = element.innerText || element.textContent;
-      console.log("Extracting selected content...", pageContent.substring(0, 100));
+      htmlContent = element.innerHTML;
+      console.log("Extracting selected HTML...", htmlContent.substring(0, 100));
     } else {
       // Clone the body to avoid modifying the original DOM
       const bodyClone = document.body.cloneNode(true);
@@ -189,41 +190,34 @@
       const extensionElements = bodyClone.querySelectorAll('#rsstag-selection-toolbar, #rsstag-analyze-btn, .rsstag-element-highlight, .rsstag-selected');
       extensionElements.forEach(el => el.remove());
 
-      pageContent = bodyClone.innerText || bodyClone.textContent;
-      console.log("Extracting full page content...", pageContent.substring(0, 100));
+      htmlContent = bodyClone.innerHTML;
+      console.log("Extracting full page HTML...", htmlContent.substring(0, 100));
     }
 
-    // Determine API endpoint based on analysis type
-    let apiEndpoint = "http://127.0.0.1:8000/api/themed-post";
-    if (currentAnalysisType === 'insides') {
-      apiEndpoint = "http://127.0.0.1:8000/api/insides";
-    }
+    console.log("Submitting content to new submission API");
 
-    console.log(`Sending content to ${apiEndpoint} for ${currentAnalysisType} analysis`);
-
-    // Send POST request to the API
-    fetch(apiEndpoint, {
+    // Send POST request to the new submit API
+    fetch("http://127.0.0.1:8000/api/submit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        article: pageContent
+        html: htmlContent,
+        source_url: sourceUrl
       })
     })
       .then(response => response.json())
       .then(data => {
-        console.log("API response received:", data);
-        // Send results to background script to open in new tab
-        browser.runtime.sendMessage({
-          action: "openResultsTab",
-          data: data,
-          pageType: currentAnalysisType
-        });
+        console.log("Submission created:", data.submission_id);
+        // Redirect to the API-hosted results page
+        const redirectUrl = `http://127.0.0.1:8000${data.redirect_url}`;
+        console.log("Redirecting to:", redirectUrl);
+        window.location.href = redirectUrl;
       })
       .catch(error => {
-        console.error("Error calling API:", error);
-        alert("Error analyzing page content: " + error.message);
+        console.error("Error submitting content:", error);
+        alert("Error submitting content: " + error.message);
       });
   }
 })();

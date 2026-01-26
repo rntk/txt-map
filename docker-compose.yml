@@ -1,17 +1,34 @@
 version: '3.8'
 
 services:
-  app:
+  api:
     build: .
     ports:
       - "8000:8000"
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
+      - LLAMACPP_URL=http://llamacpp:8080
     depends_on:
       - mongodb
     restart: unless-stopped
     networks:
       - app-network
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build: .
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017/
+      - LLAMACPP_URL=http://llamacpp:8080
+    depends_on:
+      - mongodb
+      - api
+    restart: unless-stopped
+    networks:
+      - app-network
+    command: ["python", "workers.py"]
+    deploy:
+      replicas: 1  # Scale up for more parallel processing
 
   mongodb:
     image: mongo:8.0

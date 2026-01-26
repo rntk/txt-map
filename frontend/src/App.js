@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TopicList from './components/TopicList';
 import TextDisplay from './components/TextDisplay';
+import TextPage from './components/TextPage';
 import './styles/App.css';
 
 function App() {
@@ -18,9 +19,14 @@ function App() {
   useEffect(() => {
     const pathname = window.location.pathname;
     const pathParts = pathname.split('/');
-    const apiType = pathParts[2]; // 'clustered-post', 'themed-post', or 'topics'
+    const apiType = pathParts[2]; // 'clustered-post', 'themed-post', 'topics', or 'text'
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
     setPageType(apiType);
+
+    // If text submission page, render TextPage component
+    if (apiType === 'text') {
+      return;
+    }
 
     // Determine limit from current URL ?limit=, default 10
     const searchParams = new URLSearchParams(window.location.search);
@@ -287,6 +293,11 @@ function App() {
 
   if (!articles.length) {
     return <div>Loading...</div>;
+  }
+
+  // Render TextPage for submission pages
+  if (pageType === 'text') {
+    return <TextPage />;
   }
 
   return (
