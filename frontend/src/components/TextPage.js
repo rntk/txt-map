@@ -114,6 +114,8 @@ function TextPage() {
   const [error, setError] = useState(null);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [hoveredTopic, setHoveredTopic] = useState(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   const submissionId = window.location.pathname.split('/')[3];
 
@@ -174,6 +176,57 @@ function TextPage() {
     setHoveredTopic(topic);
   };
 
+  const runRefresh = async (tasks, successMessage) => {
+    setActionMessage('');
+    setActionLoading(true);
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/submission/${submissionId}/refresh`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tasks })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      setActionMessage(successMessage);
+      fetchSubmission();
+    } catch (err) {
+      setActionMessage(`Action failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this submission and all its queued tasks? This cannot be undone.')) {
+      return;
+    }
+    setActionMessage('');
+    setActionLoading(true);
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/submission/${submissionId}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      setActionMessage('Submission deleted.');
+      window.location.href = '/page/topics';
+    } catch (err) {
+      setActionMessage(`Delete failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -205,7 +258,8 @@ function TextPage() {
   const articles = results.sentences.length > 0 ? [{
     sentences: results.sentences,
     topics: results.topics || [],
-    topic_summaries: results.topic_summaries || {}
+    topic_summaries: results.topic_summaries || {},
+    paragraph_map: results.paragraph_map || null
   }] : [];
 
   const allTopics = results.topics ? results.topics.map(topic => ({
@@ -214,15 +268,85 @@ function TextPage() {
     summary: results.topic_summaries ? results.topic_summaries[topic.name] : ''
   })) : [];
 
+  const rawText = submission.text_content || '';
+
   return (
     <div className="App">
       <div style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h1>Text Analysis Results</h1>
+          <div>
+            <h1>Text Analysis Results</h1>
+            {submission.source_url && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
+              </div>
+            )}
+          </div>
           <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} />
         </div>
 
         <StatusIndicator tasks={status.tasks} />
+
+        <div className="text-management">
+          <div className="text-management-header">
+            <h2>Manage Submission</h2>
+            <div className="text-management-actions">
+              <button
+                className="action-btn"
+                onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')}
+                disabled={actionLoading}
+              >
+                Recalculate All
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => runRefresh(['topic_extraction', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')}
+                disabled={actionLoading}
+              >
+                Recalculate Topics
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => runRefresh(['summarization'], 'Summarization queued.')}
+                disabled={actionLoading}
+              >
+                Recalculate Summary
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')}
+                disabled={actionLoading}
+              >
+                Recalculate Mindmap
+              </button>
+              <button
+                className="action-btn"
+                onClick={() => runRefresh(['insides'], 'Insides queued.')}
+                disabled={actionLoading}
+              >
+                Recalculate Insides
+              </button>
+              <button
+                className="action-btn danger"
+                onClick={handleDelete}
+                disabled={actionLoading}
+              >
+                Delete Submission
+              </button>
+            </div>
+          </div>
+          {actionMessage && <div className="text-management-message">{actionMessage}</div>}
+        </div>
+
+        <div className="raw-text-panel">
+          <div className="raw-text-header">
+            <h2>Raw Text</h2>
+            <div className="raw-text-meta">
+              {rawText.length.toLocaleString()} characters
+            </div>
+          </div>
+          <pre className="raw-text-content">{rawText || 'No raw text available.'}</pre>
+        </div>
 
         {isProcessing && (
           <div style={{
@@ -239,7 +363,7 @@ function TextPage() {
         {articles.length > 0 ? (
           <div className="container">
             <TopicList
-              allTopics={allTopics}
+              topics={allTopics}
               selectedTopics={selectedTopics}
               hoveredTopic={hoveredTopic}
               onToggleTopic={toggleTopic}
@@ -247,13 +371,19 @@ function TextPage() {
               readTopics={new Set()}
               onToggleRead={() => {}}
             />
-            <TextDisplay
-              articles={articles}
-              selectedTopics={selectedTopics}
-              hoveredTopic={hoveredTopic}
-              readArticles={new Set()}
-              onToggleReadArticle={() => {}}
-            />
+            {articles.map((article, index) => (
+              <TextDisplay
+                key={index}
+                sentences={article.sentences}
+                selectedTopics={selectedTopics}
+                hoveredTopic={hoveredTopic}
+                readTopics={new Set()}
+                articleTopics={article.topics}
+                articleIndex={index}
+                topicSummaries={article.topic_summaries}
+                paragraphMap={article.paragraph_map}
+              />
+            ))}
           </div>
         ) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

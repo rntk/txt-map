@@ -120,12 +120,39 @@ def get_submission(
     return {
         "submission_id": submission_id,
         "source_url": submission.get("source_url", ""),
+        "text_content": submission.get("text_content", ""),
+        "html_content": submission.get("html_content", ""),
         "created_at": submission["created_at"],
         "status": {
             "overall": overall_status,
             "tasks": submission["tasks"]
         },
         "results": submission["results"]
+    }
+
+
+@router.delete("/submission/{submission_id}")
+def delete_submission(
+    submission_id: str,
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Delete a submission and any queued tasks
+    """
+    submission = submissions_storage.get_by_id(submission_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    db = submissions_storage._db
+    db.task_queue.delete_many({"submission_id": submission_id})
+    delete_result = db.submissions.delete_one({"submission_id": submission_id})
+
+    if delete_result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete submission")
+
+    return {
+        "message": "Submission deleted",
+        "submission_id": submission_id
     }
 
 
@@ -187,4 +214,56 @@ def post_refresh(
     return {
         "message": "Tasks queued for recalculation",
         "tasks_queued": tasks_queued
+    }
+
+
+@router.get("/submissions")
+def list_submissions(
+    submission_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    List submissions with optional filters.
+    """
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="Limit must be positive")
+
+    query = {}
+    if submission_id:
+        query["submission_id"] = submission_id
+
+    db = submissions_storage._db
+    fetch_limit = limit if not status else min(max(limit * 5, limit), 1000)
+    submissions = list(db.submissions.find(query).sort("created_at", -1).limit(fetch_limit))
+
+    items = []
+    for submission in submissions:
+        overall_status = submissions_storage.get_overall_status(submission)
+        if status and overall_status != status:
+            continue
+
+        text_content = submission.get("text_content") or ""
+        results = submission.get("results") or {}
+        sentences = results.get("sentences") or []
+        topics = results.get("topics") or []
+
+        items.append({
+            "submission_id": submission.get("submission_id"),
+            "source_url": submission.get("source_url", ""),
+            "created_at": submission.get("created_at"),
+            "updated_at": submission.get("updated_at"),
+            "overall_status": overall_status,
+            "text_characters": len(text_content),
+            "sentence_count": len(sentences),
+            "topic_count": len(topics)
+        })
+
+        if len(items) >= limit:
+            break
+
+    return {
+        "submissions": items,
+        "count": len(items)
     }

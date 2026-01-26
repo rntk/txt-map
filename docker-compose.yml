@@ -5,10 +5,12 @@ services:
     build: .
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
-      - LLAMACPP_URL=${LLAMACPP_URL}
-      - TOKEN=${TOKEN}
+      - LLAMACPP_URL=${LLAMACPP_URL:-http://llamacpp:8080}
+      - TOKEN=${TOKEN:-}
     depends_on:
       - mongodb
     restart: unless-stopped
@@ -18,10 +20,12 @@ services:
 
   worker:
     build: .
+    env_file:
+      - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
-      - LLAMACPP_URL=${LLAMACPP_URL}
-      - TOKEN=${TOKEN}
+      - LLAMACPP_URL=${LLAMACPP_URL:-http://llamacpp:8080}
+      - TOKEN=${TOKEN:-}
     depends_on:
       - mongodb
       - api

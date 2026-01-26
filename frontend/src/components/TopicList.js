@@ -1,13 +1,27 @@
 import React, { useState, useMemo } from 'react';
 
-function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTopics, onToggleRead, showPanel, panelTopic, onToggleShowPanel, onNavigateTopic }) {
+function TopicList({
+  topics = [],
+  selectedTopics = [],
+  onToggleTopic = () => {},
+  onHoverTopic = () => {},
+  readTopics = new Set(),
+  onToggleRead = () => {},
+  showPanel = false,
+  panelTopic = null,
+  onToggleShowPanel = () => {},
+  onNavigateTopic
+}) {
   const [expandedRoots, setExpandedRoots] = useState(new Set());
+  const safeTopics = Array.isArray(topics) ? topics : [];
+  const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
+  const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
   // Group topics by their root (first word before space or underscore)
   const hierarchicalTopics = useMemo(() => {
     const grouped = new Map();
 
-    topics.forEach(topic => {
+    safeTopics.forEach(topic => {
       // Split by space or underscore and get the first word
       const root = topic.name.split(/[\s_]/)[0];
 
@@ -40,19 +54,19 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
   };
 
   const toggleAllTopicsInRoot = (subTopics) => {
-    const allSelected = subTopics.every(topic => selectedTopics.includes(topic));
+    const allSelected = subTopics.every(topic => safeSelectedTopics.includes(topic));
 
     if (allSelected) {
       // Deselect all
       subTopics.forEach(topic => {
-        if (selectedTopics.includes(topic)) {
+        if (safeSelectedTopics.includes(topic)) {
           onToggleTopic(topic);
         }
       });
     } else {
       // Select all
       subTopics.forEach(topic => {
-        if (!selectedTopics.includes(topic)) {
+        if (!safeSelectedTopics.includes(topic)) {
           onToggleTopic(topic);
         }
       });
@@ -60,10 +74,10 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
   };
 
   const toggleReadForRoot = (subTopics) => {
-    const allRead = subTopics.every(topic => readTopics.has(topic));
+    const allRead = subTopics.every(topic => safeReadTopics.has(topic));
 
     subTopics.forEach(topic => {
-      const isRead = readTopics.has(topic);
+      const isRead = safeReadTopics.has(topic);
       if (allRead && isRead) {
         // Mark all as unread
         onToggleRead(topic);
@@ -82,11 +96,11 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
   };
 
   const isRootSelected = (subTopics) => {
-    return subTopics.some(topic => selectedTopics.includes(topic));
+    return subTopics.some(topic => safeSelectedTopics.includes(topic));
   };
 
   const isRootRead = (subTopics) => {
-    return subTopics.every(topic => readTopics.has(topic));
+    return subTopics.every(topic => safeReadTopics.has(topic));
   };
 
   return (
@@ -133,7 +147,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                 {subTopics.map((topic, subIndex) => (
                   <li
                     key={subIndex}
-                    className={`topic-item ${readTopics.has(topic) ? 'topic-item-read' : ''}`}
+                    className={`topic-item ${safeReadTopics.has(topic) ? 'topic-item-read' : ''}`}
                     onMouseEnter={() => onHoverTopic(topic)}
                     onMouseLeave={() => onHoverTopic(null)}
                   >
@@ -141,7 +155,7 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                       <label className="topic-name-label">
                         <input
                           type="checkbox"
-                          checked={selectedTopics.includes(topic)}
+                          checked={safeSelectedTopics.includes(topic)}
                           onChange={() => onToggleTopic(topic)}
                         />
                         {topic.name}
@@ -157,9 +171,9 @@ function TopicList({ topics, selectedTopics, onToggleTopic, onHoverTopic, readTo
                       <div className="topic-buttons">
                         <button
                           onClick={() => onToggleRead(topic)}
-                          className={`read-toggle ${readTopics.has(topic) ? 'readed' : ''}`}
+                          className={`read-toggle ${safeReadTopics.has(topic) ? 'readed' : ''}`}
                         >
-                          {readTopics.has(topic) ? 'Readed' : 'Unreaded'}
+                          {safeReadTopics.has(topic) ? 'Readed' : 'Unreaded'}
                         </button>
                         <button
                           onClick={() => onToggleShowPanel(topic)}

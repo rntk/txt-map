@@ -62,23 +62,29 @@ function sanitizeHTML(html) {
 }
 
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary, paragraphMap }) {
+  const safeSentences = Array.isArray(sentences) ? sentences : [];
+  const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
+  const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
+  const readTopicsSet = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+  const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
+
   const fadedIndices = new Set();
-  readTopics.forEach(topic => {
-    const relatedTopic = articleTopics.find(t => t.name === topic.name);
+  readTopicsSet.forEach(topic => {
+    const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
     if (relatedTopic) {
       relatedTopic.sentences.forEach(num => fadedIndices.add(num - 1));
     }
   });
 
   const highlightedIndices = new Set();
-  selectedTopics.forEach(topic => {
-    const relatedTopic = articleTopics.find(t => t.name === topic.name);
+  safeSelectedTopics.forEach(topic => {
+    const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
     if (relatedTopic) {
       relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
     }
   });
   if (hoveredTopic) {
-    const relatedTopic = articleTopics.find(t => t.name === hoveredTopic.name);
+    const relatedTopic = safeArticleTopics.find(t => t.name === hoveredTopic.name);
     if (relatedTopic) {
       relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
     }
@@ -99,7 +105,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   // Build a map of sentence index to topics that end at that sentence
   const sentenceToTopicsEnding = new Map();
-  articleTopics.forEach(topic => {
+  safeArticleTopics.forEach(topic => {
     if (topic.sentences && topic.sentences.length > 0) {
       // Find the last sentence index for this topic (1-indexed, so subtract 1)
       const lastSentenceIndex = Math.max(...topic.sentences) - 1;
@@ -111,12 +117,12 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   });
 
   // Group sentences by paragraph if paragraph_map is provided
-  if (paragraphMap && Object.keys(paragraphMap).length > 0) {
+  if (safeParagraphMap && Object.keys(safeParagraphMap).length > 0) {
     // Build a map of paragraph index -> array of {text, index}
     const paragraphGroups = new Map();
     
-    sentences.forEach((sentence, idx) => {
-      const sentenceParagraphIdx = paragraphMap[idx] !== undefined ? paragraphMap[idx] : 0;
+    safeSentences.forEach((sentence, idx) => {
+      const sentenceParagraphIdx = safeParagraphMap[idx] !== undefined ? safeParagraphMap[idx] : 0;
       
       if (!paragraphGroups.has(sentenceParagraphIdx)) {
         paragraphGroups.set(sentenceParagraphIdx, []);
@@ -170,7 +176,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     <div className="text-display">
       <div className="text-content">
         <p className="article-text">
-          {sentences.map((sentence, index) => (
+          {safeSentences.map((sentence, index) => (
             <React.Fragment key={index}>
               <span
                 id={`sentence-${articleIndex}-${index}`}

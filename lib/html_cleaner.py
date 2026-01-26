@@ -30,6 +30,16 @@ class HTMLCleaner(HTMLParser):
         """Get clean content"""
         return self._strings
 
+    def clean(self, html_content: str) -> str:
+        """Parse HTML and return normalized plain text."""
+        self.purge()
+        if html_content:
+            self.feed(html_content)
+            self.close()
+        content = " ".join(self._strings)
+        # Collapse whitespace for downstream processing.
+        return " ".join(content.split())
+
     def error(self, error):
         """Save last error"""
         self._error = error

@@ -3,23 +3,23 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle analysis request from popup
   if (message.action === "startAnalysis") {
     const { analysisType, tabId } = message;
-    
+
     // Send message to content script with analysis type
-    sendMessageWithRetry(tabId, { 
-      action: "extractContent", 
-      analysisType: analysisType 
+    sendMessageWithRetry(tabId, {
+      action: "extractContent",
+      analysisType: analysisType
     }, 3);
-    
+
     sendResponse({ status: "started" });
     return true;
   }
-  
+
   // Handle results from content script
   if (message.action === "openResultsTab") {
     const { data, pageType } = message;
-    
+
     // Store the API results in local storage
-    browser.storage.local.set({ 
+    browser.storage.local.set({
       analysisResults: data,
       pageType: pageType || 'topics',
       timestamp: Date.now()
@@ -36,6 +36,17 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ status: "error", error: error.message });
     });
     return true; // Keep message channel open for async response
+  }
+
+  // Handle opening a new tab from content script
+  if (message.action === "openNewTab") {
+    browser.tabs.create({
+      url: message.url,
+      active: true
+    }).then(() => {
+      sendResponse({ status: "tab_opened" });
+    });
+    return true;
   }
 });
 

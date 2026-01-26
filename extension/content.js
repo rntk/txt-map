@@ -212,8 +212,11 @@
         console.log("Submission created:", data.submission_id);
         // Redirect to the API-hosted results page
         const redirectUrl = `http://127.0.0.1:8000${data.redirect_url}`;
-        console.log("Redirecting to:", redirectUrl);
-        window.location.href = redirectUrl;
+        console.log("Opening in new tab:", redirectUrl);
+        browser.runtime.sendMessage({
+          action: "openNewTab",
+          url: redirectUrl
+        });
       })
       .catch(error => {
         console.error("Error submitting content:", error);

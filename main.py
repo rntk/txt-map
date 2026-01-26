@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from handlers import topics_handler, themed_topic_handler, submission_handler
+from handlers import topics_handler, themed_topic_handler, submission_handler, task_queue_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
@@ -13,6 +13,7 @@ app.mount("/static", StaticFiles(directory="frontend/build/static"), name="stati
 app.include_router(topics_handler.router, prefix="/api")
 app.include_router(themed_topic_handler.router, prefix="/api")
 app.include_router(submission_handler.router, prefix="/api")
+app.include_router(task_queue_handler.router, prefix="/api")
 
 import os
 mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
@@ -57,6 +58,14 @@ def serve_themed_topic_page_with_topic(topic: str):
 
 @app.get("/page/text/{submission_id}")
 def serve_text_page(submission_id: str):
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/tasks")
+def serve_tasks_page():
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/texts")
+def serve_texts_page():
     return FileResponse("frontend/build/index.html")
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import TopicList from './components/TopicList';
 import TextDisplay from './components/TextDisplay';
 import TextPage from './components/TextPage';
+import TaskControlPage from './components/TaskControlPage';
+import TextListPage from './components/TextListPage';
 import './styles/App.css';
 
 function App() {
@@ -23,8 +25,8 @@ function App() {
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
     setPageType(apiType);
 
-    // If text submission page, render TextPage component
-    if (apiType === 'text') {
+    // If text submission page, text list page, or task control page, render dedicated component
+    if (apiType === 'text' || apiType === 'tasks' || apiType === 'texts') {
       return;
     }
 
@@ -244,6 +246,12 @@ function App() {
   };
 
   // Loading state handling
+  if (pageType === 'tasks') {
+    return <TaskControlPage />;
+  }
+  if (pageType === 'texts') {
+    return <TextListPage />;
+  }
   if (pageType === 'topics') {
     if (!topics.length) {
       return <div>Loading...</div>;
@@ -291,13 +299,13 @@ function App() {
     );
   }
 
-  if (!articles.length) {
-    return <div>Loading...</div>;
-  }
-
   // Render TextPage for submission pages
   if (pageType === 'text') {
     return <TextPage />;
+  }
+
+  if (!articles.length) {
+    return <div>Loading...</div>;
   }
 
   return (
