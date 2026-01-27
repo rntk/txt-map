@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for FastAPI RSS Content Analysis App
 
 # Stage 1: Build frontend
-FROM node:22-alpine as frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Python application
-FROM python:3.11-slim as backend
+FROM python:3.11-slim AS backend
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

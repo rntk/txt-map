@@ -54,19 +54,19 @@ function TopicList({
   };
 
   const toggleAllTopicsInRoot = (subTopics) => {
-    const allSelected = subTopics.every(topic => safeSelectedTopics.includes(topic));
+    const allSelected = subTopics.every(topic => safeSelectedTopics.some(t => t.name === topic.name));
 
     if (allSelected) {
       // Deselect all
       subTopics.forEach(topic => {
-        if (safeSelectedTopics.includes(topic)) {
+        if (safeSelectedTopics.some(t => t.name === topic.name)) {
           onToggleTopic(topic);
         }
       });
     } else {
       // Select all
       subTopics.forEach(topic => {
-        if (!safeSelectedTopics.includes(topic)) {
+        if (!safeSelectedTopics.some(t => t.name === topic.name)) {
           onToggleTopic(topic);
         }
       });
@@ -96,7 +96,7 @@ function TopicList({
   };
 
   const isRootSelected = (subTopics) => {
-    return subTopics.some(topic => safeSelectedTopics.includes(topic));
+    return subTopics.some(topic => safeSelectedTopics.some(t => t.name === topic.name));
   };
 
   const isRootRead = (subTopics) => {
@@ -158,7 +158,7 @@ function TopicList({
                         <label className="topic-name-label">
                           <input
                             type="checkbox"
-                            checked={safeSelectedTopics.includes(topic)}
+                            checked={safeSelectedTopics.some(t => t.name === topic.name)}
                             onChange={() => onToggleTopic(topic)}
                           />
                           {topic.name}

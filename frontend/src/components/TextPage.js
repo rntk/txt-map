@@ -167,9 +167,16 @@ function TextPage() {
   }, [submissionId]);
 
   const toggleTopic = (topic) => {
-    setSelectedTopics(prev =>
-      prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]
-    );
+    setSelectedTopics(prev => {
+      const isCurrentlySelected = prev.some(t => t.name === topic.name);
+      // Always clear hover state when deselecting a topic
+      if (isCurrentlySelected) {
+        setHoveredTopic(null);
+      }
+      return isCurrentlySelected
+        ? prev.filter(t => t.name !== topic.name)
+        : [...prev, topic];
+    });
   };
 
   const handleHoverTopic = (topic) => {
