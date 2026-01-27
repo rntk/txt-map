@@ -2,6 +2,8 @@
  * Shared utilities for River Charts
  */
 
+import * as d3 from 'd3';
+
 /**
  * Calculates bins for a river chart based on sentence indices.
  * 
@@ -90,8 +92,6 @@ export const estimateCharacterCounts = (bins, items, nameKey = 'name') => {
 /**
  * Common color scale for charts
  */
-import * as d3 from 'd3';
-
 export const getRiverColorScale = (keys) => {
     return d3.scaleOrdinal()
         .domain(keys)

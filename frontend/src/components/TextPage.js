@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
+import TopicsRiverChart from './TopicsRiverChart';
+import SubtopicsRiverChart from './SubtopicsRiverChart';
+import MindmapResults from './MindmapResults';
+import InsidesResults from './InsidesResults';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -116,6 +120,8 @@ function TextPage() {
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'topics_river' | 'mindmap' | 'insides'
+  const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
 
   const submissionId = window.location.pathname.split('/')[3];
 
@@ -181,6 +187,19 @@ function TextPage() {
 
   const handleHoverTopic = (topic) => {
     setHoveredTopic(topic);
+  };
+
+  const handleSummaryClick = (mapping, article) => {
+    if (mapping && mapping.source_sentences) {
+      setSummaryModalData({
+        sentences: mapping.source_sentences.map(idx => article.sentences[idx - 1]),
+        summarySentence: mapping.summary_sentence
+      });
+    }
+  };
+
+  const closeSummaryModal = () => {
+    setSummaryModalData(null);
   };
 
   const runRefresh = async (tasks, successMessage) => {
@@ -385,19 +404,167 @@ function TextPage() {
               />
             </div>
             <div className="right-column">
-              {articles.map((article, index) => (
-                <TextDisplay
-                  key={index}
-                  sentences={article.sentences}
-                  selectedTopics={selectedTopics}
-                  hoveredTopic={hoveredTopic}
-                  readTopics={new Set()}
-                  articleTopics={article.topics}
-                  articleIndex={index}
-                  topicSummaries={article.topic_summaries}
-                  paragraphMap={article.paragraph_map}
-                />
-              ))}
+              <div className="article-section">
+                <div className="article-header">
+                  <div className="article-title-section">
+                    <h1>Analyzed Text ({safeTopics.length} topics)</h1>
+                  </div>
+                  <div className="article-controls">
+                    <div className="tabs">
+                      <button
+                        className={activeTab === 'article' ? 'active' : ''}
+                        onClick={() => setActiveTab('article')}
+                      >
+                        Article
+                      </button>
+                      <button
+                        className={activeTab === 'summary' ? 'active' : ''}
+                        onClick={() => setActiveTab('summary')}
+                      >
+                        Summary
+                      </button>
+                      <button
+                        className={activeTab === 'topics_river' ? 'active' : ''}
+                        onClick={() => setActiveTab('topics_river')}
+                      >
+                        Topics River
+                      </button>
+                      <button
+                        className={activeTab === 'mindmap' ? 'active' : ''}
+                        onClick={() => setActiveTab('mindmap')}
+                      >
+                        Mindmap
+                      </button>
+                      <button
+                        className={activeTab === 'insides' ? 'active' : ''}
+                        onClick={() => setActiveTab('insides')}
+                      >
+                        Insides
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {activeTab === 'summary' ? (
+                  <div className="summary-content">
+                    <h2>Summary</h2>
+                    <div className="summary-text">
+                      {Array.isArray(results.summary) && results.summary.length > 0 ? (
+                        results.summary_mappings && results.summary_mappings.length > 0 ? (
+                          results.summary.map((summaryText, i) => {
+                            const mapping = results.summary_mappings.find(m => m.summary_index === i);
+                            return (
+                              <div key={i} className="summary-paragraph-wrapper">
+                                <p className="summary-paragraph-text">
+                                  {summaryText}
+                                  {mapping && (
+                                    <>
+                                      {' '}
+                                      <button
+                                        className="summary-source-link"
+                                        onClick={() => handleSummaryClick(mapping, articles[0])}
+                                        title="View source sentences"
+                                      >
+                                        [source]
+                                      </button>
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          results.summary.map((p, i) => (
+                            <p key={i}>{p}</p>
+                          ))
+                        )
+                      ) : (
+                        <p>No summary available. Processing may still be in progress...</p>
+                      )}
+                    </div>
+                    {summaryModalData && (
+                      <div className="summary-modal-overlay" onClick={closeSummaryModal}>
+                        <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
+                          <div className="modal-header">
+                            <h3>Source Sentences</h3>
+                            <button className="modal-close" onClick={closeSummaryModal}>×</button>
+                          </div>
+                          <div className="modal-body">
+                            <div className="modal-summary-sentence">
+                              <strong>Summary:</strong> {summaryModalData.summarySentence}
+                            </div>
+                            <div className="modal-divider"></div>
+                            <div className="modal-source-sentences">
+                              <strong>Original sentences:</strong>
+                              {summaryModalData.sentences.map((sent, idx) => (
+                                <div key={idx} className="modal-sentence">
+                                  <span className="sentence-number">{idx + 1}.</span>
+                                  <span className="sentence-text">{sent}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : activeTab === 'topics_river' ? (
+                  <div className="topics-river-container" style={{ padding: '20px' }}>
+                    <div style={{ marginBottom: '60px' }}>
+                      <h2>Topics River</h2>
+                      <p>Visualization of topic density across the article.</p>
+                      <TopicsRiverChart topics={safeTopics} articleLength={safeSentences.length} />
+                    </div>
+                    <div className="subtopics-river-section">
+                      <h2>Subtopics River</h2>
+                      <p>Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
+                      {results.subtopics ? (
+                        <SubtopicsRiverChart
+                          topics={safeTopics}
+                          subtopics={results.subtopics}
+                          articleLength={safeSentences.length}
+                        />
+                      ) : (
+                        <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
+                      )}
+                    </div>
+                  </div>
+                ) : activeTab === 'mindmap' ? (
+                  <div className="mindmap-tab-container" style={{ padding: '20px' }}>
+                    <MindmapResults
+                      mindmapData={{
+                        aggregated_mindmap: {
+                          structure: results.topic_mindmaps || {}
+                        },
+                        sentences: safeSentences,
+                        mindmap_results: results.mindmap_results || []
+                      }}
+                    />
+                  </div>
+                ) : activeTab === 'insides' ? (
+                  <div className="insides-tab-container" style={{ padding: '20px' }}>
+                    <InsidesResults
+                      insidesData={{
+                        insides: results.insides || []
+                      }}
+                    />
+                  </div>
+                ) : (
+                  articles.map((article, index) => (
+                    <TextDisplay
+                      key={index}
+                      sentences={article.sentences}
+                      selectedTopics={selectedTopics}
+                      hoveredTopic={hoveredTopic}
+                      readTopics={new Set()}
+                      articleTopics={article.topics}
+                      articleIndex={index}
+                      topicSummaries={article.topic_summaries}
+                      paragraphMap={article.paragraph_map}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         ) : (
