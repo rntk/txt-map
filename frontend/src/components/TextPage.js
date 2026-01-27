@@ -255,23 +255,26 @@ function TextPage() {
   const isProcessing = status.overall === 'processing' || status.overall === 'pending';
 
   // Format data for TopicList and TextDisplay components
-  const articles = results.sentences.length > 0 ? [{
-    sentences: results.sentences,
-    topics: results.topics || [],
+  const safeSentences = Array.isArray(results.sentences) ? results.sentences : [];
+  const safeTopics = Array.isArray(results.topics) ? results.topics : [];
+
+  const articles = safeSentences.length > 0 ? [{
+    sentences: safeSentences,
+    topics: safeTopics,
     topic_summaries: results.topic_summaries || {},
     paragraph_map: results.paragraph_map || null
   }] : [];
 
-  const allTopics = results.topics ? results.topics.map(topic => ({
+  const allTopics = safeTopics.map(topic => ({
     ...topic,
     totalSentences: topic.sentences ? topic.sentences.length : 0,
     summary: results.topic_summaries ? results.topic_summaries[topic.name] : ''
-  })) : [];
+  }));
 
   const rawText = submission.text_content || '';
 
   return (
-    <div className="App">
+    <div className="app">
       <div style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
@@ -362,28 +365,33 @@ function TextPage() {
 
         {articles.length > 0 ? (
           <div className="container">
-            <TopicList
-              topics={allTopics}
-              selectedTopics={selectedTopics}
-              hoveredTopic={hoveredTopic}
-              onToggleTopic={toggleTopic}
-              onHoverTopic={handleHoverTopic}
-              readTopics={new Set()}
-              onToggleRead={() => {}}
-            />
-            {articles.map((article, index) => (
-              <TextDisplay
-                key={index}
-                sentences={article.sentences}
+            <div className="left-column">
+              <h1>Topics</h1>
+              <TopicList
+                topics={allTopics}
                 selectedTopics={selectedTopics}
                 hoveredTopic={hoveredTopic}
+                onToggleTopic={toggleTopic}
+                onHoverTopic={handleHoverTopic}
                 readTopics={new Set()}
-                articleTopics={article.topics}
-                articleIndex={index}
-                topicSummaries={article.topic_summaries}
-                paragraphMap={article.paragraph_map}
+                onToggleRead={() => {}}
               />
-            ))}
+            </div>
+            <div className="right-column">
+              {articles.map((article, index) => (
+                <TextDisplay
+                  key={index}
+                  sentences={article.sentences}
+                  selectedTopics={selectedTopics}
+                  hoveredTopic={hoveredTopic}
+                  readTopics={new Set()}
+                  articleTopics={article.topics}
+                  articleIndex={index}
+                  topicSummaries={article.topic_summaries}
+                  paragraphMap={article.paragraph_map}
+                />
+              ))}
+            </div>
           </div>
         ) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

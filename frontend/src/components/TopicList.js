@@ -105,105 +105,109 @@ function TopicList({
 
   return (
     <div className="topic-list">
-      <ul className="root-list">
-        {hierarchicalTopics.map(({ root, subTopics, totalSentences }, index) => (
-          <li key={index} className="root-item">
-            <div className={`root-header ${isRootRead(subTopics) ? 'root-header-read' : ''}`}>
-              <div className="root-header-top">
-                <span className="expand-icon" onClick={() => toggleRoot(root)}>
-                  {expandedRoots.has(root) ? '▼' : '▶'}
-                </span>
-                <label className="root-label" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={isRootSelected(subTopics)}
-                    onChange={() => toggleAllTopicsInRoot(subTopics)}
-                  />
-                  <span onClick={() => toggleRoot(root)}>
-                    {root}
+      {hierarchicalTopics.length === 0 ? (
+        <div className="topic-list-empty">No topics yet.</div>
+      ) : (
+        <ul className="root-list">
+          {hierarchicalTopics.map(({ root, subTopics, totalSentences }, index) => (
+            <li key={index} className="root-item">
+              <div className={`root-header ${isRootRead(subTopics) ? 'root-header-read' : ''}`}>
+                <div className="root-header-top">
+                  <span className="expand-icon" onClick={() => toggleRoot(root)}>
+                    {expandedRoots.has(root) ? '▼' : '▶'}
                   </span>
-                </label>
-              </div>
-              <div className="root-metadata">
-                <span className="root-stats">({subTopics.length} topics, {totalSentences} sentences)</span>
-              </div>
-              <div className="root-buttons" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => toggleReadForRoot(subTopics)}
-                  className={`read-toggle ${isRootRead(subTopics) ? 'readed' : ''}`}
-                >
-                  {isRootRead(subTopics) ? 'Readed' : 'Unreaded'}
-                </button>
-                <button
-                  onClick={() => toggleShowPanelForRoot(subTopics)}
-                  className="show-toggle"
-                >
-                  Show
-                </button>
-              </div>
-            </div>
-            {expandedRoots.has(root) && (
-              <ul className="subtopic-list">
-                {subTopics.map((topic, subIndex) => (
-                  <li
-                    key={subIndex}
-                    className={`topic-item ${safeReadTopics.has(topic) ? 'topic-item-read' : ''}`}
-                    onMouseEnter={() => onHoverTopic(topic)}
-                    onMouseLeave={() => onHoverTopic(null)}
+                  <label className="root-label" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isRootSelected(subTopics)}
+                      onChange={() => toggleAllTopicsInRoot(subTopics)}
+                    />
+                    <span onClick={() => toggleRoot(root)}>
+                      {root}
+                    </span>
+                  </label>
+                </div>
+                <div className="root-metadata">
+                  <span className="root-stats">({subTopics.length} topics, {totalSentences} sentences)</span>
+                </div>
+                <div className="root-buttons" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => toggleReadForRoot(subTopics)}
+                    className={`read-toggle ${isRootRead(subTopics) ? 'readed' : ''}`}
                   >
-                    <div className="topic-item-content">
-                      <label className="topic-name-label">
-                        <input
-                          type="checkbox"
-                          checked={safeSelectedTopics.includes(topic)}
-                          onChange={() => onToggleTopic(topic)}
-                        />
-                        {topic.name}
-                      </label>
-                      {topic.summary && (
-                        <div className="topic-summary-note" title={topic.summary}>
-                          {topic.summary}
+                    {isRootRead(subTopics) ? 'Readed' : 'Unreaded'}
+                  </button>
+                  <button
+                    onClick={() => toggleShowPanelForRoot(subTopics)}
+                    className="show-toggle"
+                  >
+                    Show
+                  </button>
+                </div>
+              </div>
+              {expandedRoots.has(root) && (
+                <ul className="subtopic-list">
+                  {subTopics.map((topic, subIndex) => (
+                    <li
+                      key={subIndex}
+                      className={`topic-item ${safeReadTopics.has(topic) ? 'topic-item-read' : ''}`}
+                      onMouseEnter={() => onHoverTopic(topic)}
+                      onMouseLeave={() => onHoverTopic(null)}
+                    >
+                      <div className="topic-item-content">
+                        <label className="topic-name-label">
+                          <input
+                            type="checkbox"
+                            checked={safeSelectedTopics.includes(topic)}
+                            onChange={() => onToggleTopic(topic)}
+                          />
+                          {topic.name}
+                        </label>
+                        {topic.summary && (
+                          <div className="topic-summary-note" title={topic.summary}>
+                            {topic.summary}
+                          </div>
+                        )}
+                        <div className="topic-metadata">
+                          <span className="topic-sentence-count">({topic.totalSentences} sentences)</span>
                         </div>
-                      )}
-                      <div className="topic-metadata">
-                        <span className="topic-sentence-count">({topic.totalSentences} sentences)</span>
+                        <div className="topic-buttons">
+                          <button
+                            onClick={() => onToggleRead(topic)}
+                            className={`read-toggle ${safeReadTopics.has(topic) ? 'readed' : ''}`}
+                          >
+                            {safeReadTopics.has(topic) ? 'Readed' : 'Unreaded'}
+                          </button>
+                          <button
+                            onClick={() => onToggleShowPanel(topic)}
+                            className="show-toggle"
+                          >
+                            {showPanel && panelTopic === topic ? 'Hide' : 'Show'}
+                          </button>
+                          <button
+                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
+                            className="nav-toggle prev-toggle"
+                            title="Scroll to previous sentence for this topic"
+                          >
+                            Prev
+                          </button>
+                          <button
+                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
+                            className="nav-toggle next-toggle"
+                            title="Scroll to next sentence for this topic"
+                          >
+                            Next
+                          </button>
+                        </div>
                       </div>
-                      <div className="topic-buttons">
-                        <button
-                          onClick={() => onToggleRead(topic)}
-                          className={`read-toggle ${safeReadTopics.has(topic) ? 'readed' : ''}`}
-                        >
-                          {safeReadTopics.has(topic) ? 'Readed' : 'Unreaded'}
-                        </button>
-                        <button
-                          onClick={() => onToggleShowPanel(topic)}
-                          className="show-toggle"
-                        >
-                          {showPanel && panelTopic === topic ? 'Hide' : 'Show'}
-                        </button>
-                        <button
-                          onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
-                          className="nav-toggle prev-toggle"
-                          title="Scroll to previous sentence for this topic"
-                        >
-                          Prev
-                        </button>
-                        <button
-                          onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
-                          className="nav-toggle next-toggle"
-                          title="Scroll to next sentence for this topic"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
