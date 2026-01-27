@@ -14,6 +14,79 @@ def normalize_topic(topic_name):
     return re.sub(r'[^a-z0-9]+', '_', topic_name.lower()).strip('_')
 
 
+def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, llm, cache_collection):
+    """
+    Generate subtopics for a specific chapter/topic.
+    
+    Args:
+        topic_name: Name of the parent topic
+        sentences: List of sentence texts for this topic
+        sentence_indices: List of sentence indices (1-based) in the original document
+        llm: LLamaCPP client instance
+        cache_collection: MongoDB cache collection
+        
+    Returns:
+        List of subtopic dictionaries with name, sentences, and parent_topic
+    """
+    if not sentences or topic_name == "no_topic":
+        return []
+
+    numbered_sentences = [f"{sentence_indices[i]}. {sentences[i]}" for i in range(len(sentences))]
+    sentences_text = "\n".join(numbered_sentences)
+
+    prompt_template = """Group the following sentences into detailed sub-chapters for the topic "{topic_name}".
+- For each sub-chapter, specify which sentences belong to it.
+- Output format MUST be exactly:
+<subtopic_name>: <comma-separated sentence numbers>
+
+Important instructions:
+- Use the exact sentence numbers as provided (e.g., if "15. Some text", use 15).
+- Keep sub-chapters specific and meaningful.
+- Aim for 2-5 subtopics per chapter.
+- If a sentence doesn't fit, assign it to 'no_topic'.
+
+Topic: {topic_name}
+Sentences:
+{sentences_text}"""
+
+    prompt = prompt_template.replace("{topic_name}", topic_name).replace("{sentences_text}", sentences_text)
+    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+
+    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+
+    if cached_response:
+        response = cached_response["response"]
+    else:
+        response = llm.call([prompt])
+        cache_collection.update_one(
+            {"prompt_hash": prompt_hash},
+            {"$set": {
+                "prompt_hash": prompt_hash,
+                "prompt": prompt,
+                "response": response,
+                "created_at": datetime.datetime.now()
+            }},
+            upsert=True
+        )
+
+    subtopics = []
+    for line in response.strip().split('\n'):
+        if ':' in line:
+            name, nums_str = line.split(':', 1)
+            name = name.strip()
+            # Normalize subtopic name but keep it descriptive
+            clean_name = re.sub(r'[^a-zA-Z0-9 ]+', ' ', name).strip()
+            nums = [int(n.strip()) for n in nums_str.split(',') if n.strip().isdigit()]
+            if nums:
+                subtopics.append({
+                    "name": clean_name,
+                    "sentences": nums,
+                    "parent_topic": topic_name
+                })
+    
+    return subtopics
+
+
 def create_coordinate_grid(sentences):
     """
     Split sentences into a grid of words (Lines x Words).
@@ -235,14 +308,34 @@ Result:"""
             "sentences": sorted(list(set(sent_indices)))
         })
 
+    # Use final sentences if available, otherwise use original sentences
+    final_sentences_to_use = final_sentences if final_sentences else sentences
+
+    # Generate subtopics for each topic
+    all_subtopics = []
+    for topic in topics_list:
+        if topic["sentences"] and topic["name"] != "no_topic":
+            # Get the actual sentence texts for this topic
+            topic_sentences = [final_sentences_to_use[idx - 1] for idx in topic["sentences"]]
+            subtopics = generate_subtopics_for_topic(
+                topic["name"], 
+                topic_sentences, 
+                topic["sentences"], 
+                llm, 
+                cache_collection
+            )
+            all_subtopics.extend(subtopics)
+            print(f"  Generated {len(subtopics)} subtopics for topic '{topic['name']}'")
+
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
     submissions_storage.update_results(
         submission_id,
         {
             "topics": topics_list,
-            "sentences": final_sentences if final_sentences else sentences  # Use extracted sentences or original
+            "sentences": final_sentences_to_use,
+            "subtopics": all_subtopics
         }
     )
 
-    print(f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(final_sentences)} sentences")
+    print(f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(all_subtopics)} subtopics, {len(final_sentences_to_use)} sentences")
