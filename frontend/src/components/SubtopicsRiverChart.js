@@ -105,9 +105,10 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
         bins = estimateCharacterCounts(bins, orderedSubtopics);
 
         const keys = orderedSubtopics.map(st => st.name);
+        // Stack with order matching the topics/subtopics list (first appearance order)
         const stackedData = d3.stack()
             .offset(d3.stackOffsetWiggle)
-            .order(d3.stackOrderInsideOut)
+            .order(d3.stackOrderNone)  // Preserve order as in orderedSubtopics list
             .keys(keys)
             (bins);
 

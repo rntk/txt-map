@@ -84,9 +84,10 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             totalSentencesPerTopic[topic.name] = topic.sentences ? topic.sentences.length : 0;
         });
 
+        // Stack with order matching the topics list (first appearance order)
         const stackedData = d3.stack()
             .offset(d3.stackOffsetWiggle)
-            .order(d3.stackOrderInsideOut)
+            .order(d3.stackOrderNone)  // Preserve order as in topics list
             .keys(keys)
             (data);
 
