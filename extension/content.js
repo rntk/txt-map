@@ -21,9 +21,9 @@
     selectionToolbar.id = 'rsstag-selection-toolbar';
     selectionToolbar.innerHTML = `
       <span id="rsstag-toolbar-text">Pick a block on the page.</span>
-      <button id="rsstag-pick-btn">Pick Block</button>
-      <button id="rsstag-submit-btn" disabled>Submit</button>
-      <button id="rsstag-cancel-btn">Cancel</button>
+      <button id="rsstag-pick-btn" type="button">Pick Block</button>
+      <button id="rsstag-submit-btn" type="button" disabled>Submit</button>
+      <button id="rsstag-cancel-btn" type="button">Cancel</button>
     `;
 
     document.body.appendChild(selectionToolbar);
@@ -128,7 +128,11 @@
     submitBtn.textContent = hasSelection ? 'Submit Block' : 'Submit';
   }
 
-  function submitSelection() {
+  function submitSelection(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     if (!selectedElement) {
       alert('Please pick a block first.');
       return;
@@ -137,18 +141,18 @@
     const sourceUrl = window.location.href;
     const html = selectedElement.innerHTML;
 
-    fetch("http://127.0.0.1:8000/api/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
+    browser.runtime.sendMessage({
+      action: "submitSelection",
+      payload: {
         html: html,
         source_url: sourceUrl
-      })
+      }
     })
-      .then(response => response.json())
-      .then(data => {
+      .then(result => {
+        if (!result || !result.ok) {
+          throw new Error(result && result.error ? result.error : "Unknown error");
+        }
+        const data = result.data;
         if (!data || !data.redirect_url) {
           throw new Error('Missing redirect_url in response');
         }

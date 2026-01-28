@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from handlers import topics_handler, themed_topic_handler, submission_handler, task_queue_handler
@@ -7,6 +8,15 @@ from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
 
 app = FastAPI(title="My FastAPI App", description="A simple FastAPI application with separate handlers")
+
+# Allow extension/background fetches (OPTIONS preflight for JSON POST).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 
