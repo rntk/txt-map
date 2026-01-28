@@ -1,9 +1,11 @@
 """
 Mindmap generation task - creates mindmap structures for topics
+with importance scoring and cross-topic relationships
 """
 from lib.storage.submissions import SubmissionsStorage
 import hashlib
 import datetime
+import re
 
 
 def mark_words_in_sentence(sentence: str):
@@ -18,9 +20,10 @@ def mark_words_in_sentence(sentence: str):
 def generate_mindmap_for_topic(topic_name, sentences, sentence_indices, llm, cache_collection):
     """
     Generate a mind map structure for a specific topic based on its sentences.
+    Now includes importance scoring (1-5) and node types.
     """
     if not sentences:
-        return {}, []
+        return {}, [], []
 
     # Combine sentences for the topic and track sentence boundaries in the combined text
     combined_text = ""
@@ -53,21 +56,38 @@ CRITICAL INSTRUCTIONS FOR BREVITY AND MEANINGFUL EXTRACTION:
 - ELIMINATE CONNECTING WORDS: Remove articles (the, a, an), conjunctions (and, but), prepositions (in, on), etc.
 - AVOID ADJECTIVES UNLESS CRITICAL: Only include adjectives if they fundamentally change the meaning.
 
+IMPORTANCE SCORING (1-5):
+For each node, assign an importance score:
+5 = CRITICAL: Core concept essential to understanding the main topic
+4 = IMPORTANT: Key supporting idea or major sub-topic
+3 = RELEVANT: Useful detail or explanation
+2 = MINOR: Ancillary point or example
+1 = INCIDENTAL: Brief mention or tangential information
+
+NODE TYPES:
+- concept: Core idea or abstract notion
+- entity: Person, organization, product, or named thing
+- action: Process, method, or activity
+- example: Specific instance or illustration
+- attribute: Property, characteristic, or quality
+- relationship: Connection between concepts
+
 EXAMPLE OF GOOD EXTRACTION:
 Original text: "The |#0#| rapid |#1#| development |#2#| of |#3#| artificial |#4#| intelligence |#5#| technologies |#6#| in |#7#| modern |#8#| healthcare |#9#| systems |#10#|"
-Good extraction: "development, intelligence" or "AI, healthcare"
-Bad extraction: "rapid development of artificial intelligence technologies in modern healthcare systems"
+Good extraction: "2-2 | 5 | concept" (development) then "4-5 | 5 | concept" (artificial intelligence)
+Bad extraction: "0-10 | 3 | concept" (the rapid development of artificial intelligence technologies in modern healthcare systems)
 
-Return a hierarchical list of word ranges in the format:
-Topic_Range, Subtopic_Range
+Return a hierarchical list of word ranges with importance scores and types in the format:
+Topic_Range | Importance_Score | Node_Type
+Topic_Range, Subtopic_Range | Importance_Score | Node_Type
 
 Format for a range is: start-end
 Where 'start' is the marker number of the first word and 'end' is the marker number of the last word (inclusive).
 
-Example:
-Text: The |#0#| quick |#1#| brown |#2#| fox |#3#| jumps |#4#| over |#5#| the |#6#| lazy |#7#| dog |#8#|
-Mind map:
-3-3, 8-8  # "fox", "dog" - shortest meaningful terms
+Example Output:
+3-3 | 5 | entity
+3-3, 8-8 | 4 | relationship
+10-12 | 3 | example
 
 <content>
 {marked_text}
@@ -95,16 +115,18 @@ Mind map:"""
             upsert=True
         )
 
-    # Parse the mindmap response - expect comma-separated ranges
+    # Parse the mindmap response - expect comma-separated ranges with metadata
     mindmap_topics = []
     sentence_to_hierarchies = {}
+    node_metadata = {}  # Store importance and type for each node
 
     for line in mindmap_response.strip().split('\n'):
         line = line.strip()
         if not line:
             continue
 
-        # Split by comma to get hierarchy
+        # Parse format: "range1-range2, range3-range4 | importance | type"
+        # or just "range1-range2 | importance | type" for single node
         parts = [p.strip() for p in line.split(',')]
         if not parts:
             continue
@@ -112,12 +134,37 @@ Mind map:"""
         current_hierarchy = [topic_name]  # Root of the mindmap is the topic name
         valid_line = True
         line_ranges = []
+        current_importance = 3  # Default importance
+        current_type = "concept"  # Default type
 
         for i, part in enumerate(parts):
+            # Check if this part has metadata (contains |)
+            if '|' in part:
+                # Split range from metadata
+                range_meta_parts = [p.strip() for p in part.split('|')]
+                range_str = range_meta_parts[0]
+                
+                # Parse importance if provided
+                if len(range_meta_parts) >= 2:
+                    try:
+                        importance_val = int(range_meta_parts[1])
+                        current_importance = max(1, min(5, importance_val))  # Clamp to 1-5
+                    except ValueError:
+                        pass
+                
+                # Parse type if provided
+                if len(range_meta_parts) >= 3:
+                    node_type = range_meta_parts[2].lower().strip()
+                    valid_types = {'concept', 'entity', 'action', 'example', 'attribute', 'relationship'}
+                    if node_type in valid_types:
+                        current_type = node_type
+            else:
+                range_str = part
+
             # Parse range start-end
-            if '-' in part:
+            if '-' in range_str:
                 # Remove any non-digit/dash chars
-                clean_part = "".join(c for c in part if c.isdigit() or c == '-')
+                clean_part = "".join(c for c in range_str if c.isdigit() or c == '-')
                 range_parts = clean_part.split('-')
 
                 if len(range_parts) == 2 and range_parts[0] and range_parts[1]:
@@ -136,6 +183,13 @@ Mind map:"""
 
                             current_hierarchy.append(topic_text)
                             line_ranges.append((r_start, r_end))
+                            
+                            # Store metadata for this node
+                            node_metadata[topic_text] = {
+                                "importance": current_importance,
+                                "type": current_type,
+                                "range": (r_start, r_end)
+                            }
                         else:
                             valid_line = False
                             break
@@ -150,7 +204,11 @@ Mind map:"""
                 break
 
         if valid_line and current_hierarchy:
-            mindmap_topics.append(current_hierarchy)
+            mindmap_topics.append({
+                "hierarchy": current_hierarchy,
+                "importance": current_importance,
+                "type": current_type
+            })
             # Find which sentences this hierarchy belongs to
             for r_start, r_end in line_ranges:
                 for i, (s_start, s_end) in enumerate(sentence_boundaries):
@@ -159,35 +217,189 @@ Mind map:"""
                         orig_idx = sentence_indices[i]
                         if orig_idx not in sentence_to_hierarchies:
                             sentence_to_hierarchies[orig_idx] = []
-                        if current_hierarchy not in sentence_to_hierarchies[orig_idx]:
-                            sentence_to_hierarchies[orig_idx].append(current_hierarchy)
+                        hierarchy_entry = {
+                            "path": current_hierarchy,
+                            "importance": current_importance,
+                            "type": current_type
+                        }
+                        # Avoid duplicates
+                        if hierarchy_entry not in sentence_to_hierarchies[orig_idx]:
+                            sentence_to_hierarchies[orig_idx].append(hierarchy_entry)
 
-    # Build the hierarchical structure under topic_name
+    # Build the hierarchical structure under topic_name with metadata
     structure = {}
-    for topic_hierarchy in mindmap_topics:
-        current_level = structure
+    def add_to_structure(struct, hierarchy, importance, node_type, metadata_dict):
+        if not hierarchy:
+            return
+        node = hierarchy[0]
+        if node not in struct:
+            struct[node] = {
+                "children": {},
+                "importance": importance,
+                "type": node_type,
+                "metadata": metadata_dict.get(node, {"importance": importance, "type": node_type})
+            }
+        if len(hierarchy) > 1:
+            add_to_structure(
+                struct[node]["children"], 
+                hierarchy[1:], 
+                importance, 
+                node_type,
+                metadata_dict
+            )
+
+    for entry in mindmap_topics:
         # Skip the first level (topic_name) because it's already the key
-        for topic in topic_hierarchy[1:]:
-            if topic not in current_level:
-                current_level[topic] = {}
-            current_level = current_level[topic]
+        hierarchy = entry["hierarchy"][1:]
+        if hierarchy:
+            add_to_structure(
+                structure, 
+                hierarchy, 
+                entry["importance"], 
+                entry["type"],
+                node_metadata
+            )
 
     # Build mindmap_results format for this topic
     mindmap_results = []
     for i, orig_idx in enumerate(sentence_indices):
-        hierarchies = sentence_to_hierarchies.get(orig_idx, [[topic_name]])
+        hierarchies = sentence_to_hierarchies.get(orig_idx, [])
+        if not hierarchies:
+            hierarchies = [{"path": [topic_name], "importance": 5, "type": "concept"}]
+        
         mindmap_results.append({
             "sentence_index": orig_idx,
             "sentence": sentences[i],
-            "mindmap_topics": hierarchies
+            "mindmap_topics": [h["path"] for h in hierarchies],
+            "topic_metadata": [{"importance": h["importance"], "type": h["type"]} for h in hierarchies]
         })
 
-    return structure, mindmap_results
+    return structure, mindmap_results, node_metadata
+
+
+def extract_cross_topic_relationships(topics, topic_mindmaps, llm, cache_collection):
+    """
+    Extract relationships between different topics in the mindmap.
+    Returns a list of relationship dictionaries.
+    """
+    if len(topics) < 2:
+        return []
+
+    # Build a summary of all topics and their key nodes
+    topic_summaries = []
+    for topic_name, structure in topic_mindmaps.items():
+        key_nodes = []
+        
+        def collect_nodes(struct, prefix=""):
+            for node_name, node_data in struct.items():
+                if isinstance(node_data, dict):
+                    node_info = f"{prefix}{node_name}"
+                    key_nodes.append(node_info)
+                    if "children" in node_data:
+                        collect_nodes(node_data["children"], prefix + "  > ")
+        
+        collect_nodes(structure)
+        topic_summaries.append(f"Topic: {topic_name}\nKey nodes:\n" + "\n".join(key_nodes[:10]))
+
+    prompt_template = """Analyze the following topics and identify cross-topic relationships.
+For each relationship, specify:
+- Source topic/node
+- Relationship type
+- Target topic/node
+- Brief description of the connection
+
+Relationship types:
+- extends: Source expands upon or elaborates target
+- example_of: Source is a specific instance of target  
+- contrasts_with: Source differs from or opposes target
+- supports: Source provides evidence or backing for target
+- prerequisite: Source is required to understand target
+- related_to: General connection between topics
+
+Topics:
+{topics_summary}
+
+Return relationships in this format (one per line):
+Source | Relationship | Target | Description
+
+Example:
+Machine Learning | extends | Artificial Intelligence | ML is a subset of AI
+Neural Networks | example_of | Deep Learning | NNs are a technique in DL
+
+Relationships:"""
+
+    topics_summary = "\n\n".join(topic_summaries)
+    prompt = prompt_template.replace("{topics_summary}", topics_summary)
+    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
+
+    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
+
+    if cached_response:
+        response = cached_response["response"]
+    else:
+        response = llm.call([prompt])
+        cache_collection.update_one(
+            {"prompt_hash": prompt_hash},
+            {"$set": {
+                "prompt_hash": prompt_hash,
+                "prompt": prompt,
+                "response": response,
+                "created_at": datetime.datetime.now()
+            }},
+            upsert=True
+        )
+
+    # Parse relationships
+    relationships = []
+    for line in response.strip().split('\n'):
+        line = line.strip()
+        if not line or '|' not in line:
+            continue
+        
+        parts = [p.strip() for p in line.split('|')]
+        if len(parts) >= 3:
+            relationships.append({
+                "source": parts[0],
+                "relationship": parts[1].lower().replace(' ', '_'),
+                "target": parts[2],
+                "description": parts[3] if len(parts) > 3 else ""
+            })
+
+    return relationships
+
+
+def flatten_structure(structure, parent_path=None):
+    """
+    Flatten the nested structure for easier UI consumption.
+    Returns a list of all nodes with their paths and metadata.
+    """
+    if parent_path is None:
+        parent_path = []
+    
+    nodes = []
+    for node_name, node_data in structure.items():
+        if isinstance(node_data, dict):
+            current_path = parent_path + [node_name]
+            node_entry = {
+                "name": node_name,
+                "path": current_path,
+                "importance": node_data.get("importance", 3),
+                "type": node_data.get("type", "concept"),
+                "has_children": bool(node_data.get("children", {}))
+            }
+            nodes.append(node_entry)
+            
+            # Recursively add children
+            if "children" in node_data:
+                nodes.extend(flatten_structure(node_data["children"], current_path))
+    
+    return nodes
 
 
 def process_mindmap(submission: dict, db, llm):
     """
     Process mindmap generation task for a submission.
+    Now includes importance scoring and cross-topic relationships.
 
     Args:
         submission: Submission document from DB
@@ -214,6 +426,7 @@ def process_mindmap(submission: dict, db, llm):
 
     topic_mindmaps = {}
     all_mindmap_results = []
+    all_node_metadata = {}
 
     print(f"Generating mindmaps for {len(topics)} topics")
 
@@ -225,7 +438,7 @@ def process_mindmap(submission: dict, db, llm):
             ]
 
             if topic_sentences_text:
-                structure, results = generate_mindmap_for_topic(
+                structure, mindmap_results, node_metadata = generate_mindmap_for_topic(
                     topic["name"],
                     topic_sentences_text,
                     topic["sentences"],
@@ -233,7 +446,31 @@ def process_mindmap(submission: dict, db, llm):
                     cache_collection
                 )
                 topic_mindmaps[topic["name"]] = structure
-                all_mindmap_results.extend(results)
+                all_mindmap_results.extend(mindmap_results)
+                all_node_metadata.update(node_metadata)
+
+    # Extract cross-topic relationships
+    print(f"Extracting cross-topic relationships")
+    relationships = extract_cross_topic_relationships(
+        topics, topic_mindmaps, llm, cache_collection
+    )
+
+    # Create flattened node list for easy filtering
+    all_nodes = []
+    for topic_name, structure in topic_mindmaps.items():
+        topic_nodes = flatten_structure(structure)
+        for node in topic_nodes:
+            node["topic"] = topic_name
+        all_nodes.extend(topic_nodes)
+
+    # Calculate statistics
+    # Use string keys for MongoDB compatibility (BSON requires string keys)
+    importance_distribution = {str(i): 0 for i in range(1, 6)}
+    type_distribution = {}
+    for node in all_nodes:
+        importance_distribution[str(node["importance"])] = importance_distribution.get(str(node["importance"]), 0) + 1
+        node_type = node["type"]
+        type_distribution[node_type] = type_distribution.get(node_type, 0) + 1
 
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
@@ -241,8 +478,17 @@ def process_mindmap(submission: dict, db, llm):
         submission_id,
         {
             "topic_mindmaps": topic_mindmaps,
-            "mindmap_results": all_mindmap_results
+            "mindmap_results": all_mindmap_results,
+            "mindmap_metadata": {
+                "node_count": len(all_nodes),
+                "importance_distribution": importance_distribution,
+                "type_distribution": type_distribution,
+                "all_nodes": all_nodes,
+                "cross_topic_relationships": relationships
+            }
         }
     )
 
-    print(f"Mindmap generation completed for submission {submission_id}: {len(topic_mindmaps)} topic mindmaps")
+    print(f"Mindmap generation completed for submission {submission_id}: "
+          f"{len(topic_mindmaps)} topic mindmaps, {len(all_nodes)} nodes, "
+          f"{len(relationships)} relationships")

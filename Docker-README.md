@@ -58,6 +58,20 @@ If you prefer to build and run manually:
      rss-content-analyzer
    ```
 
+## Build the Browser Extension with Docker
+
+If you don't want to install Node.js locally, you can build the extension using a Node Docker image:
+
+```bash
+docker run --rm -it \
+  -v "$(pwd)/extension:/ext" \
+  -w /ext \
+  node:22-alpine \
+  sh -lc "npm install && npm run build && touch app-bundle.css"
+```
+
+This produces `extension/app-bundle.js` (and `app-bundle.css`) for loading via `extension/manifest.json`.
+
 ## Environment Variables
 
 The application supports the following environment variables:

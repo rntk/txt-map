@@ -533,12 +533,12 @@ function TextPage() {
                   <div className="mindmap-tab-container" style={{ padding: '20px' }}>
                     <MindmapResults
                       mindmapData={{
-                        aggregated_mindmap: {
-                          structure: results.topic_mindmaps || {}
-                        },
+                        topic_mindmaps: results.topic_mindmaps || {},
                         sentences: safeSentences,
-                        mindmap_results: results.mindmap_results || []
+                        mindmap_results: results.mindmap_results || [],
+                        mindmap_metadata: results.mindmap_metadata || {}
                       }}
+                      insidesData={results.insides || []}
                     />
                   </div>
                 ) : activeTab === 'insides' ? (

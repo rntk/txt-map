@@ -84,6 +84,19 @@ docker run -d -p 27017:27017 mongo:8.0
 1. Firefox: `about:debugging` → Load Temporary Add-on → Select `/app/extension/manifest.json`
 2. Chrome: `chrome://extensions` → Load unpacked → Select `/app/extension/`
 
+### Build Extension with Docker (no local Node.js)
+
+From the repo root:
+```bash
+docker run --rm -it \
+  -v "$(pwd)/extension:/ext" \
+  -w /ext \
+  node:22-alpine \
+  sh -lc "npm install && npm run build && touch app-bundle.css"
+```
+
+Then load the extension from `extension/manifest.json` as described above.
+
 ## Usage
 
 ### Using the Browser Extension
