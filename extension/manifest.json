@@ -2,15 +2,10 @@
   "manifest_version": 2,
   "name": "RSS Tag Theme Analyzer",
   "version": "1.0",
-  "description": "Extract page content and analyze topics/themes",
+  "description": "Select text and submit it to the API for processing",
   "permissions": [
-    "activeTab",
     "tabs",
-    "storage",
-    "notifications",
-    "<all_urls>",
-    "http://127.0.0.1:8000/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1:8000/*"
   ],
   "background": {
     "scripts": ["background.js"]
@@ -20,8 +15,7 @@
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png"
     },
-    "default_title": "Analyze Page Topics",
-    "default_popup": "popup.html"
+    "default_title": "Submit Selected Text"
   },
   "content_scripts": [
     {
@@ -30,16 +24,6 @@
       "css": ["content.css"],
       "run_at": "document_idle"
     }
-  ],
-  "web_accessible_resources": [
-    "results.html",
-    "results-loader.js",
-    "overlay.html",
-    "overlay.js",
-    "app-bundle.js",
-    "app-bundle.css",
-    "overlay.css",
-    "results.css"
   ],
   "icons": {
     "48": "icons/icon-48.png",

@@ -1,25 +1,25 @@
-/* Styles for selection toolbar and element highlighting injected by content script */
+/* Styles for selection toolbar injected by content script */
 #rsstag-selection-toolbar {
   position: fixed;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 999999;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 15px 25px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 12px 18px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   display: flex;
-  gap: 15px;
+  gap: 12px;
   align-items: center;
-  animation: rsstag-slideDown 0.3s ease-out;
+  animation: rsstag-slideDown 0.2s ease-out;
 }
 
 @keyframes rsstag-slideDown {
   from {
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateX(-50%) translateY(-12px);
     opacity: 0;
   }
   to {
@@ -29,72 +29,61 @@
 }
 
 #rsstag-selection-toolbar button {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   white-space: nowrap;
 }
 
-#rsstag-select-btn {
-  background: white;
-  color: #667eea;
+#rsstag-pick-btn {
+  background: #60a5fa;
+  color: #0b1e34;
 }
 
-#rsstag-select-btn:hover {
-  background: #f0f0f0;
-  transform: scale(1.05);
+#rsstag-pick-btn.active {
+  background: #fbbf24;
+  color: #1f1300;
 }
 
-#rsstag-select-btn.active {
-  background: #ffd700;
-  color: #333;
+#rsstag-submit-btn {
+  background: #10b981;
+  color: #06281c;
 }
 
-#rsstag-fullpage-btn {
-  background: rgba(255,255,255,0.2);
-  color: white;
-  border: 2px solid white;
-}
-
-#rsstag-fullpage-btn:hover {
-  background: rgba(255,255,255,0.3);
-  transform: scale(1.05);
+#rsstag-submit-btn:disabled {
+  background: #6b7280;
+  color: #e5e7eb;
+  cursor: not-allowed;
+  opacity: 0.8;
 }
 
 #rsstag-cancel-btn {
-  background: rgba(255,0,0,0.8);
-  color: white;
+  background: #ef4444;
+  color: #fff;
 }
 
-#rsstag-cancel-btn:hover {
-  background: rgba(255,0,0,1);
-  transform: scale(1.05);
+#rsstag-selection-toolbar button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 #rsstag-toolbar-text {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .rsstag-element-highlight {
-  outline: 3px solid #667eea !important;
+  outline: 2px solid #60a5fa !important;
   outline-offset: 2px;
-  background: rgba(102, 126, 234, 0.1) !important;
+  background: rgba(96, 165, 250, 0.12) !important;
   cursor: pointer !important;
-  transition: all 0.2s;
-}
-
-.rsstag-element-highlight:hover {
-  outline-color: #ffd700 !important;
-  background: rgba(255, 215, 0, 0.2) !important;
 }
 
 .rsstag-selected {
-  outline: 4px solid #ffd700 !important;
+  outline: 3px solid #fbbf24 !important;
   outline-offset: 2px;
-  background: rgba(255, 215, 0, 0.3) !important;
+  background: rgba(251, 191, 36, 0.2) !important;
 }
