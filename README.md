@@ -76,7 +76,7 @@ python workers.py
 
 **Terminal 3 - Start MongoDB (if not using Docker):**
 ```bash
-docker run -d -p 27017:27017 mongo:8.0
+docker run -d -p 27017:27017 mongo:8
 ```
 
 ### Load Browser Extension

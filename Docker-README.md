@@ -47,13 +47,13 @@ If you prefer to build and run manually:
 
 2. **Run MongoDB separately**:
    ```bash
-   docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_DATABASE=rss mongo:7.0
+   docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_DATABASE=rss mongo:8
    ```
 
 3. **Run the application**:
    ```bash
    docker run -d --name rss-app -p 8000:8000 \
-     -e MONGODB_URL=mongodb://host.docker.internal:27017/ \
+     -e MONGODB_URL=mongodb://mongodb:27017/ \
      --link mongodb:mongodb \
      rss-content-analyzer
    ```
@@ -77,7 +77,7 @@ This produces `extension/app-bundle.js` (and `app-bundle.css`) for loading via `
 The application supports the following environment variables:
 
 - `MONGODB_URL`: MongoDB connection string (default: `mongodb://localhost:8765/`)
-- `LLAMACPP_URL`: LLamaCPP server URL (default: `http://localhost:8989`)
+- `LLAMACPP_URL`: LLamaCPP server URL (default: `http://llamacpp:8080` in Docker, `http://localhost:8989` locally)
 - `TOKEN`: Optional authentication token for LLamaCPP server
 
 ## LlamaCPP Integration
@@ -134,5 +134,3 @@ For production deployment:
 6. Use a production-grade LLM inference server
 
 
-sudo docker build -t rsstag-tests -f Dockerfile.web ./
-sudo docker run --rm -it --network=host -v $(pwd):/app --name rsstag-tests rsstag-tests 
