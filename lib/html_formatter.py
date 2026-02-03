@@ -114,28 +114,3 @@ def preserve_formatting_in_text(html_content):
     return formatted_text, plain_text
 
 
-def reconstruct_with_formatting(words, word_ranges, formatted_text):
-    """
-    Reconstruct sentences from word ranges while preserving original formatting.
-    
-    Args:
-        words: List of words from plain text analysis
-        word_ranges: List of (start_word_idx, end_word_idx) tuples
-        formatted_text: Original formatted text with paragraph breaks
-    
-    Returns:
-        List of formatted sentence strings
-    """
-    # Build mapping from plain words back to formatted text
-    formatted_words = formatted_text.split()
-    plain_words = ' '.join(formatted_text.split()).split()
-    
-    sentences = []
-    for start_idx, end_idx in word_ranges:
-        if 0 <= start_idx <= end_idx < len(words):
-            # Extract the sentence with formatting preserved
-            sentence_words = words[start_idx:end_idx + 1]
-            sentence = ' '.join(sentence_words)
-            sentences.append(sentence)
-    
-    return sentences

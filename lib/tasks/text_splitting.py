@@ -49,12 +49,13 @@ def process_text_splitting(submission: dict, db, llm):
         raise ValueError("No text content to process")
 
     # Split article with markers
-    _, words, paragraph_map, paragraph_texts, marker_count, marker_word_indices, marked_text, word_to_paragraph = split_article_with_markers(
+
+    result = split_article_with_markers(
         text_content, llm
     )
 
     # Build basic sentences from marker positions
-    sentences = build_basic_sentences(words, marker_word_indices)
+    sentences = build_basic_sentences(result.words, result.marker_word_indices)
 
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
@@ -62,12 +63,12 @@ def process_text_splitting(submission: dict, db, llm):
         submission_id,
         {
             "sentences": sentences,
-            "words": words,
-            "marked_text": marked_text,
-            "marker_count": marker_count,
-            "marker_word_indices": marker_word_indices,
-            "word_to_paragraph": word_to_paragraph,
-            "paragraph_texts": paragraph_texts
+            "words": result.words,
+            "marked_text": result.marked_text,
+            "marker_count": result.marker_count,
+            "marker_word_indices": result.marker_word_indices,
+            "word_to_paragraph": result.word_to_paragraph,
+            "paragraph_texts": result.paragraph_texts
         }
     )
 

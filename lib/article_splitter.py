@@ -3,10 +3,24 @@ Article splitting utilities for converting articles into structured segments.
 """
 import re
 from typing import List, Tuple, Dict, Optional
+from dataclasses import dataclass
 from lib.html_formatter import FormattingPreserver
 
 
-def split_article_with_markers(article: str, llm) -> Tuple[List[str], List[str], Dict[int, int], List[str], int, List[int]]:
+@dataclass
+class ArticleSplitResult:
+    sentences: List[str]
+    words: List[str]
+    paragraph_map: Dict[int, int]
+    paragraph_texts: List[str]
+    marker_count: int
+    marker_word_indices: List[int]
+    marked_text: str
+    word_to_paragraph: List[int]
+
+
+
+def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
     """
     Split an article into sentences using a hybrid marker-based approach.
     
@@ -20,13 +34,7 @@ def split_article_with_markers(article: str, llm) -> Tuple[List[str], List[str],
         llm: LLM client instance (used for token estimation and chunking)
     
     Returns:
-        Tuple containing:
-        - sentences: List of sentence strings (built from marked text ranges)
-        - words: List of individual words from the plain text
-        - paragraph_map: Dict mapping sentence index to paragraph index
-        - paragraph_texts: List of paragraph texts (preserving formatting)
-        - marker_count: Total number of markers added
-        - marker_word_indices: List mapping marker number to word index
+        ArticleSplitResult containing all processing artifacts
     """
     # Extract both formatted and plain text
     formatter = FormattingPreserver()
@@ -49,7 +57,7 @@ def split_article_with_markers(article: str, llm) -> Tuple[List[str], List[str],
     # Split text into words and add numbered markers
     words = text.split()
     if not words:
-        return [], [], {}, [], 0, []
+        return ArticleSplitResult([], [], {}, [], 0, [], "", [])
     
     print(f"\n=== DEBUG: Total words: {len(words)} ===")
     print(f"First 10 words: {words[:10]}")
@@ -105,7 +113,16 @@ def split_article_with_markers(article: str, llm) -> Tuple[List[str], List[str],
     
     # Return the components needed for further processing
     # Note: sentences will be built later from marker ranges
-    return [], words, paragraph_map, paragraph_texts, marker_count, marker_word_indices, marked_text, word_to_paragraph
+    return ArticleSplitResult(
+        sentences=[],
+        words=words,
+        paragraph_map=paragraph_map,
+        paragraph_texts=paragraph_texts,
+        marker_count=marker_count,
+        marker_word_indices=marker_word_indices,
+        marked_text=marked_text,
+        word_to_paragraph=word_to_paragraph
+    )
 
 
 def build_sentences_from_ranges(
