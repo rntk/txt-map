@@ -38,6 +38,14 @@ submissions_storage.prepare()
 app.state.posts_storage = posts_storage
 app.state.submissions_storage = submissions_storage
 
+@app.get("/")
+def serve_root_page():
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/menu")
+def serve_menu_page():
+    return FileResponse("frontend/build/index.html")
+
 @app.get("/page/themed-post")
 def serve_themed_post_page():
     return FileResponse("frontend/build/index.html")

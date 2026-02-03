@@ -4,6 +4,7 @@ import TextDisplay from './components/TextDisplay';
 import TextPage from './components/TextPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
+import MainPage from './components/MainPage';
 import './styles/App.css';
 
 function App() {
@@ -25,8 +26,8 @@ function App() {
     const tag = pathParts.length > 3 && pathParts[3] ? pathParts[3] : null;
     setPageType(apiType);
 
-    // If text submission page, text list page, or task control page, render dedicated component
-    if (apiType === 'text' || apiType === 'tasks' || apiType === 'texts') {
+    // If text submission page, text list page, or task control page, or no api type (main page), don't fetch articles
+    if (!apiType || apiType === 'menu' || apiType === 'text' || apiType === 'tasks' || apiType === 'texts') {
       return;
     }
 
@@ -251,6 +252,10 @@ function App() {
   };
 
   // Loading state handling
+  if (!pageType || pageType === 'menu') {
+    return <MainPage />;
+  }
+
   if (pageType === 'tasks') {
     return <TaskControlPage />;
   }
