@@ -69,8 +69,8 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
 
   const fadedIndices = new Set();
-  readTopicsSet.forEach(topic => {
-    const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
+  readTopicsSet.forEach(topicName => {
+    const relatedTopic = safeArticleTopics.find(t => t.name === topicName);
     if (relatedTopic) {
       relatedTopic.sentences.forEach(num => fadedIndices.add(num - 1));
     }

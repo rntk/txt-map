@@ -74,10 +74,10 @@ function TopicList({
   };
 
   const toggleReadForRoot = (subTopics) => {
-    const allRead = subTopics.every(topic => safeReadTopics.has(topic));
+    const allRead = subTopics.every(topic => safeReadTopics.has(topic.name));
 
     subTopics.forEach(topic => {
-      const isRead = safeReadTopics.has(topic);
+      const isRead = safeReadTopics.has(topic.name);
       if (allRead && isRead) {
         // Mark all as unread
         onToggleRead(topic);
@@ -100,7 +100,7 @@ function TopicList({
   };
 
   const isRootRead = (subTopics) => {
-    return subTopics.every(topic => safeReadTopics.has(topic));
+    return subTopics.every(topic => safeReadTopics.has(topic.name));
   };
 
   return (
@@ -150,7 +150,7 @@ function TopicList({
                   {subTopics.map((topic, subIndex) => (
                     <li
                       key={subIndex}
-                      className={`topic-item ${safeReadTopics.has(topic) ? 'topic-item-read' : ''}`}
+                      className={`topic-item ${safeReadTopics.has(topic.name) ? 'topic-item-read' : ''}`}
                       onMouseEnter={() => onHoverTopic(topic)}
                       onMouseLeave={() => onHoverTopic(null)}
                     >
@@ -174,9 +174,9 @@ function TopicList({
                         <div className="topic-buttons">
                           <button
                             onClick={() => onToggleRead(topic)}
-                            className={`read-toggle ${safeReadTopics.has(topic) ? 'readed' : ''}`}
+                            className={`read-toggle ${safeReadTopics.has(topic.name) ? 'readed' : ''}`}
                           >
-                            {safeReadTopics.has(topic) ? 'Readed' : 'Unreaded'}
+                            {safeReadTopics.has(topic.name) ? 'Readed' : 'Unreaded'}
                           </button>
                           <button
                             onClick={() => onToggleShowPanel(topic)}

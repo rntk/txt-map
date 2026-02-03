@@ -112,10 +112,11 @@ function App() {
   const toggleRead = (topic) => {
     setReadTopics(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(topic)) {
-        newSet.delete(topic);
+      const topicName = topic.name;
+      if (newSet.has(topicName)) {
+        newSet.delete(topicName);
       } else {
-        newSet.add(topic);
+        newSet.add(topicName);
       }
       return newSet;
     });
@@ -142,10 +143,10 @@ function App() {
       article.topics.forEach(topic => {
         if (isCurrentlyRead) {
           // Article was read, now marking as unread - remove topic from read topics
-          newSet.delete(topic);
+          newSet.delete(topic.name);
         } else {
           // Article was unread, now marking as read - add topic to read topics
-          newSet.add(topic);
+          newSet.add(topic.name);
         }
       });
       return newSet;

@@ -122,6 +122,7 @@ function TextPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'topics_river' | 'mindmap' | 'insides'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
+  const [readTopics, setReadTopics] = useState(new Set());
 
   const submissionId = window.location.pathname.split('/')[3];
 
@@ -187,6 +188,19 @@ function TextPage() {
 
   const handleHoverTopic = (topic) => {
     setHoveredTopic(topic);
+  };
+
+  const toggleRead = (topic) => {
+    setReadTopics(prev => {
+      const newSet = new Set(prev);
+      const topicName = topic.name;
+      if (newSet.has(topicName)) {
+        newSet.delete(topicName);
+      } else {
+        newSet.add(topicName);
+      }
+      return newSet;
+    });
   };
 
   const handleSummaryClick = (mapping, article) => {
@@ -399,8 +413,8 @@ function TextPage() {
                 hoveredTopic={hoveredTopic}
                 onToggleTopic={toggleTopic}
                 onHoverTopic={handleHoverTopic}
-                readTopics={new Set()}
-                onToggleRead={() => {}}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
               />
             </div>
             <div className="right-column">
@@ -556,7 +570,7 @@ function TextPage() {
                       sentences={article.sentences}
                       selectedTopics={selectedTopics}
                       hoveredTopic={hoveredTopic}
-                      readTopics={new Set()}
+                      readTopics={readTopics}
                       articleTopics={article.topics}
                       articleIndex={index}
                       topicSummaries={article.topic_summaries}
