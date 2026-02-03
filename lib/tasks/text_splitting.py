@@ -72,4 +72,4 @@ def process_text_splitting(submission: dict, db, llm):
         }
     )
 
-    print(f"Text splitting completed for submission {submission_id}: {len(sentences)} sentences, {len(words)} words, {marker_count} markers")
+    print(f"Text splitting completed for submission {submission_id}: {len(sentences)} sentences, {len(result.words)} words, {result.marker_count} markers")
