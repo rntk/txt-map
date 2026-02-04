@@ -298,8 +298,11 @@ function TextPage() {
   const safeSentences = Array.isArray(results.sentences) ? results.sentences : [];
   const safeTopics = Array.isArray(results.topics) ? results.topics : [];
 
+  const safeHtmlSentences = Array.isArray(results.html_sentences) ? results.html_sentences : [];
+
   const articles = safeSentences.length > 0 ? [{
     sentences: safeSentences,
+    html_sentences: safeHtmlSentences,
     topics: safeTopics,
     topic_summaries: results.topic_summaries || {},
     paragraph_map: results.paragraph_map || null
@@ -568,6 +571,7 @@ function TextPage() {
                     <TextDisplay
                       key={index}
                       sentences={article.sentences}
+                      htmlSentences={article.html_sentences}
                       selectedTopics={selectedTopics}
                       hoveredTopic={hoveredTopic}
                       readTopics={readTopics}

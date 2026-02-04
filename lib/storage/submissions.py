@@ -8,6 +8,14 @@ from pymongo import MongoClient
 
 class SubmissionsStorage:
     indexes = ["submission_id", "created_at"]
+    task_names = ["text_splitting", "topic_extraction", "summarization", "mindmap", "insides"]
+    task_dependencies = {
+        "text_splitting": [],
+        "topic_extraction": ["text_splitting"],
+        "summarization": ["text_splitting", "topic_extraction"],
+        "mindmap": ["text_splitting", "topic_extraction"],
+        "insides": ["text_splitting"],
+    }
 
     def __init__(self, db: MongoClient) -> None:
         self._db: MongoClient = db
@@ -73,7 +81,9 @@ class SubmissionsStorage:
             },
             "results": {
                 "sentences": [],
+                "html_sentences": [],
                 "words": [],
+                "html_words": [],
                 "marked_text": "",
                 "marker_count": 0,
                 "marker_word_indices": [],
@@ -148,8 +158,7 @@ class SubmissionsStorage:
         task_names: Optional[List[str]] = None
     ) -> bool:
         """Clear results and reset task statuses for refresh"""
-        if task_names is None:
-            task_names = ["text_splitting", "topic_extraction", "summarization", "mindmap", "insides"]
+        task_names = self.expand_recalculation_tasks(task_names)
 
         now = datetime.utcnow()
         update_fields = {"updated_at": now}
@@ -164,7 +173,9 @@ class SubmissionsStorage:
         # Clear related results
         if "text_splitting" in task_names:
             update_fields["results.sentences"] = []
+            update_fields["results.html_sentences"] = []
             update_fields["results.words"] = []
+            update_fields["results.html_words"] = []
             update_fields["results.marked_text"] = ""
             update_fields["results.marker_count"] = 0
             update_fields["results.marker_word_indices"] = []
@@ -183,6 +194,7 @@ class SubmissionsStorage:
         if "mindmap" in task_names:
             update_fields["results.topic_mindmaps"] = {}
             update_fields["results.mindmap_results"] = []
+            update_fields["results.mindmap_metadata"] = {}
 
         if "insides" in task_names:
             update_fields["results.insides"] = []
@@ -192,6 +204,30 @@ class SubmissionsStorage:
             {"$set": update_fields}
         )
         return result.modified_count > 0
+
+    def expand_recalculation_tasks(self, task_names: Optional[List[str]] = None) -> List[str]:
+        """
+        Expand selected tasks with downstream dependent tasks.
+        Example: requesting topic_extraction also includes summarization and mindmap.
+        """
+        if task_names is None or "all" in task_names:
+            return self.task_names.copy()
+
+        selected = {name for name in task_names if name in self.task_names}
+        expanded = set(selected)
+
+        changed = True
+        while changed:
+            changed = False
+            for task_name in self.task_names:
+                if task_name in expanded:
+                    continue
+                deps = self.task_dependencies.get(task_name, [])
+                if any(dep in expanded for dep in deps):
+                    expanded.add(task_name)
+                    changed = True
+
+        return [name for name in self.task_names if name in expanded]
 
     def get_overall_status(self, submission: dict) -> str:
         """Determine overall status from task statuses"""

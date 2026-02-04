@@ -105,30 +105,34 @@ def repeat_task_queue_entry(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    submissions_storage.clear_results(submission_id, [task_type])
+    expanded_tasks = submissions_storage.expand_recalculation_tasks([task_type])
+    submissions_storage.clear_results(submission_id, expanded_tasks)
 
     db.task_queue.delete_many({
         "submission_id": submission_id,
-        "task_type": task_type,
+        "task_type": {"$in": expanded_tasks},
         "status": {"$in": ["pending", "processing"]}
     })
 
     now = datetime.utcnow()
-    new_entry = {
-        "submission_id": submission_id,
-        "task_type": task_type,
-        "priority": TASK_PRIORITIES.get(task_type, 3),
-        "status": "pending",
-        "created_at": now,
-        "started_at": None,
-        "completed_at": None,
-        "worker_id": None,
-        "retry_count": 0,
-        "error": None,
-    }
-    result = db.task_queue.insert_one(new_entry)
+    inserted_ids = []
+    for expanded_task in expanded_tasks:
+        new_entry = {
+            "submission_id": submission_id,
+            "task_type": expanded_task,
+            "priority": TASK_PRIORITIES.get(expanded_task, 3),
+            "status": "pending",
+            "created_at": now,
+            "started_at": None,
+            "completed_at": None,
+            "worker_id": None,
+            "retry_count": 0,
+            "error": None,
+        }
+        result = db.task_queue.insert_one(new_entry)
+        inserted_ids.append(str(result.inserted_id))
 
-    return {"requeued": True, "task_id": str(result.inserted_id)}
+    return {"requeued": True, "tasks": expanded_tasks, "task_ids": inserted_ids}
 
 
 @router.post("/task-queue/add")
@@ -144,24 +148,27 @@ def add_task_queue_entry(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    submissions_storage.clear_results(payload.submission_id, [payload.task_type])
+    expanded_tasks = submissions_storage.expand_recalculation_tasks([payload.task_type])
+    submissions_storage.clear_results(payload.submission_id, expanded_tasks)
 
     now = datetime.utcnow()
-    priority = payload.priority if payload.priority is not None else TASK_PRIORITIES.get(payload.task_type, 3)
-    entry = {
-        "submission_id": payload.submission_id,
-        "task_type": payload.task_type,
-        "priority": priority,
-        "status": "pending",
-        "created_at": now,
-        "started_at": None,
-        "completed_at": None,
-        "worker_id": None,
-        "retry_count": 0,
-        "error": None,
-    }
-
     db = submissions_storage._db
-    result = db.task_queue.insert_one(entry)
+    inserted_ids = []
+    for expanded_task in expanded_tasks:
+        priority = payload.priority if payload.priority is not None else TASK_PRIORITIES.get(expanded_task, 3)
+        entry = {
+            "submission_id": payload.submission_id,
+            "task_type": expanded_task,
+            "priority": priority,
+            "status": "pending",
+            "created_at": now,
+            "started_at": None,
+            "completed_at": None,
+            "worker_id": None,
+            "retry_count": 0,
+            "error": None,
+        }
+        result = db.task_queue.insert_one(entry)
+        inserted_ids.append(str(result.inserted_id))
 
-    return {"queued": True, "task_id": str(result.inserted_id)}
+    return {"queued": True, "tasks": expanded_tasks, "task_ids": inserted_ids}

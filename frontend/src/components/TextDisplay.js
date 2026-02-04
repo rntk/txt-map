@@ -1,68 +1,9 @@
 import React from 'react';
+import { sanitizeHTML } from '../utils/sanitize';
 
-// Minimal HTML sanitizer to render original article HTML safely without external deps.
-// Removes dangerous tags and attributes while preserving common formatting.
-function sanitizeHTML(html) {
-  if (!html || typeof document === 'undefined') return '';
-  const template = document.createElement('template');
-  template.innerHTML = html;
-
-  const blockedTags = new Set([
-    'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'svg',
-    'form', 'input', 'button'
-  ]);
-
-  // Remove all blocked tags
-  blockedTags.forEach(tag => {
-    template.content.querySelectorAll(tag).forEach(el => el.remove());
-  });
-
-  const isUnsafeUrl = (val) => {
-    if (!val) return false;
-    const v = String(val).trim().toLowerCase();
-    return v.startsWith('javascript:') || v.startsWith('data:') || v.startsWith('vbscript:');
-  };
-
-  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT, null);
-  let node = walker.currentNode;
-  while (node) {
-    // Remove event handlers and unsafe attributes
-    // Allow a conservative set of attributes
-    const allowedAttrs = new Set(['href', 'src', 'alt', 'title', 'class', 'id', 'rel', 'target', 'aria-label', 'role', 'width', 'height']);
-    // Clone attributes first to avoid live list mutation issues
-    Array.from(node.attributes).forEach(attr => {
-      const name = attr.name.toLowerCase();
-      const val = attr.value;
-      // remove inline event handlers and style
-      if (name.startsWith('on') || name === 'style') {
-        node.removeAttribute(attr.name);
-        return;
-      }
-      if (!allowedAttrs.has(name)) {
-        node.removeAttribute(attr.name);
-        return;
-      }
-      if ((name === 'href' || name === 'src') && isUnsafeUrl(val)) {
-        node.removeAttribute(attr.name);
-        return;
-      }
-      if (name === 'target' && val === '_blank') {
-        // enforce rel safety
-        const rel = node.getAttribute('rel') || '';
-        const needed = ['noopener', 'noreferrer'];
-        const current = new Set(rel.split(/\s+/).filter(Boolean));
-        needed.forEach(n => current.add(n));
-        node.setAttribute('rel', Array.from(current).join(' '));
-      }
-    });
-    node = walker.nextNode();
-  }
-
-  return template.innerHTML;
-}
-
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary, paragraphMap }) {
+function TextDisplay({ sentences, htmlSentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, rawHtml, topicSummaries, onShowTopicSummary, paragraphMap }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
+  const safeHtmlSentences = Array.isArray(htmlSentences) && htmlSentences.length === safeSentences.length ? htmlSentences : null;
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
   const readTopicsSet = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
@@ -140,30 +81,43 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         <div className="text-content">
           {paragraphs.map((para, paraIdx) => (
             <p key={paraIdx} className="article-paragraph">
-              {para.map(({ text, index }) => (
-                <React.Fragment key={index}>
-                  <span
-                    id={`sentence-${articleIndex}-${index}`}
-                    data-article-index={articleIndex}
-                    data-sentence-index={index}
-                    className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
-                  >
-                    {text}{' '}
-                  </span>
-                  {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
-                    sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
-                      <button
-                        key={`${index}-${tIdx}`}
-                        className="topic-summary-link"
-                        onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
-                        title={`View summary for topic: ${topic.name}`}
+              {para.map(({ text, index }) => {
+                const htmlText = safeHtmlSentences ? safeHtmlSentences[index] : null;
+                return (
+                  <React.Fragment key={index}>
+                    {htmlText ? (
+                      <span
+                        id={`sentence-${articleIndex}-${index}`}
+                        data-article-index={articleIndex}
+                        data-sentence-index={index}
+                        className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHTML(htmlText) + ' ' }}
+                      />
+                    ) : (
+                      <span
+                        id={`sentence-${articleIndex}-${index}`}
+                        data-article-index={articleIndex}
+                        data-sentence-index={index}
+                        className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
                       >
-                        [📝 {topic.name}]
-                      </button>
-                    ))
-                  )}
-                </React.Fragment>
-              ))}
+                        {text}{' '}
+                      </span>
+                    )}
+                    {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
+                      sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                        <button
+                          key={`${index}-${tIdx}`}
+                          className="topic-summary-link"
+                          onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
+                          title={`View summary for topic: ${topic.name}`}
+                        >
+                          [📝 {topic.name}]
+                        </button>
+                      ))
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </p>
           ))}
         </div>
@@ -176,30 +130,43 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     <div className="text-display">
       <div className="text-content">
         <p className="article-text">
-          {safeSentences.map((sentence, index) => (
-            <React.Fragment key={index}>
-              <span
-                id={`sentence-${articleIndex}-${index}`}
-                data-article-index={articleIndex}
-                data-sentence-index={index}
-                className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
-              >
-                {sentence}{' '}
-              </span>
-              {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
-                sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
-                  <button
-                    key={`${index}-${tIdx}`}
-                    className="topic-summary-link"
-                    onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
-                    title={`View summary for topic: ${topic.name}`}
+          {safeSentences.map((sentence, index) => {
+            const htmlText = safeHtmlSentences ? safeHtmlSentences[index] : null;
+            return (
+              <React.Fragment key={index}>
+                {htmlText ? (
+                  <span
+                    id={`sentence-${articleIndex}-${index}`}
+                    data-article-index={articleIndex}
+                    data-sentence-index={index}
+                    className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHTML(htmlText) + ' ' }}
+                  />
+                ) : (
+                  <span
+                    id={`sentence-${articleIndex}-${index}`}
+                    data-article-index={articleIndex}
+                    data-sentence-index={index}
+                    className={highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}
                   >
-                    [📝 {topic.name}]
-                  </button>
-                ))
-              )}
-            </React.Fragment>
-          ))}
+                    {sentence}{' '}
+                  </span>
+                )}
+                {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
+                  sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                    <button
+                      key={`${index}-${tIdx}`}
+                      className="topic-summary-link"
+                      onClick={() => onShowTopicSummary(topic, topicSummaries[topic.name])}
+                      title={`View summary for topic: ${topic.name}`}
+                    >
+                      [📝 {topic.name}]
+                    </button>
+                  ))
+                )}
+              </React.Fragment>
+            );
+          })}
         </p>
       </div>
     </div>

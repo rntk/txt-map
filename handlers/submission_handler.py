@@ -169,10 +169,15 @@ def post_refresh(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    # Determine which tasks to refresh
-    task_names = refresh_request.tasks
-    if task_names is None or "all" in task_names:
-        task_names = ["text_splitting", "topic_extraction", "summarization", "mindmap", "insides"]
+    # Determine which tasks to refresh and validate user input
+    requested_tasks = refresh_request.tasks or ["all"]
+    invalid_tasks = [t for t in requested_tasks if t != "all" and t not in submissions_storage.task_names]
+    if invalid_tasks:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported task(s): {', '.join(invalid_tasks)}"
+        )
+    task_names = submissions_storage.expand_recalculation_tasks(requested_tasks)
 
     # Clear results and reset task statuses
     submissions_storage.clear_results(submission_id, task_names)

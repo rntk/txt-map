@@ -43,19 +43,23 @@ def process_text_splitting(submission: dict, db, llm):
         llm: LLamaCPP client instance
     """
     submission_id = submission["submission_id"]
-    text_content = submission.get("text_content", "")
 
-    if not text_content:
+    # Prefer html_content for preserving formatting; fall back to text_content
+    html_content = submission.get("html_content", "")
+    text_content = submission.get("text_content", "")
+    source = html_content or text_content
+
+    if not source:
         raise ValueError("No text content to process")
 
-    # Split article with markers
+    # Split article with markers (HTMLWordExtractor handles both HTML and plain text)
+    result = split_article_with_markers(source, llm)
 
-    result = split_article_with_markers(
-        text_content, llm
-    )
-
-    # Build basic sentences from marker positions
+    # Build basic sentences from marker positions (plain text for LLM tasks)
     sentences = build_basic_sentences(result.words, result.marker_word_indices)
+
+    # Build HTML-formatted sentences (for frontend rendering)
+    html_sentences = build_basic_sentences(result.html_words, result.marker_word_indices)
 
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
@@ -63,7 +67,9 @@ def process_text_splitting(submission: dict, db, llm):
         submission_id,
         {
             "sentences": sentences,
+            "html_sentences": html_sentences,
             "words": result.words,
+            "html_words": result.html_words,
             "marked_text": result.marked_text,
             "marker_count": result.marker_count,
             "marker_word_indices": result.marker_word_indices,

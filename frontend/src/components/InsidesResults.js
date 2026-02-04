@@ -1,4 +1,5 @@
 import React from 'react';
+import { sanitizeHTML } from '../utils/sanitize';
 import '../styles/App.css';
 
 function InsidesResults({ insidesData }) {
@@ -73,9 +74,11 @@ function InsidesResults({ insidesData }) {
                 };
 
                 return (
-                  <span key={sIdx} style={style}>
-                    {sent.text}{' '}
-                  </span>
+                  <span
+                    key={sIdx}
+                    style={style}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHTML(sent.text) + ' ' }}
+                  />
                 );
               })}
             </p>

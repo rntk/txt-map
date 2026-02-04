@@ -72,6 +72,7 @@ def process_insides(submission: dict, db, llm):
 
     marked_text = results.get("marked_text", "")
     words = results.get("words", [])
+    html_words = results.get("html_words", [])
     marker_count = results.get("marker_count", 0)
     marker_word_indices = results.get("marker_word_indices", [])
     word_to_paragraph = results.get("word_to_paragraph", [])
@@ -129,9 +130,10 @@ def process_insides(submission: dict, db, llm):
 
     print(f"Found {len(all_ranges)} inside ranges")
 
-    # Build sentences from marker ranges
+    # Build sentences from marker ranges (use html_words when available for formatted output)
     sentences, sentence_range_map, _, paragraph_map = build_sentences_from_ranges(
-        all_ranges, words, marker_count, marker_word_indices, word_to_paragraph, paragraph_texts
+        all_ranges, words, marker_count, marker_word_indices, word_to_paragraph, paragraph_texts,
+        html_words=html_words if html_words else None,
     )
 
     # Build results list

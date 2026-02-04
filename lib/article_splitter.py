@@ -3,8 +3,8 @@ Article splitting utilities for converting articles into structured segments.
 """
 import re
 from typing import List, Tuple, Dict, Optional
-from dataclasses import dataclass
-from lib.html_formatter import FormattingPreserver
+from dataclasses import dataclass, field
+from lib.html_formatter import HTMLWordExtractor
 
 
 @dataclass
@@ -17,6 +17,7 @@ class ArticleSplitResult:
     marker_word_indices: List[int]
     marked_text: str
     word_to_paragraph: List[int]
+    html_words: List[str] = field(default_factory=list)
 
 
 
@@ -36,28 +37,17 @@ def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
     Returns:
         ArticleSplitResult containing all processing artifacts
     """
-    # Extract both formatted and plain text
-    formatter = FormattingPreserver()
-    formatter.feed(article)
-    formatted_text = formatter.get_formatted_text()
-    plain_text = formatter.get_plain_text()
-    
-    # Use plain text for LLM analysis
-    text = plain_text
-    
-    # Split formatted text into paragraphs for tracking
-    paragraphs = []
-    paragraph_texts = []
-    for para in formatted_text.split('\n\n'):
-        para = para.strip()
-        if para:
-            paragraphs.append(para)
-            paragraph_texts.append(para)
-    
-    # Split text into words and add numbered markers
-    words = text.split()
+    # Extract dual word lists from HTML
+    extractor = HTMLWordExtractor()
+    extractor.extract(article)
+
+    words = extractor.content_words
+    html_words = extractor.html_words
+    word_to_paragraph = extractor.word_to_paragraph
+    paragraph_texts = extractor.paragraph_texts
+
     if not words:
-        return ArticleSplitResult([], [], {}, [], 0, [], "", [])
+        return ArticleSplitResult([], [], {}, [], 0, [], "", [], [])
     
     print(f"\n=== DEBUG: Total words: {len(words)} ===")
     print(f"First 10 words: {words[:10]}")
@@ -102,15 +92,9 @@ def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
     print(f"Marked text (first 500 chars): {marked_text[:500]}")
     print(f"... (total length: {len(marked_text)} chars)")
     
-    # Build paragraph mapping
+    # Build paragraph mapping (populated later by sentence builder)
     paragraph_map = {}
-    
-    # Create word-to-paragraph mapping from formatted text
-    word_to_paragraph = []
-    for para_idx, para_text in enumerate(paragraph_texts):
-        para_words = para_text.split()
-        word_to_paragraph.extend([para_idx] * len(para_words))
-    
+
     # Return the components needed for further processing
     # Note: sentences will be built later from marker ranges
     return ArticleSplitResult(
@@ -121,7 +105,8 @@ def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
         marker_count=marker_count,
         marker_word_indices=marker_word_indices,
         marked_text=marked_text,
-        word_to_paragraph=word_to_paragraph
+        word_to_paragraph=word_to_paragraph,
+        html_words=html_words,
     )
 
 
@@ -131,11 +116,12 @@ def build_sentences_from_ranges(
     marker_count: int,
     marker_word_indices: List[int],
     word_to_paragraph: List[int],
-    paragraph_texts: List[str]
+    paragraph_texts: List[str],
+    html_words: Optional[List[str]] = None,
 ) -> Tuple[List[str], Dict[int, Optional[Tuple[int, int]]], Dict[int, int], Dict[int, int]]:
     """
     Build sentences from marker ranges and create mappings.
-    
+
     Args:
         marker_ranges: List of (start_marker, end_marker) tuples
         words: List of words from the article
@@ -143,10 +129,11 @@ def build_sentences_from_ranges(
         marker_word_indices: List mapping marker numbers to word indices
         word_to_paragraph: List mapping word index to paragraph index
         paragraph_texts: List of paragraph texts
-    
+        html_words: Optional parallel list of HTML-wrapped words (same length as words)
+
     Returns:
         Tuple containing:
-        - sentences: List of sentence strings
+        - sentences: List of sentence strings (plain when html_words is None, HTML-formatted when provided)
         - sentence_range_map: Dict mapping sentence index to (start_marker, end_marker) or None
         - sentence_start_word: Dict mapping sentence index to starting word index
         - paragraph_map: Dict mapping sentence index to paragraph index
@@ -204,33 +191,37 @@ def build_sentences_from_ranges(
     if cursor <= len(words) - 1:
         merged_segments.append((cursor, len(words) - 1, None))
 
-    # Minimum sentence length thresholds
+    # Choose which word list to use for building sentence text
+    source_words = html_words if html_words is not None else words
+
+    # Minimum sentence length thresholds (based on content words, not HTML)
     MIN_SENTENCE_WORDS = 5
     MIN_SENTENCE_CHARS = 30
-    
+
     print(f"\n=== DEBUG: Building sentences with minimum thresholds: {MIN_SENTENCE_WORDS} words, {MIN_SENTENCE_CHARS} chars ===")
-    
+
     for seg_word_start, seg_word_end, seg_range in merged_segments:
         if seg_word_start > seg_word_end:
             continue
-        sentence = " ".join(words[seg_word_start:seg_word_end + 1]).strip()
+        sentence = " ".join(source_words[seg_word_start:seg_word_end + 1]).strip()
         if not sentence:
             continue
-        
-        # Calculate sentence metrics
+
+        # Calculate sentence metrics using content words (not HTML) for consistent sizing
         word_count = seg_word_end - seg_word_start + 1
-        char_count = len(sentence)
-        
+        plain_sentence = " ".join(words[seg_word_start:seg_word_end + 1]).strip()
+        char_count = len(plain_sentence)
+
         # Check if this sentence is too short
         is_too_short = word_count < MIN_SENTENCE_WORDS or char_count < MIN_SENTENCE_CHARS
-        
+
         # If sentence is too short and we have a previous sentence, merge with previous
         if is_too_short and len(sentences) > 0:
-            print(f"=== DEBUG: Merging short sentence ({word_count} words, {char_count} chars): '{sentence[:50]}...' ===")
+            print(f"=== DEBUG: Merging short sentence ({word_count} words, {char_count} chars): '{plain_sentence[:50]}...' ===")
             # Merge with previous sentence
             prev_idx = len(sentences) - 1
             sentences[prev_idx] = sentences[prev_idx] + " " + sentence
-            
+
             # Update the range map if both have ranges
             if seg_range is not None:
                 prev_range = sentence_range_map[prev_idx]
@@ -248,7 +239,7 @@ def build_sentences_from_ranges(
             sentences.append(sentence)
             sentence_range_map[sentence_idx] = seg_range
             sentence_start_word[sentence_idx] = seg_word_start
-            
+
             # Map sentence to paragraph
             if seg_word_start < len(word_to_paragraph):
                 paragraph_map[sentence_idx] = word_to_paragraph[seg_word_start]
