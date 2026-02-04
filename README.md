@@ -35,67 +35,218 @@ Frontend (React)
 
 ## Quick Start
 
-### Prerequisites
+## Prerequisites
 
-- Docker & Docker Compose
-- OR: Python 3.11+, MongoDB, LLamaCPP server
+- MongoDB running on port 8765 (or set `MONGODB_URL` env var)
+- LLamaCPP server running on port 8989 (or set `LLAMACPP_URL` env var)
 
-### Option A: Docker (Recommended)
+## Step 1: Start the API Server
 
-```bash
-# Start all services
-docker-compose up --build
+Open a terminal:
 
-# The API will be at: http://localhost:8000
-# MongoDB at: localhost:27017
-```
-
-This starts:
-- API server on port 8000
-- Background worker (1 instance)
-- MongoDB database
-
-To scale workers:
-```bash
-docker-compose up --scale worker=3
-```
-
-### Option B: Local Development
-
-**Terminal 1 - Start API:**
 ```bash
 cd /app
 python main.py
 ```
 
-**Terminal 2 - Start Worker:**
+You should see:
+```
+MONGODB_URL: mongodb://localhost:8765/
+LLAMACPP_URL: http://localhost:8989
+```
+
+The API will be available at `http://127.0.0.1:8000`
+
+## Step 2: Start the Background Worker
+
+Open a **new terminal**:
+
 ```bash
 cd /app
 python workers.py
 ```
 
-**Terminal 3 - Start MongoDB (if not using Docker):**
-```bash
-docker run -d -p 27017:27017 mongo:8
+You should see:
+```
+INFO - Worker worker-12345 started
 ```
 
-### Load Browser Extension
+The worker will poll for tasks every 2 seconds.
 
-1. Firefox: `about:debugging` → Load Temporary Add-on → Select `/app/extension/manifest.json`
-2. Chrome: `chrome://extensions` → Load unpacked → Select `/app/extension/`
+## Step 3: Test the System
 
-### Build Extension with Docker (no local Node.js)
+### Option A: Using the Browser Extension
 
-From the repo root:
+1. Load extension in Firefox/Chrome:
+   - Firefox: `about:debugging` → Load Temporary Add-on
+   - Chrome: `chrome://extensions` → Developer mode → Load unpacked
+   - Select `/app/extension/` directory
+
+2. Navigate to any webpage (e.g., a news article)
+
+3. Click the extension icon
+
+4. Click "Topics Analysis" or "Insides Analysis"
+
+5. Choose "Select Block" and click on an article, OR click "Full Page"
+
+6. Browser will redirect to `http://127.0.0.1:8000/page/text/{id}`
+
+7. Watch the processing status update in real-time!
+
+### Option B: Using curl (for testing)
+
 ```bash
-docker run --rm -it \
-  -v "$(pwd)/extension:/ext" \
-  -w /ext \
-  node:22-alpine \
-  sh -lc "npm install && npm run build && touch app-bundle.css"
+# Submit some content
+curl -X POST http://127.0.0.1:8000/api/submit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "html": "<h1>Test Article</h1><p>This is a test article about machine learning and artificial intelligence. Deep learning is a subset of machine learning.</p>",
+    "source_url": "https://example.com/test"
+  }'
 ```
 
-Then load the extension from `extension/manifest.json` as described above.
+You'll get a response like:
+```json
+{
+  "submission_id": "abc123...",
+  "redirect_url": "/page/text/abc123..."
+}
+```
+
+Visit the URL in your browser:
+```
+http://127.0.0.1:8000/page/text/abc123...
+```
+
+### Check Status Programmatically
+
+```bash
+# Replace {id} with your submission_id
+curl http://127.0.0.1:8000/api/submission/{id}/status
+```
+
+### Get Results
+
+```bash
+curl http://127.0.0.1:8000/api/submission/{id}
+```
+
+### Refresh/Re-process
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/submission/{id}/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"tasks": ["all"]}'
+```
+
+## What You Should See
+
+### In the Worker Terminal
+
+```
+INFO - Worker worker-12345 started
+INFO - Claimed task text_splitting for submission abc123...
+INFO - Processing text_splitting for submission abc123...
+Text splitting completed for submission abc123...: 45 words, 8 markers
+INFO - Completed text_splitting for submission abc123...
+INFO - Claimed task topic_extraction for submission abc123...
+...
+```
+
+### In the Browser
+
+1. **Status Indicator** showing task progress:
+   - Text Splitting: ✓ completed
+   - Topic Extraction: ⟳ processing
+   - Summarization: ○ pending
+   - Mindmap: ○ pending
+   - Insides: ○ pending
+
+2. **Yellow banner** while processing:
+   "Processing in progress... Results will appear as tasks complete."
+
+3. **Results appear progressively** as each task completes
+
+4. **Refresh button** to re-run all processing
+
+## Troubleshooting
+
+### Worker not picking up tasks?
+
+Check MongoDB connection:
+```bash
+mongo mongodb://localhost:8765/
+> use rss
+> db.task_queue.find()
+```
+
+You should see pending tasks.
+
+### API returning errors?
+
+Check MongoDB and LLamaCPP are running:
+```bash
+# Check MongoDB
+mongo mongodb://localhost:8765/
+
+# Check LLamaCPP
+curl http://localhost:8989/health
+```
+
+### Extension not working?
+
+1. Check browser console for errors (F12)
+2. Verify API is running on port 8000
+3. Check extension permissions in manifest.json
+
+### No results showing?
+
+1. Check worker is running
+2. Check task status via API: `/api/submission/{id}/status`
+3. Check worker terminal for errors
+4. Check MongoDB for results:
+   ```bash
+   mongo mongodb://localhost:8765/
+   > use rss
+   > db.submissions.findOne()
+   ```
+
+## Next Steps
+
+Once everything is working:
+
+1. Review `/app/IMPLEMENTATION_SUMMARY.md` for architecture details
+2. Implement the full task processing logic (see "Next Steps" section)
+3. Customize the frontend UI as needed
+4. Add more task types
+5. Deploy workers to separate machines for scaling
+
+## Environment Variables
+
+```bash
+# MongoDB connection (default: mongodb://localhost:8765/)
+export MONGODB_URL="mongodb://your-host:27017/"
+
+# LLamaCPP server (default: http://localhost:8989)
+export LLAMACPP_URL="http://your-llm-host:8989"
+
+# Optional auth token for LLamaCPP
+export TOKEN="your-secret-token"
+```
+
+## Running with Docker Compose
+
+If using the provided docker-compose.yml:
+
+```bash
+docker-compose up -d mongodb
+docker-compose up api
+# In another terminal:
+docker-compose up worker
+```
+
+Note: You may need to update docker-compose.yml to add the worker service.
 
 ## Usage
 
@@ -287,10 +438,6 @@ mongo mongodb://localhost:27017/
 
 ## Documentation
 
-- `QUICK_START.md` - Step-by-step setup guide
-- `IMPLEMENTATION_SUMMARY.md` - Architecture details
-- `FINAL_STATUS.md` - Implementation status
-- `COMPLETED_WORK.md` - Complete work log
 - `Docker-README.md` - Docker-specific instructions
 
 ## Development
