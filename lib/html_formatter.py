@@ -120,6 +120,11 @@ class HTMLWordExtractor(HTMLParser):
         'span', 'sub', 'sup', 'small', 'abbr', 'cite', 'q',
     }
 
+    IGNORED_TAGS = {
+        'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'svg',
+        'form', 'input', 'button', 'noscript', 'head', 'title', 'template'
+    }
+
     def __init__(self):
         super().__init__()
         self.content_words = []
@@ -131,6 +136,8 @@ class HTMLWordExtractor(HTMLParser):
         self._current_para_idx = 0
         self._para_has_words = False   # whether current paragraph has any words
         self._started = False          # whether we've seen any word at all
+        self._ignore_depth = 0
+
 
     # ------------------------------------------------------------------
     # HTMLParser callbacks
@@ -142,9 +149,13 @@ class HTMLWordExtractor(HTMLParser):
             self._open_new_paragraph(tag)
         if tag in self.INLINE_TAGS:
             self._inline_stack.append((tag, dict(attrs)))
+        if tag in self.IGNORED_TAGS:
+            self._ignore_depth += 1
 
     def handle_endtag(self, tag):
         tag = tag.lower()
+        if tag in self.IGNORED_TAGS:
+            self._ignore_depth = max(0, self._ignore_depth - 1)
         if tag in self.INLINE_TAGS:
             # Pop the most recent matching tag (handle nesting)
             for i in range(len(self._inline_stack) - 1, -1, -1):
@@ -155,6 +166,9 @@ class HTMLWordExtractor(HTMLParser):
             self._open_new_paragraph(tag)
 
     def handle_data(self, data):
+        if self._ignore_depth > 0:
+            return
+            
         # Recursively unescape HTML entities
         text = data
         while True:

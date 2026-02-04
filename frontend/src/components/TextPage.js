@@ -298,14 +298,13 @@ function TextPage() {
   const safeSentences = Array.isArray(results.sentences) ? results.sentences : [];
   const safeTopics = Array.isArray(results.topics) ? results.topics : [];
 
-  const safeHtmlSentences = Array.isArray(results.html_sentences) ? results.html_sentences : [];
-
   const articles = safeSentences.length > 0 ? [{
     sentences: safeSentences,
-    html_sentences: safeHtmlSentences,
     topics: safeTopics,
     topic_summaries: results.topic_summaries || {},
-    paragraph_map: results.paragraph_map || null
+    paragraph_map: results.paragraph_map || null,
+    raw_html: submission.html_content || '',
+    marker_word_indices: Array.isArray(results.marker_word_indices) ? results.marker_word_indices : []
   }] : [];
 
   const allTopics = safeTopics.map(topic => ({
@@ -571,7 +570,6 @@ function TextPage() {
                     <TextDisplay
                       key={index}
                       sentences={article.sentences}
-                      htmlSentences={article.html_sentences}
                       selectedTopics={selectedTopics}
                       hoveredTopic={hoveredTopic}
                       readTopics={readTopics}
@@ -579,6 +577,8 @@ function TextPage() {
                       articleIndex={index}
                       topicSummaries={article.topic_summaries}
                       paragraphMap={article.paragraph_map}
+                      rawHtml={article.raw_html}
+                      markerWordIndices={article.marker_word_indices}
                     />
                   ))
                 )}

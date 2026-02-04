@@ -18,28 +18,77 @@ export function sanitizeHTML(html) {
   const isUnsafeUrl = (val) => {
     if (!val) return false;
     const v = String(val).trim().toLowerCase();
-    return v.startsWith('javascript:') || v.startsWith('data:') || v.startsWith('vbscript:');
+    const jsProto = `java${'script:'}`;
+    const vbsProto = `vb${'script:'}`;
+    return v.startsWith(jsProto) || v.startsWith('data:') || v.startsWith(vbsProto);
+  };
+
+  const allowedStyleProps = new Set([
+    'color', 'background-color', 'font-weight', 'font-style', 'text-decoration', 'text-transform',
+    'font-size', 'font-family', 'line-height', 'letter-spacing', 'word-spacing', 'text-align',
+    'margin', 'margin-left', 'margin-right', 'margin-top', 'margin-bottom',
+    'padding', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom',
+    'border', 'border-left', 'border-right', 'border-top', 'border-bottom', 'border-color',
+    'border-width', 'border-style', 'border-radius', 'display', 'width', 'height', 'max-width',
+    'min-width', 'max-height', 'min-height', 'white-space'
+  ]);
+
+  const sanitizeStyle = (styleValue) => {
+    if (!styleValue) return '';
+    return String(styleValue)
+      .split(';')
+      .map((decl) => decl.trim())
+      .filter(Boolean)
+      .map((decl) => {
+        const splitIdx = decl.indexOf(':');
+        if (splitIdx <= 0) return '';
+        const prop = decl.slice(0, splitIdx).trim().toLowerCase();
+        const val = decl.slice(splitIdx + 1).trim();
+        const lowerVal = val.toLowerCase();
+        if (!allowedStyleProps.has(prop)) return '';
+        if (
+          lowerVal.includes('expression(') ||
+          lowerVal.includes(`java${'script:'}`) ||
+          lowerVal.includes('@import') ||
+          lowerVal.includes('url(')
+        ) {
+          return '';
+        }
+        return `${prop}: ${val}`;
+      })
+      .filter(Boolean)
+      .join('; ');
   };
 
   const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT, null);
   // TreeWalker starts at the root (DocumentFragment), which has no attributes.
   let node = walker.nextNode();
   while (node) {
-    const allowedAttrs = new Set(['href', 'src', 'alt', 'title', 'class', 'id', 'rel', 'target', 'aria-label', 'role', 'width', 'height']);
-    Array.from(node.attributes || []).forEach(attr => {
+    const allowedAttrs = new Set(['href', 'src', 'alt', 'title', 'class', 'id', 'rel', 'target', 'aria-label', 'role', 'width', 'height', 'style']);
+    const attrs = Array.from(node.attributes || []);
+    for (const attr of attrs) {
       const name = attr.name.toLowerCase();
       const val = attr.value;
-      if (name.startsWith('on') || name === 'style') {
+      if (name.startsWith('on')) {
         node.removeAttribute(attr.name);
-        return;
+        continue;
       }
       if (!allowedAttrs.has(name)) {
         node.removeAttribute(attr.name);
-        return;
+        continue;
       }
       if ((name === 'href' || name === 'src') && isUnsafeUrl(val)) {
         node.removeAttribute(attr.name);
-        return;
+        continue;
+      }
+      if (name === 'style') {
+        const safeStyle = sanitizeStyle(val);
+        if (!safeStyle) {
+          node.removeAttribute(attr.name);
+        } else {
+          node.setAttribute('style', safeStyle);
+        }
+        continue;
       }
       if (name === 'target' && val === '_blank') {
         const rel = node.getAttribute('rel') || '';
@@ -48,7 +97,7 @@ export function sanitizeHTML(html) {
         needed.forEach(n => current.add(n));
         node.setAttribute('rel', Array.from(current).join(' '));
       }
-    });
+    }
     node = walker.nextNode();
   }
 

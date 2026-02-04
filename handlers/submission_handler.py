@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from lib.storage.submissions import SubmissionsStorage
-from lib.html_cleaner import HTMLCleaner
 from datetime import datetime
 
 
@@ -30,14 +29,11 @@ def post_submit(
     """
     Accept HTML content, save to DB, queue tasks, and return submission ID
     """
-    # Extract plain text from HTML
-    cleaner = HTMLCleaner()
-    text_content = cleaner.clean(request.html)
-
     # Create submission in database
     submission = submissions_storage.create(
         html_content=request.html,
-        text_content=text_content,
+        # Keep raw HTML in text_content as well to avoid any pre-cleaning.
+        text_content=request.html,
         source_url=request.source_url
     )
 

@@ -52,38 +52,44 @@ def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
     print(f"\n=== DEBUG: Total words: {len(words)} ===")
     print(f"First 10 words: {words[:10]}")
     
-    # Create marked text with hybrid marker approach:
+    # Create marker positions with hybrid marker approach:
     # - Add marker after punctuation characters
     # - Add marker every N words if no punctuation encountered (backup)
     # Using |#N#| format where N is the marker position number
     WORDS_PER_MARKER = 15  # Backup marker interval
     PUNCTUATION_CHARS = {'.', ',', ';', ':', '!', '?', ')', ']', '}'}
-    
-    marked_parts = []
+
     marker_count = 0
     words_since_last_marker = 0
     # Map marker number -> word index after which the marker is placed
     # Example: if marker 1 is placed after word index 14, marker_word_indices[0] == 14
     marker_word_indices = []
-    
+
     for i, word in enumerate(words):
-        marked_parts.append(word)
         words_since_last_marker += 1
         
         # Check if word ends with punctuation
         has_punctuation = any(word.rstrip().endswith(p) for p in PUNCTUATION_CHARS)
         
+        # Check if this word is the last word of a paragraph
+        is_paragraph_boundary = False
+        if i < len(words) - 1:
+            if word_to_paragraph[i] != word_to_paragraph[i+1]:
+                is_paragraph_boundary = True
+
         # Add marker if:
         # 1. Word has punctuation, OR
-        # 2. We've passed N words without a marker
-        if has_punctuation or words_since_last_marker >= WORDS_PER_MARKER:
+        # 2. We've passed N words without a marker, OR
+        # 3. We are at a paragraph boundary
+        if has_punctuation or words_since_last_marker >= WORDS_PER_MARKER or is_paragraph_boundary:
             if i < len(words) - 1:  # Don't add marker after the last word
                 marker_count += 1
-                marked_parts.append(f"|#{marker_count}#|")
                 marker_word_indices.append(i)
                 words_since_last_marker = 0
-    
-    marked_text = " ".join(marked_parts)
+
+    # Build marked text from the original raw article (with HTML intact),
+    # ensuring markers are only inserted in text nodes, never inside HTML tags.
+    marked_text = _inject_markers_into_raw_html(article, marker_word_indices)
     
     print(f"\n=== DEBUG: Hybrid marker approach ===")
     print(f"Total markers added: {marker_count} (vs {len(words)-1} with per-word marking)")
@@ -108,6 +114,56 @@ def split_article_with_markers(article: str, llm) -> ArticleSplitResult:
         word_to_paragraph=word_to_paragraph,
         html_words=html_words,
     )
+
+
+def _inject_markers_into_raw_html(raw_html: str, marker_word_indices: List[int]) -> str:
+    """
+    Insert |#N#| markers into raw HTML after specific text words.
+
+    The function keeps the original HTML structure and spacing as much as possible by:
+    - splitting into tag and non-tag chunks,
+    - injecting markers only in non-tag chunks.
+    """
+    if not raw_html or not marker_word_indices:
+        return raw_html
+
+    marker_by_word_index = {
+        word_index: marker_number
+        for marker_number, word_index in enumerate(marker_word_indices, start=1)
+    }
+
+    # Split into alternating [text, <tag>, text, ...] chunks.
+    parts = re.split(r'(<[^>]+>)', raw_html)
+    out_parts = []
+    word_index = 0
+
+    for part in parts:
+        if not part:
+            continue
+
+        # Keep tags unchanged.
+        if part.startswith('<') and part.endswith('>'):
+            out_parts.append(part)
+            continue
+
+        # Inject markers into text chunks while preserving original whitespace.
+        cursor = 0
+        text_out = []
+        for match in re.finditer(r'\S+', part):
+            text_out.append(part[cursor:match.start()])
+            token = match.group(0)
+            text_out.append(token)
+
+            if word_index in marker_by_word_index:
+                text_out.append(f" |#{marker_by_word_index[word_index]}#|")
+
+            word_index += 1
+            cursor = match.end()
+
+        text_out.append(part[cursor:])
+        out_parts.append(''.join(text_out))
+
+    return ''.join(out_parts)
 
 
 def build_sentences_from_ranges(

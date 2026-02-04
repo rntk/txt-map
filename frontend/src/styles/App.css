@@ -575,6 +575,10 @@
   line-height: 1.6;
 }
 
+.sentence-token {
+  display: inline;
+}
+
 .highlighted {
   background-color: #fffacd;
 }

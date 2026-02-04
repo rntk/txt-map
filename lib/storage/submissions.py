@@ -81,7 +81,6 @@ class SubmissionsStorage:
             },
             "results": {
                 "sentences": [],
-                "html_sentences": [],
                 "words": [],
                 "html_words": [],
                 "marked_text": "",
@@ -173,7 +172,6 @@ class SubmissionsStorage:
         # Clear related results
         if "text_splitting" in task_names:
             update_fields["results.sentences"] = []
-            update_fields["results.html_sentences"] = []
             update_fields["results.words"] = []
             update_fields["results.html_words"] = []
             update_fields["results.marked_text"] = ""
