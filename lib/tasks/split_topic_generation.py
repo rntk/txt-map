@@ -26,7 +26,10 @@ def process_split_topic_generation(submission: dict, db, llm):
         raise ValueError("No text content to process")
 
     tracer = Tracer()
-    result = split_article_with_markers(source, llm, tracer=tracer)
+    max_chunk_chars = submission.get("max_chunk_chars", 12_000)
+    result = split_article_with_markers(
+        source, llm, tracer=tracer, max_chunk_chars=max_chunk_chars
+    )
 
     submissions_storage = SubmissionsStorage(db)
     submissions_storage.update_results(

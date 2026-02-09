@@ -28,7 +28,8 @@ def process_text_splitting(submission: dict, db, llm):
         raise ValueError("No text content to process")
 
     # Split article using txt_splitt (via article_splitter wrapper)
-    result = split_article_with_markers(source, llm)
+    max_chunk_chars = 84_000 #submission.get("max_chunk_chars", 24_000)
+    result = split_article_with_markers(source, llm, max_chunk_chars=max_chunk_chars)
 
     # sentences are already list of strings
     sentences = result.sentences

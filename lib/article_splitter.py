@@ -7,6 +7,7 @@ from lib.txt_splitt import (
     LLMRepairingGapHandler,
     NormalizingSplitter,
     Pipeline,
+    SizeBasedChunker,
     TopicRangeLLM,
     TopicRangeParser,
     Tracer,
@@ -57,6 +58,7 @@ def split_article(
     llm=None,
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
+    max_chunk_chars: int = 12_000,
 ) -> ArticleSplitResult:
     """
     Split an article into sentences and topic ranges using txt_splitt.
@@ -66,6 +68,7 @@ def split_article(
         llm: LLM client used by txt_splitt topic extraction.
         tracer: Optional tracer for pipeline debugging.
         anchor_every_words: Add a marker anchor roughly every N words.
+        max_chunk_chars: Maximum characters per chunk for LLM processing.
 
     Returns:
         ArticleSplitResult containing sentences and topics.
@@ -94,7 +97,11 @@ def split_article(
     pipeline = Pipeline(
         splitter=splitter,
         marker=BracketMarker(),
-        llm=TopicRangeLLM(client=llm_callable, temperature=0.0),
+        llm=TopicRangeLLM(
+            client=llm_callable,
+            temperature=0.0,
+            chunker=SizeBasedChunker(max_chars=max_chunk_chars),
+        ),
         parser=TopicRangeParser(),
         gap_handler=LLMRepairingGapHandler(
             llm_callable, temperature=0.0, tracer=tracer
@@ -114,8 +121,13 @@ def split_article_with_markers(
     llm=None,
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
+    max_chunk_chars: int = 12_000,
 ) -> ArticleSplitResult:
     """Backward-compatible alias for split_article."""
     return split_article(
-        article, llm=llm, tracer=tracer, anchor_every_words=anchor_every_words
+        article,
+        llm=llm,
+        tracer=tracer,
+        anchor_every_words=anchor_every_words,
+        max_chunk_chars=max_chunk_chars,
     )
