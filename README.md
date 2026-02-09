@@ -1,6 +1,6 @@
-# RSSTag Content Analysis Platform
+# Content Analysis Platform
 
-RSSTag is a FastAPI + worker system that processes submitted HTML content into structured analysis results (topics, summaries, mindmap, and insights), then serves them in a React UI.
+This is a FastAPI + worker system that processes submitted HTML content into structured analysis results (topics, summaries, mindmap, and insights), then serves them in a React UI.
 
 ## Documentation Map
 
