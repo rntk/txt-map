@@ -4,7 +4,9 @@ from typing import Dict, List, Optional
 from lib.txt_splitt import (
     BracketMarker,
     DenseRegexSentenceSplitter,
+    HTMLParserTagStripCleaner,
     LLMRepairingGapHandler,
+    MappingOffsetRestorer,
     NormalizingSplitter,
     Pipeline,
     SizeBasedChunker,
@@ -83,9 +85,12 @@ def split_article(
         min_length=20,
         max_length=260,
     )
+    html_cleaner = HTMLParserTagStripCleaner()
+    offset_restorer = MappingOffsetRestorer()
 
     if llm is None:
-        sentence_objects = splitter.split(article)
+        cleaned_article, _ = html_cleaner.clean(article)
+        sentence_objects = splitter.split(cleaned_article)
         return ArticleSplitResult(
             sentences=[s.text for s in sentence_objects],
             topics=[],
@@ -106,6 +111,8 @@ def split_article(
         gap_handler=LLMRepairingGapHandler(
             llm_callable, temperature=0.0, tracer=tracer
         ),
+        html_cleaner=html_cleaner,
+        offset_restorer=offset_restorer,
         tracer=tracer,
     )
 

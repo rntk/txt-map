@@ -74,12 +74,6 @@ class Tracer:
             _format_span(span, lines, indent=0)
         return "\n".join(lines)
 
-    def print(self) -> None:
-        """Print formatted traces if any spans were recorded."""
-        formatted = self.format()
-        if formatted:
-            print(formatted)
-
 
 def _format_span(span: Span, lines: list[str], indent: int) -> None:
     prefix = "  " * indent
@@ -112,10 +106,6 @@ class NoOpTracer:
     def format(self) -> str:
         """Return empty string (no traces collected)."""
         return ""
-
-    def print(self) -> None:
-        """No-op print helper for compatibility with Tracer."""
-        return None
 
 
 class TracingLLMCallable:

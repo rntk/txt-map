@@ -10,9 +10,9 @@ from lib.txt_splitt.types import Sentence, SentenceGroup, SentenceRange
 _CONTEXT_SIZE = 3
 _DEFAULT_NEW_TOPIC = ("Uncategorized",)
 
-OwnerId = int | str
-TracingSpan = Span | NoOpSpan
-GapTracer = Tracer | NoOpTracer
+type OwnerId = int | str
+type TracingSpan = Span | NoOpSpan
+type GapTracer = Tracer | NoOpTracer
 
 
 class StrictGapHandler:

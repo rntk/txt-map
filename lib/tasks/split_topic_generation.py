@@ -44,4 +44,6 @@ def process_split_topic_generation(submission: dict, db, llm):
         f"Split/topic generation completed for submission {submission_id}: "
         f"{len(result.sentences)} sentences, {len(result.topics)} topics"
     )
-    tracer.print()
+    trace_output = tracer.format()
+    if trace_output:
+        print(trace_output)
