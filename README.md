@@ -248,6 +248,43 @@ docker-compose up worker
 
 Note: You may need to update docker-compose.yml to add the worker service.
 
+## Frontend Test Notes
+
+After changing frontend code, restart Docker Compose services first, then run:
+
+```bash
+cd /app/frontend
+npm test -- --watchAll=false
+```
+
+For coverage:
+
+```bash
+cd /app/frontend
+npm run test:coverage
+```
+
+Run the same tests in Docker with `frontend/Dockerfile.test`:
+
+```bash
+# from /app
+docker build -f frontend/Dockerfile.test -t frontend-tests .
+
+# runs: npm ci && npm run test:coverage against mounted source
+docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests
+```
+
+To run the non-coverage Jest command in the same image:
+
+```bash
+docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests \
+  sh -lc "npm ci && npm test -- --watchAll=false"
+```
+
+The tests include checks for:
+- safe HTML rendering with sanitization (e.g. `script`, `style`, `iframe` removal)
+- topic highlight/read-unread highlight behavior in rendered HTML
+
 ## Usage
 
 ### Using the Browser Extension

@@ -1,0 +1,14 @@
+FROM node:24-alpine
+
+WORKDIR /app/frontend
+
+ENV CI=true
+
+# Build image:
+#   docker build -f frontend/Dockerfile.test -t frontend-tests .
+#
+# Run tests with mounted frontend source:
+#   docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests
+
+# Default command installs deps from mounted source and runs coverage.
+CMD ["sh", "-lc", "npm ci && npm run test:coverage"]
