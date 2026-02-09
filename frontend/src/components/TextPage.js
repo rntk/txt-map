@@ -551,10 +551,7 @@ function TextPage() {
                       mindmapData={{
                         topic_mindmaps: results.topic_mindmaps || {},
                         sentences: safeSentences,
-                        mindmap_results: results.mindmap_results || [],
-                        mindmap_metadata: results.mindmap_metadata || {}
                       }}
-                      insidesData={results.insides || []}
                     />
                   </div>
                 ) : activeTab === 'insides' ? (

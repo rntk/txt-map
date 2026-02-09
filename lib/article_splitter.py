@@ -1,24 +1,23 @@
-"""
-Article splitting utilities using txt_splitt.
-"""
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional
 
 from lib.txt_splitt import (
     BracketMarker,
     DenseRegexSentenceSplitter,
+    LLMRepairingGapHandler,
     NormalizingSplitter,
     Pipeline,
-    RepairingGapHandler,
     TopicRangeLLM,
     TopicRangeParser,
+    Tracer,
+    TracingLLMCallable,
 )
 
 
 @dataclass
 class ArticleSplitResult:
     sentences: List[str]
-    topics: List[dict]
+    topics: List[Dict]
 
 
 class _LLMCallableAdapter:
@@ -31,8 +30,8 @@ class _LLMCallableAdapter:
         return self._llm_client.call([prompt], temperature=temperature)
 
 
-def _groups_to_topics(groups) -> List[dict]:
-    topics: List[dict] = []
+def _groups_to_topics(groups) -> List[Dict]:
+    topics: List[Dict] = []
 
     for group in groups:
         indices: List[int] = []
@@ -53,13 +52,20 @@ def _groups_to_topics(groups) -> List[dict]:
     return topics
 
 
-def split_article(article: str, llm=None) -> ArticleSplitResult:
+def split_article(
+    article: str,
+    llm=None,
+    tracer: Optional[Tracer] = None,
+    anchor_every_words: int = 5,
+) -> ArticleSplitResult:
     """
     Split an article into sentences and topic ranges using txt_splitt.
 
     Args:
-        article: The article text.
+        article: The article text (plain or HTML).
         llm: LLM client used by txt_splitt topic extraction.
+        tracer: Optional tracer for pipeline debugging.
+        anchor_every_words: Add a marker anchor roughly every N words.
 
     Returns:
         ArticleSplitResult containing sentences and topics.
@@ -68,7 +74,11 @@ def split_article(article: str, llm=None) -> ArticleSplitResult:
         return ArticleSplitResult(sentences=[], topics=[])
 
     splitter = NormalizingSplitter(
-        DenseRegexSentenceSplitter(anchor_every_words=20, html_aware=True)
+        DenseRegexSentenceSplitter(
+            anchor_every_words=anchor_every_words, html_aware=True
+        ),
+        min_length=20,
+        max_length=260,
     )
 
     if llm is None:
@@ -78,12 +88,18 @@ def split_article(article: str, llm=None) -> ArticleSplitResult:
             topics=[],
         )
 
+    llm_adapter = _LLMCallableAdapter(llm)
+    llm_callable = TracingLLMCallable(llm_adapter, tracer) if tracer else llm_adapter
+
     pipeline = Pipeline(
         splitter=splitter,
         marker=BracketMarker(),
-        llm=TopicRangeLLM(client=_LLMCallableAdapter(llm), temperature=0.0),
+        llm=TopicRangeLLM(client=llm_callable, temperature=0.0),
         parser=TopicRangeParser(),
-        gap_handler=RepairingGapHandler(),
+        gap_handler=LLMRepairingGapHandler(
+            llm_callable, temperature=0.0, tracer=tracer
+        ),
+        tracer=tracer,
     )
 
     split_result = pipeline.run(article)
@@ -93,6 +109,13 @@ def split_article(article: str, llm=None) -> ArticleSplitResult:
     return ArticleSplitResult(sentences=sentences, topics=topics)
 
 
-def split_article_with_markers(article: str, llm=None) -> ArticleSplitResult:
+def split_article_with_markers(
+    article: str,
+    llm=None,
+    tracer: Optional[Tracer] = None,
+    anchor_every_words: int = 5,
+) -> ArticleSplitResult:
     """Backward-compatible alias for split_article."""
-    return split_article(article, llm=llm)
+    return split_article(
+        article, llm=llm, tracer=tracer, anchor_every_words=anchor_every_words
+    )

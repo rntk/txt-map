@@ -30,7 +30,7 @@ TASK_DEPENDENCIES = {
     "split_topic_generation": [],
     "subtopics_generation": ["split_topic_generation"],
     "summarization": ["split_topic_generation"],
-    "mindmap": ["split_topic_generation"],
+    "mindmap": ["subtopics_generation"],
     "insides": ["split_topic_generation"],
 }
 
