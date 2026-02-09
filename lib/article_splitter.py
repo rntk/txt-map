@@ -12,6 +12,7 @@ from lib.txt_splitt import (
     SizeBasedChunker,
     TopicRangeLLM,
     TopicRangeParser,
+    AdjacentSameTopicJoiner,
     Tracer,
     TracingLLMCallable,
 )
@@ -111,6 +112,7 @@ def split_article(
         gap_handler=LLMRepairingGapHandler(
             llm_callable, temperature=0.0, tracer=tracer
         ),
+        joiner=AdjacentSameTopicJoiner(),
         html_cleaner=html_cleaner,
         offset_restorer=offset_restorer,
         tracer=tracer,

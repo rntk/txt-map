@@ -18,6 +18,7 @@ from lib.txt_splitt.gap_handlers import (
     StrictGapHandler,
 )
 from lib.txt_splitt.html_cleaners import HTMLParserTagStripCleaner, TagStripCleaner
+from lib.txt_splitt.joiners import AdjacentSameTopicJoiner
 from lib.txt_splitt.llm import TopicRangeLLM
 from lib.txt_splitt.markers import BracketMarker
 from lib.txt_splitt.normalizers import NormalizingSplitter
@@ -27,6 +28,7 @@ from lib.txt_splitt.pipeline import Pipeline
 from lib.txt_splitt.protocols import (
     Enhancer,
     GapHandler,
+    GroupJoiner,
     HtmlCleaner,
     LLMCallable,
     LLMStrategy,
@@ -66,6 +68,7 @@ __all__ = [
     # Protocols
     "Enhancer",
     "GapHandler",
+    "GroupJoiner",
     "HtmlCleaner",
     "LLMCallable",
     "LLMStrategy",
@@ -81,6 +84,7 @@ __all__ = [
     "NormalizingSplitter",
     "HTMLParserTagStripCleaner",
     "TagStripCleaner",
+    "AdjacentSameTopicJoiner",
     "DenseRegexSentenceSplitter",
     "HtmlAwareSentenceSplitter",
     "RegexSentenceSplitter",

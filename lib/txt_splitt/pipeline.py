@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, final
 
+from lib.txt_splitt.joiners import join_sentences_by_groups
 from lib.txt_splitt.protocols import (
     Enhancer,
     GapHandler,
+    GroupJoiner,
     HtmlCleaner,
     LLMStrategy,
     MarkerStrategy,
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
 
 @final
 class Pipeline:
-    """Orchestrates the 5-stage text splitting pipeline."""
+    """Orchestrates the text splitting pipeline."""
 
     def __init__(
         self,
@@ -34,6 +36,7 @@ class Pipeline:
         parser: ResponseParser,
         gap_handler: GapHandler,
         enhancer: Enhancer | None = None,
+        joiner: GroupJoiner | None = None,
         html_cleaner: HtmlCleaner | None = None,
         offset_restorer: OffsetRestorer | None = None,
         tracer: Tracer | None = None,
@@ -49,6 +52,7 @@ class Pipeline:
         self._parser = parser
         self._gap_handler = gap_handler
         self._enhancer = enhancer
+        self._joiner = joiner
         self._html_cleaner = html_cleaner
         self._offset_restorer = offset_restorer
         self._tracer = tracer if tracer is not None else NoOpTracer()
@@ -99,9 +103,17 @@ class Pipeline:
                     groups = self._enhancer.enhance(groups, sentences)
                     s.attributes["group_count"] = len(groups)
 
+            # Stage 7 (optional): Join adjacent groups
+            if self._joiner is not None:
+                with self._tracer.span("join") as s:
+                    groups = self._joiner.join(groups, sentences)
+                    sentences, groups = join_sentences_by_groups(groups, sentences)
+                    s.attributes["sentence_count"] = len(sentences)
+                    s.attributes["group_count"] = len(groups)
+
             result = SplitResult(sentences=tuple(sentences), groups=tuple(groups))
 
-            # Stage 7 (optional): Restore original-text offsets
+            # Stage 8 (optional): Restore original-text offsets
             if self._offset_restorer is not None and mapping is not None:
                 with self._tracer.span("offset_restore") as s:
                     result = self._offset_restorer.restore(result, mapping)
