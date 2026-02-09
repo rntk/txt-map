@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from lib.storage.submissions import SubmissionsStorage
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 class SubmitRequest(BaseModel):
@@ -37,14 +37,14 @@ def post_submit(
         source_url=request.source_url
     )
 
-    # Create task queue entries for text_splitting (other tasks will be queued after dependencies complete)
+    # Create task queue entries for split_topic_generation (other tasks wait for dependencies)
     db = submissions_storage._db
     db.task_queue.insert_one({
         "submission_id": submission["submission_id"],
-        "task_type": "text_splitting",
+        "task_type": "split_topic_generation",
         "priority": 1,
         "status": "pending",
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC),
         "started_at": None,
         "completed_at": None,
         "worker_id": None,
@@ -54,7 +54,7 @@ def post_submit(
 
     # Queue other tasks (they will wait for dependencies)
     for task_type, priority in [
-        ("topic_extraction", 2),
+        ("subtopics_generation", 2),
         ("summarization", 3),
         ("mindmap", 3),
         ("insides", 3)
@@ -64,7 +64,7 @@ def post_submit(
             "task_type": task_type,
             "priority": priority,
             "status": "pending",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
             "started_at": None,
             "completed_at": None,
             "worker_id": None,
@@ -186,12 +186,12 @@ def post_refresh(
     })
 
     # Re-queue tasks
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     tasks_queued = []
 
     task_priorities = {
-        "text_splitting": 1,
-        "topic_extraction": 2,
+        "split_topic_generation": 1,
+        "subtopics_generation": 2,
         "summarization": 3,
         "mindmap": 3,
         "insides": 3

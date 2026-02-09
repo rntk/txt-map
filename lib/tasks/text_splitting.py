@@ -5,32 +5,7 @@ from lib.article_splitter import split_article_with_markers
 from lib.storage.submissions import SubmissionsStorage
 
 
-def build_basic_sentences(words, marker_word_indices):
-    """
-    Build basic sentences from marker positions.
-    Each marker represents a sentence boundary.
-    """
-    if not words:
-        return []
 
-    sentences = []
-    start_idx = 0
-
-    for marker_idx in marker_word_indices:
-        end_idx = marker_idx
-        if start_idx <= end_idx < len(words):
-            sentence = " ".join(words[start_idx:end_idx + 1]).strip()
-            if sentence:
-                sentences.append(sentence)
-        start_idx = end_idx + 1
-
-    # Add remaining words as final sentence
-    if start_idx < len(words):
-        sentence = " ".join(words[start_idx:]).strip()
-        if sentence:
-            sentences.append(sentence)
-
-    return sentences
 
 
 def process_text_splitting(submission: dict, db, llm):
@@ -52,13 +27,11 @@ def process_text_splitting(submission: dict, db, llm):
     if not source:
         raise ValueError("No text content to process")
 
-    # Split article with markers (HTMLWordExtractor handles both HTML and plain text)
+    # Split article using txt_splitt (via article_splitter wrapper)
     result = split_article_with_markers(source, llm)
 
-    # Build sentences from original content (HTML-aware words).
-    # We keep a single sentence representation across backend and frontend.
-    sentence_source_words = result.html_words if result.html_words else result.words
-    sentences = build_basic_sentences(sentence_source_words, result.marker_word_indices)
+    # sentences are already list of strings
+    sentences = result.sentences
 
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
@@ -66,14 +39,7 @@ def process_text_splitting(submission: dict, db, llm):
         submission_id,
         {
             "sentences": sentences,
-            "words": result.words,
-            "html_words": result.html_words,
-            "marked_text": result.marked_text,
-            "marker_count": result.marker_count,
-            "marker_word_indices": result.marker_word_indices,
-            "word_to_paragraph": result.word_to_paragraph,
-            "paragraph_texts": result.paragraph_texts
         }
     )
 
-    print(f"Text splitting completed for submission {submission_id}: {len(sentences)} sentences, {len(result.words)} words, {result.marker_count} markers")
+    print(f"Text splitting completed for submission {submission_id}: {len(sentences)} sentences")

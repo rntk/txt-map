@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import ObjectId
 
 from lib.storage.submissions import SubmissionsStorage
@@ -14,11 +14,11 @@ def get_submissions_storage(request: Request) -> SubmissionsStorage:
     return request.app.state.submissions_storage
 
 
-ALLOWED_TASKS = ["text_splitting", "topic_extraction", "summarization", "mindmap", "insides"]
+ALLOWED_TASKS = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides"]
 
 TASK_PRIORITIES = {
-    "text_splitting": 1,
-    "topic_extraction": 2,
+    "split_topic_generation": 1,
+    "subtopics_generation": 2,
     "summarization": 3,
     "mindmap": 3,
     "insides": 3,
@@ -114,7 +114,7 @@ def repeat_task_queue_entry(
         "status": {"$in": ["pending", "processing"]}
     })
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     inserted_ids = []
     for expanded_task in expanded_tasks:
         new_entry = {
@@ -151,7 +151,7 @@ def add_task_queue_entry(
     expanded_tasks = submissions_storage.expand_recalculation_tasks([payload.task_type])
     submissions_storage.clear_results(payload.submission_id, expanded_tasks)
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     db = submissions_storage._db
     inserted_ids = []
     for expanded_task in expanded_tasks:

@@ -1,10 +1,12 @@
 """
-Topic extraction task - extracts topics from text using coordinate grid approach
+Topic extraction task - extracts topics from text using sentence tagging approach
 """
 from lib.storage.submissions import SubmissionsStorage
 import hashlib
 import datetime
 import re
+import logging
+from typing import List, Tuple, Dict, Set, Optional
 
 
 def normalize_topic(topic_name):
@@ -87,24 +89,99 @@ Sentences:
     return subtopics
 
 
-def create_coordinate_grid(sentences):
+def build_tagged_text(sentences: List[str], start_index: int = 0) -> str:
     """
-    Split sentences into a grid of words (Lines x Words).
-    Returns:
-        grid: List of List of words.
-        rows: List of original sentence strings (lines).
+    Format sentences with {N} markers for LLM prompting.
     """
-    grid = []
-    for sentence in sentences:
-        words = sentence.split()
-        grid.append(words)
+    formatted = [f"{{{start_index + i}}} {sent}" for i, sent in enumerate(sentences)]
+    return "\n".join(formatted)
 
-    return grid, sentences
+
+def parse_range_string(ranges_str: str) -> List[Tuple[int, int]]:
+    """Parse range string like '0-5, 10-15, 20' into list of (start, end) tuples."""
+    results = []
+    parts = [p.strip() for p in ranges_str.split(",")]
+
+    for part in parts:
+        if "-" in part and not part.startswith("-"):
+            match = re.match(r"(\d+)\s*-\s*(\d+)", part)
+            if match:
+                results.append((int(match.group(1)), int(match.group(2))))
+                continue
+
+        match = re.match(r"(\d+)", part)
+        if match:
+            n = int(match.group(1))
+            results.append((n, n))
+
+    return results
+
+
+def parse_llm_ranges(response: str) -> List[Tuple[str, int, int]]:
+    """
+    Parse hierarchical topic paths and sentence ranges from LLM response.
+    Expected format: Technology>Database>PostgreSQL: 0-5, 10-15
+    """
+    lines = [ln.strip() for ln in response.strip().split("\n") if ln.strip()]
+    ranges = []
+
+    for ln in lines:
+        if ":" not in ln:
+            continue
+
+        topic_path, ranges_str = ln.split(":", 1)
+        topic_path = topic_path.strip()
+        ranges_str = ranges_str.strip()
+
+        # We accept non-hierarchical topics too, though prompt asks for hierarchy
+        parsed_ranges = parse_range_string(ranges_str)
+
+        for start_idx, end_idx in parsed_ranges:
+            ranges.append((topic_path, start_idx, end_idx))
+
+    return ranges
+
+
+def normalize_topic_ranges(topic_ranges: List[Tuple[str, int, int]], max_index: int) -> List[Tuple[str, int, int]]:
+    """
+    Clamp, order, and fill gaps to ensure continuous coverage.
+    Uses 0-based sentence indices.
+    """
+    if not topic_ranges:
+        return []
+
+    cleaned = []
+    for topic, start, end in topic_ranges:
+        start = max(0, min(start, max_index))
+        end = max(0, min(end, max_index))
+        if start > end:
+            start, end = end, start
+        cleaned.append((topic, start, end))
+
+    cleaned.sort(key=lambda x: (x[1], x[2]))
+    normalized = []
+    current = 0
+
+    for topic, start, end in cleaned:
+        if end < current:
+            continue
+        if start > current:
+            normalized.append(("no_topic", current, start - 1))
+        start = max(start, current)
+        normalized.append((topic, start, end))
+        current = end + 1
+        if current > max_index:
+            break
+
+    if current <= max_index:
+        normalized.append(("no_topic", current, max_index))
+
+    return normalized
 
 
 def process_topic_extraction(submission: dict, db, llm):
     """
-    Process topic extraction task using coordinate grid approach.
+    Process topic extraction task using sentence tagging approach.
 
     Args:
         submission: Submission document from DB
@@ -119,14 +196,109 @@ def process_topic_extraction(submission: dict, db, llm):
     if not sentences:
         raise ValueError("Text splitting must be completed first")
 
-    # Create coordinate grid
-    grid, rows = create_coordinate_grid(sentences)
+    # 1. Prepare Prompt Template
+    # (Using the prompt from PostSplitter)
+    prompt_template = """You are analyzing a text presented as numbered sentences.
+Sentence numbers are 0-indexed.
 
-    if not grid:
-        print(f"No grid created for submission {submission_id}")
-        submissions_storage = SubmissionsStorage(db)
-        submissions_storage.update_results(submission_id, {"topics": []})
-        return
+Your task: Extract specific, searchable topic keywords for each distinct section of the text.
+
+AGGREGATION REQUIREMENTS (CRITICAL):
+These keywords will be grouped across multiple articles. Use CONSISTENT, CANONICAL naming:
+
+Common entities - use these EXACT forms:
+- Languages: Python, JavaScript, TypeScript, Go, Rust, Java, C++, C#
+- Databases: PostgreSQL, MongoDB, Redis, MySQL, SQLite
+- Cloud: AWS, Google Cloud, Azure, Kubernetes, Docker, Terraform
+- AI/ML: GPT-4, Claude, Gemini, LLaMA, ChatGPT, AI, ML, Large Language Models
+- Frameworks: React, Vue, Angular, Django, FastAPI, Spring Boot, Next.js, NestJS
+- Companies: OpenAI, Anthropic, Google, Microsoft, Meta, Apple, Amazon, NVIDIA
+
+Version format: "Name X.Y" (drop patch version)
+- ✓ "Python 3.12" (not "Python 3.12.1", "Python version 3.12", "Python v3.12")
+- ✓ "React 19" (not "React v19.0", "React 19.0")
+
+When in doubt: use the official product/company name with official capitalization.
+KEYWORD SELECTION HIERARCHY (prefer in order):
+1. Named entities: specific products, companies, people, technologies
+   Examples: "GPT-4", "Kubernetes", "PostgreSQL", "Linus Torvalds"
+2. Specific concepts/events: concrete actions, announcements, or occurrences
+   Examples: "Series B funding", "CVE-2024-1234 vulnerability", "React 19 release"
+3. Technical terms: domain-specific terminology
+   Examples: "vector embeddings", "JWT authentication", "HTTP/3 protocol"
+
+HIERARCHICAL TOPIC GRAPH (REQUIRED):
+Express each topic as a hierarchical path using ">" separator:
+- Use 2-4 levels (avoid too shallow or too deep)
+- Top level: General category (Technology, Sport, Politics, Science, Business, Health)
+- Middle levels: Sub-categories (AI, Football, Database, Cloud, Security)
+- Bottom level: Specific entity or aspect (GPT-4, England, PostgreSQL, AWS)
+
+Examples:
+✓ Technology>AI>GPT-4: 0-5
+✓ Technology>Database>PostgreSQL: 6-9, 15-17
+✓ Sport>Football>England: 10-14
+✓ Science>Climate>IPCC Report: 18-20
+
+Invalid formats:
+✗ PostgreSQL: 1-5 (too flat - missing category hierarchy)
+✗ Tech>Software>DB>SQL>PostgreSQL>Version15: 1-5 (too deep - max 4 levels)
+
+For digest posts with multiple unrelated topics, create separate hierarchies:
+Technology>AI>OpenAI: 0-5
+Sport>Football>England: 6-10
+Politics>Elections>France: 11-15
+
+WHAT MAKES A GOOD KEYWORD:
+✓ Helps readers decide if this section is relevant to their interests
+✓ Specific enough to distinguish this section from others in the article
+✓ Consistent with canonical naming (enables aggregation across articles)
+✓ Something a user might search for
+✓ 1-5 words (noun phrases preferred)
+
+BAD KEYWORDS (too generic or inconsistent):
+✗ "Tech News", "Update", "Information", "Technology", "Discussion", "News"
+✗ "Postgres" (use "PostgreSQL"), "JS" (use "JavaScript"), "K8s" (use "Kubernetes")
+
+GOOD KEYWORDS (specific, searchable, and canonical):
+✓ "PostgreSQL: indexing" (not "Database Tips", "Postgres indexing")
+✓ "Python: asyncio" (not "Programming", "Python async patterns")
+✓ "React: hooks" (not "Frontend", "React.js hooks")
+✓ "GPT-4" (not "OpenAI GPT-4", "GPT-4 model")
+
+SEMANTIC DISTINCTIVENESS:
+If multiple sections share a theme, differentiate them:
+- ✓ "AI: medical imaging" and "AI: drug discovery" (not just "AI" for both)
+- ✓ "PostgreSQL: indexing" and "PostgreSQL: replication" (not just "PostgreSQL")
+
+SPECIFICITY BALANCE:
+- General topic → use canonical name: "PostgreSQL", "Python", "React"
+- Specific aspect → use qualified form: "PostgreSQL: indexing", "Python: asyncio"
+- Don't over-specify: "React: hooks" not "React hooks useState optimization patterns"
+
+OUTPUT FORMAT (exactly one hierarchy per line):
+CategoryLevel1>CategoryLevel2>...>SpecificTopic: SentenceRanges
+
+SentenceRanges can be:
+- Single range: 0-5
+- Multiple ranges: 0-5, 10-15, 20-22
+- Individual sentences: 0, 2, 5
+- Mixed: 0-3, 7, 10-15
+
+Examples:
+Technology>Database>PostgreSQL: 0-5, 10-15
+Sport>Football>England: 2, 4, 6-9
+
+SENTENCE RULES:
+- Sentence numbers are 0-indexed
+- Every sentence must belong to exactly one keyword group
+- Be granular: separate distinct stories/topics into their own keyword groups
+
+<grid>
+{tagged_text}
+</grid>
+
+Output:"""
 
     # Ensure LLM cache collection exists
     cache_collection = db.llm_cache
@@ -135,188 +307,142 @@ def process_topic_extraction(submission: dict, db, llm):
         try:
             db.llm_cache.create_index("prompt_hash", unique=True)
         except:
-            pass  # Index might already exist
+            pass
 
-    # Prompt Template for grid-based topic extraction
-    prompt_template = """You are analyzing a text presented as a coordinate grid (Excel-like).
-X axis: Word position (0-indexed)
-Y axis: Line/Sentence number (0-indexed)
-The X-axis header at the top shows column numbers.
+    # Token/Chunking Estimation
+    try:
+        context_size = getattr(llm, "context_size", getattr(llm, "_LLamaCPP__max_context_tokens", 64000))
+    except Exception:
+        context_size = 64000
 
-Your task is to:
-1. Identify logical topics or themes in the text.
-2. Define the sentences/segments that belong to each topic using Start and End coordinates.
-   - Start coordinate: (Y, X)
-   - End coordinate: (Y, X)
+    # Calculate static part of the prompt
+    # We remove the placeholder to get accurate static size
+    template_tokens = llm.estimate_tokens(prompt_template.replace("{tagged_text}", ""))
+    # Reserve buffer for output and safety (1500 tokens)
+    max_chunk_tokens = context_size - template_tokens - 1500
 
-Output format (exactly one topic per line):
-Topic name: (StartY, StartX)-(EndY, EndX), (StartY, StartX)-(EndY, EndX)
+    print(f"DEBUG: Context size: {context_size}, Template tokens: {template_tokens}, Max chunk tokens: {max_chunk_tokens}")
 
-Example:
-Artificial Intelligence: (0,0)-(0,15), (1,0)-(1,10)
-Machine Learning: (2,0)-(2,8)
-no_topic: (2,9)-(2,15)
-
-Instructions:
-- Coordinate format: (LineNumber, WordNumber). e.g., (0, 0) is the first word of the first line.
-- Covers ALL text: Every word in the grid must belong to a topic or 'no_topic'.
-- Ranges are INCLUSIVE.
-- If a sentence (Row) is split between topics, use precise word coordinates.
-- Reading order is: Row Y, Word X -> Row Y, Word X+1 ... -> Row Y+1, Word 0 ...
-
-<grid>
-{grid_text}
-</grid>
-
-Result:"""
-
-    # Build grid text for prompt
-    grid_lines = []
-    for i, words in enumerate(grid):
-        line_str = f"{i}: " + " ".join(words)
-        grid_lines.append(line_str)
-
-    # Chunk if needed
     chunks = []
-    chunk_line_ranges = []
+    current_chunk = []
+    current_tokens = 0
+    current_start_idx = 0
+    
+    # Pre-calculate tokens for each sentence to build optimal chunks
+    for i, sent in enumerate(sentences):
+        # Format like: {N} Sentence text
+        line = f"{{{i}}} {sent}"
+        # Estimate +1 for newline character in join
+        line_tokens = llm.estimate_tokens(line) + 1
+        
+        # If adding this line exceeds the chunk limit, finalize current chunk
+        if current_tokens + line_tokens > max_chunk_tokens and current_chunk:
+            chunks.append({
+                "sentences": current_chunk,
+                "start_idx": current_start_idx
+            })
+            print(f"DEBUG: Created chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)")
+            # Reset for next chunk
+            current_chunk = []
+            current_tokens = 0
+            current_start_idx = i
+            
+        current_chunk.append(sent)
+        current_tokens += line_tokens
+        
+    # Add final chunk
+    if current_chunk:
+        chunks.append({
+            "sentences": current_chunk,
+            "start_idx": current_start_idx
+        })
+        print(f"DEBUG: Created final chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)")
 
-    max_tokens = llm._LLamaCPP__max_context_tokens - 1000
+    # Process all chunks
+    all_topic_ranges = []
+    
+    for chunk_idx, chunk in enumerate(chunks):
+        chunk_sentences = chunk["sentences"]
+        start_idx = chunk["start_idx"]
+        
+        print(f"Processing chunk {chunk_idx + 1}/{len(chunks)} (Indices {start_idx}-{start_idx + len(chunk_sentences) - 1})...")
 
-    current_chunk_lines_str = []
-    current_chunk_words = []
-    current_chunk_len = 0
-    chunk_start_y = 0
-
-    for i, words in enumerate(grid):
-        line_str = grid_lines[i]
-        line_len = len(line_str)
-
-        if current_chunk_len + line_len > max_tokens * 3:
-            if llm.estimate_tokens("\n".join(current_chunk_lines_str) + line_str) > max_tokens:
-                # Finalize current chunk
-                max_w = max(len(w_list) for w_list in current_chunk_words) if current_chunk_words else 0
-                header = "X: " + " ".join([str(x) for x in range(max_w)])
-                full_chunk_str = header + "\n" + "\n".join(current_chunk_lines_str)
-
-                chunks.append(full_chunk_str)
-                chunk_line_ranges.append((chunk_start_y, i))
-
-                current_chunk_lines_str = [line_str]
-                current_chunk_words = [words]
-                current_chunk_len = line_len
-                chunk_start_y = i
-                continue
-
-        current_chunk_lines_str.append(line_str)
-        current_chunk_words.append(words)
-        current_chunk_len += line_len
-
-    if current_chunk_lines_str:
-        max_w = max(len(w_list) for w_list in current_chunk_words) if current_chunk_words else 0
-        header = "X: " + " ".join([str(x) for x in range(max_w)])
-        full_chunk_str = header + "\n" + "\n".join(current_chunk_lines_str)
-
-        chunks.append(full_chunk_str)
-        chunk_line_ranges.append((chunk_start_y, len(grid)))
-
-    total_parsed_ranges = []
-
-    print(f"Processing {len(chunks)} chunks for topic extraction")
-
-    for i, (chunk_text, (start_y, end_y)) in enumerate(zip(chunks, chunk_line_ranges)):
-        prompt = prompt_template.replace("{grid_text}", chunk_text)
+        # 1. Build Tagged Text for this chunk
+        tagged_text = build_tagged_text(chunk_sentences, start_index=start_idx)
+        
+        # 2. Prepare Prompt
+        prompt = prompt_template.replace("{tagged_text}", tagged_text)
         prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
 
         cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
 
         if cached_response:
             response = cached_response["response"]
-            print(f"Chunk {i}: Using cached response")
+            print(f"  Using cached response for chunk {chunk_idx + 1}")
         else:
-            print(f"Chunk {i}: Calling LLM")
-            response = llm.call([prompt])
-            cache_collection.update_one(
-                {"prompt_hash": prompt_hash},
-                {"$set": {
-                    "prompt_hash": prompt_hash,
-                    "prompt": prompt,
-                    "response": response,
-                    "created_at": datetime.datetime.now()
-                }},
-                upsert=True
-            )
+            print(f"  Calling LLM for chunk {chunk_idx + 1}")
+            try:
+                response = llm.call([prompt])
+                cache_collection.update_one(
+                    {"prompt_hash": prompt_hash},
+                    {"$set": {
+                        "prompt_hash": prompt_hash,
+                        "prompt": prompt,
+                        "response": response,
+                        "created_at": datetime.datetime.now()
+                    }},
+                    upsert=True
+                )
+            except Exception as e:
+                print(f"  Error calling LLM for chunk {chunk_idx + 1}: {e}")
+                response = ""
 
-        # Parse Response - extract (Y, X)-(Y, X) coordinates
-        for line in response.strip().split('\n'):
-            if ':' in line:
-                parts = line.split(':', 1)
-                t_name = parts[0].strip()
-                coords_str = parts[1].strip()
+        # 3. Parse Ranges
+        chunk_ranges = parse_llm_ranges(response)
+        all_topic_ranges.extend(chunk_ranges)
 
-                # Regex for (Y, X)-(Y, X)
-                matches = re.findall(r'\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*-\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)', coords_str)
+    if not all_topic_ranges:
+        print(f"No topics found for submission {submission_id}")
 
-                for m in matches:
-                    sy, sx, ey, ex = map(int, m)
-                    total_parsed_ranges.append((t_name, sy, sx, ey, ex))
+    # 4. Normalize (Global)
+    # This handles clamping, overlaps cleanup, and gap filling across all chunks
+    normalized_ranges = normalize_topic_ranges(all_topic_ranges, len(sentences) - 1)
 
-    # Reconstruct topics from ranges
+    # 5. Convert to Topics List
+    # Map back to 1-based indices and grouping structure
     final_topics = {}
-    final_sentences = []
+    
+    for topic, start, end in normalized_ranges:
+        # Convert 0-based range [start, end] to 1-based list of indices
+        sent_indices = list(range(start + 1, end + 2))
+        
+        if topic not in final_topics:
+            final_topics[topic] = []
+        final_topics[topic].extend(sent_indices)
 
-    # Sort ranges by appearance (sy, sx)
-    total_parsed_ranges.sort(key=lambda x: (x[1], x[2]))
-
-    for t_name, sy, sx, ey, ex in total_parsed_ranges:
-        # Extract text from grid
-        segment_words = []
-
-        # Validate coordinates
-        sy = max(0, min(sy, len(grid) - 1))
-        ey = max(0, min(ey, len(grid) - 1))
-
-        # Loop from sy to ey
-        for cy in range(sy, ey + 1):
-            row_words = grid[cy]
-            start_word = sx if cy == sy else 0
-            end_word = ex if cy == ey else len(row_words) - 1
-
-            # Bounds check
-            start_word = max(0, min(start_word, len(row_words)))
-            end_word = max(0, min(end_word, len(row_words) - 1))
-
-            if start_word <= end_word:
-                segment_words.extend(row_words[start_word: end_word + 1])
-
-        sentence_text = " ".join(segment_words)
-        if not sentence_text.strip():
-            continue
-
-        final_sentences.append(sentence_text)
-        sent_idx = len(final_sentences)  # 1-based index
-
-        norm_name = normalize_topic(t_name)
-        if norm_name not in final_topics:
-            final_topics[norm_name] = []
-        final_topics[norm_name].append(sent_idx)
-
-    # Format topics list
     topics_list = []
     for name, sent_indices in final_topics.items():
-        topics_list.append({
-            "name": name,
-            "sentences": sorted(list(set(sent_indices)))
-        })
+        # Clean name slightly if needed, though PostSplitter enforces canonical names
+        clean_name = name.strip()
+        unique_indices = sorted(list(set(sent_indices)))
+        if unique_indices:
+            topics_list.append({
+                "name": clean_name,
+                "sentences": unique_indices
+            })
 
-    # Use final sentences if available, otherwise use original sentences
-    final_sentences_to_use = final_sentences if final_sentences else sentences
-
-    # Generate subtopics for each topic
+    # 6. Generate subtopics
     all_subtopics = []
+    
     for topic in topics_list:
         if topic["sentences"] and topic["name"] != "no_topic":
             # Get the actual sentence texts for this topic
-            topic_sentences = [final_sentences_to_use[idx - 1] for idx in topic["sentences"]]
+            topic_sentences = [sentences[idx - 1] for idx in topic["sentences"]]
+            
+            # Use just the last part of the hierarchy for the subtopic prompt 
+            # or the full path? The original code used normalize_topic(name).
+            # The prompt in generate_subtopics_for_topic uses existing name. 
+            
             subtopics = generate_subtopics_for_topic(
                 topic["name"], 
                 topic_sentences, 
@@ -327,15 +453,15 @@ Result:"""
             all_subtopics.extend(subtopics)
             print(f"  Generated {len(subtopics)} subtopics for topic '{topic['name']}'")
 
-    # Update submission with results
+    # 7. Update submission
     submissions_storage = SubmissionsStorage(db)
     submissions_storage.update_results(
         submission_id,
         {
             "topics": topics_list,
-            "sentences": final_sentences_to_use,
+            "sentences": sentences, # Ensure sentences are saved
             "subtopics": all_subtopics
         }
     )
 
-    print(f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(all_subtopics)} subtopics, {len(final_sentences_to_use)} sentences")
+    print(f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(all_subtopics)} subtopics")

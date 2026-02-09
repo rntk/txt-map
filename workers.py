@@ -5,15 +5,15 @@ import time
 import signal
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from pymongo import MongoClient
 
 from lib.llm.llamacpp import LLamaCPP
 from lib.storage.submissions import SubmissionsStorage
 
 # Task handlers
-from lib.tasks.text_splitting import process_text_splitting
-from lib.tasks.topic_extraction import process_topic_extraction
+from lib.tasks.split_topic_generation import process_split_topic_generation
+from lib.tasks.subtopics_generation import process_subtopics_generation
 from lib.tasks.summarization import process_summarization
 from lib.tasks.mindmap import process_mindmap
 from lib.tasks.insides import process_insides
@@ -27,17 +27,17 @@ logger = logging.getLogger("worker")
 
 # Task dependencies - tasks can only run if their dependencies are completed
 TASK_DEPENDENCIES = {
-    "text_splitting": [],
-    "topic_extraction": ["text_splitting"],
-    "summarization": ["text_splitting", "topic_extraction"],
-    "mindmap": ["text_splitting", "topic_extraction"],
-    "insides": ["text_splitting"],
+    "split_topic_generation": [],
+    "subtopics_generation": ["split_topic_generation"],
+    "summarization": ["split_topic_generation"],
+    "mindmap": ["split_topic_generation"],
+    "insides": ["split_topic_generation"],
 }
 
 # Task priorities (lower = higher priority)
 TASK_PRIORITIES = {
-    "text_splitting": 1,
-    "topic_extraction": 2,
+    "split_topic_generation": 1,
+    "subtopics_generation": 2,
     "summarization": 3,
     "mindmap": 3,
     "insides": 3,
@@ -45,8 +45,8 @@ TASK_PRIORITIES = {
 
 # Task handlers mapping
 TASK_HANDLERS = {
-    "text_splitting": process_text_splitting,
-    "topic_extraction": process_topic_extraction,
+    "split_topic_generation": process_split_topic_generation,
+    "subtopics_generation": process_subtopics_generation,
     "summarization": process_summarization,
     "mindmap": process_mindmap,
     "insides": process_insides
@@ -106,7 +106,7 @@ class Worker:
                 {
                     "$set": {
                         "status": "processing",
-                        "started_at": datetime.utcnow(),
+                        "started_at": datetime.now(UTC),
                         "worker_id": self.worker_id
                     }
                 },
@@ -175,7 +175,7 @@ class Worker:
 
     def _mark_task_completed(self, task):
         """Mark task as completed in both task_queue and submission"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Update task queue
         self.db.task_queue.update_one(
@@ -197,7 +197,7 @@ class Worker:
 
     def _mark_task_failed(self, task, error_msg):
         """Mark task as failed in both task_queue and submission"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Update task queue
         self.db.task_queue.update_one(

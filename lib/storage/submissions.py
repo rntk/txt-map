@@ -1,20 +1,20 @@
 import logging
 import uuid
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from pymongo import MongoClient
 
 
 class SubmissionsStorage:
     indexes = ["submission_id", "created_at"]
-    task_names = ["text_splitting", "topic_extraction", "summarization", "mindmap", "insides"]
+    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides"]
     task_dependencies = {
-        "text_splitting": [],
-        "topic_extraction": ["text_splitting"],
-        "summarization": ["text_splitting", "topic_extraction"],
-        "mindmap": ["text_splitting", "topic_extraction"],
-        "insides": ["text_splitting"],
+        "split_topic_generation": [],
+        "subtopics_generation": ["split_topic_generation"],
+        "summarization": ["split_topic_generation"],
+        "mindmap": ["split_topic_generation"],
+        "insides": ["split_topic_generation"],
     }
 
     def __init__(self, db: MongoClient) -> None:
@@ -38,7 +38,7 @@ class SubmissionsStorage:
     ) -> dict:
         """Create a new submission and return the document"""
         submission_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         submission = {
             "submission_id": submission_id,
@@ -48,13 +48,13 @@ class SubmissionsStorage:
             "created_at": now,
             "updated_at": now,
             "tasks": {
-                "text_splitting": {
+                "split_topic_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
                     "error": None
                 },
-                "topic_extraction": {
+                "subtopics_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
@@ -81,13 +81,6 @@ class SubmissionsStorage:
             },
             "results": {
                 "sentences": [],
-                "words": [],
-                "html_words": [],
-                "marked_text": "",
-                "marker_count": 0,
-                "marker_word_indices": [],
-                "word_to_paragraph": [],
-                "paragraph_texts": [],
                 "topics": [],
                 "topic_summaries": {},
                 "topic_mindmaps": {},
@@ -114,7 +107,7 @@ class SubmissionsStorage:
         error: Optional[str] = None
     ) -> bool:
         """Update task status (pending, processing, completed, failed)"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         update_fields = {
             f"tasks.{task_name}.status": status,
             "updated_at": now
@@ -145,7 +138,7 @@ class SubmissionsStorage:
             {
                 "$set": {
                     **{f"results.{k}": v for k, v in results.items()},
-                    "updated_at": datetime.utcnow()
+                    "updated_at": datetime.now(UTC)
                 }
             }
         )
@@ -159,7 +152,7 @@ class SubmissionsStorage:
         """Clear results and reset task statuses for refresh"""
         task_names = self.expand_recalculation_tasks(task_names)
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         update_fields = {"updated_at": now}
 
         # Reset task statuses
@@ -170,18 +163,11 @@ class SubmissionsStorage:
             update_fields[f"tasks.{task_name}.error"] = None
 
         # Clear related results
-        if "text_splitting" in task_names:
+        if "split_topic_generation" in task_names:
             update_fields["results.sentences"] = []
-            update_fields["results.words"] = []
-            update_fields["results.html_words"] = []
-            update_fields["results.marked_text"] = ""
-            update_fields["results.marker_count"] = 0
-            update_fields["results.marker_word_indices"] = []
-            update_fields["results.word_to_paragraph"] = []
-            update_fields["results.paragraph_texts"] = []
-
-        if "topic_extraction" in task_names:
             update_fields["results.topics"] = []
+
+        if "subtopics_generation" in task_names:
             update_fields["results.subtopics"] = []
 
         if "summarization" in task_names:
@@ -206,7 +192,7 @@ class SubmissionsStorage:
     def expand_recalculation_tasks(self, task_names: Optional[List[str]] = None) -> List[str]:
         """
         Expand selected tasks with downstream dependent tasks.
-        Example: requesting topic_extraction also includes summarization and mindmap.
+        Example: requesting split_topic_generation also includes dependent tasks.
         """
         if task_names is None or "all" in task_names:
             return self.task_names.copy()

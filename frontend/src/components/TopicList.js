@@ -3,13 +3,13 @@ import React, { useState, useMemo } from 'react';
 function TopicList({
   topics = [],
   selectedTopics = [],
-  onToggleTopic = () => {},
-  onHoverTopic = () => {},
+  onToggleTopic = () => { },
+  onHoverTopic = () => { },
   readTopics = new Set(),
-  onToggleRead = () => {},
+  onToggleRead = () => { },
   showPanel = false,
   panelTopic = null,
-  onToggleShowPanel = () => {},
+  onToggleShowPanel = () => { },
   onNavigateTopic
 }) {
   const [expandedRoots, setExpandedRoots] = useState(new Set());
@@ -17,13 +17,13 @@ function TopicList({
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
-  // Group topics by their root (first word before space or underscore)
+  // Group topics by their root (first part before '>')
   const hierarchicalTopics = useMemo(() => {
     const grouped = new Map();
 
     safeTopics.forEach(topic => {
-      // Split by space or underscore and get the first word
-      const root = topic.name.split(/[\s_]/)[0];
+      // Group topics by their root (first part before '>')
+      const root = topic.name.split('>')[0].trim();
 
       if (!grouped.has(root)) {
         grouped.set(root, []);

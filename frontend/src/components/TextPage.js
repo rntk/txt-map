@@ -345,7 +345,7 @@ function TextPage() {
               </button>
               <button
                 className="action-btn"
-                onClick={() => runRefresh(['topic_extraction', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')}
+                onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')}
                 disabled={actionLoading}
               >
                 Recalculate Topics

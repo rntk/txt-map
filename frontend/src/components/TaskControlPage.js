@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import '../styles/App.css';
 
 const TASK_TYPES = [
-  'text_splitting',
-  'topic_extraction',
+  'split_topic_generation',
+  'subtopics_generation',
   'summarization',
   'mindmap',
   'insides'
@@ -20,7 +20,7 @@ function TaskControlPage() {
   });
   const [newTask, setNewTask] = useState({
     submissionId: '',
-    taskType: 'text_splitting',
+    taskType: 'split_topic_generation',
     priority: ''
   });
   const [actionMessage, setActionMessage] = useState('');
