@@ -1,32 +1,44 @@
-# RSS Tag Firefox Extension
+# Browser Extension
 
-A lightweight Firefox extension that submits selected text to the local API and opens the redirect page.
+WebExtension for selecting a block of content from any webpage and submitting it to the local API.
 
-## Features
+## What It Does
 
-- Click the extension icon to start selection
-- Select any text on the page
-- Submit the selection to `http://127.0.0.1:8000/api/submit`
-- Opens the API-provided redirect URL in a new tab
+- Injects a page toolbar when you click the extension icon
+- Lets you pick one DOM block on the current page
+- Sends selected HTML to `POST http://127.0.0.1:8000/api/submit`
+- Opens the returned `redirect_url` in a new tab
 
-## Installation
+## Files
 
-1. Ensure the backend API is running at `http://127.0.0.1:8000`
-2. Open Firefox and go to `about:debugging`
-3. Click "This Firefox" in the left sidebar
-4. Click "Load Temporary Add-on"
-5. Select `manifest.json` from this directory
+- `manifest.json`: extension manifest and permissions
+- `background.js`: icon click handling, API submit, open-tab action
+- `content.js`: selection UI, block picking, payload creation
+- `content.css`: toolbar + highlight styles
+
+## Install (Firefox)
+
+1. Open `about:debugging`
+2. Select `This Firefox`
+3. Click `Load Temporary Add-on`
+4. Choose `extension/manifest.json`
+
+## Install (Chromium-based)
+
+1. Open `chrome://extensions`
+2. Enable Developer mode
+3. Click `Load unpacked`
+4. Select the `extension/` directory
 
 ## Usage
 
-1. Navigate to any web page
-2. Click the extension icon in the toolbar
-3. Select the text you want to submit
-4. Click "Submit" in the toolbar
+1. Open any page
+2. Click the extension icon
+3. Click `Pick Block`, then click the content block
+4. Click `Submit Block`
+5. A new tab opens with `/page/text/{submission_id}`
 
-## Architecture
+## Requirements
 
-- `manifest.json`: Extension configuration and permissions
-- `background.js`: Handles icon clicks and opens the redirect tab
-- `content.js`: Manages selection UI and submits text
-- `content.css`: Styles for the selection toolbar
+- API server running at `http://127.0.0.1:8000`
+- CORS is enabled in the backend for extension requests

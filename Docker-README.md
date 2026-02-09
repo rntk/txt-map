@@ -1,136 +1,75 @@
-# Docker Setup for RSS Content Analysis App
+# Docker Guide
 
-This guide explains how to run the FastAPI RSS Content Analysis application using Docker.
+This project includes Dockerfiles and a `docker-compose.yml` for API, worker, and MongoDB services.
 
-## Prerequisites
+## Services in `docker-compose.yml`
 
-- Docker
-- Docker Compose
+- `api`: FastAPI server on `http://localhost:8000`
+- `worker`: background task processor (`python workers.py`)
+- `mongodb`: MongoDB 8 on `localhost:27017`
+- optional commented `llamacpp` service
 
-## Quick Start
+## Start
 
-1. **Clone the repository** (if not already done):
-   ```bash
-   git clone <repository-url>
-   cd <repository-directory>
-   ```
-
-2. **Build and run with Docker Compose**:
-   ```bash
-   docker-compose up --build
-   ```
-
-   This will:
-   - Build the FastAPI application
-   - Start MongoDB database
-   - Start API server on `http://localhost:8000`
-   - Start background worker for task processing
-
-3. **Access the application**:
-   - API Documentation: http://localhost:8000/docs
-   - Submit content via browser extension or API
-   - View results at: http://localhost:8000/page/text/{submission_id}
-
-4. **Scale workers** for more processing power:
-   ```bash
-   docker-compose up --scale worker=3
-   ```
-
-## Manual Docker Build
-
-If you prefer to build and run manually:
-
-1. **Build the Docker image**:
-   ```bash
-   docker build -t rss-content-analyzer .
-   ```
-
-2. **Run MongoDB separately**:
-   ```bash
-   docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_DATABASE=rss mongo:8
-   ```
-
-3. **Run the application**:
-   ```bash
-   docker run -d --name rss-app -p 8000:8000 \
-     -e MONGODB_URL=mongodb://mongodb:27017/ \
-     --link mongodb:mongodb \
-     rss-content-analyzer
-   ```
-
-## Build the Browser Extension with Docker
-
-If you don't want to install Node.js locally, you can build the extension using a Node Docker image:
+From `/app`:
 
 ```bash
-docker run --rm -it \
-  -v "$(pwd)/extension:/ext" \
-  -w /ext \
-  node:22-alpine \
-  sh -lc "npm install && npm run build && touch app-bundle.css"
+docker compose up --build
 ```
 
-This produces `extension/app-bundle.js` (and `app-bundle.css`) for loading via `extension/manifest.json`.
-
-## Environment Variables
-
-The application supports the following environment variables:
-
-- `MONGODB_URL`: MongoDB connection string (default: `mongodb://localhost:8765/`)
-- `LLAMACPP_URL`: LLamaCPP server URL (default: `http://llamacpp:8080` in Docker, `http://localhost:8989` locally)
-- `TOKEN`: Optional authentication token for LLamaCPP server
-
-## LlamaCPP Integration
-
-The application requires a LlamaCPP server for LLM processing. For Docker deployment:
-
-1. **Uncomment the LlamaCPP service** in `docker-compose.yml`
-2. **Add your model** to a `models` directory
-3. **Update the model path** in the compose file
-4. The services will automatically use `http://llamacpp:8080` when running in Docker
-
-## Data Persistence
-
-MongoDB data is persisted using Docker volumes. The database will retain data between container restarts.
-
-## Development
-
-For development with hot reloading:
+Run in background:
 
 ```bash
-# Run only MongoDB
-docker-compose up mongodb
-
-# Terminal 1: Run the API locally with auto-reload
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2: Run the worker
-python workers.py
+docker compose up -d --build
 ```
 
-## Troubleshooting
+## Stop
 
-1. **Port conflicts**: If ports 8000 or 27017 are in use, modify the port mappings in `docker-compose.yml`
+```bash
+docker compose down
+```
 
-2. **MongoDB connection issues**: Ensure the `MONGODB_URL` environment variable matches your MongoDB setup
+## Scale Workers
 
-3. **Frontend not loading**: The frontend is built during the Docker image creation. If you modify frontend files, rebuild the image:
-   ```bash
-   docker-compose up --build
-   ```
+```bash
+docker compose up --scale worker=3
+```
 
-4. **LlamaCPP connection errors**: Make sure your LlamaCPP server is accessible and update the URL in the handler files if needed
+## Environment
 
-## Production Considerations
+`docker-compose.yml` loads `.env` and sets:
 
-For production deployment:
+- `MONGODB_URL=mongodb://mongodb:27017/`
+- `LLAMACPP_URL=${LLAMACPP_URL:-http://llamacpp:8080}`
+- `TOKEN=${TOKEN:-}`
 
-1. Use environment-specific configuration files
-2. Set up proper MongoDB authentication
-3. Use secrets management for sensitive data
-4. Configure proper logging and monitoring
-5. Set up SSL/TLS termination
-6. Use a production-grade LLM inference server
+If you use an external LLamaCPP server, set `LLAMACPP_URL` in `.env`.
 
+## Useful URLs
 
+- API docs: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Frontend pages are served by the API at `/page/*`
+
+## Rebuild After Changes
+
+When backend/frontend code changes:
+
+```bash
+docker compose up --build
+```
+
+When only restarting services is needed:
+
+```bash
+docker compose restart
+```
+
+## Frontend Tests in Docker
+
+Use the dedicated frontend test image:
+
+```bash
+docker build -f frontend/Dockerfile.test -t frontend-tests .
+docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests
+```
