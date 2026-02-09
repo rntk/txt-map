@@ -1,4 +1,4 @@
-# RSS Content Analysis - Topic Extraction & Text Analysis Platform
+# Content Analysis - Topic Extraction & Text Analysis Platform
 
 A production-ready content analysis system that extracts topics, generates summaries, creates mindmaps, and identifies key insights from web content using LLM-powered background workers.
 
@@ -23,14 +23,15 @@ Frontend (React)
 
 ## Features
 
-- **Text Splitting**: Extract and structure text with word-level markers
-- **Topic Extraction**: Grid-based coordinate approach for precise topic identification
-- **Summarization**: Generate concise summaries for all content and topics
-- **Mindmap Generation**: Create hierarchical mindmap structures
-- **Insides Extraction**: Identify key insights, personal stories, and important takeaways
+- **Unified Processing**: `split_topic_generation` task combines text splitting and precise topic extraction
+- **Subtopics Generation**: Automatic generation of sub-chapters for each identified topic
+- **Summarization**: Generate concise summaries for all content and individual topics
+- **Mindmap Generation**: Create hierarchical mindmap structures from topics and subtopics
+- **Insights (Insides) Extraction**: Identify key insights, personal stories, and important takeaways
 - **Real-time Processing**: Live status updates with progressive result loading
-- **LLM Caching**: MD5-based caching to avoid redundant expensive LLM calls
+- **LLM Caching**: MD5-based caching in MongoDB to avoid redundant expensive LLM calls
 - **Scalable Workers**: Add workers as needed for parallel processing
+- **Task Management**: Fine-grained task queuing and re-processing capability
 - **Refresh Capability**: Re-process content with one click
 
 ## Quick Start
@@ -77,10 +78,14 @@ The worker will poll for tasks every 2 seconds.
 
 ### Option A: Using the Browser Extension
 
-1. Load extension in Firefox/Chrome:
-   - Firefox: `about:debugging` → Load Temporary Add-on
-   - Chrome: `chrome://extensions` → Developer mode → Load unpacked
-   - Select `/app/extension/` directory
+1. Build and Load extension in Firefox/Chrome:
+   - Build extension:
+     ```bash
+     cd /app/extension/
+     npm install && npm run build
+     ```
+   - Firefox: `about:debugging` → Load Temporary Add-on → Select `/app/extension/manifest.json`
+   - Chrome: `chrome://extensions` → Developer mode → Load unpacked → Select `/app/extension/` directory
 
 2. Navigate to any webpage (e.g., a news article)
 
@@ -146,19 +151,19 @@ curl -X POST http://127.0.0.1:8000/api/submission/{id}/refresh \
 
 ```
 INFO - Worker worker-12345 started
-INFO - Claimed task text_splitting for submission abc123...
-INFO - Processing text_splitting for submission abc123...
-Text splitting completed for submission abc123...: 45 words, 8 markers
-INFO - Completed text_splitting for submission abc123...
-INFO - Claimed task topic_extraction for submission abc123...
+INFO - Claimed task split_topic_generation for submission abc123...
+INFO - Processing split_topic_generation for submission abc123...
+Split/topic generation completed for submission abc123...: 45 sentences, 8 topics
+INFO - Completed split_topic_generation for submission abc123...
+INFO - Claimed task subtopics_generation for submission abc123...
 ...
 ```
 
 ### In the Browser
 
 1. **Status Indicator** showing task progress:
-   - Text Splitting: ✓ completed
-   - Topic Extraction: ⟳ processing
+   - Split & Topics: ✓ completed
+   - Subtopics: ⟳ processing
    - Summarization: ○ pending
    - Mindmap: ○ pending
    - Insides: ○ pending
@@ -226,7 +231,7 @@ Once everything is working:
 
 ```bash
 # MongoDB connection (default: mongodb://localhost:8765/)
-export MONGODB_URL="mongodb://your-host:27017/"
+export MONGODB_URL="mongodb://your-host:8765/"
 
 # LLamaCPP server (default: http://localhost:8989)
 export LLAMACPP_URL="http://your-llm-host:8989"
@@ -338,7 +343,7 @@ curl -X POST http://localhost:8000/api/submission/{id}/refresh \
 
 ```bash
 # MongoDB connection (default: mongodb://localhost:8765/)
-export MONGODB_URL="mongodb://localhost:27017/"
+export MONGODB_URL="mongodb://localhost:8765/"
 
 # LLamaCPP server (default: http://localhost:8989)
 export LLAMACPP_URL="http://localhost:8989"
@@ -355,18 +360,19 @@ export TOKEN="your-secret-token"
 ├── workers.py                       # Background worker system
 ├── handlers/
 │   ├── submission_handler.py       # Submission API endpoints
-│   ├── themed_post_handler.py      # Legacy themed post handler
-│   └── ...
+│   ├── topics_handler.py           # Topics aggregation API
+│   ├── themed_topic_handler.py     # Topic-specific posts API
+│   └── task_queue_handler.py       # Task management API
 ├── lib/
 │   ├── storage/
 │   │   ├── submissions.py          # Submissions storage class
 │   │   └── posts.py                # Posts storage class
 │   └── tasks/                       # Task processing modules
-│       ├── text_splitting.py       # Text extraction & structuring
-│       ├── topic_extraction.py     # Grid-based topic extraction
-│       ├── summarization.py        # Summary generation
-│       ├── mindmap.py              # Mindmap hierarchy extraction
-│       └── insides.py              # Key insights extraction
+│       ├── split_topic_generation.py # Text splitting & topic identification
+│       ├── subtopics_generation.py   # Hierarchical sub-topic generation
+│       ├── summarization.py          # Summary generation
+│       ├── mindmap.py                # Mindmap hierarchy extraction
+│       └── insides.py                # Key insights extraction
 ├── frontend/
 │   └── src/
 │       ├── components/
@@ -383,20 +389,19 @@ export TOKEN="your-secret-token"
 
 Tasks execute in dependency order with priorities:
 
-1. **text_splitting** (Priority 1) - No dependencies
+1. **split_topic_generation** (Priority 1) - No dependencies
    - Extracts plain text from HTML
-   - Creates word-level markers for precision
-   - Builds sentence structure
+   - Identifies topics and creates word-level markers
+   - Builds hierarchical topic names (e.g., "Category > Subcategory")
 
-2. **topic_extraction** (Priority 2) - Depends on text_splitting
-   - Uses coordinate grid approach (Y=line, X=word)
-   - Sends to LLM for topic identification
-   - Rebuilds sentences from grid coordinates
+2. **subtopics_generation** (Priority 2) - Depends on split_topic_generation
+   - Breaks down identified topics into more detailed sub-chapters
+   - Enables deeper mindmap structures
 
 3. **Parallel Processing** (Priority 3):
-   - **summarization** - Generates summaries for sentences and topics
-   - **mindmap** - Creates hierarchical mindmap trees
-   - **insides** - Extracts key insights and important segments
+   - **summarization** - Generates brief summaries for sentences and topics
+   - **mindmap** - Creates hierarchical mindmap trees from topics and subtopics
+   - **insides** - Extracts key insights, quotes, and statistics
 
 ## Scaling
 
@@ -440,6 +445,9 @@ Once running, access interactive API docs at:
 | `/api/submission/{id}` | GET | Get all results for a submission |
 | `/api/submission/{id}/status` | GET | Get task completion status (for polling) |
 | `/api/submission/{id}/refresh` | POST | Clear results and re-queue tasks |
+| `/api/topics` | GET | List aggregated topics across all posts |
+| `/api/themed-topic/{topic}` | GET | Get posts matching a specific topic |
+| `/api/task-queue` | GET | List and filter tasks in the processing queue |
 | `/page/text/{id}` | GET | Serve results page in browser |
 
 ## Performance Features
@@ -456,7 +464,7 @@ Once running, access interactive API docs at:
 
 Check MongoDB connection:
 ```bash
-mongo mongodb://localhost:27017/
+mongo mongodb://localhost:8765/
 > use rss
 > db.task_queue.find()
 ```
@@ -513,7 +521,7 @@ npm run build  # Production build
 - **Database**: MongoDB 8.0
 - **Workers**: Python asyncio-based polling
 - **Frontend**: React, React Router
-- **Extension**: WebExtensions API
+- **Extension**: WebExtensions API, React (built with npm)
 - **LLM**: LLamaCPP (or OpenAI-compatible API)
 
 ## License
