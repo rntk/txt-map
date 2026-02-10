@@ -1,6 +1,6 @@
 # Frontend (React)
 
-This frontend renders RSSTag analysis pages and task/submission management views. It is served by FastAPI from `frontend/build` in production and can run standalone in development.
+This frontend renders analysis pages and task/submission management views. It is served by FastAPI from `frontend/build` in production and can run standalone in development.
 
 ## Paths and Views
 

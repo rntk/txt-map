@@ -20,7 +20,7 @@ function MainPage() {
     return (
         <div className="main-page">
             <div className="main-container">
-                <h1 className="main-title">RSSTag Dashboard</h1>
+                <h1 className="main-title">Dashboard</h1>
                 <div className="menu-grid">
                     {menuItems.map((item, index) => (
                         <a key={index} href={item.link} className="menu-card">
@@ -29,9 +29,6 @@ function MainPage() {
                             <div className="card-description">{item.description}</div>
                         </a>
                     ))}
-                </div>
-                <div className="menu-footer">
-                    &copy; 2026 RSSTag System. All rights reserved.
                 </div>
             </div>
         </div>
