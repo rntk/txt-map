@@ -3,7 +3,7 @@ Combined text splitting and topic generation task.
 """
 from lib.article_splitter import split_article_with_markers
 from lib.storage.submissions import SubmissionsStorage
-from lib.txt_splitt import Tracer
+from txt_splitt import Tracer
 
 
 def process_split_topic_generation(submission: dict, db, llm):

@@ -4,3 +4,4 @@ pymongo
 scikit-learn
 numpy
 requests
+git+https://github.com/rntk/txt-splitt.git

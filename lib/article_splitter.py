@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from lib.txt_splitt import (
+from txt_splitt import (
     BracketMarker,
     DenseRegexSentenceSplitter,
     HTMLParserTagStripCleaner,
