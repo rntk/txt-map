@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from handlers import topics_handler, themed_topic_handler, submission_handler, task_queue_handler
+from handlers import submission_handler, task_queue_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
@@ -20,8 +20,6 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 
-app.include_router(topics_handler.router, prefix="/api")
-app.include_router(themed_topic_handler.router, prefix="/api")
 app.include_router(submission_handler.router, prefix="/api")
 app.include_router(task_queue_handler.router, prefix="/api")
 
@@ -44,34 +42,6 @@ def serve_root_page():
 
 @app.get("/page/menu")
 def serve_menu_page():
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/themed-post")
-def serve_themed_post_page():
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/themed-post/{tag}")
-def serve_themed_post_page_with_tag(tag: str):
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/clustered-post")
-def serve_clustered_post_page():
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/clustered-post/{tag}")
-def serve_clustered_post_page_with_tag(tag: str):
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/topics")
-def serve_topics_page():
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/themed-topic")
-def serve_themed_topic_page():
-    return FileResponse("frontend/build/index.html")
-
-@app.get("/page/themed-topic/{topic}")
-def serve_themed_topic_page_with_topic(topic: str):
     return FileResponse("frontend/build/index.html")
 
 @app.get("/page/text/{submission_id}")

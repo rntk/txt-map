@@ -13,24 +13,6 @@ const menuItems = [
         description: 'Monitor and manage background processing tasks. Check status and retry failed jobs.',
         icon: '⚙️',
         link: '/page/tasks'
-    },
-    {
-        title: 'Clustered Posts',
-        description: 'View posts grouped by their semantic clusters. Discover related content automatically.',
-        icon: '🧩',
-        link: '/page/clustered-post'
-    },
-    {
-        title: 'Topics Cloud',
-        description: 'Explore the global topic visualization. See what themes are trending across all texts.',
-        icon: '☁️',
-        link: '/page/topics'
-    },
-    {
-        title: 'Themed Posts',
-        description: 'Browse posts organized by specific themes and manual categorizations.',
-        icon: '🏷️',
-        link: '/page/themed-post'
     }
 ];
 
