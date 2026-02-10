@@ -103,6 +103,22 @@ function TopicList({
     return subTopics.every(topic => safeReadTopics.has(topic.name));
   };
 
+  const getTopicSelectionKey = (topicOrTopics) => {
+    if (!topicOrTopics) return '';
+    if (Array.isArray(topicOrTopics)) {
+      return topicOrTopics
+        .map(topic => topic?.name)
+        .filter(Boolean)
+        .sort()
+        .join('|');
+    }
+    return topicOrTopics.name || '';
+  };
+
+  const isPanelSelection = (topicOrTopics) => {
+    return showPanel && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topicOrTopics);
+  };
+
   return (
     <div className="topic-list">
       {hierarchicalTopics.length === 0 ? (
@@ -182,7 +198,7 @@ function TopicList({
                             onClick={() => onToggleShowPanel(topic)}
                             className="show-toggle"
                           >
-                            {showPanel && panelTopic === topic ? 'Hide' : 'Show'}
+                            {isPanelSelection(topic) ? 'Hide' : 'Show'}
                           </button>
                           <button
                             onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}

@@ -442,10 +442,11 @@
 
 .overlay-panel {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 60%;
-  height: 80%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(960px, calc(100vw - 40px));
+  height: min(80vh, calc(100vh - 40px));
   background-color: white;
   border: 2px solid #ccc;
   border-radius: 8px;

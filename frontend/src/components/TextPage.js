@@ -123,6 +123,8 @@ function TextPage() {
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'topics_river' | 'mindmap' | 'insides'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
+  const [showPanel, setShowPanel] = useState(false);
+  const [panelTopic, setPanelTopic] = useState(null);
 
   const submissionId = window.location.pathname.split('/')[3];
 
@@ -201,6 +203,93 @@ function TextPage() {
       }
       return newSet;
     });
+  };
+
+  const getTopicSelectionKey = (topicOrTopics) => {
+    if (!topicOrTopics) return '';
+    if (Array.isArray(topicOrTopics)) {
+      return topicOrTopics
+        .map(topic => topic?.name)
+        .filter(Boolean)
+        .sort()
+        .join('|');
+    }
+    return topicOrTopics.name || '';
+  };
+
+  const toggleShowPanel = (topicOrTopics) => {
+    const isSameSelection = getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topicOrTopics);
+
+    if (showPanel && isSameSelection) {
+      setShowPanel(false);
+      setPanelTopic(null);
+    } else {
+      setShowPanel(true);
+      setPanelTopic(topicOrTopics);
+    }
+  };
+
+  const getSentenceElement = (articleIndex, sentenceIndex) => {
+    const byId = document.getElementById(`sentence-${articleIndex}-${sentenceIndex}`);
+    if (byId) {
+      return byId;
+    }
+    return document.querySelector(
+      `[data-article-index="${articleIndex}"][data-sentence-index="${sentenceIndex}"]`
+    );
+  };
+
+  const navigateTopicSentence = (topic, direction = 'next') => {
+    if (!topic || !topic.name) return;
+
+    const related = safeTopics.find(t => t.name === topic.name);
+    if (!related || !Array.isArray(related.sentences) || related.sentences.length === 0) return;
+
+    const targets = related.sentences
+      .map(num => (num || 1) - 1)
+      .filter(index => index >= 0)
+      .sort((a, b) => a - b);
+    if (targets.length === 0) return;
+
+    const viewportTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const viewportBottom = viewportTop + (window.innerHeight || document.documentElement.clientHeight || 0);
+    const margin = 8;
+
+    let targetIndex = -1;
+    if (direction === 'next') {
+      for (let i = 0; i < targets.length; i += 1) {
+        const el = getSentenceElement(0, targets[i]);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const absTop = rect.top + window.scrollY;
+          if (absTop > viewportBottom - margin) {
+            targetIndex = i;
+            break;
+          }
+        }
+      }
+    } else {
+      for (let i = targets.length - 1; i >= 0; i -= 1) {
+        const el = getSentenceElement(0, targets[i]);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const absBottom = rect.bottom + window.scrollY;
+          if (absBottom < viewportTop + margin) {
+            targetIndex = i;
+            break;
+          }
+        }
+      }
+    }
+
+    // If no target exists outside of viewport in requested direction, keep scroll position.
+    if (targetIndex === -1) return;
+
+    const target = targets[targetIndex];
+    const targetEl = getSentenceElement(0, target);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   const handleSummaryClick = (mapping, article) => {
@@ -417,9 +506,63 @@ function TextPage() {
                 onHoverTopic={handleHoverTopic}
                 readTopics={readTopics}
                 onToggleRead={toggleRead}
+                showPanel={showPanel}
+                panelTopic={panelTopic}
+                onToggleShowPanel={toggleShowPanel}
+                onNavigateTopic={navigateTopicSentence}
               />
             </div>
             <div className="right-column">
+              {showPanel && panelTopic && (() => {
+                const topicsToShow = Array.isArray(panelTopic) ? panelTopic : [panelTopic];
+                const topicNames = topicsToShow.map(topic => topic.name);
+                const totalSentences = topicsToShow.reduce((sum, topic) => sum + (topic.totalSentences || 0), 0);
+                const displayName = Array.isArray(panelTopic)
+                  ? `${topicsToShow[0].name.split(/[\s_]/)[0]} (${topicsToShow.length} topics)`
+                  : panelTopic.name;
+
+                const selectedArticle = articles[0];
+                const relatedTopics = selectedArticle.topics.filter(topic => topicNames.includes(topic.name));
+                const allSentenceIndices = new Set();
+                relatedTopics.forEach(topic => {
+                  topic.sentences.forEach(idx => allSentenceIndices.add(idx));
+                });
+                const sortedIndices = Array.from(allSentenceIndices).sort((a, b) => a - b);
+
+                return (
+                  <div className="overlay-panel">
+                    <div className="overlay-header">
+                      <div className="overlay-title-section">
+                        <h2>Sentences for {displayName}: {totalSentences} sentences</h2>
+                        {!Array.isArray(panelTopic) && panelTopic.summary && (
+                          <div className="overlay-summary-note">
+                            <span className="summary-icon">📝</span> {panelTopic.summary}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => toggleShowPanel(panelTopic)} className="close-panel">×</button>
+                    </div>
+                    <div className="overlay-content">
+                      <div className="article-section">
+                        <h3>Analyzed text ({relatedTopics.map(topic => topic.name).join(', ')})</h3>
+                        <div className="article-text">
+                          {sortedIndices.map((sentenceIndex, idx) => {
+                            const sentence = selectedArticle.sentences[sentenceIndex - 1];
+                            const isGap = idx > 0 && sortedIndices[idx] !== sortedIndices[idx - 1] + 1;
+
+                            return (
+                              <React.Fragment key={sentenceIndex}>
+                                {isGap && <div className="sentence-gap">...</div>}
+                                <span className="sentence-block">{sentence} </span>
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="article-section">
                 <div className="article-header">
                   <div className="article-title-section">
