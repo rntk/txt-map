@@ -73,6 +73,9 @@ export function sanitizeHTML(html) {
         node.removeAttribute(attr.name);
         continue;
       }
+      if (name.startsWith('data-')) {
+        continue;
+      }
       if (!allowedAttrs.has(name)) {
         node.removeAttribute(attr.name);
         continue;

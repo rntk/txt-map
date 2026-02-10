@@ -1,143 +1,103 @@
 import React from 'react';
 import { sanitizeHTML } from '../utils/sanitize';
 
-function normalizeWithMap(value) {
-  const source = String(value || '');
-  let normalized = '';
-  const normalizedToOriginal = [];
-  let previousWasWhitespace = true;
-
-  for (let i = 0; i < source.length; i += 1) {
-    const char = source[i];
-    const isWhitespace = /\s/.test(char);
-
-    if (isWhitespace) {
-      if (!previousWasWhitespace) {
-        normalized += ' ';
-        normalizedToOriginal.push(i);
-        previousWasWhitespace = true;
-      }
-      continue;
-    }
-
-    normalized += char;
-    normalizedToOriginal.push(i);
-    previousWasWhitespace = false;
-  }
-
-  if (normalized.endsWith(' ')) {
-    normalized = normalized.slice(0, -1);
-    normalizedToOriginal.pop();
-  }
-
-  return { normalized, normalizedToOriginal };
+function isInAnyRange(start, end, ranges) {
+  return ranges.some(r => start < r.end && end > r.start);
 }
 
-function mapSentenceRanges(fullText, sentences) {
-  const full = normalizeWithMap(fullText);
-  const ranges = [];
-  let searchFrom = 0;
+function wrapWord(htmlWord, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges) {
+  const wordEnd = wordStart + htmlWord.length;
 
-  sentences.forEach((sentence, sentenceIndex) => {
-    const normalizedSentence = normalizeWithMap(sentence).normalized;
-    if (!normalizedSentence) {
-      return;
-    }
+  if (!isInAnyRange(wordStart, wordEnd, allTopicRanges)) {
+    return htmlWord;
+  }
 
-    const matchIndex = full.normalized.indexOf(normalizedSentence, searchFrom);
-    if (matchIndex < 0) {
-      return;
-    }
+  const classes = ['word-token'];
+  if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
+    classes.push('highlighted');
+  } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
+    classes.push('faded');
+  }
 
-    const start = full.normalizedToOriginal[matchIndex];
-    const endNorm = matchIndex + normalizedSentence.length - 1;
-    const end = full.normalizedToOriginal[endNorm] + 1;
+  return `<span class="${classes.join(' ')}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
+}
 
-    ranges.push({
-      sentenceIndex,
-      start,
-      end
+function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, highlightRanges, fadeRanges) {
+  if (!rawHtml) return '';
+
+  const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
+  const allTopicRanges = [];
+  safeTopics.forEach(topic => {
+    (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
+      const s = Number(range.start);
+      const e = Number(range.end);
+      if (Number.isFinite(s) && Number.isFinite(e)) {
+        allTopicRanges.push({ start: s, end: e });
+      }
     });
-
-    searchFrom = matchIndex + normalizedSentence.length;
   });
 
-  return ranges;
-}
-
-function buildHighlightedRawHtml(rawHtml, safeSentences, articleIndex, highlightedIndices, fadedIndices) {
-  if (!rawHtml || typeof document === 'undefined') {
-    return '';
+  if (allTopicRanges.length === 0) {
+    return sanitizeHTML(rawHtml);
   }
 
-  const sanitizedHtml = sanitizeHTML(rawHtml);
-  const template = document.createElement('template');
-  template.innerHTML = sanitizedHtml;
+  // Scan the raw HTML string character by character.
+  // The ranges are in raw-HTML-string coordinates, so we work directly
+  // with the string to match positions correctly.
+  let result = '';
+  let inTag = false;
+  let inQuote = false;
+  let quoteChar = '';
+  let wordBuffer = '';
+  let wordStart = -1;
 
-  const fullText = template.content.textContent || '';
-  const ranges = mapSentenceRanges(fullText, safeSentences);
-  if (ranges.length === 0) {
-    return sanitizedHtml;
-  }
+  for (let i = 0; i < rawHtml.length; i++) {
+    const ch = rawHtml[i];
 
-  const textNodes = [];
-  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT, null);
-  let textNode = walker.nextNode();
-  let cursor = 0;
-
-  while (textNode) {
-    const text = textNode.nodeValue || '';
-    if (text.length > 0) {
-      textNodes.push({ node: textNode, start: cursor, end: cursor + text.length });
-      cursor += text.length;
-    }
-    textNode = walker.nextNode();
-  }
-
-  textNodes.forEach(({ node, start, end }) => {
-    const nodeRanges = ranges.filter(range => range.start < end && range.end > start);
-    if (nodeRanges.length === 0) {
-      return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    const nodeText = node.nodeValue || '';
-    let localCursor = 0;
-
-    nodeRanges.forEach((range) => {
-      const localStart = Math.max(0, range.start - start);
-      const localEnd = Math.min(nodeText.length, range.end - start);
-
-      if (localStart > localCursor) {
-        fragment.appendChild(document.createTextNode(nodeText.slice(localCursor, localStart)));
+    if (inTag) {
+      if (inQuote) {
+        if (ch === quoteChar) inQuote = false;
+      } else if (ch === '"' || ch === "'") {
+        inQuote = true;
+        quoteChar = ch;
+      } else if (ch === '>') {
+        inTag = false;
       }
-
-      if (localEnd > localStart) {
-        const span = document.createElement('span');
-        const classes = ['sentence-token'];
-        if (highlightedIndices.has(range.sentenceIndex)) {
-          classes.push('highlighted');
-        } else if (fadedIndices.has(range.sentenceIndex)) {
-          classes.push('faded');
+      result += ch;
+    } else if (ch === '<') {
+      // Flush any accumulated word before entering tag
+      if (wordBuffer) {
+        result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
+        wordBuffer = '';
+        wordStart = -1;
+      }
+      inTag = true;
+      result += ch;
+    } else {
+      // Text content
+      if (/\s/.test(ch)) {
+        // Whitespace: flush word buffer
+        if (wordBuffer) {
+          result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
+          wordBuffer = '';
+          wordStart = -1;
         }
-        span.className = classes.join(' ');
-        span.dataset.articleIndex = String(articleIndex);
-        span.dataset.sentenceIndex = String(range.sentenceIndex);
-        span.textContent = nodeText.slice(localStart, localEnd);
-        fragment.appendChild(span);
+        result += ch;
+      } else {
+        // Non-whitespace: accumulate into word
+        if (wordStart === -1) wordStart = i;
+        wordBuffer += ch;
       }
-
-      localCursor = localEnd;
-    });
-
-    if (localCursor < nodeText.length) {
-      fragment.appendChild(document.createTextNode(nodeText.slice(localCursor)));
     }
+  }
 
-    node.parentNode.replaceChild(fragment, node);
-  });
+  // Flush remaining word
+  if (wordBuffer) {
+    result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
+  }
 
-  return template.innerHTML;
+  // Sanitize the final HTML (preserves our span wrappers with data-* attrs)
+  return sanitizeHTML(result);
 }
 
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml }) {
@@ -147,6 +107,32 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const readTopicsSet = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
   const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
 
+  // Build character ranges from topic.ranges (in raw HTML string coordinates)
+  const highlightRanges = [];
+  const fadeRanges = [];
+
+  safeArticleTopics.forEach(topic => {
+    const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
+    if (ranges.length === 0) return;
+
+    const isHighlighted = safeSelectedTopics.some(t => t.name === topic.name) ||
+      (hoveredTopic && hoveredTopic.name === topic.name);
+    const isFaded = readTopicsSet.has(topic.name);
+
+    ranges.forEach(range => {
+      const rangeStart = Number(range.start);
+      const rangeEnd = Number(range.end);
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
+
+      if (isHighlighted) {
+        highlightRanges.push({ start: rangeStart, end: rangeEnd });
+      } else if (isFaded) {
+        fadeRanges.push({ start: rangeStart, end: rangeEnd });
+      }
+    });
+  });
+
+  // Sentence-index-based sets for non-rawHtml fallback paths
   const fadedIndices = new Set();
   readTopicsSet.forEach(topicName => {
     const relatedTopic = safeArticleTopics.find(t => t.name === topicName);
@@ -171,10 +157,10 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   const highlightedRawHtml = buildHighlightedRawHtml(
     rawHtml,
-    safeSentences,
+    safeArticleTopics,
     articleIndex,
-    highlightedIndices,
-    fadedIndices
+    highlightRanges,
+    fadeRanges
   );
 
   const sentenceToTopicsEnding = new Map();

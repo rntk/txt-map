@@ -239,26 +239,98 @@ function TextPage() {
     );
   };
 
+  const getCharElement = (articleIndex, charStart) => {
+    const exact = document.querySelector(
+      `[data-article-index="${articleIndex}"][data-char-start="${charStart}"]`
+    );
+    if (exact) {
+      return exact;
+    }
+
+    const candidates = Array.from(
+      document.querySelectorAll(`[data-article-index="${articleIndex}"][data-char-start]`)
+    );
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const withOffsets = candidates
+      .map((el) => ({
+        el,
+        start: Number(el.getAttribute('data-char-start'))
+      }))
+      .filter((entry) => Number.isFinite(entry.start))
+      .sort((a, b) => a.start - b.start);
+
+    const firstAfter = withOffsets.find((entry) => entry.start >= charStart);
+    if (firstAfter) {
+      return firstAfter.el;
+    }
+
+    return withOffsets[withOffsets.length - 1].el;
+  };
+
+  const getTopicAnchors = (topic) => {
+    if (!topic || !topic.name) {
+      return [];
+    }
+
+    const related = safeTopics.find((t) => t.name === topic.name);
+    if (!related) {
+      return [];
+    }
+
+    const ranges = Array.isArray(related.ranges) ? related.ranges : [];
+    const anchors = ranges
+      .map((range) => ({
+        charStart: Number(range?.start),
+        charEnd: Number(range?.end),
+        sentenceStart: Number(range?.sentence_start) - 1
+      }))
+      .filter((target) => Number.isFinite(target.charStart) && Number.isFinite(target.charEnd))
+      .sort((a, b) => a.charStart - b.charStart);
+
+    if (anchors.length > 0) {
+      return anchors;
+    }
+
+    const sentenceTargets = Array.isArray(related.sentences) ? related.sentences : [];
+    return sentenceTargets
+      .map((num) => Number(num) - 1)
+      .filter((index) => Number.isInteger(index) && index >= 0)
+      .sort((a, b) => a - b)
+      .map((sentenceStart) => ({
+        sentenceStart
+      }));
+  };
+
   const navigateTopicSentence = (topic, direction = 'next') => {
-    if (!topic || !topic.name) return;
-
-    const related = safeTopics.find(t => t.name === topic.name);
-    if (!related || !Array.isArray(related.sentences) || related.sentences.length === 0) return;
-
-    const targets = related.sentences
-      .map(num => (num || 1) - 1)
-      .filter(index => index >= 0)
-      .sort((a, b) => a - b);
+    const targets = getTopicAnchors(topic);
     if (targets.length === 0) return;
 
     const viewportTop = window.scrollY || document.documentElement.scrollTop || 0;
     const viewportBottom = viewportTop + (window.innerHeight || document.documentElement.clientHeight || 0);
     const margin = 8;
 
+    const resolveElement = (target) => {
+      if (Number.isFinite(target.charStart)) {
+        return getCharElement(0, target.charStart);
+      }
+      return getSentenceElement(0, target.sentenceStart);
+    };
+
+    if (direction === 'focus') {
+      const targetEl = resolveElement(targets[0]);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     let targetIndex = -1;
     if (direction === 'next') {
       for (let i = 0; i < targets.length; i += 1) {
-        const el = getSentenceElement(0, targets[i]);
+        const el = resolveElement(targets[i]);
         if (el) {
           const rect = el.getBoundingClientRect();
           const absTop = rect.top + window.scrollY;
@@ -270,7 +342,7 @@ function TextPage() {
       }
     } else {
       for (let i = targets.length - 1; i >= 0; i -= 1) {
-        const el = getSentenceElement(0, targets[i]);
+        const el = resolveElement(targets[i]);
         if (el) {
           const rect = el.getBoundingClientRect();
           const absBottom = rect.bottom + window.scrollY;
@@ -285,8 +357,7 @@ function TextPage() {
     // If no target exists outside of viewport in requested direction, keep scroll position.
     if (targetIndex === -1) return;
 
-    const target = targets[targetIndex];
-    const targetEl = getSentenceElement(0, target);
+    const targetEl = resolveElement(targets[targetIndex]);
     if (targetEl) {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }

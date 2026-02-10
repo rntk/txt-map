@@ -71,6 +71,10 @@ function TopicList({
         }
       });
     }
+
+    if (onNavigateTopic && subTopics.length > 0) {
+      onNavigateTopic(subTopics[0], 'focus');
+    }
   };
 
   const toggleReadForRoot = (subTopics) => {
@@ -86,6 +90,10 @@ function TopicList({
         onToggleRead(topic);
       }
     });
+
+    if (onNavigateTopic && subTopics.length > 0) {
+      onNavigateTopic(subTopics[0], 'focus');
+    }
   };
 
   const toggleShowPanelForRoot = (subTopics) => {
@@ -117,6 +125,20 @@ function TopicList({
 
   const isPanelSelection = (topicOrTopics) => {
     return showPanel && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topicOrTopics);
+  };
+
+  const handleTopicToggle = (topic) => {
+    onToggleTopic(topic);
+    if (onNavigateTopic) {
+      onNavigateTopic(topic, 'focus');
+    }
+  };
+
+  const handleTopicReadToggle = (topic) => {
+    onToggleRead(topic);
+    if (onNavigateTopic) {
+      onNavigateTopic(topic, 'focus');
+    }
   };
 
   return (
@@ -175,9 +197,13 @@ function TopicList({
                           <input
                             type="checkbox"
                             checked={safeSelectedTopics.some(t => t.name === topic.name)}
-                            onChange={() => onToggleTopic(topic)}
+                            onChange={() => handleTopicToggle(topic)}
                           />
-                          {topic.name}
+                          <span
+                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'focus')}
+                          >
+                            {topic.name}
+                          </span>
                         </label>
                         {topic.summary && (
                           <div className="topic-summary-note" title={topic.summary}>
@@ -189,7 +215,7 @@ function TopicList({
                         </div>
                         <div className="topic-buttons">
                           <button
-                            onClick={() => onToggleRead(topic)}
+                            onClick={() => handleTopicReadToggle(topic)}
                             className={`read-toggle ${safeReadTopics.has(topic.name) ? 'readed' : ''}`}
                           >
                             {safeReadTopics.has(topic.name) ? 'Readed' : 'Unreaded'}

@@ -584,16 +584,21 @@
   line-height: 1.6;
 }
 
+.word-token {
+  display: inline;
+}
+
 .sentence-token {
   display: inline;
 }
 
 .highlighted {
-  background-color: #fffacd;
+  background-color: #fffacd !important;
 }
 
 .faded {
-  opacity: 0.1;
+  opacity: 0.1 !important;
+  color: #999 !important;
 }
 
 .article-separator {
