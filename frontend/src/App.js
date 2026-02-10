@@ -7,6 +7,15 @@ import TopicsCloud from './components/TopicsCloud';
 import ArticlesView from './components/ArticlesView';
 import './styles/App.css';
 
+const globalMenuItems = [
+  { title: 'Home', link: '/page/menu' },
+  { title: 'Texts List', link: '/page/texts' },
+  { title: 'Task Control', link: '/page/tasks' },
+  { title: 'Clustered Posts', link: '/page/clustered-post' },
+  { title: 'Topics Cloud', link: '/page/topics' },
+  { title: 'Themed Posts', link: '/page/themed-post' }
+];
+
 function App() {
   const [articles, setArticles] = useState([]);
   const [allTopics, setAllTopics] = useState([]);
@@ -252,34 +261,60 @@ function App() {
     }
   };
 
+  const renderWithGlobalMenu = (content) => {
+    const currentPath = window.location.pathname;
+
+    return (
+      <>
+        <nav className="global-menu" aria-label="Global navigation">
+          <div className="global-menu-links">
+            {globalMenuItems.map((item) => {
+              const isActive = currentPath === item.link || currentPath.startsWith(`${item.link}/`);
+              return (
+                <a
+                  key={item.link}
+                  href={item.link}
+                  className={`global-menu-link${isActive ? ' active' : ''}`}
+                >
+                  {item.title}
+                </a>
+              );
+            })}
+          </div>
+        </nav>
+        <main className="global-page-content">{content}</main>
+      </>
+    );
+  };
+
   // Loading state handling
   if (!pageType || pageType === 'menu') {
     return <MainPage />;
   }
 
   if (pageType === 'tasks') {
-    return <TaskControlPage />;
+    return renderWithGlobalMenu(<TaskControlPage />);
   }
   if (pageType === 'texts') {
-    return <TextListPage />;
+    return renderWithGlobalMenu(<TextListPage />);
   }
   if (pageType === 'topics') {
     if (!topics.length) {
-      return <div>Loading...</div>;
+      return renderWithGlobalMenu(<div>Loading...</div>);
     }
-    return <TopicsCloud topics={topics} />;
+    return renderWithGlobalMenu(<TopicsCloud topics={topics} />);
   }
 
   // Render TextPage for submission pages
   if (pageType === 'text') {
-    return <TextPage />;
+    return renderWithGlobalMenu(<TextPage />);
   }
 
   if (!articles.length) {
-    return <div>Loading...</div>;
+    return renderWithGlobalMenu(<div>Loading...</div>);
   }
 
-  return (
+  return renderWithGlobalMenu(
     <ArticlesView
       articles={articles}
       allTopics={allTopics}

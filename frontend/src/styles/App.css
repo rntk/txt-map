@@ -2132,3 +2132,57 @@
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
   }
 }
+
+.global-menu {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  background: #ffffff;
+  border-bottom: 1px solid #dfe3e8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  padding: 10px 14px;
+}
+
+.global-menu-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.global-menu-link {
+  display: inline-block;
+  padding: 7px 11px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 13px;
+  color: #1f2937;
+  background: #f8fafc;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.global-menu-link:hover {
+  background: #eef2f7;
+  border-color: #c1c9d2;
+}
+
+.global-menu-link.active {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.global-page-content {
+  padding-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .global-menu {
+    padding: 8px 10px;
+  }
+
+  .global-menu-link {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
