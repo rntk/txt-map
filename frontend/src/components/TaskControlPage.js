@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import '../styles/App.css';
 
 const TASK_TYPES = [
@@ -25,16 +25,16 @@ function TaskControlPage() {
   });
   const [actionMessage, setActionMessage] = useState('');
 
-  const buildQuery = () => {
+  const buildQuery = useCallback(() => {
     const params = new URLSearchParams();
     if (filters.submissionId) params.append('submission_id', filters.submissionId);
     if (filters.status) params.append('status', filters.status);
     const limit = Number.parseInt(filters.limit, 10);
     if (Number.isFinite(limit) && limit > 0) params.append('limit', String(limit));
     return params.toString();
-  };
+  }, [filters.submissionId, filters.status, filters.limit]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -50,11 +50,11 @@ function TaskControlPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildQuery]);
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [fetchTasks]);
 
   const handleDelete = async (taskId) => {
     setActionMessage('');

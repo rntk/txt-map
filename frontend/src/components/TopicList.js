@@ -13,15 +13,15 @@ function TopicList({
   onNavigateTopic
 }) {
   const [expandedRoots, setExpandedRoots] = useState(new Set());
-  const safeTopics = Array.isArray(topics) ? topics : [];
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
   // Group topics by their root (first part before '>')
   const hierarchicalTopics = useMemo(() => {
+    const safe = Array.isArray(topics) ? topics : [];
     const grouped = new Map();
 
-    safeTopics.forEach(topic => {
+    safe.forEach(topic => {
       // Group topics by their root (first part before '>')
       const root = topic.name.split('>')[0].trim();
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import '../styles/App.css';
 
 const STATUS_OPTIONS = ['pending', 'processing', 'completed', 'failed'];
@@ -24,16 +24,16 @@ function TextListPage() {
     limit: '100'
   });
 
-  const buildQuery = () => {
+  const buildQuery = useCallback(() => {
     const params = new URLSearchParams();
     if (filters.submissionId) params.append('submission_id', filters.submissionId.trim());
     if (filters.status) params.append('status', filters.status);
     const limit = Number.parseInt(filters.limit, 10);
     if (Number.isFinite(limit) && limit > 0) params.append('limit', String(limit));
     return params.toString();
-  };
+  }, [filters.submissionId, filters.status, filters.limit]);
 
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -49,11 +49,11 @@ function TextListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildQuery]);
 
   useEffect(() => {
     fetchSubmissions();
-  }, []);
+  }, [fetchSubmissions]);
 
   const handleFilterSubmit = (event) => {
     event.preventDefault();

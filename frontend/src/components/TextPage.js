@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import TopicsRiverChart from './TopicsRiverChart';
@@ -128,7 +128,7 @@ function TextPage() {
 
   const submissionId = window.location.pathname.split('/')[3];
 
-  const fetchSubmission = async () => {
+  const fetchSubmission = useCallback(async () => {
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/submission/${submissionId}`);
 
@@ -144,7 +144,7 @@ function TextPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [submissionId]);
 
   useEffect(() => {
     fetchSubmission();
@@ -173,7 +173,7 @@ function TextPage() {
     }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [submissionId]);
+  }, [fetchSubmission, submissionId]);
 
   const toggleTopic = (topic) => {
     setSelectedTopics(prev => {
