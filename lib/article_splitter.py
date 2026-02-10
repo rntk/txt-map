@@ -34,14 +34,46 @@ class _LLMCallableAdapter:
         return self._llm_client.call([prompt], temperature=temperature)
 
 
-def _groups_to_topics(groups) -> List[Dict]:
+def _groups_to_topics(groups, sentence_objects) -> List[Dict]:
     topics: List[Dict] = []
+    sentence_by_index = {s.index: s for s in sentence_objects}
 
     for group in groups:
         indices: List[int] = []
+        sentence_spans: List[Dict] = []
+        topic_ranges: List[Dict] = []
+        seen_sentence_indices = set()
         for sentence_range in group.ranges:
+            sentence_start = sentence_range.start + 1
+            sentence_end = sentence_range.end + 1
             # Convert to 1-based sentence indices for existing storage/UI format.
             indices.extend(range(sentence_range.start + 1, sentence_range.end + 2))
+
+            start_sentence_obj = sentence_by_index.get(sentence_range.start)
+            end_sentence_obj = sentence_by_index.get(sentence_range.end)
+            start_offset = getattr(start_sentence_obj, "start", None)
+            end_offset = getattr(end_sentence_obj, "end", None)
+            topic_ranges.append(
+                {
+                    "sentence_start": sentence_start,
+                    "sentence_end": sentence_end,
+                    "start": start_offset,
+                    "end": end_offset,
+                }
+            )
+
+            for idx in range(sentence_range.start, sentence_range.end + 1):
+                if idx in seen_sentence_indices:
+                    continue
+                seen_sentence_indices.add(idx)
+                sentence_obj = sentence_by_index.get(idx)
+                sentence_spans.append(
+                    {
+                        "sentence": idx + 1,
+                        "start": getattr(sentence_obj, "start", None),
+                        "end": getattr(sentence_obj, "end", None),
+                    }
+                )
 
         if not indices:
             continue
@@ -50,6 +82,8 @@ def _groups_to_topics(groups) -> List[Dict]:
             {
                 "name": ">".join(group.label),
                 "sentences": sorted(set(indices)),
+                "sentence_spans": sentence_spans,
+                "ranges": topic_ranges,
             }
         )
 
@@ -120,7 +154,7 @@ def split_article(
 
     split_result = pipeline.run(article)
     sentences = [s.text for s in split_result.sentences]
-    topics = _groups_to_topics(split_result.groups)
+    topics = _groups_to_topics(split_result.groups, split_result.sentences)
 
     return ArticleSplitResult(sentences=sentences, topics=topics)
 

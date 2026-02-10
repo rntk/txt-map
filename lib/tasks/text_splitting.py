@@ -33,6 +33,7 @@ def process_text_splitting(submission: dict, db, llm):
 
     # sentences are already list of strings
     sentences = result.sentences
+    topics = result.topics
 
     # Update submission with results
     submissions_storage = SubmissionsStorage(db)
@@ -40,7 +41,11 @@ def process_text_splitting(submission: dict, db, llm):
         submission_id,
         {
             "sentences": sentences,
+            "topics": topics,
         }
     )
 
-    print(f"Text splitting completed for submission {submission_id}: {len(sentences)} sentences")
+    print(
+        f"Text splitting completed for submission {submission_id}: "
+        f"{len(sentences)} sentences, {len(topics)} topics"
+    )
