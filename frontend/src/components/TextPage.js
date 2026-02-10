@@ -120,7 +120,7 @@ function TextPage() {
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'body' | 'raw_text' | 'topics_river' | 'mindmap' | 'insides'
+  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap' | 'insides'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
   const [showPanel, setShowPanel] = useState(false);
@@ -403,7 +403,6 @@ function TextPage() {
   }));
 
   const rawText = submission.text_content || '';
-  const bodyText = (results && typeof results.body === 'string' && results.body) || rawText;
 
   return (
     <div className="app">
@@ -574,12 +573,6 @@ function TextPage() {
                         Summary
                       </button>
                       <button
-                        className={activeTab === 'body' ? 'active' : ''}
-                        onClick={() => setActiveTab('body')}
-                      >
-                        Body
-                      </button>
-                      <button
                         className={activeTab === 'raw_text' ? 'active' : ''}
                         onClick={() => setActiveTab('raw_text')}
                       >
@@ -669,11 +662,6 @@ function TextPage() {
                         </div>
                       </div>
                     )}
-                  </div>
-                ) : activeTab === 'body' ? (
-                  <div className="summary-content">
-                    <h2>Body</h2>
-                    <pre className="raw-text-content raw-text-content-page">{bodyText || 'No body available.'}</pre>
                   </div>
                 ) : activeTab === 'raw_text' ? (
                   <div className="summary-content">

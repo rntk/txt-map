@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import TopicList from './components/TopicList';
-import TextDisplay from './components/TextDisplay';
 import TextPage from './components/TextPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
 import MainPage from './components/MainPage';
-import { sanitizeHTML } from './utils/sanitize';
+import TopicsCloud from './components/TopicsCloud';
+import ArticlesView from './components/ArticlesView';
 import './styles/App.css';
 
 function App() {
@@ -19,7 +18,6 @@ function App() {
   const [panelTopic, setPanelTopic] = useState(null);
   const [pageType, setPageType] = useState(null); // 'themed-post' | 'clustered-post' | 'topics'
   const [topics, setTopics] = useState([]);
-  const [articleTabs, setArticleTabs] = useState({});
 
   useEffect(() => {
     const pathname = window.location.pathname;
@@ -254,29 +252,6 @@ function App() {
     }
   };
 
-  const getArticleTab = (index) => articleTabs[index] || 'article';
-
-  const setArticleTab = (index, tab) => {
-    setArticleTabs(prev => ({
-      ...prev,
-      [index]: tab
-    }));
-  };
-
-  const renderTabContent = (content, emptyMessage) => {
-    if (!content || (Array.isArray(content) && content.length === 0)) {
-      return <p>{emptyMessage}</p>;
-    }
-
-    if (Array.isArray(content)) {
-      return content.map((item, idx) => (
-        <p key={idx} dangerouslySetInnerHTML={{ __html: sanitizeHTML(String(item)) }} />
-      ));
-    }
-
-    return <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(String(content)) }} />;
-  };
-
   // Loading state handling
   if (!pageType || pageType === 'menu') {
     return <MainPage />;
@@ -292,47 +267,7 @@ function App() {
     if (!topics.length) {
       return <div>Loading...</div>;
     }
-    // Word cloud rendering
-    const totals = topics.map(t => t.totalPosts || 0);
-    const min = Math.min(...totals, 0);
-    const max = Math.max(...totals, 1);
-    const scale = (val) => {
-      // font size between 12 and 40 px
-      const minSize = 12;
-      const maxSize = 40;
-      const ratio = max === min ? 0.5 : (val - min) / (max - min);
-      return Math.round(minSize + ratio * (maxSize - minSize));
-    };
-    return (
-      <div className="app">
-        <div className="container">
-          <div className="right-column" style={{ width: '100%' }}>
-            <h1>Topics Cloud</h1>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              {topics.map((t) => {
-                const fontSize = scale(t.totalPosts || t.totalSentences || 0);
-                const href = `/page/themed-topic/${encodeURIComponent(t.name)}`;
-                return (
-                  <a
-                    key={t.name}
-                    href={href}
-                    title={`${t.name} • Posts: ${t.totalPosts ?? 0} • Sentences: ${t.totalSentences ?? 0}`}
-                    style={{
-                      fontSize: `${fontSize}px`,
-                      lineHeight: 1.1,
-                      textDecoration: 'none',
-                      color: '#3366cc',
-                    }}
-                  >
-                    {t.name}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <TopicsCloud topics={topics} />;
   }
 
   // Render TextPage for submission pages
@@ -345,209 +280,25 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <div className="container">
-        <div className="left-column">
-          <h1>Topics</h1>
-          <TopicList
-            topics={allTopics}
-            selectedTopics={selectedTopics}
-            onToggleTopic={toggleTopic}
-            onHoverTopic={handleHoverTopic}
-            readTopics={readTopics}
-            onToggleRead={toggleRead}
-            showPanel={showPanel}
-            panelTopic={panelTopic}
-            onToggleShowPanel={toggleShowPanel}
-            onNavigateTopic={navigateTopicSentence}
-          />
-        </div>
-        <div className="right-column">
-          {showPanel && panelTopic && (() => {
-            // Handle both single topic and array of topics
-            const topics = Array.isArray(panelTopic) ? panelTopic : [panelTopic];
-            const topicNames = topics.map(t => t.name);
-            const totalSentences = topics.reduce((sum, t) => sum + t.totalSentences, 0);
-            const displayName = Array.isArray(panelTopic)
-              ? `${topics[0].name.split(/[\s_]/)[0]} (${topics.length} topics)`
-              : panelTopic.name;
-
-            return (
-              <div className="overlay-panel">
-                <div className="overlay-header">
-                  <div className="overlay-title-section">
-                    <h2>Sentences for {displayName}: {totalSentences} sentences</h2>
-                    {!Array.isArray(panelTopic) && panelTopic.summary && (
-                      <div className="overlay-summary-note">
-                        <span className="summary-icon">📝</span> {panelTopic.summary}
-                      </div>
-                    )}
-                  </div>
-                  <button onClick={() => toggleShowPanel(panelTopic)} className="close-panel">×</button>
-                </div>
-                <div className="overlay-content">
-                  {articles.map((article, index) => {
-                    // Find all related topics in this article
-                    const relatedTopics = article.topics.filter(t => topicNames.includes(t.name));
-                    if (relatedTopics.length === 0) return null;
-
-                    // Collect all sentence indices from all related topics
-                    const allSentenceIndices = new Set();
-                    relatedTopics.forEach(topic => {
-                      topic.sentences.forEach(idx => allSentenceIndices.add(idx));
-                    });
-
-                    // Sort sentence indices to maintain original order
-                    const sortedIndices = Array.from(allSentenceIndices).sort((a, b) => a - b);
-
-                    return (
-                      <div key={index} className="article-section">
-                        <h3
-                          className="article-link"
-                          onClick={() => scrollToArticle(index)}
-                        >
-                          Article {index + 1} ({relatedTopics.map(t => t.name).join(', ')})
-                        </h3>
-                        <div className="article-text">
-                          {sortedIndices.map((sentenceIndex, idx) => {
-                            const sentence = article.sentences[sentenceIndex - 1];
-                            const isGap = idx > 0 && sortedIndices[idx] !== sortedIndices[idx - 1] + 1;
-
-                            return (
-                              <React.Fragment key={sentenceIndex}>
-                                {isGap && <div className="sentence-gap">...</div>}
-                                <span className="sentence-block">{sentence} </span>
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-          {articles.map((article, index) => (
-            <div key={index} id={`article-${index}`} className="article-section">
-              <div className="article-header">
-                <div className="article-title-section">
-                  <h1>Article {index + 1} ({article.topics.length} topics)</h1>
-                </div>
-                <div className="article-controls">
-                  <div className="tabs">
-                    <button
-                      className={getArticleTab(index) === 'article' ? 'active' : ''}
-                      onClick={() => setArticleTab(index, 'article')}
-                    >
-                      Article
-                    </button>
-                    <button
-                      className={getArticleTab(index) === 'summary' ? 'active' : ''}
-                      onClick={() => setArticleTab(index, 'summary')}
-                    >
-                      Summary
-                    </button>
-                    <button
-                      className={getArticleTab(index) === 'body' ? 'active' : ''}
-                      onClick={() => setArticleTab(index, 'body')}
-                    >
-                      Body
-                    </button>
-                    <button
-                      className={getArticleTab(index) === 'raw_text' ? 'active' : ''}
-                      onClick={() => setArticleTab(index, 'raw_text')}
-                    >
-                      Raw Text
-                    </button>
-                  </div>
-                  <label className="article-read-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={readArticles.has(index)}
-                      onChange={() => toggleArticleRead(index)}
-                    />
-                    Mark as read
-                  </label>
-                  <label className="highlight-topics-checkbox">
-                    <input
-                      type="checkbox"
-                      onChange={() => {
-                        // Toggle all topics associated with this article
-                        const articleTopics = article.topics;
-                        const isAnySelected = articleTopics.some(topic => selectedTopics.some(t => t.name === topic.name));
-                        if (isAnySelected) {
-                          // Deselect all related to this article (by name) and clear hover
-                          setHoveredTopic(null);
-                          setSelectedTopics(prev => prev.filter(topic => !articleTopics.some(t => t.name === topic.name)));
-                        } else {
-                          // Select all topics for this article using canonical topic objects from allTopics
-                          setSelectedTopics(prev => {
-                            const newTopics = [...prev];
-                            articleTopics.forEach(topic => {
-                              const canonical = allTopics.find(t => t.name === topic.name) || topic;
-                              if (!newTopics.some(t => t.name === canonical.name)) {
-                                newTopics.push(canonical);
-                              }
-                            });
-                            return newTopics;
-                          });
-                        }
-                      }}
-                      checked={article.topics.some(topic => selectedTopics.some(t => t.name === topic.name))}
-                    />
-                    Highlight topics
-                  </label>
-                </div>
-              </div>
-              {getArticleTab(index) === 'summary' ? (
-                <div className="summary-content">
-                  <h2>Summary</h2>
-                  <div className="summary-text">
-                    {renderTabContent(article.summary, 'No summary available.')}
-                  </div>
-                </div>
-              ) : getArticleTab(index) === 'body' ? (
-                <div className="summary-content">
-                  <h2>Body</h2>
-                  <div className="summary-text">
-                    {renderTabContent(article.body, 'No body available.')}
-                  </div>
-                </div>
-              ) : getArticleTab(index) === 'raw_text' ? (
-                <div className="summary-content">
-                  <h2>Raw Text</h2>
-                  {(article.raw_html || article.raw_text) ? (
-                    <TextDisplay
-                      sentences={article.sentences}
-                      selectedTopics={selectedTopics}
-                      hoveredTopic={hoveredTopic}
-                      readTopics={readTopics}
-                      articleTopics={article.topics}
-                      articleIndex={index}
-                      rawHtml={article.raw_html || article.raw_text}
-                    />
-                  ) : (
-                    <div className="summary-text">
-                      <p>No raw text available.</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <TextDisplay
-                  sentences={article.sentences}
-                  selectedTopics={selectedTopics}
-                  hoveredTopic={hoveredTopic}
-                  readTopics={readTopics}
-                  articleTopics={article.topics}
-                  articleIndex={index}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <ArticlesView
+      articles={articles}
+      allTopics={allTopics}
+      selectedTopics={selectedTopics}
+      hoveredTopic={hoveredTopic}
+      readTopics={readTopics}
+      readArticles={readArticles}
+      showPanel={showPanel}
+      panelTopic={panelTopic}
+      toggleTopic={toggleTopic}
+      handleHoverTopic={handleHoverTopic}
+      toggleRead={toggleRead}
+      toggleShowPanel={toggleShowPanel}
+      toggleArticleRead={toggleArticleRead}
+      setSelectedTopics={setSelectedTopics}
+      setHoveredTopic={setHoveredTopic}
+      scrollToArticle={scrollToArticle}
+      navigateTopicSentence={navigateTopicSentence}
+    />
   );
 }
 
