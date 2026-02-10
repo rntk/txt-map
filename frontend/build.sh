@@ -1,5 +1,5 @@
 #!/bin/sh
 
-cd /app
+cd /app/frontend
 npm install
 npm run build

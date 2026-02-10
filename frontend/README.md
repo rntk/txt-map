@@ -4,7 +4,7 @@ This frontend renders analysis pages and task/submission management views. It is
 
 ## Paths and Views
 
-Main entry: `frontend/src/App.js`
+Main entry: `frontend/src/App.jsx`
 
 Key pages:
 
@@ -21,7 +21,7 @@ From `/app/frontend`:
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
 Build production assets:
@@ -42,7 +42,6 @@ npm run test:coverage
 Current tests include:
 
 - safe HTML sanitization (`src/utils/sanitize.test.js`)
-- topic/read-unread highlighting behavior (`src/components/TextDisplay.test.js`)
 
 ## Dockerized Frontend Tests
 
@@ -59,5 +58,5 @@ To run non-coverage test mode in the same image:
 
 ```bash
 docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests \
-  sh -lc "npm ci && npm test -- --watchAll=false"
+  sh -lc "npm install && npm test -- --watchAll=false"
 ```

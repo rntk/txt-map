@@ -11,4 +11,4 @@ ENV CI=true
 #   docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests
 
 # Default command installs deps from mounted source and runs coverage.
-CMD ["sh", "-lc", "npm ci && npm run test:coverage"]
+CMD ["sh", "-lc", "npm install && npm run test:coverage"]

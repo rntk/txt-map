@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pathlib import Path
 from handlers import submission_handler, task_queue_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
@@ -18,7 +19,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+frontend_build_dir = Path("frontend/build")
+legacy_static_dir = frontend_build_dir / "static"
+vite_assets_dir = frontend_build_dir / "assets"
+
+# Support both legacy CRA output (`build/static`) and Vite output (`build/assets`).
+if legacy_static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(legacy_static_dir)), name="static")
+if vite_assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(vite_assets_dir)), name="assets")
 
 app.include_router(submission_handler.router, prefix="/api")
 app.include_router(task_queue_handler.router, prefix="/api")
