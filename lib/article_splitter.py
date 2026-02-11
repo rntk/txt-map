@@ -3,13 +3,13 @@ from typing import Dict, List, Optional
 
 from txt_splitt import (
     BracketMarker,
-    DenseRegexSentenceSplitter,
+    SparseRegexSentenceSplitter,
     HTMLParserTagStripCleaner,
     LLMRepairingGapHandler,
     MappingOffsetRestorer,
     NormalizingSplitter,
     Pipeline,
-    SizeBasedChunker,
+    OverlapChunker,
     TopicRangeLLM,
     TopicRangeParser,
     AdjacentSameTopicJoiner,
@@ -113,12 +113,8 @@ def split_article(
     if not article:
         return ArticleSplitResult(sentences=[], topics=[])
 
-    splitter = NormalizingSplitter(
-        DenseRegexSentenceSplitter(
-            anchor_every_words=anchor_every_words, html_aware=True
-        ),
-        min_length=20,
-        max_length=260,
+    splitter = SparseRegexSentenceSplitter(
+        anchor_every_words=anchor_every_words, html_aware=True
     )
     html_cleaner = HTMLParserTagStripCleaner()
     offset_restorer = MappingOffsetRestorer()
@@ -140,7 +136,7 @@ def split_article(
         llm=TopicRangeLLM(
             client=llm_callable,
             temperature=0.0,
-            chunker=SizeBasedChunker(max_chars=max_chunk_chars),
+            chunker=OverlapChunker(max_chars=max_chunk_chars),
         ),
         parser=TopicRangeParser(),
         gap_handler=LLMRepairingGapHandler(
