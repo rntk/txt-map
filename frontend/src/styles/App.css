@@ -75,6 +75,7 @@
 .article-section h1 {
   color: #333;
   margin-bottom: 0;
+  font-size: 1.4em;
 }
 
 .highlight-topics-checkbox {
@@ -91,22 +92,22 @@
 
 .container {
   display: flex;
-  gap: 20px;
+  gap: 15px;
 }
 
 .left-column {
-  flex: 0 0 300px;
-  /* Fixed width of 300px, won't grow or shrink */
-  min-width: 250px;
+  flex: 0 0 280px;
+  /* Fixed width of 280px, won't grow or shrink */
+  min-width: 240px;
   /* Minimum width to ensure readability */
-  max-width: 400px;
+  max-width: 350px;
   /* Maximum width to prevent it from being too wide */
   border-right: 1px solid #ccc;
-  padding-right: 20px;
+  padding-right: 15px;
   position: sticky;
-  top: 20px;
+  top: 10px;
   align-self: flex-start;
-  height: calc(100vh - 40px);
+  height: calc(100vh - 20px);
   overflow: hidden;
   background-color: #fff;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
@@ -115,6 +116,7 @@
 
 .left-column h1 {
   margin-top: 0;
+  font-size: 1.4em;
 }
 
 .right-column {
@@ -248,14 +250,14 @@
 }
 
 .root-item {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .root-header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 4px 6px;
   background-color: #e8f4f8;
   border-radius: 4px;
   font-weight: bold;
@@ -278,14 +280,14 @@
 .root-header-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .expand-icon {
   margin-right: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
-  width: 16px;
+  width: 14px;
   display: inline-block;
   cursor: pointer;
   flex-shrink: 0;
@@ -298,10 +300,11 @@
   min-width: 0;
   cursor: pointer;
   margin: 0;
+  font-size: 13px;
 }
 
 .root-label input[type="checkbox"] {
-  margin-right: 8px;
+  margin-right: 6px;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -314,20 +317,20 @@
 }
 
 .root-metadata {
-  padding-left: 24px;
+  padding-left: 20px;
   /* Align with the text after expand icon and checkbox */
 }
 
 .root-stats {
   color: #555;
-  font-size: 0.9em;
+  font-size: 11px;
   font-weight: normal;
 }
 
 .root-buttons {
   display: flex;
-  gap: 5px;
-  padding-left: 24px;
+  gap: 4px;
+  padding-left: 20px;
   /* Align with the text after expand icon and checkbox */
 }
 
@@ -337,18 +340,19 @@
 
 .subtopic-list {
   list-style: none;
-  padding-left: 24px;
-  margin-top: 4px;
+  padding-left: 18px;
+  margin-top: 2px;
   margin-bottom: 0;
 }
 
 .topic-list h2 {
   margin-top: 0;
+  font-size: 1.2em;
 }
 
 .topic-item {
   cursor: pointer;
-  padding: 5px;
+  padding: 3px;
   border-radius: 4px;
   min-width: 0;
   /* Allow flex item to shrink */
@@ -357,7 +361,7 @@
 .topic-item-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
 }
 
@@ -366,34 +370,35 @@
   align-items: flex-start;
   word-wrap: break-word;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: 1.3;
   cursor: pointer;
+  font-size: 12px;
 }
 
 .topic-name-label input[type="checkbox"] {
-  margin-right: 8px;
+  margin-right: 6px;
   margin-top: 2px;
   flex-shrink: 0;
   cursor: pointer;
 }
 
 .topic-metadata {
-  padding-left: 24px;
+  padding-left: 20px;
   /* Align with the text after checkbox */
 }
 
 .topic-sentence-count {
   color: #666;
-  font-size: 0.9em;
+  font-size: 11px;
 }
 
 .topic-summary-note {
-  font-size: 0.8em;
+  font-size: 11px;
   color: #777;
-  margin-top: 3px;
-  padding-left: 26px;
+  margin-top: 2px;
+  padding-left: 20px;
   /* Align with text */
-  line-height: 1.3;
+  line-height: 1.2;
   word-wrap: break-word;
   font-weight: 400;
 }
@@ -408,18 +413,19 @@
 
 .topic-buttons {
   display: flex;
-  gap: 5px;
-  padding-left: 24px;
+  gap: 4px;
+  padding-left: 20px;
   /* Align with the text after checkbox */
 }
 
 .read-toggle {
-  padding: 2px 8px;
+  padding: 1px 6px;
   background-color: #007bff;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 10px;
 }
 
 .read-toggle:hover {
@@ -436,12 +442,13 @@
 }
 
 .show-toggle {
-  padding: 2px 8px;
+  padding: 1px 6px;
   background-color: #28a745;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 10px;
 }
 
 .show-toggle:hover {

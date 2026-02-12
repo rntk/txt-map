@@ -28,44 +28,39 @@ function StatusIndicator({ tasks }) {
 
   return (
     <div style={{
-      padding: '15px',
-      background: '#f5f5f5',
-      borderRadius: '5px',
-      marginBottom: '20px'
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '4px',
+      alignItems: 'center'
     }}>
-      <h3 style={{ margin: '0 0 10px 0' }}>Processing Status</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-        {Object.entries(tasks).map(([taskName, taskInfo]) => (
-          <div key={taskName} style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '8px',
-            background: 'white',
-            borderRadius: '4px'
+      {Object.entries(tasks).map(([taskName, taskInfo]) => (
+        <div key={taskName} style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '1px 6px',
+          background: 'white',
+          borderRadius: '4px',
+          border: '1px solid #eee',
+          fontSize: '11px',
+          whiteSpace: 'nowrap'
+        }} title={`${taskName.replace(/_/g, ' ')}: ${taskInfo.status}`}>
+          <span style={{
+            marginRight: '4px',
+            fontWeight: 'bold',
+            color: getStatusColor(taskInfo.status)
           }}>
-            <span style={{
-              marginRight: '8px',
-              fontSize: '18px',
-              color: getStatusColor(taskInfo.status)
-            }}>
-              {getStatusIcon(taskInfo.status)}
-            </span>
-            <div>
-              <div style={{ fontWeight: 'bold', fontSize: '12px', textTransform: 'capitalize' }}>
-                {taskName.replace(/_/g, ' ')}
-              </div>
-              <div style={{ fontSize: '11px', color: '#666' }}>
-                {taskInfo.status}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            {getStatusIcon(taskInfo.status)}
+          </span>
+          <span style={{ color: '#444', textTransform: 'capitalize' }}>
+            {taskName.replace(/_/g, ' ')}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function RefreshButton({ submissionId, onRefresh }) {
+function RefreshButton({ submissionId, onRefresh, compact = false }) {
   const [loading, setLoading] = useState(false);
 
   const handleRefresh = async () => {
@@ -96,18 +91,16 @@ function RefreshButton({ submissionId, onRefresh }) {
     <button
       onClick={handleRefresh}
       disabled={loading}
+      className="action-btn"
       style={{
-        padding: '10px 20px',
         background: loading ? '#ccc' : '#2196f3',
         color: 'white',
         border: 'none',
-        borderRadius: '4px',
-        cursor: loading ? 'not-allowed' : 'pointer',
-        fontSize: '14px',
-        fontWeight: 'bold'
+        padding: compact ? '4px 8px' : '8px 16px',
+        fontSize: compact ? '12px' : '13px'
       }}
     >
-      {loading ? 'Refreshing...' : '🔄 Refresh Results'}
+      {loading ? '...' : '🔄 Refresh'}
     </button>
   );
 }
@@ -477,70 +470,45 @@ function TextPage() {
 
   return (
     <div className="app">
-      <div style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ padding: '10px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
           <div>
-            <h1>Text Analysis Results</h1>
+            <h1 style={{ margin: '0 0 2px 0', fontSize: '22px' }}>Text Analysis Results</h1>
             {submission.source_url && (
-              <div style={{ fontSize: '12px', color: '#666' }}>
+              <div style={{ fontSize: '11px', color: '#666' }}>
                 Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
               </div>
             )}
           </div>
-          <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={true} />
+            <button
+              className="action-btn danger"
+              onClick={handleDelete}
+              disabled={actionLoading}
+              style={{ padding: '3px 10px', fontSize: '12px' }}
+            >
+              Delete
+            </button>
+          </div>
         </div>
 
-        <StatusIndicator tasks={status.tasks} />
-
-        <div className="text-management">
-          <div className="text-management-header">
-            <h2>Manage Submission</h2>
-            <div className="text-management-actions">
-              <button
-                className="action-btn"
-                onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')}
-                disabled={actionLoading}
-              >
-                Recalculate All
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')}
-                disabled={actionLoading}
-              >
-                Recalculate Topics
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => runRefresh(['summarization'], 'Summarization queued.')}
-                disabled={actionLoading}
-              >
-                Recalculate Summary
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')}
-                disabled={actionLoading}
-              >
-                Recalculate Mindmap
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => runRefresh(['insides'], 'Insides queued.')}
-                disabled={actionLoading}
-              >
-                Recalculate Insides
-              </button>
-              <button
-                className="action-btn danger"
-                onClick={handleDelete}
-                disabled={actionLoading}
-              >
-                Delete Submission
-              </button>
+        <div className="text-management" style={{ padding: '6px 12px', margin: '0 0 12px 0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>Status:</span>
+              <StatusIndicator tasks={status.tasks} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>Recalculate:</span>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['insides'], 'Insides queued.')} disabled={actionLoading}>Insides</button>
             </div>
           </div>
-          {actionMessage && <div className="text-management-message">{actionMessage}</div>}
+          {actionMessage && <div className="text-management-message" style={{ marginTop: '4px', fontSize: '11px' }}>{actionMessage}</div>}
         </div>
 
         {isProcessing && (
