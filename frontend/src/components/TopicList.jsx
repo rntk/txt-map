@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 
 function TopicList({
   topics = [],
@@ -12,103 +12,180 @@ function TopicList({
   onToggleShowPanel = () => { },
   onNavigateTopic
 }) {
-  const [expandedRoots, setExpandedRoots] = useState(new Set());
+  const [expandedNodes, setExpandedNodes] = useState(new Set());
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
-  // Group topics by their root (first part before '>')
-  const hierarchicalTopics = useMemo(() => {
+  // Build a tree structure from topic paths (split by '>')
+  const topicTree = useMemo(() => {
     const safe = Array.isArray(topics) ? topics : [];
-    const grouped = new Map();
+    const tree = new Map();
 
     safe.forEach(topic => {
-      // Group topics by their root (first part before '>')
-      const root = topic.name.split('>')[0].trim();
+      const parts = topic.name.split('>').map(p => p.trim());
+      let path = '';
 
-      if (!grouped.has(root)) {
-        grouped.set(root, []);
+      for (let i = 0; i < parts.length; i++) {
+        const prevPath = path;
+        path = path ? `${path}>${parts[i]}` : parts[i];
+
+        if (!tree.has(path)) {
+          const isLeaf = i === parts.length - 1;
+          tree.set(path, {
+            node: {
+              name: parts[i],
+              fullPath: path,
+              isLeaf,
+              topic: isLeaf ? topic : null,
+              depth: i
+            },
+            children: new Map(),
+            parent: prevPath || null
+          });
+        }
+
+        if (prevPath) {
+          const parentEntry = tree.get(prevPath);
+          parentEntry.children.set(parts[i], tree.get(path));
+        }
       }
-      grouped.get(root).push(topic);
     });
 
-    // Convert to array and sort by root name
-    return Array.from(grouped.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([root, subTopics]) => ({
-        root,
-        subTopics: subTopics.sort((a, b) => a.name.localeCompare(b.name)),
-        totalSentences: subTopics.reduce((sum, topic) => sum + topic.totalSentences, 0)
-      }));
+    const roots = [];
+    tree.forEach((value, key) => {
+      if (value.node.depth === 0) {
+        roots.push(value);
+      }
+    });
+
+    roots.sort((a, b) => a.node.name.localeCompare(b.node.name));
+    return roots;
   }, [topics]);
 
-  const toggleRoot = (root) => {
-    setExpandedRoots(prev => {
+  const getSubtreeStats = useCallback((treeNode) => {
+    let totalTopics = 0;
+    let totalSentences = 0;
+
+    const traverse = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        totalTopics++;
+        totalSentences += node.node.topic.totalSentences || 0;
+      }
+      node.children.forEach(child => traverse(child));
+    };
+
+    traverse(treeNode);
+    return { totalTopics, totalSentences };
+  }, []);
+
+  const isSubtreeSelected = useCallback((treeNode) => {
+    let hasSelected = false;
+    const traverse = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        if (safeSelectedTopics.some(t => t.name === node.node.topic.name)) {
+          hasSelected = true;
+        }
+      }
+      node.children.forEach(child => traverse(child));
+    };
+    traverse(treeNode);
+    return hasSelected;
+  }, [safeSelectedTopics]);
+
+  const isSubtreeRead = useCallback((treeNode) => {
+    let allRead = true;
+    let hasLeaves = false;
+    const traverse = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        hasLeaves = true;
+        if (!safeReadTopics.has(node.node.topic.name)) {
+          allRead = false;
+        }
+      }
+      node.children.forEach(child => traverse(child));
+    };
+    traverse(treeNode);
+    return hasLeaves && allRead;
+  }, [safeReadTopics]);
+
+  const toggleAllInSubtree = useCallback((treeNode) => {
+    const allSelected = isSubtreeSelected(treeNode);
+
+    const traverse = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        const isSelected = safeSelectedTopics.some(t => t.name === node.node.topic.name);
+        if (allSelected && isSelected) {
+          onToggleTopic(node.node.topic);
+        } else if (!allSelected && !isSelected) {
+          onToggleTopic(node.node.topic);
+        }
+      }
+      node.children.forEach(child => traverse(child));
+    };
+
+    traverse(treeNode);
+
+    const findFirstLeaf = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        return node.node.topic;
+      }
+      for (const child of node.children.values()) {
+        const found = findFirstLeaf(child);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const firstLeaf = findFirstLeaf(treeNode);
+    if (onNavigateTopic && firstLeaf) {
+      onNavigateTopic(firstLeaf, 'focus');
+    }
+  }, [safeSelectedTopics, onToggleTopic, onNavigateTopic, isSubtreeSelected]);
+
+  const toggleReadInSubtree = useCallback((treeNode) => {
+    const allRead = isSubtreeRead(treeNode);
+
+    const traverse = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        const isRead = safeReadTopics.has(node.node.topic.name);
+        if (allRead && isRead) {
+          onToggleRead(node.node.topic);
+        } else if (!allRead && !isRead) {
+          onToggleRead(node.node.topic);
+        }
+      }
+      node.children.forEach(child => traverse(child));
+    };
+
+    traverse(treeNode);
+
+    const findFirstLeaf = (node) => {
+      if (node.node.isLeaf && node.node.topic) {
+        return node.node.topic;
+      }
+      for (const child of node.children.values()) {
+        const found = findFirstLeaf(child);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const firstLeaf = findFirstLeaf(treeNode);
+    if (onNavigateTopic && firstLeaf) {
+      onNavigateTopic(firstLeaf, 'focus');
+    }
+  }, [safeReadTopics, onToggleRead, onNavigateTopic, isSubtreeRead]);
+
+  const toggleNode = (path) => {
+    setExpandedNodes(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(root)) {
-        newSet.delete(root);
+      if (newSet.has(path)) {
+        newSet.delete(path);
       } else {
-        newSet.add(root);
+        newSet.add(path);
       }
       return newSet;
     });
-  };
-
-  const toggleAllTopicsInRoot = (subTopics) => {
-    const allSelected = subTopics.every(topic => safeSelectedTopics.some(t => t.name === topic.name));
-
-    if (allSelected) {
-      // Deselect all
-      subTopics.forEach(topic => {
-        if (safeSelectedTopics.some(t => t.name === topic.name)) {
-          onToggleTopic(topic);
-        }
-      });
-    } else {
-      // Select all
-      subTopics.forEach(topic => {
-        if (!safeSelectedTopics.some(t => t.name === topic.name)) {
-          onToggleTopic(topic);
-        }
-      });
-    }
-
-    if (onNavigateTopic && subTopics.length > 0) {
-      onNavigateTopic(subTopics[0], 'focus');
-    }
-  };
-
-  const toggleReadForRoot = (subTopics) => {
-    const allRead = subTopics.every(topic => safeReadTopics.has(topic.name));
-
-    subTopics.forEach(topic => {
-      const isRead = safeReadTopics.has(topic.name);
-      if (allRead && isRead) {
-        // Mark all as unread
-        onToggleRead(topic);
-      } else if (!allRead && !isRead) {
-        // Mark all as read
-        onToggleRead(topic);
-      }
-    });
-
-    if (onNavigateTopic && subTopics.length > 0) {
-      onNavigateTopic(subTopics[0], 'focus');
-    }
-  };
-
-  const toggleShowPanelForRoot = (subTopics) => {
-    // Show panel for all topics in the root
-    if (subTopics.length > 0) {
-      onToggleShowPanel(subTopics);
-    }
-  };
-
-  const isRootSelected = (subTopics) => {
-    return subTopics.some(topic => safeSelectedTopics.some(t => t.name === topic.name));
-  };
-
-  const isRootRead = (subTopics) => {
-    return subTopics.every(topic => safeReadTopics.has(topic.name));
   };
 
   const getTopicSelectionKey = (topicOrTopics) => {
@@ -123,130 +200,300 @@ function TopicList({
     return topicOrTopics.name || '';
   };
 
-  const isPanelSelection = (topicOrTopics) => {
-    return showPanel && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topicOrTopics);
+  const isPanelSelection = (topic) => {
+    return showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic);
   };
 
-  const handleTopicToggle = (topic) => {
-    onToggleTopic(topic);
-    if (onNavigateTopic) {
-      onNavigateTopic(topic, 'focus');
-    }
+  // Minimalistic styles
+  const styles = {
+    topicList: {
+      fontSize: '13px',
+      lineHeight: '1.4',
+      paddingBottom: '6px',
+      height: 'calc(100vh - 100px)',
+      overflowY: 'auto',
+      paddingRight: '5px',
+      marginRight: '-5px',
+    },
+    treeNode: {
+      listStyle: 'none',
+      margin: 0,
+      padding: 0,
+    },
+    nodeContent: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '6px',
+      padding: '6px 0',
+      borderBottom: '1px solid #eee',
+    },
+    guideLine: {
+      width: '10px',
+      borderLeft: '1px dotted #ccc',
+      marginLeft: '2px',
+      flexShrink: 0,
+    },
+    expandIcon: {
+      cursor: 'pointer',
+      width: '12px',
+      textAlign: 'center',
+      fontSize: '10px',
+      color: '#666',
+      flexShrink: 0,
+      paddingTop: '2px',
+    },
+    titleRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexWrap: 'wrap',
+      marginBottom: '3px',
+    },
+    topicTitle: {
+      fontWeight: '500',
+      cursor: 'pointer',
+    },
+    topicTitleHover: {
+      textDecoration: 'underline',
+    },
+    stats: {
+      fontSize: '11px',
+      color: '#888',
+    },
+    buttonsRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      flexWrap: 'wrap',
+      marginTop: '1px',
+      marginBottom: '3px',
+    },
+    button: {
+      fontSize: '11px',
+      padding: '1px 6px',
+      border: '1px solid #ddd',
+      borderRadius: '3px',
+      background: '#f9f9f9',
+      cursor: 'pointer',
+      color: '#555',
+    },
+    buttonActive: {
+      background: '#e8f4e8',
+      borderColor: '#a8d8a8',
+      color: '#2d6a2d',
+    },
+    summaryRow: {
+      fontSize: '11px',
+      color: '#666',
+      marginTop: '1px',
+      fontStyle: 'italic',
+    },
+    checkbox: {
+      margin: 0,
+      cursor: 'pointer',
+    },
+    childrenList: {
+      listStyle: 'none',
+      margin: 0,
+      padding: 0,
+      paddingLeft: '8px',
+    },
   };
 
-  const handleTopicReadToggle = (topic) => {
-    onToggleRead(topic);
-    if (onNavigateTopic) {
-      onNavigateTopic(topic, 'focus');
-    }
-  };
+  // Recursive TreeNode component
+  const TreeNode = ({ treeNode, depth = 0 }) => {
+    const { node, children } = treeNode;
+    const hasChildren = children.size > 0;
+    const isExpanded = expandedNodes.has(node.fullPath);
+    const { totalTopics, totalSentences } = getSubtreeStats(treeNode);
+    const isNodeSelected = isSubtreeSelected(treeNode);
+    const isNodeRead = isSubtreeRead(treeNode);
 
-  return (
-    <div className="topic-list">
-      {hierarchicalTopics.length === 0 ? (
-        <div className="topic-list-empty">No topics yet.</div>
-      ) : (
-        <ul className="root-list">
-          {hierarchicalTopics.map(({ root, subTopics, totalSentences }, index) => (
-            <li key={index} className="root-item">
-              <div className={`root-header ${isRootRead(subTopics) ? 'root-header-read' : ''}`}>
-                <div className="root-header-top">
-                  <span className="expand-icon" onClick={() => toggleRoot(root)}>
-                    {expandedRoots.has(root) ? '▼' : '▶'}
-                  </span>
-                  <label className="root-label" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={isRootSelected(subTopics)}
-                      onChange={() => toggleAllTopicsInRoot(subTopics)}
-                    />
-                    <span onClick={() => toggleRoot(root)}>
-                      {root}
-                    </span>
-                  </label>
-                </div>
-                <div className="root-metadata">
-                  <span className="root-stats">({subTopics.length} topics, {totalSentences} sentences)</span>
-                </div>
-                <div className="root-buttons" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => toggleReadForRoot(subTopics)}
-                    className={`read-toggle ${isRootRead(subTopics) ? 'readed' : ''}`}
+    const topic = node.topic;
+    const isLeafSelected = topic && safeSelectedTopics.some(t => t.name === topic.name);
+    const isLeafRead = topic && safeReadTopics.has(topic.name);
+
+    const [isTitleHovered, setIsTitleHovered] = useState(false);
+
+    return (
+      <li style={styles.treeNode}>
+        <div style={styles.nodeContent}>
+          {/* Guide line for hierarchy */}
+          <div style={styles.guideLine} />
+          
+          {/* Expand icon */}
+          {hasChildren && (
+            <span 
+              style={styles.expandIcon} 
+              onClick={() => toggleNode(node.fullPath)}
+            >
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+          {!hasChildren && <span style={{ ...styles.expandIcon, visibility: 'hidden' }}>▶</span>}
+
+          {/* Main content area */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Row 1: Title + Stats */}
+            <div style={styles.titleRow}>
+              {!node.isLeaf && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={isNodeSelected}
+                    onChange={() => toggleAllInSubtree(treeNode)}
+                    style={styles.checkbox}
+                  />
+                  <span 
+                    style={{ ...styles.topicTitle, ...(isNodeRead ? { color: '#888' } : {}) }}
+                    onClick={() => toggleNode(node.fullPath)}
                   >
-                    {isRootRead(subTopics) ? 'Readed' : 'Unreaded'}
+                    {node.name}
+                  </span>
+                </label>
+              )}
+              
+              {node.isLeaf && topic && (
+                <>
+                  <input
+                    type="checkbox"
+                    checked={isLeafSelected}
+                    onChange={() => {
+                      onToggleTopic(topic);
+                      if (onNavigateTopic) {
+                        onNavigateTopic(topic, 'focus');
+                      }
+                    }}
+                    style={styles.checkbox}
+                  />
+                  <span
+                    style={{
+                      ...styles.topicTitle,
+                      ...(isTitleHovered ? styles.topicTitleHover : {}),
+                      ...(isLeafRead ? { color: '#888' } : {})
+                    }}
+                    onClick={() => {
+                      onNavigateTopic && onNavigateTopic(topic, 'focus');
+                    }}
+                    onMouseEnter={() => setIsTitleHovered(true)}
+                    onMouseLeave={() => setIsTitleHovered(false)}
+                  >
+                    {node.name}
+                  </span>
+                </>
+              )}
+              
+              <span style={styles.stats}>
+                {node.isLeaf && topic 
+                  ? `(${topic.totalSentences} sent.)`
+                  : `(${totalTopics} topics, ${totalSentences} sent.)`
+                }
+              </span>
+            </div>
+
+            {/* Row 2: Buttons */}
+            <div style={styles.buttonsRow}>
+              {node.isLeaf && topic ? (
+                <>
+                  <button
+                    onClick={() => {
+                      onToggleRead(topic);
+                      if (onNavigateTopic) {
+                        onNavigateTopic(topic, 'focus');
+                      }
+                    }}
+                    style={{
+                      ...styles.button,
+                      ...(isLeafRead ? styles.buttonActive : {})
+                    }}
+                  >
+                    {isLeafRead ? 'Readed' : 'Unreaded'}
                   </button>
                   <button
-                    onClick={() => toggleShowPanelForRoot(subTopics)}
-                    className="show-toggle"
+                    onClick={() => onToggleShowPanel(topic)}
+                    style={styles.button}
+                  >
+                    {isPanelSelection(topic) ? 'Hide' : 'Show'}
+                  </button>
+                  <button
+                    onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
+                    style={styles.button}
+                    title="Scroll to previous sentence for this topic"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
+                    style={styles.button}
+                    title="Scroll to next sentence for this topic"
+                  >
+                    Next
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => toggleReadInSubtree(treeNode)}
+                    style={{
+                      ...styles.button,
+                      ...(isNodeRead ? styles.buttonActive : {})
+                    }}
+                  >
+                    {isNodeRead ? 'Readed' : 'Unreaded'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const leaves = [];
+                      const collectLeaves = (n) => {
+                        if (n.node.isLeaf && n.node.topic) {
+                          leaves.push(n.node.topic);
+                        }
+                        n.children.forEach(c => collectLeaves(c));
+                      };
+                      collectLeaves(treeNode);
+                      if (leaves.length > 0) {
+                        onToggleShowPanel(leaves);
+                      }
+                    }}
+                    style={styles.button}
                   >
                     Show
                   </button>
-                </div>
-              </div>
-              {expandedRoots.has(root) && (
-                <ul className="subtopic-list">
-                  {subTopics.map((topic, subIndex) => (
-                    <li
-                      key={subIndex}
-                      className={`topic-item ${safeReadTopics.has(topic.name) ? 'topic-item-read' : ''}`}
-                      onMouseEnter={() => onHoverTopic(topic)}
-                      onMouseLeave={() => onHoverTopic(null)}
-                    >
-                      <div className="topic-item-content">
-                        <label className="topic-name-label">
-                          <input
-                            type="checkbox"
-                            checked={safeSelectedTopics.some(t => t.name === topic.name)}
-                            onChange={() => handleTopicToggle(topic)}
-                          />
-                          <span
-                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'focus')}
-                          >
-                            {topic.name}
-                          </span>
-                        </label>
-                        {topic.summary && (
-                          <div className="topic-summary-note" title={topic.summary}>
-                            {topic.summary}
-                          </div>
-                        )}
-                        <div className="topic-metadata">
-                          <span className="topic-sentence-count">({topic.totalSentences} sentences)</span>
-                        </div>
-                        <div className="topic-buttons">
-                          <button
-                            onClick={() => handleTopicReadToggle(topic)}
-                            className={`read-toggle ${safeReadTopics.has(topic.name) ? 'readed' : ''}`}
-                          >
-                            {safeReadTopics.has(topic.name) ? 'Readed' : 'Unreaded'}
-                          </button>
-                          <button
-                            onClick={() => onToggleShowPanel(topic)}
-                            className="show-toggle"
-                          >
-                            {isPanelSelection(topic) ? 'Hide' : 'Show'}
-                          </button>
-                          <button
-                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
-                            className="nav-toggle prev-toggle"
-                            title="Scroll to previous sentence for this topic"
-                          >
-                            Prev
-                          </button>
-                          <button
-                            onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
-                            className="nav-toggle next-toggle"
-                            title="Scroll to next sentence for this topic"
-                          >
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                </>
               )}
-            </li>
+            </div>
+
+            {/* Row 3: Summary (leaf nodes only) */}
+            {node.isLeaf && topic && topic.summary && (
+              <div style={styles.summaryRow}>
+                {topic.summary}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Children */}
+        {hasChildren && isExpanded && (
+          <ul style={styles.childrenList}>
+            {Array.from(children.values())
+              .sort((a, b) => a.node.name.localeCompare(b.node.name))
+              .map((childNode) => (
+                <TreeNode key={childNode.node.fullPath} treeNode={childNode} depth={depth + 1} />
+              ))}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
+  return (
+    <div style={styles.topicList}>
+      {topicTree.length === 0 ? (
+        <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {topicTree.map((treeNode) => (
+            <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
           ))}
         </ul>
       )}
