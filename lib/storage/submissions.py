@@ -8,13 +8,14 @@ from pymongo import MongoClient
 
 class SubmissionsStorage:
     indexes = ["submission_id", "created_at"]
-    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides"]
+    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides", "prefix_tree"]
     task_dependencies = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
         "mindmap": ["split_topic_generation"],
         "insides": ["split_topic_generation"],
+        "prefix_tree": ["split_topic_generation"],
     }
 
     def __init__(self, db: MongoClient) -> None:
@@ -77,6 +78,12 @@ class SubmissionsStorage:
                     "started_at": None,
                     "completed_at": None,
                     "error": None
+                },
+                "prefix_tree": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
                 }
             },
             "results": {
@@ -88,7 +95,8 @@ class SubmissionsStorage:
                 "subtopics": [],
                 "summary": [],
                 "summary_mappings": [],
-                "insides": []
+                "insides": [],
+                "prefix_tree": {}
             }
         }
 
@@ -182,6 +190,9 @@ class SubmissionsStorage:
 
         if "insides" in task_names:
             update_fields["results.insides"] = []
+
+        if "prefix_tree" in task_names:
+            update_fields["results.prefix_tree"] = {}
 
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},

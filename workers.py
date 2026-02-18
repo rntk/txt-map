@@ -17,6 +17,7 @@ from lib.tasks.subtopics_generation import process_subtopics_generation
 from lib.tasks.summarization import process_summarization
 from lib.tasks.mindmap import process_mindmap
 from lib.tasks.insides import process_insides
+from lib.tasks.prefix_tree import process_prefix_tree
 
 # Configure logging
 logging.basicConfig(
@@ -32,6 +33,7 @@ TASK_DEPENDENCIES = {
     "summarization": ["split_topic_generation"],
     "mindmap": ["subtopics_generation"],
     "insides": ["split_topic_generation"],
+    "prefix_tree": ["split_topic_generation"],
 }
 
 # Task priorities (lower = higher priority)
@@ -41,6 +43,7 @@ TASK_PRIORITIES = {
     "summarization": 3,
     "mindmap": 3,
     "insides": 3,
+    "prefix_tree": 3,
 }
 
 # Task handlers mapping
@@ -49,7 +52,8 @@ TASK_HANDLERS = {
     "subtopics_generation": process_subtopics_generation,
     "summarization": process_summarization,
     "mindmap": process_mindmap,
-    "insides": process_insides
+    "insides": process_insides,
+    "prefix_tree": process_prefix_tree
 }
 
 

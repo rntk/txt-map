@@ -5,6 +5,7 @@ import TopicsRiverChart from './TopicsRiverChart';
 import SubtopicsRiverChart from './SubtopicsRiverChart';
 import MindmapResults from './MindmapResults';
 import InsidesResults from './InsidesResults';
+import PrefixTreeResults from './PrefixTreeResults';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -506,6 +507,7 @@ function TextPage() {
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['insides'], 'Insides queued.')} disabled={actionLoading}>Insides</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
             </div>
           </div>
           {actionMessage && <div className="text-management-message" style={{ marginTop: '4px', fontSize: '11px' }}>{actionMessage}</div>}
@@ -635,6 +637,12 @@ function TextPage() {
                       >
                         Insides
                       </button>
+                      <button
+                        className={activeTab === 'prefix_tree' ? 'active' : ''}
+                        onClick={() => setActiveTab('prefix_tree')}
+                      >
+                        Prefix Tree
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -746,6 +754,13 @@ function TextPage() {
                       insidesData={{
                         insides: results.insides || []
                       }}
+                    />
+                  </div>
+                ) : activeTab === 'prefix_tree' ? (
+                  <div className="mindmap-tab-container" style={{ padding: '20px' }}>
+                    <PrefixTreeResults
+                      treeData={results.prefix_tree || {}}
+                      sentences={safeSentences}
                     />
                   </div>
                 ) : (

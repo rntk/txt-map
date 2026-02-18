@@ -14,7 +14,7 @@ def get_submissions_storage(request: Request) -> SubmissionsStorage:
     return request.app.state.submissions_storage
 
 
-ALLOWED_TASKS = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides"]
+ALLOWED_TASKS = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides", "prefix_tree"]
 
 TASK_PRIORITIES = {
     "split_topic_generation": 1,
@@ -22,6 +22,7 @@ TASK_PRIORITIES = {
     "summarization": 3,
     "mindmap": 3,
     "insides": 3,
+    "prefix_tree": 3,
 }
 
 

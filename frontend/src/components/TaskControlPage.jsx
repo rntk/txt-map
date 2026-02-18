@@ -6,7 +6,8 @@ const TASK_TYPES = [
   'subtopics_generation',
   'summarization',
   'mindmap',
-  'insides'
+  'insides',
+  'prefix_tree'
 ];
 
 function TaskControlPage() {

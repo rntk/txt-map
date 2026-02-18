@@ -57,7 +57,8 @@ def post_submit(
         ("subtopics_generation", 2),
         ("summarization", 3),
         ("mindmap", 3),
-        ("insides", 3)
+        ("insides", 3),
+        ("prefix_tree", 3)
     ]:
         db.task_queue.insert_one({
             "submission_id": submission["submission_id"],
@@ -194,7 +195,8 @@ def post_refresh(
         "subtopics_generation": 2,
         "summarization": 3,
         "mindmap": 3,
-        "insides": 3
+        "insides": 3,
+        "prefix_tree": 3
     }
 
     for task_name in task_names:
