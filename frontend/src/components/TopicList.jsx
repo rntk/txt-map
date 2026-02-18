@@ -223,8 +223,8 @@ function TopicList({
     nodeContent: {
       display: 'flex',
       alignItems: 'flex-start',
-      gap: '6px',
-      padding: '6px 0',
+      gap: '8px',
+      padding: '10px 8px',
       borderBottom: '1px solid #eee',
     },
     guideLine: {
@@ -358,12 +358,7 @@ function TopicList({
                   <input
                     type="checkbox"
                     checked={isLeafSelected}
-                    onChange={() => {
-                      onToggleTopic(topic);
-                      if (onNavigateTopic) {
-                        onNavigateTopic(topic, 'focus');
-                      }
-                    }}
+                    onChange={() => onToggleTopic(topic)}
                     style={styles.checkbox}
                   />
                   <span
@@ -396,12 +391,7 @@ function TopicList({
               {node.isLeaf && topic ? (
                 <>
                   <button
-                    onClick={() => {
-                      onToggleRead(topic);
-                      if (onNavigateTopic) {
-                        onNavigateTopic(topic, 'focus');
-                      }
-                    }}
+                    onClick={() => onToggleRead(topic)}
                     style={{
                       ...styles.button,
                       ...(isLeafRead ? styles.buttonActive : {})
