@@ -13,11 +13,12 @@ function HierarchicalTree({
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const gRef = useRef(null);
+  const zoomBehaviorRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [expandState, setExpandState] = useState({});
-  const [zoomTransform, setZoomTransform] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Convert data to D3 hierarchy format (multiple roots, no single root)
+  // Convert data to D3 hierarchy format
   const hierarchyData = useMemo(() => {
     if (!data || Object.keys(data).length === 0) return null;
 
@@ -46,7 +47,7 @@ function HierarchicalTree({
     return roots;
   }, [data]);
 
-  // Handle expandMode changes (Fold All / Unfold All)
+  // Handle expandMode changes
   useEffect(() => {
     if (!hierarchyData || expandMode === 'default') return;
 
@@ -63,9 +64,8 @@ function HierarchicalTree({
       hierarchyData.forEach(traverse);
       setExpandState(collapsed);
     }
-  }, [expandMode]);
+  }, [expandMode, hierarchyData]); // Added hierarchyData dependency
 
-  // Toggle a single node expand/collapse using its data path
   const toggleNode = (nodePath) => {
     setExpandState(prev => ({
       ...prev,
@@ -73,7 +73,6 @@ function HierarchicalTree({
     }));
   };
 
-  // Build the tree with collapse support using data paths (not numeric indices)
   const buildTree = (node) => {
     if (!node) return null;
 
@@ -81,7 +80,7 @@ function HierarchicalTree({
     const isCollapsed = node.path ? expandState[node.path] : false;
 
     if (result.children && result.children.length > 0) {
-      result._children = result.children; // always preserve original children
+      result._children = result.children;
       if (isCollapsed) {
         result.children = null;
       } else {
@@ -92,71 +91,52 @@ function HierarchicalTree({
     return result;
   };
 
+  // Dimensions
   useEffect(() => {
-    if (!containerRef.current || !hierarchyData) return;
-
-    const container = containerRef.current;
+    if (!containerRef.current) return;
     const updateDimensions = () => {
       setDimensions({
-        width: Math.max(1200, container.clientWidth),
-        height: Math.max(800, container.clientHeight)
+        width: Math.max(1200, containerRef.current.clientWidth),
+        height: Math.max(800, containerRef.current.clientHeight)
       });
     };
-
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, [hierarchyData]);
+  }, []); // Only setup once
 
+  // Initialize SVG Structure
   useEffect(() => {
-    if (!svgRef.current || !hierarchyData) return;
+    if (!svgRef.current || isInitialized) return;
 
     const svg = d3.select(svgRef.current);
+    // Clear in case of hot reload
     svg.selectAll('*').remove();
 
     const margin = { top: 100, right: 200, bottom: 100, left: 200 };
-    const width = dimensions.width - margin.left - margin.right;
-    const height = dimensions.height - margin.top - margin.bottom;
 
-    // Create a group for zoom/pan
-    const g = svg.append('g')
-      .attr('class', 'tree-content');
-    
+    // Group for zoom/pan
+    const g = svg.append('g').attr('class', 'tree-content');
     gRef.current = g;
 
-    // Create zoom behavior
+    // Zoom behavior
     const zoom = d3.zoom()
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
-        setZoomTransform(event.transform);
       });
+    zoomBehaviorRef.current = zoom;
 
     svg.call(zoom);
 
-    // Create tree layout with spacing
-    const treeLayout = d3.tree()
-      .size([height * 60, width * 5])
-      .separation((a, b) => {
-        const siblingSpacing = 150;
-        const cousinSpacing = 220;
-        return (a.parent === b.parent ? siblingSpacing : cousinSpacing);
-      });
+    // Create groups
+    g.append('g').attr('class', 'tree-links').attr('transform', `translate(${margin.left},${margin.top})`);
+    g.append('g').attr('class', 'tree-nodes').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Create groups for links and nodes within the zoomable group
-    const gLinks = g.append('g')
-      .attr('class', 'tree-links')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    const gNodes = g.append('g')
-      .attr('class', 'tree-nodes')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    // Add zoom controls
-    const zoomGroup = svg.append('g')
-      .attr('class', 'zoom-controls')
-      .attr('transform', `translate(${dimensions.width - 60}, 20)`);
-
+    // Zoom controls
+    const zoomGroup = svg.append('g').attr('class', 'zoom-controls');
+    
+    // Create Zoom UI elements
     zoomGroup.append('circle')
       .attr('r', 40)
       .attr('fill', 'rgba(255, 255, 255, 0.9)')
@@ -170,162 +150,136 @@ function HierarchicalTree({
       .style('font-size', '10px')
       .text('Zoom');
 
+    // Zoom In
     const zoomInBtn = zoomGroup.append('g')
       .attr('class', 'zoom-btn')
       .attr('transform', 'translate(-10, 5)')
-      .on('click', () => {
-        svg.transition().duration(300).call(zoom.scaleBy, 1.3);
-      });
+      .on('click', () => svg.transition().duration(300).call(zoom.scaleBy, 1.3));
+    
+    zoomInBtn.append('circle').attr('r', 14).attr('fill', '#3b82f6').attr('stroke', '#2563eb');
+    zoomInBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
+      .style('font-size', '16px').style('font-weight', 'bold').text('+');
 
-    zoomInBtn.append('circle')
-      .attr('r', 14)
-      .attr('fill', '#3b82f6')
-      .attr('stroke', '#2563eb');
-
-    zoomInBtn.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '4')
-      .attr('fill', 'white')
-      .style('font-size', '16px')
-      .style('font-weight', 'bold')
-      .text('+');
-
+    // Zoom Out
     const zoomOutBtn = zoomGroup.append('g')
       .attr('class', 'zoom-btn')
       .attr('transform', 'translate(10, 5)')
-      .on('click', () => {
-        svg.transition().duration(300).call(zoom.scaleBy, 0.7);
-      });
+      .on('click', () => svg.transition().duration(300).call(zoom.scaleBy, 0.7));
 
-    zoomOutBtn.append('circle')
-      .attr('r', 14)
-      .attr('fill', '#3b82f6')
-      .attr('stroke', '#2563eb');
+    zoomOutBtn.append('circle').attr('r', 14).attr('fill', '#3b82f6').attr('stroke', '#2563eb');
+    zoomOutBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
+      .style('font-size', '16px').style('font-weight', 'bold').text('−');
 
-    zoomOutBtn.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '4')
-      .attr('fill', 'white')
-      .style('font-size', '16px')
-      .style('font-weight', 'bold')
-      .text('−');
-
+    // Reset
     const resetBtn = zoomGroup.append('g')
       .attr('class', 'zoom-btn')
       .attr('transform', 'translate(0, 30)')
-      .on('click', () => {
-        svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+      .on('click', () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity));
+
+    resetBtn.append('circle').attr('r', 12).attr('fill', '#6b7280').attr('stroke', '#4b5563');
+    resetBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
+      .style('font-size', '10px').text('Reset');
+
+    setIsInitialized(true);
+  }, []); // Run once on mount
+
+  // Update Dimensions and Zoom Control Position
+  useEffect(() => {
+    if (!svgRef.current || !isInitialized) return;
+    const svg = d3.select(svgRef.current);
+    svg.select('.zoom-controls')
+       .attr('transform', `translate(${dimensions.width - 60}, 20)`);
+  }, [dimensions, isInitialized]);
+
+  // Main Render Loop (Data Updates)
+  useEffect(() => {
+    if (!hierarchyData || !isInitialized || !gRef.current) return;
+
+    const svg = d3.select(svgRef.current);
+    const g = gRef.current;
+    const gNodes = g.select('.tree-nodes');
+    const gLinks = g.select('.tree-links');
+    
+    // Use stored references or logic to determine position
+    // Since 'source' is tricky in a full reactive update without tracking individual node state,
+    // we will just center updates around their current position or parent.
+    // For expanding nodes, D3's enter selection is key.
+    
+    const margin = { top: 100, right: 200, bottom: 100, left: 200 };
+    const width = dimensions.width - margin.left - margin.right;
+    const height = dimensions.height - margin.top - margin.bottom;
+
+    // Layout
+    const treeLayout = d3.tree()
+      .size([height * 60, width * 5])
+      .separation((a, b) => {
+        const siblingSpacing = 150;
+        const cousinSpacing = 220;
+        return (a.parent === b.parent ? siblingSpacing : cousinSpacing);
       });
 
-    resetBtn.append('circle')
-      .attr('r', 12)
-      .attr('fill', '#6b7280')
-      .attr('stroke', '#4b5563');
-
-    resetBtn.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '4')
-      .attr('fill', 'white')
-      .style('font-size', '10px')
-      .text('Reset');
-
-    // Function to update the tree visualization
-    const update = (source) => {
+    const updateGraph = () => {
       const duration = 300;
-
-      // Build processed tree with current expand state
+      
       const processedRoots = hierarchyData.map(root => buildTree(root));
       const rootData = { name: '__virtual_root__', children: processedRoots };
       const root = d3.hierarchy(rootData);
 
-      // Store original data on nodes
       root.descendants().forEach((node, i) => {
-        node.id = i;
+        node.id = i; 
         node._name = node.data.name;
         node._sentences = node.data.sentences;
         node._path = node.data.path;
       });
 
-      // Compute the new tree layout
       treeLayout(root);
 
-      // Get nodes and links (exclude virtual root from display)
       const nodes = root.descendants().filter(d => d.data.name !== '__virtual_root__');
       const links = root.links().filter(d => d.source.data.name !== '__virtual_root__');
 
-      // Update nodes
+      // --- Nodes ---
       const nodeSelection = gNodes.selectAll('.tree-node-group')
-        .data(nodes, d => d.id);
+        .data(nodes, d => d._path); // Key by path to maintain object constancy
 
-      // Enter new nodes — clicking the main group selects the node
       const nodeEnter = nodeSelection.enter()
         .append('g')
         .attr('class', 'tree-node-group')
-        .attr('transform', d => `translate(${source.x0 || 0},${source.y0 || 0})`)
+        .attr('transform', d => {
+             // Try to find parent's position for smooth enter
+             // Since we don't strictly track 'source', we default to new position or parent
+             // Ideally we'd look up the parent in the old DOM.
+             // For now, simple transition from current place if possible or parent
+             return `translate(${d.y},${d.x})`; 
+        })
         .on('click', (event, d) => {
           event.stopPropagation();
-          if (onNodeSelect) {
-            onNodeSelect(d._name, d._sentences, d._path);
-          }
+          if (onNodeSelect) onNodeSelect(d._name, d._sentences, d._path);
         });
 
-      // Add circle for node
       nodeEnter.append('circle')
-        .attr('class', d => {
-          const classes = ['tree-node-circle'];
-          if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
-          if (!d.data._children) classes.push('leaf');
-          if (d.depth === 1) classes.push('root');
-          return classes.join(' ');
-        })
+        .attr('class', 'tree-node-circle')
         .attr('r', 1e-6)
-        .transition()
-        .duration(duration)
-        .attr('r', d => {
-          if (d.depth === 1) return 14;
-          return d.data._children ? 10 : 7;
-        })
-        .attr('fill', d => {
-          if (d.depth === 1) return '#ef4444';
-          if (d.data._children) return '#3b82f6';
-          return '#14b8a6';
-        });
+        .attr('fill', d => d.depth === 1 ? '#ef4444' : (d.data._children ? '#3b82f6' : '#14b8a6'));
 
-      // Add label for nodes
       nodeEnter.append('text')
         .attr('class', 'tree-node-label')
-        .attr('dy', d => d.data._children ? '-1.8em' : '0.35em')
-        .attr('x', 0)
+        .attr('dy', '0.35em')
         .attr('text-anchor', 'middle')
-        .attr('fill', '#1f2937')
-        .style('font-size', d => {
-          if (d.depth === 1) return '16px';
-          if (d.depth === 2) return '13px';
-          return '11px';
-        })
-        .style('font-weight', d => d.data._children ? '600' : '400')
+        .style('font-size', '11px')
         .text(d => d._name)
-        .style('fill-opacity', 1e-6)
-        .transition()
-        .duration(duration)
-        .style('fill-opacity', 1);
+        .style('fill-opacity', 1e-6);
 
-      // Add sentence count badge
       nodeEnter.append('text')
-        .attr('class', 'tree-node-count')
-        .attr('dy', d => d.data._children ? '1.5em' : '0.35em')
-        .attr('x', 0)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#6b7280')
-        .style('font-size', '10px')
-        .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '')
-        .style('fill-opacity', 1e-6)
-        .transition()
-        .duration(duration)
-        .style('fill-opacity', 1);
+          .attr('class', 'tree-node-count')
+          .attr('dy', '1.5em')
+          .attr('x', 0)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#6b7280')
+          .style('font-size', '10px')
+          .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '')
+          .style('fill-opacity', 1e-6);
 
-      // Add toggle button (+ / −) for nodes that have children
-      // Placed to the right of the node circle, in the direction of children
+      // Toggle btn
       const toggleGroup = nodeEnter.append('g')
         .attr('class', 'node-toggle-btn')
         .style('cursor', 'pointer')
@@ -338,112 +292,121 @@ function HierarchicalTree({
 
       toggleGroup.append('circle')
         .attr('class', 'toggle-btn-bg')
-        .attr('r', d => d.data._children ? 9 : 0)
-        .attr('cx', d => d.depth === 1 ? 26 : 20)
+        .attr('r', 0)
+        .attr('cx', 20)
         .attr('fill', '#f9fafb')
         .attr('stroke', '#9ca3af')
         .attr('stroke-width', 1.5);
-
+      
       toggleGroup.append('text')
         .attr('class', 'toggle-btn-icon')
         .attr('text-anchor', 'middle')
-        .attr('x', d => d.depth === 1 ? 26 : 20)
+        .attr('x', 20)
         .attr('dy', '0.38em')
         .style('font-size', '14px')
         .style('font-weight', 'bold')
-        .attr('fill', '#374151')
-        .style('user-select', 'none')
-        .text(d => {
-          if (!d.data._children) return '';
-          return d.data.children ? '−' : '+';
-        });
+        .text('');
 
-      // Update existing nodes
+      // UPDATE (Smooth transition to new positions)
       const nodeUpdate = nodeEnter.merge(nodeSelection);
-      nodeUpdate.transition()
-        .duration(duration)
+      
+      nodeUpdate.transition().duration(duration)
         .attr('transform', d => `translate(${d.y},${d.x})`);
 
-      // Update circle classes
       nodeUpdate.select('.tree-node-circle')
         .attr('class', d => {
-          const classes = ['tree-node-circle'];
-          if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
-          if (!d.data._children) classes.push('leaf');
-          if (d.depth === 1) classes.push('root');
-          return classes.join(' ');
+             const classes = ['tree-node-circle'];
+             if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
+             if (!d.data._children) classes.push('leaf');
+             if (d.depth === 1) classes.push('root');
+             return classes.join(' ');
+        })
+        .transition().duration(duration)
+        .attr('r', d => d.depth === 1 ? 14 : (d.data._children ? 10 : 7))
+        .attr('fill', d => {
+          if (d.depth === 1) return '#ef4444';
+          if (d.data._children) return '#3b82f6';
+          return '#14b8a6';
         });
 
-      // Update toggle button icon text
+      nodeUpdate.select('.tree-node-label')
+        .attr('dy', d => d.data._children ? '-1.8em' : '0.35em')
+        .style('font-size', d => d.depth === 1 ? '16px' : (d.depth === 2 ? '13px' : '11px'))
+        .style('font-weight', d => d.data._children ? '600' : '400')
+        .transition().duration(duration)
+        .style('fill-opacity', 1);
+
+      nodeUpdate.select('.tree-node-count')
+        .attr('dy', d => d.data._children ? '1.5em' : '0.35em')
+        .transition().duration(duration)
+        .style('fill-opacity', 1);
+
+      // Update toggle button
+      nodeUpdate.select('.toggle-btn-bg')
+        .attr('r', d => d.data._children ? 9 : 0)
+        .attr('cx', d => d.depth === 1 ? 26 : 20);
+        
       nodeUpdate.select('.toggle-btn-icon')
-        .text(d => {
-          if (!d.data._children) return '';
-          return d.data.children ? '−' : '+';
-        });
+        .attr('x', d => d.depth === 1 ? 26 : 20)
+        .text(d => !d.data._children ? '' : (d.data.children ? '−' : '+'));
 
-      // Exit old nodes
-      const nodeExit = nodeSelection.exit()
-        .transition()
-        .duration(duration)
-        .attr('transform', d => `translate(${source.y},${source.x})`)
+      // EXIT
+      const nodeExit = nodeSelection.exit().transition().duration(duration)
+        .attr('transform', function(d) { return d3.select(this).attr('transform'); }) // Stay in place while fading or move to parent?
+        .style('opacity', 0)
         .remove();
 
-      nodeExit.select('circle')
-        .attr('r', 1e-6);
+      // --- Links ---
+      const diagonal = (s, t) => {
+        return `M ${s.y} ${s.x}
+                C ${(s.y + t.y) / 2} ${s.x},
+                  ${(s.y + t.y) / 2} ${t.x},
+                  ${t.y} ${t.x}`;
+      };
 
-      nodeExit.select('text')
-        .style('fill-opacity', 1e-6);
-
-      // Update links
       const linkSelection = gLinks.selectAll('.tree-link')
-        .data(links, d => d.target.id);
+        .data(links, d => d.target._path);
 
-      // Enter new links
-      const linkEnter = linkSelection.enter()
-        .append('path')
+      const linkEnter = linkSelection.enter().append('path')
         .attr('class', 'tree-link')
-        .attr('d', d => {
-          const o = { x: source.x0 || 0, y: source.y0 || 0 };
-          return diagonal(o, o);
-        })
         .attr('fill', 'none')
         .attr('stroke', '#9ca3af')
         .attr('stroke-width', '2px')
-        .attr('stroke-opacity', 0.6);
+        .attr('stroke-opacity', 0.6)
+        .attr('d', d => {
+            const o = { x: d.source.x, y: d.source.y };
+            return diagonal(o, o);
+        });
 
-      // Update existing links
-      const linkUpdate = linkEnter.merge(linkSelection);
-      linkUpdate.transition()
-        .duration(duration)
+      linkEnter.merge(linkSelection).transition().duration(duration)
         .attr('d', d => diagonal(d.source, d.target));
 
-      // Exit old links
-      linkSelection.exit()
-        .transition()
-        .duration(duration)
+      linkSelection.exit().transition().duration(duration)
         .attr('d', d => {
-          const o = { x: source.x, y: source.y };
+          const o = { x: d.source.x, y: d.source.y }; // Collapse to source
           return diagonal(o, o);
         })
         .remove();
 
+      // --- Selected Panels Connections ---
       gLinks.selectAll('.selected-topic-link').remove();
       gNodes.selectAll('.selected-topic-panel').remove();
-
+      
       selectedPanels.forEach((panelData, panelIndex) => {
-        const selectedTreeNode = nodes.find((node) => node._path === panelData.path);
-        if (!selectedTreeNode) return;
+         // Re-find the node in current layout
+         const selectedTreeNode = nodes.find((node) => node._path === panelData.path);
+         if (!selectedTreeNode) return;
 
-          const panelWidth = 390;
-          const panelHeight = panelData.sentenceIndices && panelData.sentenceIndices.length > 0 ? 320 : 180;
-          const rightX = selectedTreeNode.y + 120;
-          const leftX = selectedTreeNode.y - panelWidth - 120;
-          const stackShift = (panelIndex % 3) * 28;
-          const panelX = panelIndex % 2 === 0 ? rightX : leftX;
-          const panelY = selectedTreeNode.x - panelHeight / 2 + stackShift;
-          const connectorTargetX = panelX > selectedTreeNode.y ? panelX : panelX + panelWidth;
+         const panelWidth = 390;
+         const panelHeight = panelData.sentenceIndices && panelData.sentenceIndices.length > 0 ? 320 : 180;
+         const rightX = selectedTreeNode.y + 120;
+         const leftX = selectedTreeNode.y - panelWidth - 120;
+         const stackShift = (panelIndex % 3) * 28;
+         const panelX = panelIndex % 2 === 0 ? rightX : leftX;
+         const panelY = selectedTreeNode.x - panelHeight / 2 + stackShift;
+         const connectorTargetX = panelX > selectedTreeNode.y ? panelX : panelX + panelWidth;
 
-          gLinks.append('path')
+         gLinks.append('path')
             .attr('class', 'selected-topic-link')
             .attr('d', `M ${selectedTreeNode.y} ${selectedTreeNode.x}
               C ${(selectedTreeNode.y + connectorTargetX) / 2} ${selectedTreeNode.x},
@@ -455,126 +418,94 @@ function HierarchicalTree({
             .attr('stroke-opacity', 0.8)
             .attr('stroke-dasharray', '8,6');
 
-          const panel = gNodes.append('g')
-            .attr('class', 'selected-topic-panel');
-
-          const panelObject = panel.append('foreignObject')
+         const panel = gNodes.append('g').attr('class', 'selected-topic-panel');
+         
+         const panelObject = panel.append('foreignObject')
             .attr('x', panelX)
             .attr('y', panelY)
             .attr('width', panelWidth)
             .attr('height', panelHeight)
-            .on('mousedown wheel touchstart', (event) => event.stopPropagation());
+            .on('mousedown wheel touchstart', (e) => e.stopPropagation());
 
-          const panelHtml = panelObject.append('xhtml:div')
-            .attr('class', 'topic-sentences-panel topic-sentences-panel-inline')
-            .on('mousedown wheel touchstart', (event) => event.stopPropagation());
+         const panelHtml = panelObject.append('xhtml:div')
+            .attr('class', 'topic-sentences-panel topic-sentences-panel-inline');
 
-          panelHtml.append('h3').text(`"${panelData.name}"`);
+         panelHtml.append('h3').text(`"${panelData.name}"`);
 
-          panelHtml.append('button')
+         panelHtml.append('button')
             .attr('class', 'close-panel-btn')
-            .attr('title', 'Clear selection')
             .text('×')
-            .on('click', (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (onClosePanel) onClosePanel(panelData.path);
+            .on('click', (e) => {
+               e.preventDefault(); e.stopPropagation();
+               if (onClosePanel) onClosePanel(panelData.path);
             });
 
-          const list = panelHtml.append('div').attr('class', 'topic-sentences-list');
-          if (panelData.sentenceIndices && panelData.sentenceIndices.length > 0) {
+         const list = panelHtml.append('div').attr('class', 'topic-sentences-list');
+         if (panelData.sentenceIndices && panelData.sentenceIndices.length > 0) {
             panelData.sentenceIndices.forEach((idx) => {
-              const text = sentences[idx - 1];
-              if (!text) return;
-              const item = list.append('div').attr('class', 'topic-sentence-item');
-              const content = item.append('div').attr('class', 'sentence-main-content');
-              content.append('div').attr('class', 'sentence-number').text(`Sentence ${idx}`);
-              content.append('div').attr('class', 'sentence-text').text(text);
+               const text = sentences[idx - 1];
+               if (!text) return;
+               const item = list.append('div').attr('class', 'topic-sentence-item');
+               const content = item.append('div').attr('class', 'sentence-main-content');
+               content.append('div').attr('class', 'sentence-number').text(`Sentence ${idx}`);
+               content.append('div').attr('class', 'sentence-text').text(text);
             });
-          } else {
-            list.append('div')
-              .attr('class', 'no-sentences')
-              .text('No sentences for this topic.');
-          }
-      });
-
-      // Store old positions for transitions
-      nodes.forEach(d => {
-        d.x0 = d.x;
-        d.y0 = d.y;
+         } else {
+            list.append('div').attr('class', 'no-sentences').text('No sentences for this topic.');
+         }
       });
     };
 
-    // Diagonal path generator for curved links
-    const diagonal = (source, target) => {
-      return `M ${source.y} ${source.x}
-              C ${(source.y + target.y) / 2} ${source.x},
-                ${(source.y + target.y) / 2} ${target.x},
-                ${target.y} ${target.x}`;
-    };
+    updateGraph();
+    
+    // We could track previous positions if we wanted smooth transition from parent
+    // but for now, simple ID matching in D3 handles it well enough for expanding.
 
-    // Initial render
-    update({ x0: height / 2, y0: 0 });
+  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, sentences]);
 
-    // Center the tree initially
-    setTimeout(() => {
-      const bounds = g.node().getBBox();
-      const fullWidth = bounds.width;
-      const fullHeight = bounds.height;
+  // Initial Centering Logic
+  // Only center when the dataset actually changes (e.g. new file loaded), not on every expand
+  useEffect(() => {
+     if (!hierarchyData || !isInitialized || !gRef.current || !zoomBehaviorRef.current) return;
+     
+     // small timeout to allow rendering to settle
+     const timeout = setTimeout(() => {
+        const svg = d3.select(svgRef.current);
+        const g = gRef.current;
+        const bounds = g.node().getBBox();
+        const fullWidth = bounds.width;
+        const fullHeight = bounds.height;
+        
+        if (fullWidth && fullHeight) {
+           const initialScale = Math.min(
+             (dimensions.width - 100) / fullWidth,
+             (dimensions.height - 100) / fullHeight,
+             0.5
+           );
 
-      if (fullWidth && fullHeight) {
-        const initialScale = Math.min(
-          (dimensions.width - 100) / fullWidth,
-          (dimensions.height - 100) / fullHeight,
-          0.5
-        );
+           const tx = (dimensions.width - fullWidth * initialScale) / 2 - bounds.x * initialScale;
+           const ty = (dimensions.height - fullHeight * initialScale) / 2 - bounds.y * initialScale;
 
-        const initialTranslateX = (dimensions.width - fullWidth * initialScale) / 2 - bounds.x * initialScale;
-        const initialTranslateY = (dimensions.height - fullHeight * initialScale) / 2 - bounds.y * initialScale;
-
-        svg.call(zoom.transform, d3.zoomIdentity.translate(initialTranslateX, initialTranslateY).scale(initialScale));
-      }
-    }, 100);
-  }, [
-    hierarchyData,
-    dimensions,
-    selectedPanels,
-    sentences,
-    onClosePanel,
-    expandState,
-    expandMode
-  ]);
+           svg.transition().duration(750)
+              .call(zoomBehaviorRef.current.transform, 
+                    d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+        }
+     }, 300);
+     return () => clearTimeout(timeout);
+  }, [hierarchyData, isInitialized]); // Removed dimensions/expandState from here so it doesn't reset on those
 
   if (!hierarchyData) {
-    return (
-      <div className="tree-visualization-empty">
-        <p>No hierarchy data available</p>
-      </div>
-    );
+    return <div className="tree-visualization-empty"><p>No hierarchy data available</p></div>;
   }
 
   return (
     <div className="hierarchical-tree-container" ref={containerRef}>
       <div className="tree-legend">
-        <div className="legend-item">
-          <span className="legend-dot root"></span>
-          <span>Root Topic</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot internal"></span>
-          <span>Category</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot leaf"></span>
-          <span>Leaf Node</span>
-        </div>
+        <div className="legend-item"><span className="legend-dot root"></span><span>Root Topic</span></div>
+        <div className="legend-item"><span className="legend-dot internal"></span><span>Category</span></div>
+        <div className="legend-item"><span className="legend-dot leaf"></span><span>Leaf Node</span></div>
       </div>
-      <svg
-        ref={svgRef}
-        width={dimensions.width}
-        height={dimensions.height}
-        className="hierarchical-tree-svg"
-      />
+      <svg ref={svgRef} width={dimensions.width} height={dimensions.height} className="hierarchical-tree-svg" />
     </div>
   );
 }
@@ -623,18 +554,8 @@ function MindmapResults({ mindmapData }) {
             {Object.keys(structure).length > 0 ? (
               <>
                 <div className="tree-controls">
-                  <button
-                    className="tree-control-btn"
-                    onClick={() => setExpandMode('none')}
-                  >
-                    Fold All
-                  </button>
-                  <button
-                    className="tree-control-btn"
-                    onClick={() => setExpandMode('all')}
-                  >
-                    Unfold All
-                  </button>
+                  <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
+                  <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
                 </div>
                 <HierarchicalTree
                   data={structure}
