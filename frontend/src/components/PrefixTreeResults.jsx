@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/App.css';
 
-function PrefixTreeNode({ label, nodeData, level = 0, expandMode, onNodeClick, selectedNode }) {
+function PrefixTreeNode({ label, nodeData, level = 0, expandMode, onNodeClick, selectedNode, parentWords = [] }) {
   const [isExpanded, setIsExpanded] = useState(level < 1);
 
   const children = nodeData.children || {};
   const count = nodeData.count || 0;
   const hasChildren = Object.keys(children).length > 0;
+
+  // Build the full word by concatenating all parent words with current label
+  const fullWord = [...parentWords, label].join('');
+  const displayLabel = level > 0 ? `${label} (${fullWord})` : label;
 
   useEffect(() => {
     if (expandMode === 'all') {
@@ -21,6 +25,7 @@ function PrefixTreeNode({ label, nodeData, level = 0, expandMode, onNodeClick, s
       <div
         className={`node-content ${selectedNode === nodeData ? 'selected' : ''}`}
         onClick={() => onNodeClick && onNodeClick(nodeData, label)}
+        title={fullWord}
       >
         {hasChildren && (
           <button
@@ -34,7 +39,7 @@ function PrefixTreeNode({ label, nodeData, level = 0, expandMode, onNodeClick, s
           </button>
         )}
         {!hasChildren && <span className="no-children-spacer"></span>}
-        <span className="node-label">{label}</span>
+        <span className="node-label">{displayLabel}</span>
         {count > 0 && <span className="node-sentence-count">({count})</span>}
       </div>
 
@@ -49,6 +54,7 @@ function PrefixTreeNode({ label, nodeData, level = 0, expandMode, onNodeClick, s
               expandMode={expandMode}
               onNodeClick={onNodeClick}
               selectedNode={selectedNode}
+              parentWords={[...parentWords, label]}
             />
           ))}
         </div>
