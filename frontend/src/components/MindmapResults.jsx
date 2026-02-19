@@ -6,6 +6,7 @@ function HierarchicalTree({
   data,
   onNodeSelect,
   onClosePanel,
+  onPanelDrag,
   selectedPanels,
   sentences,
   expandMode
@@ -135,7 +136,7 @@ function HierarchicalTree({
 
     // Zoom controls
     const zoomGroup = svg.append('g').attr('class', 'zoom-controls');
-    
+
     // Create Zoom UI elements
     zoomGroup.append('circle')
       .attr('r', 40)
@@ -155,7 +156,7 @@ function HierarchicalTree({
       .attr('class', 'zoom-btn')
       .attr('transform', 'translate(-10, 5)')
       .on('click', () => svg.transition().duration(300).call(zoom.scaleBy, 1.3));
-    
+
     zoomInBtn.append('circle').attr('r', 14).attr('fill', '#3b82f6').attr('stroke', '#2563eb');
     zoomInBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
       .style('font-size', '16px').style('font-weight', 'bold').text('+');
@@ -188,7 +189,7 @@ function HierarchicalTree({
     if (!svgRef.current || !isInitialized) return;
     const svg = d3.select(svgRef.current);
     svg.select('.zoom-controls')
-       .attr('transform', `translate(${dimensions.width - 60}, 20)`);
+      .attr('transform', `translate(${dimensions.width - 60}, 20)`);
   }, [dimensions, isInitialized]);
 
   // Main Render Loop (Data Updates)
@@ -199,12 +200,12 @@ function HierarchicalTree({
     const g = gRef.current;
     const gNodes = g.select('.tree-nodes');
     const gLinks = g.select('.tree-links');
-    
+
     // Use stored references or logic to determine position
     // Since 'source' is tricky in a full reactive update without tracking individual node state,
     // we will just center updates around their current position or parent.
     // For expanding nodes, D3's enter selection is key.
-    
+
     const margin = { top: 100, right: 200, bottom: 100, left: 200 };
     const width = dimensions.width - margin.left - margin.right;
     const height = dimensions.height - margin.top - margin.bottom;
@@ -220,13 +221,13 @@ function HierarchicalTree({
 
     const updateGraph = () => {
       const duration = 300;
-      
+
       const processedRoots = hierarchyData.map(root => buildTree(root));
       const rootData = { name: '__virtual_root__', children: processedRoots };
       const root = d3.hierarchy(rootData);
 
       root.descendants().forEach((node, i) => {
-        node.id = i; 
+        node.id = i;
         node._name = node.data.name;
         node._sentences = node.data.sentences;
         node._path = node.data.path;
@@ -245,11 +246,11 @@ function HierarchicalTree({
         .append('g')
         .attr('class', 'tree-node-group')
         .attr('transform', d => {
-             // Try to find parent's position for smooth enter
-             // Since we don't strictly track 'source', we default to new position or parent
-             // Ideally we'd look up the parent in the old DOM.
-             // For now, simple transition from current place if possible or parent
-             return `translate(${d.y},${d.x})`; 
+          // Try to find parent's position for smooth enter
+          // Since we don't strictly track 'source', we default to new position or parent
+          // Ideally we'd look up the parent in the old DOM.
+          // For now, simple transition from current place if possible or parent
+          return `translate(${d.y},${d.x})`;
         })
         .on('click', (event, d) => {
           event.stopPropagation();
@@ -270,14 +271,14 @@ function HierarchicalTree({
         .style('fill-opacity', 1e-6);
 
       nodeEnter.append('text')
-          .attr('class', 'tree-node-count')
-          .attr('dy', '1.5em')
-          .attr('x', 0)
-          .attr('text-anchor', 'middle')
-          .attr('fill', '#6b7280')
-          .style('font-size', '10px')
-          .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '')
-          .style('fill-opacity', 1e-6);
+        .attr('class', 'tree-node-count')
+        .attr('dy', '1.5em')
+        .attr('x', 0)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#6b7280')
+        .style('font-size', '10px')
+        .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '')
+        .style('fill-opacity', 1e-6);
 
       // Toggle btn
       const toggleGroup = nodeEnter.append('g')
@@ -287,7 +288,6 @@ function HierarchicalTree({
           event.stopPropagation();
           const path = d._path || d.data.path;
           if (path) toggleNode(path);
-          if (onNodeSelect) onNodeSelect(d._name, d._sentences, d._path);
         });
 
       toggleGroup.append('circle')
@@ -297,7 +297,7 @@ function HierarchicalTree({
         .attr('fill', '#f9fafb')
         .attr('stroke', '#9ca3af')
         .attr('stroke-width', 1.5);
-      
+
       toggleGroup.append('text')
         .attr('class', 'toggle-btn-icon')
         .attr('text-anchor', 'middle')
@@ -309,17 +309,17 @@ function HierarchicalTree({
 
       // UPDATE (Smooth transition to new positions)
       const nodeUpdate = nodeEnter.merge(nodeSelection);
-      
+
       nodeUpdate.transition().duration(duration)
         .attr('transform', d => `translate(${d.y},${d.x})`);
 
       nodeUpdate.select('.tree-node-circle')
         .attr('class', d => {
-             const classes = ['tree-node-circle'];
-             if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
-             if (!d.data._children) classes.push('leaf');
-             if (d.depth === 1) classes.push('root');
-             return classes.join(' ');
+          const classes = ['tree-node-circle'];
+          if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
+          if (!d.data._children) classes.push('leaf');
+          if (d.depth === 1) classes.push('root');
+          return classes.join(' ');
         })
         .transition().duration(duration)
         .attr('r', d => d.depth === 1 ? 14 : (d.data._children ? 10 : 7))
@@ -345,14 +345,14 @@ function HierarchicalTree({
       nodeUpdate.select('.toggle-btn-bg')
         .attr('r', d => d.data._children ? 9 : 0)
         .attr('cx', d => d.depth === 1 ? 26 : 20);
-        
+
       nodeUpdate.select('.toggle-btn-icon')
         .attr('x', d => d.depth === 1 ? 26 : 20)
         .text(d => !d.data._children ? '' : (d.data.children ? '−' : '+'));
 
       // EXIT
       const nodeExit = nodeSelection.exit().transition().duration(duration)
-        .attr('transform', function(d) { return d3.select(this).attr('transform'); }) // Stay in place while fading or move to parent?
+        .attr('transform', function (d) { return d3.select(this).attr('transform'); }) // Stay in place while fading or move to parent?
         .style('opacity', 0)
         .remove();
 
@@ -374,8 +374,8 @@ function HierarchicalTree({
         .attr('stroke-width', '2px')
         .attr('stroke-opacity', 0.6)
         .attr('d', d => {
-            const o = { x: d.source.x, y: d.source.y };
-            return diagonal(o, o);
+          const o = { x: d.source.x, y: d.source.y };
+          return diagonal(o, o);
         });
 
       linkEnter.merge(linkSelection).transition().duration(duration)
@@ -391,107 +391,164 @@ function HierarchicalTree({
       // --- Selected Panels Connections ---
       gLinks.selectAll('.selected-topic-link').remove();
       gNodes.selectAll('.selected-topic-panel').remove();
-      
+
       selectedPanels.forEach((panelData, panelIndex) => {
-         // Re-find the node in current layout
-         const selectedTreeNode = nodes.find((node) => node._path === panelData.path);
-         if (!selectedTreeNode) return;
+        // Re-find the node in current layout
+        const selectedTreeNode = nodes.find((node) => node._path === panelData.path);
+        if (!selectedTreeNode) return;
 
-         const panelWidth = 390;
-         const panelHeight = panelData.sentenceIndices && panelData.sentenceIndices.length > 0 ? 320 : 180;
-         const rightX = selectedTreeNode.y + 120;
-         const leftX = selectedTreeNode.y - panelWidth - 120;
-         const stackShift = (panelIndex % 3) * 28;
-         const panelX = panelIndex % 2 === 0 ? rightX : leftX;
-         const panelY = selectedTreeNode.x - panelHeight / 2 + stackShift;
-         const connectorTargetX = panelX > selectedTreeNode.y ? panelX : panelX + panelWidth;
+        const panelWidth = 390;
+        const panelHeight = panelData.sentenceIndices && panelData.sentenceIndices.length > 0 ? 320 : 180;
 
-         gLinks.append('path')
-            .attr('class', 'selected-topic-link')
-            .attr('d', `M ${selectedTreeNode.y} ${selectedTreeNode.x}
+        // Default position calculation
+        const rightX = selectedTreeNode.y + 120;
+        const leftX = selectedTreeNode.y - panelWidth - 120;
+        const stackShift = (panelIndex % 3) * 28;
+        const defaultX = panelIndex % 2 === 0 ? rightX : leftX;
+        const defaultY = selectedTreeNode.x - panelHeight / 2 + stackShift;
+
+        // Use stored position if available, otherwise default
+        let currentX = panelData.x !== undefined ? panelData.x : defaultX;
+        let currentY = panelData.y !== undefined ? panelData.y : defaultY;
+
+        const connectorTargetX = currentX > selectedTreeNode.y ? currentX : currentX + panelWidth;
+
+        // Function to update connector path during drag
+        const updateConnector = (x, y) => {
+          const targetX = x > selectedTreeNode.y ? x : x + panelWidth;
+          const newPath = `M ${selectedTreeNode.y} ${selectedTreeNode.x}
+              C ${(selectedTreeNode.y + targetX) / 2} ${selectedTreeNode.x},
+                ${(selectedTreeNode.y + targetX) / 2} ${y + panelHeight / 2},
+                ${targetX} ${y + panelHeight / 2}`;
+          link.attr('d', newPath);
+        };
+
+        const link = gLinks.append('path')
+          .attr('class', 'selected-topic-link')
+          .attr('d', `M ${selectedTreeNode.y} ${selectedTreeNode.x}
               C ${(selectedTreeNode.y + connectorTargetX) / 2} ${selectedTreeNode.x},
-                ${(selectedTreeNode.y + connectorTargetX) / 2} ${panelY + panelHeight / 2},
-                ${connectorTargetX} ${panelY + panelHeight / 2}`)
-            .attr('fill', 'none')
-            .attr('stroke', '#667eea')
-            .attr('stroke-width', 3)
-            .attr('stroke-opacity', 0.8)
-            .attr('stroke-dasharray', '8,6');
+                ${(selectedTreeNode.y + connectorTargetX) / 2} ${currentY + panelHeight / 2},
+                ${connectorTargetX} ${currentY + panelHeight / 2}`)
+          .attr('fill', 'none')
+          .attr('stroke', '#667eea')
+          .attr('stroke-width', 3)
+          .attr('stroke-opacity', 0.8)
+          .attr('stroke-dasharray', '8,6');
 
-         const panel = gNodes.append('g').attr('class', 'selected-topic-panel');
-         
-         const panelObject = panel.append('foreignObject')
-            .attr('x', panelX)
-            .attr('y', panelY)
-            .attr('width', panelWidth)
-            .attr('height', panelHeight)
-            .on('mousedown wheel touchstart', (e) => e.stopPropagation());
+        const panel = gNodes.append('g').attr('class', 'selected-topic-panel');
 
-         const panelHtml = panelObject.append('xhtml:div')
-            .attr('class', 'topic-sentences-panel topic-sentences-panel-inline');
+        // Drag behavior
+        const drag = d3.drag()
+          .subject(() => ({ x: currentX, y: currentY }))
+          .filter((event) => {
+            // Only allow dragging from header tags (H3)
+            return event.target.tagName.toLowerCase() === 'h3';
+          })
+          .on('start', function () {
+            d3.select(this).raise();
+            d3.select(this).select('h3').style('cursor', 'grabbing');
+          })
+          .on('drag', function (event) {
+            const newX = event.x;
+            const newY = event.y;
+            d3.select(this).attr('x', newX).attr('y', newY);
+            updateConnector(newX, newY);
+            currentX = newX;
+            currentY = newY;
+          })
+          .on('end', function (event) {
+            d3.select(this).select('h3').style('cursor', 'grab');
+            if (onPanelDrag) onPanelDrag(panelData.path, event.x, event.y);
+          });
 
-         panelHtml.append('h3').text(`"${panelData.name}"`);
+        const panelObject = panel.append('foreignObject')
+          .attr('x', currentX)
+          .attr('y', currentY)
+          .attr('width', panelWidth)
+          .attr('height', panelHeight)
+          .call(drag);
 
-         panelHtml.append('button')
-            .attr('class', 'close-panel-btn')
-            .text('×')
-            .on('click', (e) => {
-               e.preventDefault(); e.stopPropagation();
-               if (onClosePanel) onClosePanel(panelData.path);
-            });
+        // Prevent zoom/pan on wheel inside panel
+        panelObject.on('wheel', (e) => e.stopPropagation());
+        // We do NOT stop propagation on mousedown usually to allow drag, 
+        // but d3.drag handles it. We should stop propagation for non-header clicks if we want to prevent map panning?
+        // Actually d3 zoom filters common inputs. If we click inside the div (text), zoom shouldn't start.
+        // d3.zoom usually ignores mousedown on input/button etc but generic divs might trigger it.
+        // To be safe we stop propagation on mousedown if it's NOT the header.
+        panelObject.on('mousedown', (e) => {
+          if (e.target.tagName.toLowerCase() !== 'h3') {
+            e.stopPropagation();
+          }
+        });
 
-         const list = panelHtml.append('div').attr('class', 'topic-sentences-list');
-         if (panelData.sentenceIndices && panelData.sentenceIndices.length > 0) {
-            panelData.sentenceIndices.forEach((idx) => {
-               const text = sentences[idx - 1];
-               if (!text) return;
-               const item = list.append('div').attr('class', 'topic-sentence-item');
-               const content = item.append('div').attr('class', 'sentence-main-content');
-               content.append('div').attr('class', 'sentence-number').text(`Sentence ${idx}`);
-               content.append('div').attr('class', 'sentence-text').text(text);
-            });
-         } else {
-            list.append('div').attr('class', 'no-sentences').text('No sentences for this topic.');
-         }
+        const panelHtml = panelObject.append('xhtml:div')
+          .attr('class', 'topic-sentences-panel topic-sentences-panel-inline');
+
+        panelHtml.append('h3')
+          .text(`"${panelData.name}"`)
+          .style('cursor', 'grab') // Add visual cue
+          .style('user-select', 'none'); // Prevent text selection on header
+
+        panelHtml.append('button')
+          .attr('class', 'close-panel-btn')
+          .text('×')
+          .on('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (onClosePanel) onClosePanel(panelData.path);
+          });
+
+        const list = panelHtml.append('div').attr('class', 'topic-sentences-list');
+        if (panelData.sentenceIndices && panelData.sentenceIndices.length > 0) {
+          panelData.sentenceIndices.forEach((idx) => {
+            const text = sentences[idx - 1];
+            if (!text) return;
+            const item = list.append('div').attr('class', 'topic-sentence-item');
+            const content = item.append('div').attr('class', 'sentence-main-content');
+            content.append('div').attr('class', 'sentence-number').text(`Sentence ${idx}`);
+            content.append('div').attr('class', 'sentence-text').text(text);
+          });
+        } else {
+          list.append('div').attr('class', 'no-sentences').text('No sentences for this topic.');
+        }
       });
     };
 
     updateGraph();
-    
+
     // We could track previous positions if we wanted smooth transition from parent
     // but for now, simple ID matching in D3 handles it well enough for expanding.
 
-  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, sentences]);
+  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, sentences, onPanelDrag]);
 
   // Initial Centering Logic
   // Only center when the dataset actually changes (e.g. new file loaded), not on every expand
   useEffect(() => {
-     if (!hierarchyData || !isInitialized || !gRef.current || !zoomBehaviorRef.current) return;
-     
-     // small timeout to allow rendering to settle
-     const timeout = setTimeout(() => {
-        const svg = d3.select(svgRef.current);
-        const g = gRef.current;
-        const bounds = g.node().getBBox();
-        const fullWidth = bounds.width;
-        const fullHeight = bounds.height;
-        
-        if (fullWidth && fullHeight) {
-           const initialScale = Math.min(
-             (dimensions.width - 100) / fullWidth,
-             (dimensions.height - 100) / fullHeight,
-             0.5
-           );
+    if (!hierarchyData || !isInitialized || !gRef.current || !zoomBehaviorRef.current) return;
 
-           const tx = (dimensions.width - fullWidth * initialScale) / 2 - bounds.x * initialScale;
-           const ty = (dimensions.height - fullHeight * initialScale) / 2 - bounds.y * initialScale;
+    // small timeout to allow rendering to settle
+    const timeout = setTimeout(() => {
+      const svg = d3.select(svgRef.current);
+      const g = gRef.current;
+      const bounds = g.node().getBBox();
+      const fullWidth = bounds.width;
+      const fullHeight = bounds.height;
 
-           svg.transition().duration(750)
-              .call(zoomBehaviorRef.current.transform, 
-                    d3.zoomIdentity.translate(tx, ty).scale(initialScale));
-        }
-     }, 300);
-     return () => clearTimeout(timeout);
+      if (fullWidth && fullHeight) {
+        const initialScale = Math.min(
+          (dimensions.width - 100) / fullWidth,
+          (dimensions.height - 100) / fullHeight,
+          0.5
+        );
+
+        const tx = (dimensions.width - fullWidth * initialScale) / 2 - bounds.x * initialScale;
+        const ty = (dimensions.height - fullHeight * initialScale) / 2 - bounds.y * initialScale;
+
+        svg.transition().duration(750)
+          .call(zoomBehaviorRef.current.transform,
+            d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
   }, [hierarchyData, isInitialized]); // Removed dimensions/expandState from here so it doesn't reset on those
 
   if (!hierarchyData) {
@@ -532,13 +589,27 @@ function MindmapResults({ mindmapData }) {
     if (!path) return;
     setSelectedPanels((prev) => {
       const existingIndex = prev.findIndex((panel) => panel.path === path);
-      const nextPanel = { path, name, sentenceIndices: sentenceIndices || [] };
       if (existingIndex >= 0) {
+        // Toggle OFF (Hide window on second click)
         const updated = [...prev];
-        updated[existingIndex] = nextPanel;
+        updated.splice(existingIndex, 1);
         return updated;
       }
+      // Toggle ON
+      const nextPanel = { path, name, sentenceIndices: sentenceIndices || [] };
       return [...prev, nextPanel];
+    });
+  };
+
+  const handlePanelDrag = (path, x, y) => {
+    setSelectedPanels((prev) => {
+      const index = prev.findIndex((p) => p.path === path);
+      if (index === -1) return prev;
+      // Only update if changed significantly or just update
+      // Since this runs on drag end, it's fine
+      const updated = [...prev];
+      updated[index] = { ...updated[index], x, y };
+      return updated;
     });
   };
 
@@ -561,6 +632,7 @@ function MindmapResults({ mindmapData }) {
                   data={structure}
                   onNodeSelect={handleNodeClick}
                   onClosePanel={closePanel}
+                  onPanelDrag={handlePanelDrag}
                   selectedPanels={selectedPanels}
                   sentences={sentences}
                   expandMode={expandMode}

@@ -6,6 +6,7 @@ function HierarchicalTree({
   data,
   onNodeSelect,
   onClosePanel,
+  onPanelDrag,
   selectedPanels,
   allSentences,
   expandMode
@@ -243,9 +244,6 @@ function HierarchicalTree({
           event.stopPropagation();
           const path = d._path || d.data.path;
           if (path) toggleNode(path);
-          if (onNodeSelect) {
-            onNodeSelect({ count: d._count, sentences: d._sentences || [] }, d._name, d._path);
-          }
         });
 
       toggleGroup.append('circle').attr('class', 'toggle-btn-bg').attr('r', 0).attr('cx', 20)
@@ -334,28 +332,81 @@ function HierarchicalTree({
 
         const panelWidth = 390;
         const panelHeight = panelData.count > 0 ? 320 : 180;
+
+        // Default positions
         const rightX = selectedTreeNode.y + 120;
         const leftX = selectedTreeNode.y - panelWidth - 120;
         const stackShift = (panelIndex % 3) * 28;
-        const panelX = panelIndex % 2 === 0 ? rightX : leftX;
-        const panelY = selectedTreeNode.x - panelHeight / 2 + stackShift;
-        const connectorTargetX = panelX > selectedTreeNode.y ? panelX : panelX + panelWidth;
+        const defaultX = panelIndex % 2 === 0 ? rightX : leftX;
+        const defaultY = selectedTreeNode.x - panelHeight / 2 + stackShift;
 
-        gLinks.append('path').attr('class', 'selected-topic-link')
+        // Use stored position if available
+        let currentX = panelData.x !== undefined ? panelData.x : defaultX;
+        let currentY = panelData.y !== undefined ? panelData.y : defaultY;
+
+        const connectorTargetX = currentX > selectedTreeNode.y ? currentX : currentX + panelWidth;
+
+        // Function to update connector path during drag
+        const updateConnector = (x, y) => {
+          const targetX = x > selectedTreeNode.y ? x : x + panelWidth;
+          const newPath = `M ${selectedTreeNode.y} ${selectedTreeNode.x}
+              C ${(selectedTreeNode.y + targetX) / 2} ${selectedTreeNode.x},
+                ${(selectedTreeNode.y + targetX) / 2} ${y + panelHeight / 2},
+                ${targetX} ${y + panelHeight / 2}`;
+          link.attr('d', newPath);
+        };
+
+        const link = gLinks.append('path').attr('class', 'selected-topic-link')
           .attr('d', `M ${selectedTreeNode.y} ${selectedTreeNode.x}
               C ${(selectedTreeNode.y + connectorTargetX) / 2} ${selectedTreeNode.x},
-                ${(selectedTreeNode.y + connectorTargetX) / 2} ${panelY + panelHeight / 2},
-                ${connectorTargetX} ${panelY + panelHeight / 2}`)
+                ${(selectedTreeNode.y + connectorTargetX) / 2} ${currentY + panelHeight / 2},
+                ${connectorTargetX} ${currentY + panelHeight / 2}`)
           .attr('fill', 'none').attr('stroke', '#667eea').attr('stroke-width', 3)
           .attr('stroke-opacity', 0.8).attr('stroke-dasharray', '8,6');
 
         const panel = gNodes.append('g').attr('class', 'selected-topic-panel');
-        const panelObject = panel.append('foreignObject').attr('x', panelX).attr('y', panelY)
+
+        // Drag behavior
+        const drag = d3.drag()
+          .subject(() => ({ x: currentX, y: currentY }))
+          .filter((event) => {
+            return event.target.tagName.toLowerCase() === 'h3';
+          })
+          .on('start', function () {
+            d3.select(this).raise();
+            d3.select(this).select('h3').style('cursor', 'grabbing');
+          })
+          .on('drag', function (event) {
+            const newX = event.x;
+            const newY = event.y;
+            d3.select(this).attr('x', newX).attr('y', newY);
+            updateConnector(newX, newY);
+            currentX = newX;
+            currentY = newY;
+          })
+          .on('end', function (event) {
+            d3.select(this).select('h3').style('cursor', 'grab');
+            if (onPanelDrag) onPanelDrag(panelData.path, event.x, event.y);
+          });
+
+        const panelObject = panel.append('foreignObject').attr('x', currentX).attr('y', currentY)
           .attr('width', panelWidth).attr('height', panelHeight)
-          .on('mousedown wheel touchstart', (e) => e.stopPropagation());
+          .call(drag);
+
+        panelObject.on('wheel', (e) => e.stopPropagation());
+        panelObject.on('mousedown', (e) => {
+          if (e.target.tagName.toLowerCase() !== 'h3') {
+            e.stopPropagation();
+          }
+        });
 
         const panelHtml = panelObject.append('xhtml:div').attr('class', 'topic-sentences-panel topic-sentences-panel-inline');
-        panelHtml.append('h3').text(`"${panelData.label}"`);
+
+        panelHtml.append('h3')
+          .text(`"${panelData.label}"`)
+          .style('cursor', 'grab')
+          .style('user-select', 'none');
+
         panelHtml.append('button').attr('class', 'close-panel-btn').text('×')
           .on('click', (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -380,7 +431,7 @@ function HierarchicalTree({
 
     updateGraph();
 
-  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, allSentences]);
+  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, allSentences, onPanelDrag]);
 
   // Initial Centering Logic
   useEffect(() => {
@@ -441,17 +492,29 @@ function PrefixTreeResults({ treeData, sentences }) {
 
   const handleNodeClick = (nodeData, label, path) => {
     if (!path) return;
-    const count = nodeData?.count || 0;
-    const nodeSentences = nodeData?.sentences || [];
     setSelectedPanels((prev) => {
       const existingIndex = prev.findIndex((panel) => panel.path === path);
-      const nextPanel = { path, label, count, sentences: nodeSentences };
       if (existingIndex >= 0) {
+        // Toggle OFF
         const updated = [...prev];
-        updated[existingIndex] = nextPanel;
+        updated.splice(existingIndex, 1);
         return updated;
       }
+      // Toggle ON
+      const count = nodeData?.count || 0;
+      const nodeSentences = nodeData?.sentences || [];
+      const nextPanel = { path, label, count, sentences: nodeSentences };
       return [...prev, nextPanel];
+    });
+  };
+
+  const handlePanelDrag = (path, x, y) => {
+    setSelectedPanels((prev) => {
+      const index = prev.findIndex((p) => p.path === path);
+      if (index === -1) return prev;
+      const updated = [...prev];
+      updated[index] = { ...updated[index], x, y };
+      return updated;
     });
   };
 
@@ -474,6 +537,7 @@ function PrefixTreeResults({ treeData, sentences }) {
                   data={treeData}
                   onNodeSelect={handleNodeClick}
                   onClosePanel={closePanel}
+                  onPanelDrag={handlePanelDrag}
                   selectedPanels={selectedPanels}
                   allSentences={sentences}
                   expandMode={expandMode}
