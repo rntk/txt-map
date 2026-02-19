@@ -16,7 +16,6 @@ from lib.tasks.split_topic_generation import process_split_topic_generation
 from lib.tasks.subtopics_generation import process_subtopics_generation
 from lib.tasks.summarization import process_summarization
 from lib.tasks.mindmap import process_mindmap
-from lib.tasks.insides import process_insides
 from lib.tasks.prefix_tree import process_prefix_tree
 
 # Configure logging
@@ -32,7 +31,6 @@ TASK_DEPENDENCIES = {
     "subtopics_generation": ["split_topic_generation"],
     "summarization": ["split_topic_generation"],
     "mindmap": ["subtopics_generation"],
-    "insides": ["split_topic_generation"],
     "prefix_tree": ["split_topic_generation"],
 }
 
@@ -42,7 +40,6 @@ TASK_PRIORITIES = {
     "subtopics_generation": 2,
     "summarization": 3,
     "mindmap": 3,
-    "insides": 3,
     "prefix_tree": 3,
 }
 
@@ -52,7 +49,6 @@ TASK_HANDLERS = {
     "subtopics_generation": process_subtopics_generation,
     "summarization": process_summarization,
     "mindmap": process_mindmap,
-    "insides": process_insides,
     "prefix_tree": process_prefix_tree
 }
 

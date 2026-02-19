@@ -6,7 +6,6 @@ const TASK_TYPES = [
   'subtopics_generation',
   'summarization',
   'mindmap',
-  'insides',
   'prefix_tree'
 ];
 

@@ -4,7 +4,6 @@ import TextDisplay from './TextDisplay';
 import TopicsRiverChart from './TopicsRiverChart';
 import SubtopicsRiverChart from './SubtopicsRiverChart';
 import MindmapResults from './MindmapResults';
-import InsidesResults from './InsidesResults';
 import PrefixTreeResults from './PrefixTreeResults';
 import '../styles/App.css';
 
@@ -114,7 +113,7 @@ function TextPage() {
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap' | 'insides'
+  const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
   const [showPanel, setShowPanel] = useState(false);
@@ -503,10 +502,9 @@ function TextPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>Recalculate:</span>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insides'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
+              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['insides'], 'Insides queued.')} disabled={actionLoading}>Insides</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
             </div>
           </div>
@@ -632,12 +630,6 @@ function TextPage() {
                         Mindmap
                       </button>
                       <button
-                        className={activeTab === 'insides' ? 'active' : ''}
-                        onClick={() => setActiveTab('insides')}
-                      >
-                        Insides
-                      </button>
-                      <button
                         className={activeTab === 'prefix_tree' ? 'active' : ''}
                         onClick={() => setActiveTab('prefix_tree')}
                       >
@@ -745,14 +737,6 @@ function TextPage() {
                       mindmapData={{
                         topic_mindmaps: results.topic_mindmaps || {},
                         sentences: safeSentences,
-                      }}
-                    />
-                  </div>
-                ) : activeTab === 'insides' ? (
-                  <div className="insides-tab-container" style={{ padding: '20px' }}>
-                    <InsidesResults
-                      insidesData={{
-                        insides: results.insides || []
                       }}
                     />
                   </div>

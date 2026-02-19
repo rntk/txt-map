@@ -40,7 +40,6 @@ Tasks are queued on submission and executed with dependencies:
 2. `subtopics_generation` (depends on `split_topic_generation`)
 3. `summarization` (depends on `split_topic_generation`)
 4. `mindmap` (depends on `subtopics_generation`)
-5. `insides` (depends on `split_topic_generation`)
 
 ## Local (Non-Docker) Run
 

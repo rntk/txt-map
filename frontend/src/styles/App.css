@@ -1880,11 +1880,6 @@
   border-color: #ccc;
 }
 
-/* Insides Container Styles */
-.insides-container {
-  width: 100%;
-}
-
 /* Responsive adjustments for mindmap */
 @media (max-width: 1024px) {
   .mindmap-body {

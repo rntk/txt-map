@@ -8,13 +8,12 @@ from pymongo import MongoClient
 
 class SubmissionsStorage:
     indexes = ["submission_id", "created_at"]
-    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "insides", "prefix_tree"]
+    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree"]
     task_dependencies = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
         "mindmap": ["split_topic_generation"],
-        "insides": ["split_topic_generation"],
         "prefix_tree": ["split_topic_generation"],
     }
 
@@ -73,12 +72,6 @@ class SubmissionsStorage:
                     "completed_at": None,
                     "error": None
                 },
-                "insides": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None
-                },
                 "prefix_tree": {
                     "status": "pending",
                     "started_at": None,
@@ -95,7 +88,6 @@ class SubmissionsStorage:
                 "subtopics": [],
                 "summary": [],
                 "summary_mappings": [],
-                "insides": [],
                 "prefix_tree": {}
             }
         }
@@ -187,9 +179,6 @@ class SubmissionsStorage:
             update_fields["results.topic_mindmaps"] = {}
             update_fields["results.mindmap_results"] = []
             update_fields["results.mindmap_metadata"] = {}
-
-        if "insides" in task_names:
-            update_fields["results.insides"] = []
 
         if "prefix_tree" in task_names:
             update_fields["results.prefix_tree"] = {}

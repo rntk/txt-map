@@ -57,7 +57,6 @@ def post_submit(
         ("subtopics_generation", 2),
         ("summarization", 3),
         ("mindmap", 3),
-        ("insides", 3),
         ("prefix_tree", 3)
     ]:
         db.task_queue.insert_one({
@@ -195,7 +194,6 @@ def post_refresh(
         "subtopics_generation": 2,
         "summarization": 3,
         "mindmap": 3,
-        "insides": 3,
         "prefix_tree": 3
     }
 
