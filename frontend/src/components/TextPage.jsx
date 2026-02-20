@@ -5,6 +5,7 @@ import TopicsRiverChart from './TopicsRiverChart';
 import SubtopicsRiverChart from './SubtopicsRiverChart';
 import MindmapResults from './MindmapResults';
 import PrefixTreeResults from './PrefixTreeResults';
+import FullScreenGraph from './FullScreenGraph';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -118,6 +119,12 @@ function TextPage() {
   const [readTopics, setReadTopics] = useState(new Set());
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
+  const [fullscreenGraph, setFullscreenGraph] = useState(null); // 'mindmap' | 'prefix_tree' | null
+
+  const closeFullscreenGraph = useCallback(() => {
+    setFullscreenGraph(null);
+    setActiveTab('article');
+  }, []);
 
   const submissionId = window.location.pathname.split('/')[3];
 
@@ -625,15 +632,25 @@ function TextPage() {
                       </button>
                       <button
                         className={activeTab === 'mindmap' ? 'active' : ''}
-                        onClick={() => setActiveTab('mindmap')}
+                        onClick={() => {
+                          setActiveTab('mindmap');
+                          setFullscreenGraph('mindmap');
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Open mindmap in full screen"
                       >
-                        Mindmap
+                        🧠 Mindmap
                       </button>
                       <button
                         className={activeTab === 'prefix_tree' ? 'active' : ''}
-                        onClick={() => setActiveTab('prefix_tree')}
+                        onClick={() => {
+                          setActiveTab('prefix_tree');
+                          setFullscreenGraph('prefix_tree');
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Open prefix tree in full screen"
                       >
-                        Prefix Tree
+                        🌳 Prefix Tree
                       </button>
                     </div>
                   </div>
@@ -732,21 +749,21 @@ function TextPage() {
                     </div>
                   </div>
                 ) : activeTab === 'mindmap' ? (
-                  <div className="mindmap-tab-container" style={{ padding: '20px' }}>
-                    <MindmapResults
-                      mindmapData={{
-                        topic_mindmaps: results.topic_mindmaps || {},
-                        sentences: safeSentences,
-                      }}
-                    />
-                  </div>
+                  <MindmapResults
+                    mindmapData={{
+                      topic_mindmaps: results.topic_mindmaps || {},
+                      sentences: safeSentences,
+                    }}
+                    fullscreen={true}
+                    onCloseFullscreen={closeFullscreenGraph}
+                  />
                 ) : activeTab === 'prefix_tree' ? (
-                  <div className="mindmap-tab-container" style={{ padding: '20px' }}>
-                    <PrefixTreeResults
-                      treeData={results.prefix_tree || {}}
-                      sentences={safeSentences}
-                    />
-                  </div>
+                  <PrefixTreeResults
+                    treeData={results.prefix_tree || {}}
+                    sentences={safeSentences}
+                    fullscreen={true}
+                    onCloseFullscreen={closeFullscreenGraph}
+                  />
                 ) : (
                   articles.map((article, index) => (
                     <TextDisplay

@@ -2670,3 +2670,193 @@
   position: relative;
   z-index: 1;
 }
+
+/* Fullscreen Graph Modal Styles */
+.fullscreen-graph-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  overflow: hidden;
+}
+
+.fullscreen-graph-container {
+  width: 98vw;
+  height: 98vh;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fullscreen-graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  height: 44px;
+  gap: 12px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fullscreen-graph-title {
+  margin: 0;
+  font-size: 0.95em;
+  color: #333;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.header-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.header-toolbar .toolbar-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-toolbar .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #666;
+  background: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.header-toolbar .tree-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.header-toolbar .tree-control-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.header-toolbar .tree-control-btn:hover {
+  background-color: #0056b3;
+}
+
+.fullscreen-graph-close {
+  background: #e0e0e0;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #444;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+  line-height: 1;
+}
+
+.fullscreen-graph-close:hover {
+  background-color: #d0d0d0;
+  color: #222;
+}
+
+.fullscreen-graph-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.fullscreen-graph-content .mindmap-results-container {
+  width: 100%;
+  height: 100%;
+}
+
+.fullscreen-graph-content .hierarchical-tree-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.fullscreen-graph-content .hierarchical-tree-container {
+  width: 100%;
+  height: 100%;
+}
+
+.fullscreen-graph-content .hierarchical-tree-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Mindmap Results Container */
+.mindmap-results-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mindmap-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.mindmap-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hierarchical-tree-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hierarchical-tree-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  z-index: 1;
+}

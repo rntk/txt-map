@@ -188,6 +188,26 @@ function TopicList({
     });
   };
 
+  const getAllNonLeafPaths = useCallback(() => {
+    const paths = new Set();
+    const traverse = (treeNode) => {
+      if (treeNode.children.size > 0) {
+        paths.add(treeNode.node.fullPath);
+        treeNode.children.forEach(child => traverse(child));
+      }
+    };
+    topicTree.forEach(root => traverse(root));
+    return paths;
+  }, [topicTree]);
+
+  const unfoldAll = useCallback(() => {
+    setExpandedNodes(getAllNonLeafPaths());
+  }, [getAllNonLeafPaths]);
+
+  const foldAll = useCallback(() => {
+    setExpandedNodes(new Set());
+  }, []);
+
   const getTopicSelectionKey = (topicOrTopics) => {
     if (!topicOrTopics) return '';
     if (Array.isArray(topicOrTopics)) {
@@ -223,14 +243,14 @@ function TopicList({
     nodeContent: {
       display: 'flex',
       alignItems: 'flex-start',
-      gap: '8px',
-      padding: '10px 8px',
+      gap: '4px',
+      padding: '10px 4px',
       borderBottom: '1px solid #eee',
     },
     guideLine: {
-      width: '10px',
+      width: '6px',
       borderLeft: '1px dotted #ccc',
-      marginLeft: '2px',
+      marginLeft: '0px',
       flexShrink: 0,
     },
     expandIcon: {
@@ -296,7 +316,7 @@ function TopicList({
       listStyle: 'none',
       margin: 0,
       padding: 0,
-      paddingLeft: '8px',
+      paddingLeft: '4px',
     },
   };
 
@@ -481,11 +501,17 @@ function TopicList({
       {topicTree.length === 0 ? (
         <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {topicTree.map((treeNode) => (
-            <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
-          ))}
-        </ul>
+        <>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            <button onClick={unfoldAll} style={styles.button}>Unfold All</button>
+            <button onClick={foldAll} style={styles.button}>Fold All</button>
+          </div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {topicTree.map((treeNode) => (
+              <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
