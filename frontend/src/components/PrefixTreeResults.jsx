@@ -15,6 +15,7 @@ function HierarchicalTree({
   const containerRef = useRef(null);
   const gRef = useRef(null);
   const zoomBehaviorRef = useRef(null);
+  const lastToggledNodeRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [expandState, setExpandState] = useState({});
   const [isInitialized, setIsInitialized] = useState(false);
@@ -66,7 +67,12 @@ function HierarchicalTree({
     }
   }, [expandMode, hierarchyData]);
 
-  const toggleNode = (nodePath) => {
+  const toggleNode = (nodePath, sourceNodeData) => {
+    if (sourceNodeData) {
+      lastToggledNodeRef.current = { path: nodePath, oldX: sourceNodeData.x, oldY: sourceNodeData.y };
+    } else {
+      lastToggledNodeRef.current = null;
+    }
     setExpandState(prev => ({
       ...prev,
       [nodePath]: !prev[nodePath]
@@ -178,11 +184,9 @@ function HierarchicalTree({
     const height = dimensions.height - margin.top - margin.bottom;
 
     const treeLayout = d3.tree()
-      .size([height * 80, width * 5])
+      .nodeSize([50, 300])
       .separation((a, b) => {
-        const siblingSpacing = 200;
-        const cousinSpacing = 300;
-        return (a.parent === b.parent ? siblingSpacing : cousinSpacing);
+        return (a.parent === b.parent ? 1 : 1.2);
       });
 
     const updateGraph = () => {
@@ -202,6 +206,19 @@ function HierarchicalTree({
       });
 
       treeLayout(root);
+
+      if (lastToggledNodeRef.current) {
+        const { path, oldX, oldY } = lastToggledNodeRef.current;
+        const newNode = root.descendants().find(d => d._path === path);
+        if (newNode) {
+          const deltaX = newNode.x - oldX;
+          const deltaY = newNode.y - oldY;
+          if (deltaX !== 0 || deltaY !== 0) {
+            svg.transition().duration(300).call(zoomBehaviorRef.current.translateBy, -deltaY, -deltaX);
+          }
+        }
+        lastToggledNodeRef.current = null;
+      }
 
       const nodes = root.descendants().filter(d => d.data.name !== '__virtual_root__');
       const links = root.links().filter(d => d.source.data.name !== '__virtual_root__');
@@ -243,7 +260,7 @@ function HierarchicalTree({
         .on('click', (event, d) => {
           event.stopPropagation();
           const path = d._path || d.data.path;
-          if (path) toggleNode(path);
+          if (path) toggleNode(path, d);
         });
 
       toggleGroup.append('circle').attr('class', 'toggle-btn-bg').attr('r', 0).attr('cx', 20)
