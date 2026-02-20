@@ -7,6 +7,7 @@ import MarimekkoChartTab from './MarimekkoChartTab';
 import MindmapResults from './MindmapResults';
 import PrefixTreeResults from './PrefixTreeResults';
 import FullScreenGraph from './FullScreenGraph';
+import TopicsTagCloud from './TopicsTagCloud';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -659,6 +660,12 @@ function TextPage() {
                       >
                         🌳 Prefix Tree
                       </button>
+                      <button
+                        className={activeTab === 'tags_cloud' ? 'active' : ''}
+                        onClick={() => setActiveTab('tags_cloud')}
+                      >
+                        ☁️ Tags Cloud
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -774,6 +781,11 @@ function TextPage() {
                     sentences={safeSentences}
                     fullscreen={true}
                     onCloseFullscreen={closeFullscreenGraph}
+                  />
+                ) : activeTab === 'tags_cloud' ? (
+                  <TopicsTagCloud
+                    topics={safeTopics}
+                    sentences={safeSentences}
                   />
                 ) : (
                   articles.map((article, index) => (
