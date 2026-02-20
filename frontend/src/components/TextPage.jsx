@@ -784,6 +784,7 @@ function TextPage() {
                   />
                 ) : activeTab === 'tags_cloud' ? (
                   <TopicsTagCloud
+                    submissionId={submissionId}
                     topics={safeTopics}
                     sentences={safeSentences}
                   />

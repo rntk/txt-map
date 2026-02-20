@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from lib.storage.submissions import SubmissionsStorage
+from lib.nlp import compute_word_frequencies
 from datetime import datetime, UTC
 import io
 
@@ -293,6 +294,55 @@ def post_refresh(
         "message": "Tasks queued for recalculation",
         "tasks_queued": tasks_queued
     }
+
+
+@router.get("/submission/{submission_id}/word-cloud")
+def get_word_cloud(
+    submission_id: str,
+    path: List[str] = Query(default=[]),
+    top_n: int = Query(default=60, ge=1, le=200),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Return a word-frequency cloud for the sentences that belong to topics
+    matching *path* (a hierarchical list of topic segments, e.g. ["Sport", "Tennis"]).
+    An empty *path* covers all topics.
+    Uses NLTK tokenisation, POS tagging, and lemmatisation on the backend.
+    """
+    submission = submissions_storage.get_by_id(submission_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    results = submission.get("results") or {}
+    topics = results.get("topics") or []
+    sentences = results.get("sentences") or []
+
+    if not sentences:
+        return {"words": [], "sentence_count": 0}
+
+    # Filter topics whose name starts with the requested path segments.
+    def topic_matches(name: str) -> bool:
+        parts = [p.strip() for p in name.split(">")]
+        if len(parts) < len(path):
+            return False
+        return all(parts[i] == path[i] for i in range(len(path)))
+
+    matching_topics = [t for t in topics if topic_matches(t.get("name", ""))]
+
+    # Collect unique 1-based sentence indices.
+    sentence_indices: set = set()
+    for topic in matching_topics:
+        for idx in (topic.get("sentences") or []):
+            sentence_indices.add(int(idx))
+
+    texts = [
+        sentences[idx - 1]
+        for idx in sentence_indices
+        if 1 <= idx <= len(sentences)
+    ]
+
+    words = compute_word_frequencies(texts, top_n=top_n)
+    return {"words": words, "sentence_count": len(sentence_indices)}
 
 
 @router.get("/submissions")

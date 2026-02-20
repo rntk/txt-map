@@ -1,25 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 
-const STOP_WORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
-  'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-  'could', 'should', 'may', 'might', 'shall', 'can', 'not', 'no', 'nor',
-  'so', 'yet', 'both', 'either', 'neither', 'each', 'few', 'more', 'most',
-  'other', 'some', 'such', 'than', 'too', 'very', 'just',
-  'it', 'its', 'this', 'that', 'these', 'those', 'he', 'she', 'they',
-  'we', 'you', 'i', 'me', 'him', 'her', 'us', 'them',
-  'my', 'your', 'his', 'their', 'our', 'its',
-  'what', 'which', 'who', 'when', 'where', 'why', 'how',
-  'all', 'any', 'if', 'as', 'into', 'about', 'after', 'before',
-  'up', 'out', 'then', 'also', 'there', 'through', 'while', 'during',
-  'over', 'under', 'between', 'among', 'said', 'says',
-  'one', 'two', 'three', 'four', 'five', 'new', 'old',
-  'first', 'last', 'many', 'much', 'like', 'now', 'only', 'same',
-  'however', 'therefore', 'thus', 'since', 'although', 'though', 'because',
-  'even', 'every', 'well', 'can', 'per', 'get', 'got', 'let', 'set',
-  'use', 'used', 'using', 'also', 'their', 'them', 'they', 'those',
-]);
+// ── Word cloud renderer ────────────────────────────────────────────────────────
 
 function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data available.' }) {
   if (!words || words.length === 0) {
@@ -45,7 +26,7 @@ function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data availabl
     for (let i = 0; i < word.length; i++) {
       hash = (hash * 31 + word.charCodeAt(i)) & 0x7fffffff;
     }
-    const hue = (hash % 280) + 20; // avoid pure red
+    const hue = (hash % 280) + 20;
     return `hsl(${hue}, 55%, 32%)`;
   };
 
@@ -88,21 +69,12 @@ function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data availabl
   );
 }
 
-// Topics whose path starts with navPath and has at least one more segment
+// ── Topic hierarchy helpers (pure string manipulation, no NLP) ─────────────────
+
 function getChildTopics(topics, navPath) {
   return topics.filter(topic => {
     const parts = topic.name.split('>').map(s => s.trim());
     if (parts.length <= navPath.length) return false;
-    return navPath.every((seg, i) => parts[i] === seg);
-  });
-}
-
-// Topics that match navPath exactly OR are children of navPath (for sentence collection)
-function getMatchingTopics(topics, navPath) {
-  if (navPath.length === 0) return topics;
-  return topics.filter(topic => {
-    const parts = topic.name.split('>').map(s => s.trim());
-    if (parts.length < navPath.length) return false;
     return navPath.every((seg, i) => parts[i] === seg);
   });
 }
@@ -121,49 +93,47 @@ function buildTopicWordCloud(topics, navPath) {
     .map(([word, frequency]) => ({ word, frequency }));
 }
 
-function buildSentenceWordCloud(topics, sentences, navPath) {
-  const matching = getMatchingTopics(topics, navPath);
-  const indices = new Set();
-  matching.forEach(topic => {
-    (topic.sentences || []).forEach(idx => indices.add(idx));
-  });
+// ── Main component ─────────────────────────────────────────────────────────────
 
-  const text = Array.from(indices)
-    .map(idx => (sentences[Number(idx) - 1] || ''))
-    .join(' ');
-
-  const wordFreq = {};
-  text
-    .toLowerCase()
-    .replace(/[^a-z\s'-]/g, ' ')
-    .split(/\s+/)
-    .forEach(raw => {
-      const word = raw.replace(/^[^a-z]+|[^a-z]+$/g, '');
-      if (word.length >= 3 && !STOP_WORDS.has(word)) {
-        wordFreq[word] = (wordFreq[word] || 0) + 1;
-      }
-    });
-
-  const words = Object.entries(wordFreq)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 60)
-    .map(([word, frequency]) => ({ word, frequency }));
-
-  return { words, sentenceCount: indices.size };
-}
-
-function TopicsTagCloud({ topics, sentences }) {
+function TopicsTagCloud({ submissionId, topics, sentences }) {
   const [navPath, setNavPath] = useState([]);
 
+  // Sentence word cloud fetched from backend
+  const [sentenceWords, setSentenceWords] = useState([]);
+  const [sentenceCount, setSentenceCount] = useState(0);
+  const [loadingCloud, setLoadingCloud] = useState(false);
+
+  // Sub-topic navigation cloud is computed locally — it's pure string work.
   const topicWords = useMemo(
     () => buildTopicWordCloud(topics, navPath),
     [topics, navPath]
   );
 
-  const { words: sentenceWords, sentenceCount } = useMemo(
-    () => buildSentenceWordCloud(topics, sentences, navPath),
-    [topics, sentences, navPath]
-  );
+  // Fetch sentence word cloud from backend whenever the path changes.
+  const fetchWordCloud = useCallback(async (path) => {
+    setLoadingCloud(true);
+    try {
+      const params = new URLSearchParams();
+      path.forEach(seg => params.append('path', seg));
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/submission/${submissionId}/word-cloud?${params}`
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setSentenceWords(data.words || []);
+      setSentenceCount(data.sentence_count || 0);
+    } catch (err) {
+      console.error('word-cloud fetch failed:', err);
+      setSentenceWords([]);
+      setSentenceCount(0);
+    } finally {
+      setLoadingCloud(false);
+    }
+  }, [submissionId]);
+
+  useEffect(() => {
+    fetchWordCloud(navPath);
+  }, [fetchWordCloud, navPath]);
 
   const isRoot = navPath.length === 0;
 
@@ -236,18 +206,41 @@ function TopicsTagCloud({ topics, sentences }) {
         </div>
       )}
 
-      {/* Sentence word cloud */}
+      {/* Sentence word cloud (from backend) */}
       <div>
         <div style={{ marginBottom: '10px', fontSize: '14px', fontWeight: '600', color: '#444' }}>
           {isRoot ? 'All text' : navPath.join(' › ')} — key words
-          <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
-            from {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
-          </span>
+          {!loadingCloud && (
+            <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
+              from {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          {loadingCloud && (
+            <span style={{ fontSize: '12px', fontWeight: '400', color: '#aaa', marginLeft: '8px' }}>
+              computing…
+            </span>
+          )}
         </div>
-        <WordCloudDisplay
-          words={sentenceWords}
-          emptyMessage="No sentences found for this topic."
-        />
+        {loadingCloud ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '90px',
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef',
+            color: '#aaa',
+            fontSize: '13px',
+          }}>
+            Loading word cloud…
+          </div>
+        ) : (
+          <WordCloudDisplay
+            words={sentenceWords}
+            emptyMessage="No sentences found for this topic."
+          />
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,9 @@ from handlers import submission_handler, task_queue_handler
 from pymongo import MongoClient
 from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
+from lib.nlp import ensure_nltk_data
+
+ensure_nltk_data()
 
 app = FastAPI(title="My FastAPI App", description="A simple FastAPI application with separate handlers")
 
