@@ -252,23 +252,22 @@ function HierarchicalTree({
         .attr('r', 1e-6)
         .attr('fill', d => d.depth === 1 ? '#ef4444' : (d.children ? '#3b82f6' : '#14b8a6'));
 
-      nodeEnter.append('text')
+      const label = nodeEnter.append('text')
         .attr('class', 'tree-node-label')
-        .attr('dy', '0.35em')
+        .attr('dy', '-1.8em')
         .attr('text-anchor', 'middle')
-        .style('font-size', '11px')
-        .text(d => d._name)
         .style('fill-opacity', 1e-6);
 
-      nodeEnter.append('text')
+      label.append('tspan')
+        .attr('class', 'tree-node-name')
+        .text(d => d._name);
+
+      label.append('tspan')
         .attr('class', 'tree-node-count')
-        .attr('dy', '1.5em')
-        .attr('x', 0)
-        .attr('text-anchor', 'middle')
+        .attr('dx', '0.5em')
         .attr('fill', '#6b7280')
-        .style('font-size', '10px')
-        .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '')
-        .style('fill-opacity', 1e-6);
+        .style('font-size', '0.85em')
+        .text(d => d._sentences && d._sentences.length > 0 ? `(${d._sentences.length})` : '');
 
       // Toggle btn
       const toggleGroup = nodeEnter.append('g')
@@ -320,14 +319,9 @@ function HierarchicalTree({
         });
 
       nodeUpdate.select('.tree-node-label')
-        .attr('dy', d => d.children ? '-1.8em' : '0.35em')
+        .attr('dy', '-1.8em')
         .style('font-size', d => d.depth === 1 ? '16px' : (d.depth === 2 ? '13px' : '11px'))
         .style('font-weight', d => d.children ? '600' : '400')
-        .transition().duration(duration)
-        .style('fill-opacity', 1);
-
-      nodeUpdate.select('.tree-node-count')
-        .attr('dy', d => d.children ? '1.5em' : '0.35em')
         .transition().duration(duration)
         .style('fill-opacity', 1);
 

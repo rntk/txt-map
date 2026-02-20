@@ -217,16 +217,17 @@ function HierarchicalTree({
           return '#14b8a6';
         });
 
-      nodeEnter.append('text').attr('class', 'tree-node-label').attr('dy', '0.35em').attr('text-anchor', 'middle')
-        .style('font-size', '11px').text(d => d._name).style('fill-opacity', 1e-6);
+      const label = nodeEnter.append('text').attr('class', 'tree-node-label').attr('dy', '-1.8em').attr('text-anchor', 'middle')
+        .style('fill-opacity', 1e-6);
 
-      nodeEnter.append('text').attr('class', 'tree-node-fullword').attr('dy', '1.4em').attr('text-anchor', 'middle')
+      label.append('tspan').attr('class', 'tree-node-name').text(d => d._name);
+
+      label.append('tspan').attr('class', 'tree-node-count').attr('dx', '0.5em')
+        .attr('fill', '#6b7280').style('font-size', '0.85em').text(d => d._count > 0 ? `(${d._count})` : '');
+
+      nodeEnter.append('text').attr('class', 'tree-node-fullword').attr('dy', '-0.3em').attr('text-anchor', 'middle')
         .style('font-size', '9px').style('font-style', 'italic').text(d => d.depth > 1 ? d._fullWord : '')
         .style('fill-opacity', 0);
-
-      nodeEnter.append('text').attr('class', 'tree-node-count').attr('dy', '1.5em').attr('text-anchor', 'middle')
-        .attr('fill', '#6b7280').style('font-size', '10px').text(d => d._count > 0 ? `(${d._count})` : '')
-        .style('fill-opacity', 1e-6);
 
       const toggleGroup = nodeEnter.append('g').attr('class', 'node-toggle-btn').style('cursor', 'pointer')
         .on('click', (event, d) => {
@@ -262,18 +263,14 @@ function HierarchicalTree({
         });
 
       nodeUpdate.select('.tree-node-label')
-        .attr('dy', d => d.children ? '-1.8em' : '0.35em')
+        .attr('dy', '-1.8em')
         .style('font-size', d => d.depth === 1 ? '16px' : (d.depth === 2 ? '13px' : '11px'))
         .style('font-weight', d => d.children ? '600' : '400')
         .transition().duration(duration).style('fill-opacity', 1);
 
       nodeUpdate.select('.tree-node-fullword')
-        .attr('dy', d => d.children ? '-0.3em' : '1.4em')
+        .attr('dy', '-0.3em')
         .transition().duration(duration).style('fill-opacity', 0.7);
-
-      nodeUpdate.select('.tree-node-count')
-        .attr('dy', d => d.children ? '1.5em' : '0.35em')
-        .transition().duration(duration).style('fill-opacity', 1);
 
       nodeUpdate.select('.toggle-btn-bg').attr('r', d => d.children ? 9 : 0)
         .attr('cx', d => d.depth === 1 ? 26 : 20);
