@@ -74,16 +74,22 @@ def _extract_content_from_upload(filename: str, data: bytes) -> tuple[str, str]:
         return html, text
 
     if ext == ".pdf":
-        import pypdf
+        from lib.pdf_to_html import convert_pdf_to_html, extract_text_from_pdf
         try:
-            reader = pypdf.PdfReader(io.BytesIO(data))
-            pages = [page.extract_text() or "" for page in reader.pages]
+            # Generate semantic HTML with headings, paragraphs, bold, italic
+            html_content = convert_pdf_to_html(data)
+            # Extract plain text for text_content
+            text_content = extract_text_from_pdf(data)
+            if not text_content.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF appears to contain no extractable text (may be scanned/image-only)."
+                )
+            return html_content, text_content
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Could not parse PDF: {e}")
-        text = "\n\n".join(pages)
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="PDF appears to contain no extractable text (may be scanned/image-only).")
-        return text, text
 
     raise HTTPException(
         status_code=415,
