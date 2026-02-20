@@ -247,6 +247,9 @@ function HierarchicalTree({
           if (onNodeSelect) onNodeSelect(d._name, d._sentences, d._path);
         });
 
+      nodeEnter.append('title')
+        .text(d => d._path ? d._path.split('/').join(' > ') : d._name);
+
       nodeEnter.append('circle')
         .attr('class', 'tree-node-circle')
         .attr('r', 1e-6)

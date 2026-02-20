@@ -208,6 +208,9 @@ function HierarchicalTree({
           }
         });
 
+      nodeEnter.append('title')
+        .text(d => d._path ? d._path.split('/').join('') : d._name);
+
       nodeEnter.append('circle')
         .attr('class', 'tree-node-circle')
         .attr('r', 1e-6)
