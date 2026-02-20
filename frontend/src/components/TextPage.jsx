@@ -8,6 +8,7 @@ import MindmapResults from './MindmapResults';
 import PrefixTreeResults from './PrefixTreeResults';
 import FullScreenGraph from './FullScreenGraph';
 import TopicsTagCloud from './TopicsTagCloud';
+import CircularPackingChart from './CircularPackingChart';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -666,6 +667,12 @@ function TextPage() {
                       >
                         ☁️ Tags Cloud
                       </button>
+                      <button
+                        className={activeTab === 'circular_packing' ? 'active' : ''}
+                        onClick={() => setActiveTab('circular_packing')}
+                      >
+                        ⬤ Circles
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -788,6 +795,12 @@ function TextPage() {
                     topics={safeTopics}
                     sentences={safeSentences}
                   />
+                ) : activeTab === 'circular_packing' ? (
+                  <div style={{ padding: '20px' }}>
+                    <h2>Topic Circles</h2>
+                    <p>Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.</p>
+                    <CircularPackingChart topics={safeTopics} />
+                  </div>
                 ) : (
                   articles.map((article, index) => (
                     <TextDisplay
