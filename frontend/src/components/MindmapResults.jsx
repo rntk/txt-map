@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
+import FullScreenGraph from './FullScreenGraph';
 import '../styles/App.css';
 
 function HierarchicalTree({
@@ -544,17 +545,12 @@ function HierarchicalTree({
 
   return (
     <div className="hierarchical-tree-container" ref={containerRef}>
-      <div className="tree-legend">
-        <div className="legend-item"><span className="legend-dot root"></span><span>Root Topic</span></div>
-        <div className="legend-item"><span className="legend-dot internal"></span><span>Category</span></div>
-        <div className="legend-item"><span className="legend-dot leaf"></span><span>Leaf Node</span></div>
-      </div>
       <svg ref={svgRef} width={dimensions.width} height={dimensions.height} className="hierarchical-tree-svg" />
     </div>
   );
 }
 
-function MindmapResults({ mindmapData }) {
+function MindmapResults({ mindmapData, fullscreen = false, onCloseFullscreen }) {
   const [expandMode, setExpandMode] = useState('default');
   const [selectedPanels, setSelectedPanels] = useState([]);
 
@@ -577,12 +573,10 @@ function MindmapResults({ mindmapData }) {
     setSelectedPanels((prev) => {
       const existingIndex = prev.findIndex((panel) => panel.path === path);
       if (existingIndex >= 0) {
-        // Toggle OFF (Hide window on second click)
         const updated = [...prev];
         updated.splice(existingIndex, 1);
         return updated;
       }
-      // Toggle ON
       const nextPanel = { path, name, sentenceIndices: sentenceIndices || [] };
       return [...prev, nextPanel];
     });
@@ -592,8 +586,6 @@ function MindmapResults({ mindmapData }) {
     setSelectedPanels((prev) => {
       const index = prev.findIndex((p) => p.path === path);
       if (index === -1) return prev;
-      // Only update if changed significantly or just update
-      // Since this runs on drag end, it's fine
       const updated = [...prev];
       updated[index] = { ...updated[index], x, y };
       return updated;
@@ -604,17 +596,19 @@ function MindmapResults({ mindmapData }) {
     setSelectedPanels((prev) => prev.filter((panel) => panel.path !== path));
   };
 
-  return (
+  const handleClose = () => {
+    if (onCloseFullscreen) {
+      onCloseFullscreen();
+    }
+  };
+
+  const graphContent = (
     <div className="mindmap-results-container">
       <div className="mindmap-body">
         <div className="mindmap-left">
           <div className="hierarchical-tree-wrapper">
             {Object.keys(structure).length > 0 ? (
               <>
-                <div className="tree-controls">
-                  <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
-                  <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
-                </div>
                 <HierarchicalTree
                   data={structure}
                   onNodeSelect={handleNodeClick}
@@ -636,6 +630,32 @@ function MindmapResults({ mindmapData }) {
       </div>
     </div>
   );
+
+  if (fullscreen) {
+    return (
+      <FullScreenGraph
+        onClose={handleClose}
+        title="🧠 Mindmap"
+        toolbar={
+          <>
+            <div className="toolbar-legend">
+              <div className="legend-item"><span className="legend-dot root"></span><span>Root</span></div>
+              <div className="legend-item"><span className="legend-dot internal"></span><span>Category</span></div>
+              <div className="legend-item"><span className="legend-dot leaf"></span><span>Leaf</span></div>
+            </div>
+            <div className="tree-controls">
+              <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
+              <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
+            </div>
+          </>
+        }
+      >
+        {graphContent}
+      </FullScreenGraph>
+    );
+  }
+
+  return graphContent;
 }
 
 export default MindmapResults;

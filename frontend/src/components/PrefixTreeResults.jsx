@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
+import FullScreenGraph from './FullScreenGraph';
 import '../styles/App.css';
 
 function HierarchicalTree({
@@ -454,17 +455,12 @@ function HierarchicalTree({
 
   return (
     <div className="hierarchical-tree-container" ref={containerRef}>
-      <div className="tree-legend">
-        <div className="legend-item"><span className="legend-dot root"></span><span>Root</span></div>
-        <div className="legend-item"><span className="legend-dot internal"></span><span>Prefix</span></div>
-        <div className="legend-item"><span className="legend-dot leaf"></span><span>Complete Word</span></div>
-      </div>
       <svg ref={svgRef} width={dimensions.width} height={dimensions.height} className="hierarchical-tree-svg" />
     </div>
   );
 }
 
-function PrefixTreeResults({ treeData, sentences }) {
+function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFullscreen }) {
   const [expandMode, setExpandMode] = useState('default');
   const [selectedPanels, setSelectedPanels] = useState([]);
 
@@ -484,12 +480,10 @@ function PrefixTreeResults({ treeData, sentences }) {
     setSelectedPanels((prev) => {
       const existingIndex = prev.findIndex((panel) => panel.path === path);
       if (existingIndex >= 0) {
-        // Toggle OFF
         const updated = [...prev];
         updated.splice(existingIndex, 1);
         return updated;
       }
-      // Toggle ON
       const count = nodeData?.count || 0;
       const nodeSentences = nodeData?.sentences || [];
       const nextPanel = { path, label, count, sentences: nodeSentences };
@@ -511,17 +505,19 @@ function PrefixTreeResults({ treeData, sentences }) {
     setSelectedPanels((prev) => prev.filter((panel) => panel.path !== path));
   };
 
-  return (
+  const handleClose = () => {
+    if (onCloseFullscreen) {
+      onCloseFullscreen();
+    }
+  };
+
+  const graphContent = (
     <div className="mindmap-results-container">
       <div className="mindmap-body">
         <div className="mindmap-left">
           <div className="hierarchical-tree-wrapper">
             {Object.keys(treeData).length > 0 ? (
               <>
-                <div className="tree-controls">
-                  <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
-                  <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
-                </div>
                 <HierarchicalTree
                   data={treeData}
                   onNodeSelect={handleNodeClick}
@@ -543,6 +539,32 @@ function PrefixTreeResults({ treeData, sentences }) {
       </div>
     </div>
   );
+
+  if (fullscreen) {
+    return (
+      <FullScreenGraph
+        onClose={handleClose}
+        title="🌳 Prefix Tree"
+        toolbar={
+          <>
+            <div className="toolbar-legend">
+              <div className="legend-item"><span className="legend-dot root"></span><span>Root</span></div>
+              <div className="legend-item"><span className="legend-dot internal"></span><span>Prefix</span></div>
+              <div className="legend-item"><span className="legend-dot leaf"></span><span>Word</span></div>
+            </div>
+            <div className="tree-controls">
+              <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
+              <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
+            </div>
+          </>
+        }
+      >
+        {graphContent}
+      </FullScreenGraph>
+    );
+  }
+
+  return graphContent;
 }
 
 export default PrefixTreeResults;
