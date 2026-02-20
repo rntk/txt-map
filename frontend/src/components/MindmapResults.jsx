@@ -68,34 +68,11 @@ function HierarchicalTree({
     }
   }, [expandMode, hierarchyData]); // Added hierarchyData dependency
 
-  const toggleNode = (nodePath, sourceNodeData) => {
-    if (sourceNodeData) {
-      lastToggledNodeRef.current = { path: nodePath, oldX: sourceNodeData.x, oldY: sourceNodeData.y };
-    } else {
-      lastToggledNodeRef.current = null;
-    }
+  const toggleNode = (nodePath) => {
     setExpandState(prev => ({
       ...prev,
       [nodePath]: !prev[nodePath]
     }));
-  };
-
-  const buildTree = (node) => {
-    if (!node) return null;
-
-    const result = { ...node };
-    const isCollapsed = node.path ? expandState[node.path] : false;
-
-    if (result.children && result.children.length > 0) {
-      result._children = result.children;
-      if (isCollapsed) {
-        result.children = null;
-      } else {
-        result.children = result.children.map(child => buildTree(child));
-      }
-    }
-
-    return result;
   };
 
   // Dimensions
@@ -226,34 +203,30 @@ function HierarchicalTree({
     const updateGraph = () => {
       const duration = 300;
 
-      const processedRoots = hierarchyData.map(root => buildTree(root));
-      const rootData = { name: '__virtual_root__', children: processedRoots };
+      const rootData = { name: '__virtual_root__', children: hierarchyData };
       const root = d3.hierarchy(rootData);
 
       root.descendants().forEach((node, i) => {
         node.id = i;
         node._name = node.data.name;
         node._sentences = node.data.sentences;
-        node._path = node.data.path;
+        node._path = node.data.path || (node.data.name === '__virtual_root__' ? '' : node.data.name);
       });
 
       treeLayout(root);
 
-      if (lastToggledNodeRef.current) {
-        const { path, oldX, oldY } = lastToggledNodeRef.current;
-        const newNode = root.descendants().find(d => d._path === path);
-        if (newNode) {
-          const deltaX = newNode.x - oldX;
-          const deltaY = newNode.y - oldY;
-          if (deltaX !== 0 || deltaY !== 0) {
-            svg.transition().duration(300).call(zoomBehaviorRef.current.translateBy, -deltaY, -deltaX);
-          }
+      // Determine visibility based on expandState without altering children
+      root.each(node => {
+        if (node.depth === 0) {
+          node._isVisible = true;
+        } else {
+          const parentCollapsed = node.parent && expandState[node.parent._path];
+          node._isVisible = node.parent._isVisible && !parentCollapsed;
         }
-        lastToggledNodeRef.current = null;
-      }
+      });
 
-      const nodes = root.descendants().filter(d => d.data.name !== '__virtual_root__');
-      const links = root.links().filter(d => d.source.data.name !== '__virtual_root__');
+      const nodes = root.descendants().filter(d => d.data.name !== '__virtual_root__' && d._isVisible);
+      const links = root.links().filter(d => d.source.data.name !== '__virtual_root__' && d.target._isVisible);
 
       // --- Nodes ---
       const nodeSelection = gNodes.selectAll('.tree-node-group')
@@ -277,7 +250,7 @@ function HierarchicalTree({
       nodeEnter.append('circle')
         .attr('class', 'tree-node-circle')
         .attr('r', 1e-6)
-        .attr('fill', d => d.depth === 1 ? '#ef4444' : (d.data._children ? '#3b82f6' : '#14b8a6'));
+        .attr('fill', d => d.depth === 1 ? '#ef4444' : (d.children ? '#3b82f6' : '#14b8a6'));
 
       nodeEnter.append('text')
         .attr('class', 'tree-node-label')
@@ -304,7 +277,7 @@ function HierarchicalTree({
         .on('click', (event, d) => {
           event.stopPropagation();
           const path = d._path || d.data.path;
-          if (path) toggleNode(path, d);
+          if (path) toggleNode(path);
         });
 
       toggleGroup.append('circle')
@@ -334,38 +307,38 @@ function HierarchicalTree({
         .attr('class', d => {
           const classes = ['tree-node-circle'];
           if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
-          if (!d.data._children) classes.push('leaf');
+          if (!d.children) classes.push('leaf');
           if (d.depth === 1) classes.push('root');
           return classes.join(' ');
         })
         .transition().duration(duration)
-        .attr('r', d => d.depth === 1 ? 14 : (d.data._children ? 10 : 7))
+        .attr('r', d => d.depth === 1 ? 14 : (d.children ? 10 : 7))
         .attr('fill', d => {
           if (d.depth === 1) return '#ef4444';
-          if (d.data._children) return '#3b82f6';
+          if (d.children) return '#3b82f6';
           return '#14b8a6';
         });
 
       nodeUpdate.select('.tree-node-label')
-        .attr('dy', d => d.data._children ? '-1.8em' : '0.35em')
+        .attr('dy', d => d.children ? '-1.8em' : '0.35em')
         .style('font-size', d => d.depth === 1 ? '16px' : (d.depth === 2 ? '13px' : '11px'))
-        .style('font-weight', d => d.data._children ? '600' : '400')
+        .style('font-weight', d => d.children ? '600' : '400')
         .transition().duration(duration)
         .style('fill-opacity', 1);
 
       nodeUpdate.select('.tree-node-count')
-        .attr('dy', d => d.data._children ? '1.5em' : '0.35em')
+        .attr('dy', d => d.children ? '1.5em' : '0.35em')
         .transition().duration(duration)
         .style('fill-opacity', 1);
 
       // Update toggle button
       nodeUpdate.select('.toggle-btn-bg')
-        .attr('r', d => d.data._children ? 9 : 0)
+        .attr('r', d => d.children ? 9 : 0)
         .attr('cx', d => d.depth === 1 ? 26 : 20);
 
       nodeUpdate.select('.toggle-btn-icon')
         .attr('x', d => d.depth === 1 ? 26 : 20)
-        .text(d => !d.data._children ? '' : (d.data.children ? '−' : '+'));
+        .text(d => !d.children ? '' : (expandState[d._path] ? '+' : '−'));
 
       // EXIT
       const nodeExit = nodeSelection.exit().transition().duration(duration)
