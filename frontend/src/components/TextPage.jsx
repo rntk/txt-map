@@ -3,6 +3,7 @@ import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import TopicsRiverChart from './TopicsRiverChart';
 import SubtopicsRiverChart from './SubtopicsRiverChart';
+import MarimekkoChartTab from './MarimekkoChartTab';
 import MindmapResults from './MindmapResults';
 import PrefixTreeResults from './PrefixTreeResults';
 import FullScreenGraph from './FullScreenGraph';
@@ -631,6 +632,12 @@ function TextPage() {
                         Topics River
                       </button>
                       <button
+                        className={activeTab === 'marimekko' ? 'active' : ''}
+                        onClick={() => setActiveTab('marimekko')}
+                      >
+                        Marimekko
+                      </button>
+                      <button
                         className={activeTab === 'mindmap' ? 'active' : ''}
                         onClick={() => {
                           setActiveTab('mindmap');
@@ -747,6 +754,10 @@ function TextPage() {
                         <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
                       )}
                     </div>
+                  </div>
+                ) : activeTab === 'marimekko' ? (
+                  <div className="marimekko-container" style={{ padding: '20px' }}>
+                    <MarimekkoChartTab topics={safeTopics} subtopics={results.subtopics} />
                   </div>
                 ) : activeTab === 'mindmap' ? (
                   <MindmapResults
