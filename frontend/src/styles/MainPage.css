@@ -113,3 +113,38 @@
   color: #9ca3af;
   font-size: 0.875rem;
 }
+
+/* Upload card */
+.upload-card {
+  cursor: pointer;
+  border: 2px dashed rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.upload-card:hover,
+.upload-card--dragging {
+  border-color: rgba(37, 99, 235, 0.4);
+  background: #f8faff;
+}
+
+.upload-card--dragging {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.upload-card--uploading {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.upload-card__icon {
+  transition: transform 0.2s ease;
+}
+
+.upload-card:hover .upload-card__icon {
+  transform: translateY(-3px);
+}
+
+.upload-card__error {
+  color: #dc2626;
+  font-size: 0.9rem;
+}

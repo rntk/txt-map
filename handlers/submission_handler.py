@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List
 from lib.storage.submissions import SubmissionsStorage
 from datetime import datetime, UTC
+import io
 
 
 class SubmitRequest(BaseModel):
@@ -37,40 +38,110 @@ def post_submit(
         source_url=request.source_url
     )
 
-    # Create task queue entries for split_topic_generation (other tasks wait for dependencies)
     db = submissions_storage._db
-    db.task_queue.insert_one({
+    _queue_all_tasks(db, submission["submission_id"])
+
+    return {
         "submission_id": submission["submission_id"],
-        "task_type": "split_topic_generation",
-        "priority": 1,
+        "redirect_url": f"/page/text/{submission['submission_id']}"
+    }
+
+
+ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf"}
+
+
+def _extract_content_from_upload(filename: str, data: bytes) -> tuple[str, str]:
+    """
+    Extract (html_content, text_content) from uploaded file bytes.
+    Returns (html_content, text_content) — for plain text types both are the same.
+    """
+    ext = ""
+    if filename:
+        ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if ext in (".html", ".htm"):
+        content = data.decode("utf-8", errors="replace")
+        return content, content
+
+    if ext == ".txt":
+        content = data.decode("utf-8", errors="replace")
+        return content, content
+
+    if ext == ".md":
+        import markdown as md_lib
+        text = data.decode("utf-8", errors="replace")
+        html = md_lib.markdown(text, extensions=['extra', 'codehilite'])
+        return html, text
+
+    if ext == ".pdf":
+        import pypdf
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(data))
+            pages = [page.extract_text() or "" for page in reader.pages]
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not parse PDF: {e}")
+        text = "\n\n".join(pages)
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="PDF appears to contain no extractable text (may be scanned/image-only).")
+        return text, text
+
+    raise HTTPException(
+        status_code=415,
+        detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+    )
+
+
+def _queue_all_tasks(db, submission_id: str):
+    """Insert task queue entries for a new submission (same as /submit)."""
+    now = datetime.now(UTC)
+    base = {
+        "submission_id": submission_id,
         "status": "pending",
-        "created_at": datetime.now(UTC),
+        "created_at": now,
         "started_at": None,
         "completed_at": None,
         "worker_id": None,
         "retry_count": 0,
-        "error": None
-    })
-
-    # Queue other tasks (they will wait for dependencies)
+        "error": None,
+    }
     for task_type, priority in [
+        ("split_topic_generation", 1),
         ("subtopics_generation", 2),
         ("summarization", 3),
         ("mindmap", 3),
-        ("prefix_tree", 3)
+        ("prefix_tree", 3),
     ]:
-        db.task_queue.insert_one({
-            "submission_id": submission["submission_id"],
-            "task_type": task_type,
-            "priority": priority,
-            "status": "pending",
-            "created_at": datetime.now(UTC),
-            "started_at": None,
-            "completed_at": None,
-            "worker_id": None,
-            "retry_count": 0,
-            "error": None
-        })
+        db.task_queue.insert_one({**base, "task_type": task_type, "priority": priority})
+
+
+@router.post("/upload")
+async def post_upload(
+    file: UploadFile = File(...),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Accept an uploaded file (html, htm, txt, md, pdf), extract its text/html
+    content, and process it the same way as a browser-extension submission.
+    """
+    filename = file.filename or ""
+    if "." not in filename or \
+            ("." + filename.rsplit(".", 1)[-1].lower()) not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+        )
+
+    data = await file.read()
+    html_content, text_content = _extract_content_from_upload(filename, data)
+
+    submission = submissions_storage.create(
+        html_content=html_content,
+        text_content=text_content,
+        source_url=filename,
+    )
+
+    db = submissions_storage._db
+    _queue_all_tasks(db, submission["submission_id"])
 
     return {
         "submission_id": submission["submission_id"],
