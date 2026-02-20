@@ -10,7 +10,8 @@ function HierarchicalTree({
   onPanelDrag,
   selectedPanels,
   allSentences,
-  expandMode
+  expandMode,
+  foldDepth
 }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
@@ -48,6 +49,27 @@ function HierarchicalTree({
 
     return roots;
   }, [data]);
+
+  // Handle foldDepth changes
+  useEffect(() => {
+    if (!hierarchyData || !foldDepth) return;
+
+    const targetDepth = foldDepth.depth;
+    const shouldCollapse = foldDepth.collapse;
+    const updates = {};
+    const traverse = (node) => {
+      if (node.path && node.children && node.children.length > 0) {
+        const depth = node.path.split('/').filter(Boolean).length;
+        if (depth === targetDepth) {
+          updates[node.path] = shouldCollapse;
+        } else {
+          node.children.forEach(traverse);
+        }
+      }
+    };
+    hierarchyData.forEach(traverse);
+    setExpandState(prev => ({ ...prev, ...updates }));
+  }, [foldDepth, hierarchyData]);
 
   // Handle expandMode changes
   useEffect(() => {
@@ -462,7 +484,17 @@ function HierarchicalTree({
 
 function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFullscreen }) {
   const [expandMode, setExpandMode] = useState('default');
+  const [foldDepth, setFoldDepth] = useState(null);
+  const foldDepthRef = useRef(0);
   const [selectedPanels, setSelectedPanels] = useState([]);
+
+  const handleLegendClick = (depth) => {
+    foldDepthRef.current += 1;
+    setFoldDepth(prev => {
+      const wasCollapsed = prev && prev.depth === depth && prev.collapse;
+      return { depth, key: foldDepthRef.current, collapse: !wasCollapsed };
+    });
+  };
 
   if (!treeData) {
     return (
@@ -526,6 +558,7 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
                   selectedPanels={selectedPanels}
                   allSentences={sentences}
                   expandMode={expandMode}
+                  foldDepth={foldDepth}
                 />
               </>
             ) : (
@@ -548,9 +581,9 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
         toolbar={
           <>
             <div className="toolbar-legend">
-              <div className="legend-item"><span className="legend-dot root"></span><span>Root</span></div>
-              <div className="legend-item"><span className="legend-dot internal"></span><span>Prefix</span></div>
-              <div className="legend-item"><span className="legend-dot leaf"></span><span>Word</span></div>
+              <div className="legend-item" onClick={() => handleLegendClick(1)} style={{cursor:'pointer'}} title="Toggle Root level fold"><span className="legend-dot root"></span><span>Root</span></div>
+              <div className="legend-item" onClick={() => handleLegendClick(2)} style={{cursor:'pointer'}} title="Toggle Prefix level fold"><span className="legend-dot internal"></span><span>Prefix</span></div>
+              <div className="legend-item" onClick={() => handleLegendClick(3)} style={{cursor:'pointer'}} title="Toggle Word level fold"><span className="legend-dot leaf"></span><span>Word</span></div>
             </div>
             <div className="tree-controls">
               <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
