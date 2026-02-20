@@ -200,13 +200,15 @@ function TopicList({
     return paths;
   }, [topicTree]);
 
-  const unfoldAll = useCallback(() => {
-    setExpandedNodes(getAllNonLeafPaths());
-  }, [getAllNonLeafPaths]);
+  const [allExpanded, setAllExpanded] = useState(false);
 
-  const foldAll = useCallback(() => {
-    setExpandedNodes(new Set());
-  }, []);
+  const toggleExpandAll = useCallback(() => {
+    setAllExpanded(prev => {
+      const newState = !prev;
+      setExpandedNodes(newState ? getAllNonLeafPaths() : new Set());
+      return newState;
+    });
+  }, [getAllNonLeafPaths]);
 
   const getTopicSelectionKey = (topicOrTopics) => {
     if (!topicOrTopics) return '';
@@ -503,8 +505,9 @@ function TopicList({
       ) : (
         <>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-            <button onClick={unfoldAll} style={styles.button}>Unfold All</button>
-            <button onClick={foldAll} style={styles.button}>Fold All</button>
+            <button onClick={toggleExpandAll} style={styles.button}>
+              {allExpanded ? 'Fold All' : 'Unfold All'}
+            </button>
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {topicTree.map((treeNode) => (
