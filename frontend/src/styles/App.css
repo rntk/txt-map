@@ -3068,6 +3068,10 @@
   padding: 2px 7px;
 }
 
+.diff-nearest-link {
+  cursor: pointer;
+}
+
 @media (max-width: 720px) {
   .diff-selectors {
     grid-template-columns: 1fr;

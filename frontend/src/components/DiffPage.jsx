@@ -133,42 +133,129 @@ function DiffPage() {
   const rows = useMemo(() => {
     const matches = diffState?.diff?.matches_left_to_right || [];
     const unmatchedRight = diffState?.diff?.unmatched_right || [];
-    const nearest = diffState?.diff?.nearest_left_to_right || [];
-    const nearestMap = {};
-    nearest.forEach((entry) => {
-      const key = `${entry.left_sentence_index}:${entry.right_sentence_index}`;
-      if (!nearestMap[key]) nearestMap[key] = [];
-      nearestMap[key].push(entry);
+    const nearestLeftToRight = diffState?.diff?.nearest_left_to_right || [];
+    const nearestRightToLeft = diffState?.diff?.nearest_right_to_left || [];
+    const nearestLeftMap = {};
+    const nearestRightMap = {};
+
+    const addLeftToRightEdge = (entry) => {
+      if (entry.left_sentence_index == null || entry.right_sentence_index == null) return;
+      const leftKey = String(entry.left_sentence_index);
+      if (!nearestLeftMap[leftKey]) nearestLeftMap[leftKey] = [];
+      nearestLeftMap[leftKey].push({
+        left_sentence_index: entry.left_sentence_index,
+        right_sentence_index: entry.right_sentence_index,
+        left_topic: entry.left_topic || null,
+        right_topic: entry.right_topic || null,
+        similarity: entry.similarity || 0,
+      });
+    };
+
+    const addRightToLeftEdge = (entry) => {
+      if (entry.right_sentence_index == null || entry.left_sentence_index == null) return;
+      const rightKey = String(entry.right_sentence_index);
+      if (!nearestRightMap[rightKey]) nearestRightMap[rightKey] = [];
+      nearestRightMap[rightKey].push({
+        right_sentence_index: entry.right_sentence_index,
+        left_sentence_index: entry.left_sentence_index,
+        right_topic: entry.right_topic || null,
+        left_topic: entry.left_topic || null,
+        similarity: entry.similarity || 0,
+      });
+    };
+
+    // Build an undirected nearest graph: each similarity relation must be navigable both ways.
+    nearestLeftToRight.forEach((entry) => {
+      addLeftToRightEdge(entry);
+      addRightToLeftEdge(entry);
+    });
+
+    nearestRightToLeft.forEach((entry) => {
+      addRightToLeftEdge(entry);
+      addLeftToRightEdge(entry);
     });
 
     const matchRows = matches.map((row, index) => {
-      const key = `${row.left_sentence_index}:${row.right_sentence_index}`;
+      const hasLeft = row.left_sentence_index != null;
+      const hasRight = row.right_sentence_index != null;
+      const leftKey = String(row.left_sentence_index);
+      const rightKey = String(row.right_sentence_index);
+      const rawNearestRight = nearestLeftMap[leftKey] || [];
+      const rawNearestLeft = nearestRightMap[rightKey] || [];
+
+      const dedupRight = new Map();
+      rawNearestRight.forEach((candidate) => {
+        if (candidate.right_sentence_index == null) return;
+        if (candidate.right_sentence_index === row.right_sentence_index) return;
+        const existing = dedupRight.get(candidate.right_sentence_index);
+        if (!existing || (candidate.similarity || 0) > (existing.similarity || 0)) {
+          dedupRight.set(candidate.right_sentence_index, candidate);
+        }
+      });
+      const nearestRightLinks = Array.from(dedupRight.values())
+        .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+        .slice(0, 5);
+
+      const dedupLeft = new Map();
+      rawNearestLeft.forEach((candidate) => {
+        if (candidate.left_sentence_index == null) return;
+        if (candidate.left_sentence_index === row.left_sentence_index) return;
+        const existing = dedupLeft.get(candidate.left_sentence_index);
+        if (!existing || (candidate.similarity || 0) > (existing.similarity || 0)) {
+          dedupLeft.set(candidate.left_sentence_index, candidate);
+        }
+      });
+      const nearestLeftLinks = Array.from(dedupLeft.values())
+        .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+        .slice(0, 5);
+
       return {
         id: `match-${index}`,
-        kind: 'match',
-        similarity: row.similarity || 0,
+        kind: hasLeft && hasRight ? 'match' : 'unmatched-left',
+        hasLeft,
+        hasRight,
+        similarity: hasLeft && hasRight ? row.similarity || 0 : 0,
         leftTopic: row.left_topic,
         leftText: row.left_text,
         leftSentenceIndex: row.left_sentence_index,
         rightTopic: row.right_topic,
         rightText: row.right_text,
         rightSentenceIndex: row.right_sentence_index,
-        nearest: nearestMap[key] || [],
+        nearestRight: nearestRightLinks,
+        nearestLeft: nearestLeftLinks,
       };
     });
 
-    const unmatchedRows = unmatchedRight.map((row, index) => ({
-      id: `unmatched-right-${index}`,
-      kind: 'unmatched-right',
-      similarity: 0,
-      leftTopic: null,
-      leftText: null,
-      leftSentenceIndex: null,
-      rightTopic: row.topic,
-      rightText: row.text,
-      rightSentenceIndex: row.sentence_index,
-      nearest: [],
-    }));
+    const unmatchedRows = unmatchedRight.map((row, index) => {
+      const rightKey = String(row.sentence_index);
+      const rawNearestLeft = nearestRightMap[rightKey] || [];
+      const dedupLeft = new Map();
+      rawNearestLeft.forEach((candidate) => {
+        if (candidate.left_sentence_index == null) return;
+        const existing = dedupLeft.get(candidate.left_sentence_index);
+        if (!existing || (candidate.similarity || 0) > (existing.similarity || 0)) {
+          dedupLeft.set(candidate.left_sentence_index, candidate);
+        }
+      });
+
+      return {
+        id: `unmatched-right-${index}`,
+        kind: 'unmatched-right',
+        hasLeft: false,
+        hasRight: true,
+        similarity: 0,
+        leftTopic: null,
+        leftText: null,
+        leftSentenceIndex: null,
+        rightTopic: row.topic,
+        rightText: row.text,
+        rightSentenceIndex: row.sentence_index,
+        nearestRight: [],
+        nearestLeft: Array.from(dedupLeft.values())
+          .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+          .slice(0, 5),
+      };
+    });
 
     return [...matchRows, ...unmatchedRows];
   }, [diffState]);
@@ -208,6 +295,48 @@ function DiffPage() {
       return (current + delta + filteredRows.length) % filteredRows.length;
     });
   };
+
+  const jumpToRightSentence = useCallback((sentenceIndex) => {
+    if (sentenceIndex == null) return;
+    const targetInFiltered = filteredRows.findIndex((row) => row.rightSentenceIndex === sentenceIndex);
+    if (targetInFiltered >= 0) {
+      setActiveIndex(targetInFiltered);
+      return;
+    }
+
+    const targetInAll = rows.find((row) => row.rightSentenceIndex === sentenceIndex);
+    if (!targetInAll) return;
+    setQuery('');
+    window.setTimeout(() => {
+      const targetAfterReset = rows.find((row) => row.rightSentenceIndex === sentenceIndex);
+      if (!targetAfterReset) return;
+      const targetIndex = rows.findIndex((row) => row.id === targetAfterReset.id);
+      if (targetIndex >= 0) {
+        setActiveIndex(targetIndex);
+      }
+    }, 0);
+  }, [filteredRows, rows]);
+
+  const jumpToLeftSentence = useCallback((sentenceIndex) => {
+    if (sentenceIndex == null) return;
+    const targetInFiltered = filteredRows.findIndex((row) => row.leftSentenceIndex === sentenceIndex);
+    if (targetInFiltered >= 0) {
+      setActiveIndex(targetInFiltered);
+      return;
+    }
+
+    const targetInAll = rows.find((row) => row.leftSentenceIndex === sentenceIndex);
+    if (!targetInAll) return;
+    setQuery('');
+    window.setTimeout(() => {
+      const targetAfterReset = rows.find((row) => row.leftSentenceIndex === sentenceIndex);
+      if (!targetAfterReset) return;
+      const targetIndex = rows.findIndex((row) => row.id === targetAfterReset.id);
+      if (targetIndex >= 0) {
+        setActiveIndex(targetIndex);
+      }
+    }, 0);
+  }, [filteredRows, rows]);
 
   const leftOptions = submissions;
   const rightOptions = submissions;
@@ -317,11 +446,26 @@ function DiffPage() {
                     id={`diff-row-${row.id}`}
                   >
                     <div className="diff-cell diff-left">
-                      {row.leftText ? (
+                      {row.hasLeft ? (
                         <>
                           <div className="diff-topic">{row.leftTopic}</div>
                           <div className="diff-meta">Sentence #{(row.leftSentenceIndex ?? -1) + 1}</div>
                           <div>{highlightText(row.leftText, query)}</div>
+                          {row.nearestRight.length > 0 && (
+                            <div className="diff-nearest">
+                              {row.nearestRight.map((item, idx) => (
+                                <button
+                                  type="button"
+                                  key={`${row.id}-nearest-right-from-left-${idx}`}
+                                  className="diff-nearest-chip diff-nearest-link"
+                                  onClick={() => jumpToRightSentence(item.right_sentence_index)}
+                                  title={`Go to right sentence #${(item.right_sentence_index ?? -1) + 1}`}
+                                >
+                                  Similar: {item.right_topic || '(untitled)'} · #{(item.right_sentence_index ?? -1) + 1} ({Math.round((item.similarity || 0) * 100)}%)
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div className="diff-empty">No match on left</div>
@@ -332,12 +476,14 @@ function DiffPage() {
                         <span className={`diff-sim ${similarityClass(row.similarity)}`}>
                           {Math.round((row.similarity || 0) * 100)}%
                         </span>
-                      ) : (
+                      ) : row.kind === 'unmatched-right' ? (
                         <span className="diff-sim diff-sim-new">NEW</span>
+                      ) : (
+                        <span className="diff-sim diff-sim-low">NO MATCH</span>
                       )}
                     </div>
                     <div className="diff-cell diff-right">
-                      {row.rightText ? (
+                      {row.hasRight ? (
                         <>
                           <div className="diff-topic">{row.rightTopic}</div>
                           <div className="diff-meta">Sentence #{(row.rightSentenceIndex ?? -1) + 1}</div>
@@ -346,12 +492,18 @@ function DiffPage() {
                       ) : (
                         <div className="diff-empty">No match on right</div>
                       )}
-                      {row.nearest.length > 0 && (
+                      {row.nearestLeft.length > 0 && (
                         <div className="diff-nearest">
-                          {row.nearest.map((item, idx) => (
-                            <span key={`${row.id}-nearest-${idx}`} className="diff-nearest-chip">
-                              Near: {Math.round((item.similarity || 0) * 100)}%
-                            </span>
+                          {row.nearestLeft.map((item, idx) => (
+                            <button
+                              type="button"
+                              key={`${row.id}-nearest-left-from-right-${idx}`}
+                              className="diff-nearest-chip diff-nearest-link"
+                              onClick={() => jumpToLeftSentence(item.left_sentence_index)}
+                              title={`Go to left sentence #${(item.left_sentence_index ?? -1) + 1}`}
+                            >
+                              Similar: {item.left_topic || '(untitled)'} · #{(item.left_sentence_index ?? -1) + 1} ({Math.round((item.similarity || 0) * 100)}%)
+                            </button>
                           ))}
                         </div>
                       )}

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -9,7 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-ALGORITHM_VERSION = "semantic-v1-topic-aware-charwb-3-6-th0.25-cr0.5-top3"
+ALGORITHM_VERSION = "semantic-v3-topic-aware-charwb-3-6-th0.25-cr0.5-topk-shared"
 
 
 def canonical_pair(left_submission_id: str, right_submission_id: str) -> Tuple[str, str, str]:
@@ -152,17 +151,23 @@ def _compute_directional(
     similarity_matrix = cosine_similarity(source_matrix, target_matrix)
 
     nearest: List[dict] = []
+    matched_target_indices: set[int] = set()
+
+    matches: List[dict] = []
     for source_idx, source_unit in enumerate(source_units):
         row = similarity_matrix[source_idx]
-        ranked_indices = np.argsort(row)[::-1]
-        count = 0
-        for target_idx in ranked_indices:
-            if count >= top_k_nearest:
-                break
-            similarity = float(row[int(target_idx)])
+        ranked_indices = [int(idx) for idx in np.argsort(row)[::-1]]
+        best_target_idx = ranked_indices[0] if ranked_indices else -1
+        best_similarity = float(row[best_target_idx]) if best_target_idx >= 0 else 0.0
+
+        # Single shared ranking approach:
+        # 1) rank #1 goes to the center match;
+        # 2) ranks #2..#(N+1) populate nearest links.
+        for target_idx in ranked_indices[1 : top_k_nearest + 1]:
+            similarity = float(row[target_idx])
             if similarity < nearest_min_similarity:
-                break
-            target_unit = target_units[int(target_idx)]
+                continue
+            target_unit = target_units[target_idx]
             nearest.append(
                 {
                     f"{source_label}_topic": source_unit["topic"],
@@ -174,24 +179,6 @@ def _compute_directional(
                     "similarity": round(similarity, 4),
                 }
             )
-            count += 1
-
-    matched_target_indices: set[int] = set()
-    matches: List[dict] = []
-    for source_idx, source_unit in enumerate(source_units):
-        best_target_idx = -1
-        best_similarity = 0.0
-        ranked = sorted(
-            enumerate(similarity_matrix[source_idx]),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-        for target_idx, similarity in ranked:
-            if target_idx in matched_target_indices:
-                continue
-            best_target_idx = int(target_idx)
-            best_similarity = float(similarity)
-            break
 
         if best_target_idx >= 0 and best_similarity >= threshold:
             matched_target_indices.add(best_target_idx)
@@ -320,7 +307,8 @@ def orient_payload(
             "meta": payload.get("meta") or {},
             "matches_left_to_right": remap_rows(payload.get("matches_a_to_b") or [], "a", "b"),
             "nearest_left_to_right": remap_rows(payload.get("nearest_a_to_b") or [], "a", "b"),
-            "nearest_right_to_left": remap_rows(payload.get("nearest_b_to_a") or [], "b", "a"),
+            # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
+            "nearest_right_to_left": remap_rows(payload.get("nearest_b_to_a") or [], "a", "b"),
             "unmatched_left": payload.get("unmatched_a") or [],
             "unmatched_right": payload.get("unmatched_b") or [],
         }
@@ -329,7 +317,8 @@ def orient_payload(
         "meta": payload.get("meta") or {},
         "matches_left_to_right": remap_rows(payload.get("matches_b_to_a") or [], "b", "a"),
         "nearest_left_to_right": remap_rows(payload.get("nearest_b_to_a") or [], "b", "a"),
-        "nearest_right_to_left": remap_rows(payload.get("nearest_a_to_b") or [], "a", "b"),
+        # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
+        "nearest_right_to_left": remap_rows(payload.get("nearest_a_to_b") or [], "b", "a"),
         "unmatched_left": payload.get("unmatched_b") or [],
         "unmatched_right": payload.get("unmatched_a") or [],
     }
