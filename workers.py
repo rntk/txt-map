@@ -12,6 +12,7 @@ from lib.diff.semantic_diff import (
     ALGORITHM_VERSION,
     check_submission_topic_readiness,
     compute_topic_aware_semantic_diff,
+    stale_reasons,
 )
 from lib.llm.llamacpp import LLamaCPP
 from lib.storage.semantic_diffs import SemanticDiffsStorage
@@ -147,18 +148,7 @@ class Worker:
         Atomically claim a pending semantic diff job.
         Returns the job document if claimed, None otherwise.
         """
-        return self.db.semantic_diff_jobs.find_one_and_update(
-            {"status": "pending"},
-            {
-                "$set": {
-                    "status": "processing",
-                    "started_at": datetime.now(UTC),
-                    "worker_id": self.worker_id,
-                    "error": None,
-                }
-            },
-            sort=[("created_at", 1)],
-        )
+        return self.semantic_diffs_storage.claim_job(self.worker_id)
 
     def process_task(self, task):
         """Execute the task handler"""
@@ -250,6 +240,7 @@ class Worker:
         pair_key = job.get("pair_key")
         submission_a_id = job.get("submission_a_id")
         submission_b_id = job.get("submission_b_id")
+        force_recalculate = bool(job.get("force_recalculate"))
 
         if not pair_key or not submission_a_id or not submission_b_id:
             self._mark_diff_job_failed(job, "Invalid job payload")
@@ -268,6 +259,25 @@ class Worker:
                     "Topic prerequisites are not ready: "
                     f"left={readiness_a['missing']}, right={readiness_b['missing']}"
                 )
+
+            if not force_recalculate:
+                existing_diff = self.semantic_diffs_storage.get_diff_by_pair_key(pair_key)
+                if existing_diff:
+                    reasons = stale_reasons(
+                        existing_diff,
+                        submission_a,
+                        submission_b,
+                        algorithm_version=ALGORITHM_VERSION,
+                    )
+                    if not reasons:
+                        self._mark_diff_job_completed(job)
+                        logger.info(
+                            "Skipped semantic diff job %s (%s vs %s): diff is already up to date",
+                            job.get("job_id"),
+                            submission_a_id,
+                            submission_b_id,
+                        )
+                        return
 
             payload = compute_topic_aware_semantic_diff(submission_a, submission_b)
 
@@ -292,22 +302,10 @@ class Worker:
             self._mark_diff_job_failed(job, str(exc))
 
     def _mark_diff_job_completed(self, job):
-        self.db.semantic_diff_jobs.update_one(
-            {"_id": job["_id"]},
-            {"$set": {"status": "completed", "completed_at": datetime.now(UTC)}},
-        )
+        self.semantic_diffs_storage.mark_job_completed(job["_id"])
 
     def _mark_diff_job_failed(self, job, error_msg):
-        self.db.semantic_diff_jobs.update_one(
-            {"_id": job["_id"]},
-            {
-                "$set": {
-                    "status": "failed",
-                    "completed_at": datetime.now(UTC),
-                    "error": error_msg,
-                }
-            },
-        )
+        self.semantic_diffs_storage.mark_job_failed(job["_id"], error_msg)
 
     def run(self, poll_interval=2):
         """Main worker loop"""

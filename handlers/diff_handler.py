@@ -170,6 +170,9 @@ def post_diff_calculate(
     )
     active_job = semantic_diffs_storage.get_active_job(pair_key)
     if active_job:
+        if payload.force and not bool(active_job.get("force_recalculate")):
+            semantic_diffs_storage.set_job_force_recalculate(active_job["_id"], True)
+            active_job["force_recalculate"] = True
         return {
             "job_id": active_job.get("job_id"),
             "status": active_job.get("status"),
@@ -179,7 +182,22 @@ def post_diff_calculate(
             "force_recalculate": bool(active_job.get("force_recalculate")),
         }
 
-    job = semantic_diffs_storage.create_job(
+    diff_doc = semantic_diffs_storage.get_diff_by_pair_key(pair_key)
+    if diff_doc and not payload.force:
+        reasons = stale_reasons(
+            diff_doc, left_submission, right_submission, algorithm_version=ALGORITHM_VERSION
+        )
+        if not reasons:
+            return {
+                "job_id": None,
+                "status": "up_to_date",
+                "pair_key": pair_key,
+                "submission_a_id": submission_a_id,
+                "submission_b_id": submission_b_id,
+                "force_recalculate": False,
+            }
+
+    job, created = semantic_diffs_storage.create_or_get_active_job(
         job_id=str(uuid.uuid4()),
         pair_key=pair_key,
         submission_a_id=submission_a_id,
@@ -188,12 +206,14 @@ def post_diff_calculate(
         requested_right_id=payload.right_submission_id,
         force_recalculate=payload.force,
     )
+    if not created and payload.force and not bool(job.get("force_recalculate")):
+        semantic_diffs_storage.set_job_force_recalculate(job["_id"], True)
+        job["force_recalculate"] = True
     return {
         "job_id": job["job_id"],
         "status": job["status"],
         "pair_key": pair_key,
         "submission_a_id": submission_a_id,
         "submission_b_id": submission_b_id,
-        "force_recalculate": payload.force,
+        "force_recalculate": bool(job.get("force_recalculate")),
     }
-

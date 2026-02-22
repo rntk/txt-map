@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -63,6 +63,9 @@ def build_topic_units(submission: dict) -> Tuple[List[dict], List[str]]:
 
     if not sentences:
         missing.append("sentences_missing")
+        if not topics:
+            missing.append("topics_missing")
+        return [], missing
     if not topics:
         missing.append("topics_missing")
         return [], missing
@@ -112,7 +115,7 @@ def _compute_directional(
     source_units: List[dict],
     target_units: List[dict],
     *,
-    similarity_matrix: Optional[np.ndarray] = None,
+    similarity_matrix: np.ndarray | None = None,
     threshold: float,
     nearest_min_similarity: float,
     top_k_nearest: int,
@@ -235,7 +238,7 @@ def compute_topic_aware_semantic_diff(
             f"Topic prerequisites are not ready: left={missing_a or []}, right={missing_b or []}"
         )
 
-    similarity_a_to_b: Optional[np.ndarray] = None
+    similarity_a_to_b: np.ndarray | None = None
     if units_a and units_b:
         corpus = [u["text"] for u in units_a] + [u["text"] for u in units_b]
         vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
@@ -319,6 +322,7 @@ def orient_payload(
         return {
             "meta": payload.get("meta") or {},
             "matches_left_to_right": remap_rows(payload.get("matches_a_to_b") or [], "a", "b"),
+            "matches_right_to_left": remap_rows(payload.get("matches_b_to_a") or [], "a", "b"),
             "nearest_left_to_right": remap_rows(payload.get("nearest_a_to_b") or [], "a", "b"),
             # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
             "nearest_right_to_left": remap_rows(payload.get("nearest_b_to_a") or [], "a", "b"),
@@ -329,6 +333,7 @@ def orient_payload(
     return {
         "meta": payload.get("meta") or {},
         "matches_left_to_right": remap_rows(payload.get("matches_b_to_a") or [], "b", "a"),
+        "matches_right_to_left": remap_rows(payload.get("matches_a_to_b") or [], "b", "a"),
         "nearest_left_to_right": remap_rows(payload.get("nearest_b_to_a") or [], "b", "a"),
         # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
         "nearest_right_to_left": remap_rows(payload.get("nearest_a_to_b") or [], "b", "a"),
