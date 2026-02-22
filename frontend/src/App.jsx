@@ -3,12 +3,14 @@ import TextPage from './components/TextPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
 import MainPage from './components/MainPage';
+import DiffPage from './components/DiffPage';
 import './styles/App.css';
 
 const globalMenuItems = [
   { title: 'Home', link: '/page/menu' },
   { title: 'Texts List', link: '/page/texts' },
-  { title: 'Task Control', link: '/page/tasks' }
+  { title: 'Task Control', link: '/page/tasks' },
+  { title: 'Diff', link: '/page/diff' }
 ];
 
 function App() {
@@ -56,6 +58,11 @@ function App() {
   // Texts list page
   if (pageType === 'texts') {
     return renderWithGlobalMenu(<TextListPage />);
+  }
+
+  // Diff page
+  if (pageType === 'diff') {
+    return renderWithGlobalMenu(<DiffPage />);
   }
 
   // Text submission page

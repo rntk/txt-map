@@ -13,6 +13,12 @@ const menuItems = [
         description: 'Monitor and manage background processing tasks. Check status and retry failed jobs.',
         icon: '⚙️',
         link: '/page/tasks'
+    },
+    {
+        title: 'Diff',
+        description: 'Compare two documents with topic-aware semantic matching and sentence-level links.',
+        icon: '⇄',
+        link: '/page/diff'
     }
 ];
 

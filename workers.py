@@ -8,7 +8,13 @@ import os
 from datetime import datetime, UTC
 from pymongo import MongoClient
 
+from lib.diff.semantic_diff import (
+    ALGORITHM_VERSION,
+    check_submission_topic_readiness,
+    compute_topic_aware_semantic_diff,
+)
 from lib.llm.llamacpp import LLamaCPP
+from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
 
 # Task handlers
@@ -60,6 +66,7 @@ class Worker:
         self.running = True
         self.worker_id = f"worker-{os.getpid()}"
         self.submissions_storage = SubmissionsStorage(db)
+        self.semantic_diffs_storage = SemanticDiffsStorage(db)
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -134,6 +141,24 @@ class Worker:
                     )
 
         return None
+
+    def claim_diff_job(self):
+        """
+        Atomically claim a pending semantic diff job.
+        Returns the job document if claimed, None otherwise.
+        """
+        return self.db.semantic_diff_jobs.find_one_and_update(
+            {"status": "pending"},
+            {
+                "$set": {
+                    "status": "processing",
+                    "started_at": datetime.now(UTC),
+                    "worker_id": self.worker_id,
+                    "error": None,
+                }
+            },
+            sort=[("created_at", 1)],
+        )
 
     def process_task(self, task):
         """Execute the task handler"""
@@ -220,6 +245,70 @@ class Worker:
             error=error_msg
         )
 
+    def process_diff_job(self, job):
+        """Compute and persist a topic-aware semantic diff job."""
+        pair_key = job.get("pair_key")
+        submission_a_id = job.get("submission_a_id")
+        submission_b_id = job.get("submission_b_id")
+
+        if not pair_key or not submission_a_id or not submission_b_id:
+            self._mark_diff_job_failed(job, "Invalid job payload")
+            return
+
+        try:
+            submission_a = self.submissions_storage.get_by_id(submission_a_id)
+            submission_b = self.submissions_storage.get_by_id(submission_b_id)
+            if not submission_a or not submission_b:
+                raise ValueError("One or both submissions no longer exist")
+
+            readiness_a = check_submission_topic_readiness(submission_a)
+            readiness_b = check_submission_topic_readiness(submission_b)
+            if not readiness_a["ready"] or not readiness_b["ready"]:
+                raise ValueError(
+                    "Topic prerequisites are not ready: "
+                    f"left={readiness_a['missing']}, right={readiness_b['missing']}"
+                )
+
+            payload = compute_topic_aware_semantic_diff(submission_a, submission_b)
+
+            self.semantic_diffs_storage.upsert_diff(
+                pair_key=pair_key,
+                submission_a_id=submission_a_id,
+                submission_b_id=submission_b_id,
+                algorithm_version=ALGORITHM_VERSION,
+                submission_a_updated_at=submission_a.get("updated_at"),
+                submission_b_updated_at=submission_b.get("updated_at"),
+                payload=payload,
+            )
+            self._mark_diff_job_completed(job)
+            logger.info(
+                "Completed semantic diff job %s (%s vs %s)",
+                job.get("job_id"),
+                submission_a_id,
+                submission_b_id,
+            )
+        except Exception as exc:
+            logger.error("Error processing semantic diff job %s: %s", job.get("job_id"), exc, exc_info=True)
+            self._mark_diff_job_failed(job, str(exc))
+
+    def _mark_diff_job_completed(self, job):
+        self.db.semantic_diff_jobs.update_one(
+            {"_id": job["_id"]},
+            {"$set": {"status": "completed", "completed_at": datetime.now(UTC)}},
+        )
+
+    def _mark_diff_job_failed(self, job, error_msg):
+        self.db.semantic_diff_jobs.update_one(
+            {"_id": job["_id"]},
+            {
+                "$set": {
+                    "status": "failed",
+                    "completed_at": datetime.now(UTC),
+                    "error": error_msg,
+                }
+            },
+        )
+
     def run(self, poll_interval=2):
         """Main worker loop"""
         logger.info(f"Worker {self.worker_id} started")
@@ -232,8 +321,12 @@ class Worker:
                 if task:
                     self.process_task(task)
                 else:
-                    # No tasks available, sleep for a bit
-                    time.sleep(poll_interval)
+                    diff_job = self.claim_diff_job()
+                    if diff_job:
+                        self.process_diff_job(diff_job)
+                    else:
+                        # No jobs available, sleep for a bit
+                        time.sleep(poll_interval)
 
             except Exception as e:
                 logger.error(f"Unexpected error in worker loop: {e}", exc_info=True)
@@ -259,6 +352,7 @@ def main():
 
     # Create and run worker
     SubmissionsStorage(db).prepare()
+    SemanticDiffsStorage(db).prepare()
     worker = Worker(db, llm)
 
     try:
