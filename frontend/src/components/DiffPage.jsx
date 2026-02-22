@@ -39,7 +39,9 @@ function DiffPage() {
   const [diffState, setDiffState] = useState(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [diffError, setDiffError] = useState('');
+  const [diffMessage, setDiffMessage] = useState('');
   const [jobLoading, setJobLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -110,6 +112,7 @@ function DiffPage() {
     if (!leftId || !rightId || leftId === rightId) return;
     setJobLoading(true);
     setDiffError('');
+    setDiffMessage('');
     try {
       const response = await fetch('/api/diff/calculate', {
         method: 'POST',
@@ -128,6 +131,36 @@ function DiffPage() {
       setDiffError(error.message || 'Failed to queue calculation');
     } finally {
       setJobLoading(false);
+    }
+  }, [fetchDiff, leftId, rightId]);
+
+  const deleteDiffData = useCallback(async () => {
+    if (!leftId || !rightId || leftId === rightId) return;
+
+    const shouldDelete = window.confirm('Delete stored semantic diff data for this pair? This removes cached diff results and queued/completed diff jobs for these two documents.');
+    if (!shouldDelete) return;
+
+    setDeleteLoading(true);
+    setDiffError('');
+    setDiffMessage('');
+    try {
+      const params = new URLSearchParams({
+        left_submission_id: leftId,
+        right_submission_id: rightId,
+      });
+      const response = await fetch(`/api/diff?${params.toString()}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const data = await response.json();
+      await fetchDiff();
+      setDiffMessage(`Deleted diff data (${data.deleted_diff_count || 0} diff docs, ${data.deleted_job_count || 0} jobs).`);
+    } catch (error) {
+      setDiffError(error.message || 'Failed to delete diff data');
+    } finally {
+      setDeleteLoading(false);
     }
   }, [fetchDiff, leftId, rightId]);
 
@@ -395,6 +428,7 @@ function DiffPage() {
 
       {submissionsError && <div className="text-list-message text-list-error">{submissionsError}</div>}
       {diffError && <div className="text-list-message text-list-error">{diffError}</div>}
+      {diffMessage && <div className="text-list-message">{diffMessage}</div>}
 
       {leftId && rightId && leftId === rightId && (
         <div className="text-list-message text-list-error">Left and right documents must be different.</div>
@@ -425,16 +459,25 @@ function DiffPage() {
                 <div>Waiting until topic/sentence prerequisites are ready.</div>
               </div>
             )}
-            {['missing', 'failed', 'stale'].includes(diffState.state) && (
-              <div className="diff-actions">
-                <button className="text-list-primary" onClick={() => runCalculation(false)} disabled={jobLoading}>
-                  {jobLoading ? '...' : 'Calculate diff'}
-                </button>
-                <button className="action-btn" onClick={() => runCalculation(true)} disabled={jobLoading}>
-                  {jobLoading ? '...' : 'Recalculate'}
-                </button>
-              </div>
-            )}
+            <div className="diff-actions">
+              {['missing', 'failed', 'stale'].includes(diffState.state) && (
+                <>
+                  <button className="text-list-primary" onClick={() => runCalculation(false)} disabled={jobLoading || deleteLoading}>
+                    {jobLoading ? '...' : 'Calculate diff'}
+                  </button>
+                  <button className="action-btn" onClick={() => runCalculation(true)} disabled={jobLoading || deleteLoading}>
+                    {jobLoading ? '...' : 'Recalculate'}
+                  </button>
+                </>
+              )}
+              <button
+                className="action-btn danger"
+                onClick={deleteDiffData}
+                disabled={!leftId || !rightId || leftId === rightId || jobLoading || deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete diff data'}
+              </button>
+            </div>
           </div>
 
           {diffState.diff && (

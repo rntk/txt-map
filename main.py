@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -9,6 +9,7 @@ from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.nlp import ensure_nltk_data
+from lib.diff.semantic_diff import canonical_pair
 
 ensure_nltk_data()
 
@@ -52,6 +53,28 @@ semantic_diffs_storage.prepare()
 app.state.posts_storage = posts_storage
 app.state.submissions_storage = submissions_storage
 app.state.semantic_diffs_storage = semantic_diffs_storage
+
+
+@app.delete("/api/diff")
+def delete_diff_data(left_submission_id: str, right_submission_id: str):
+    if left_submission_id == right_submission_id:
+        raise HTTPException(status_code=400, detail="Please select two different submissions")
+
+    pair_key, submission_a_id, submission_b_id = canonical_pair(left_submission_id, right_submission_id)
+    db = app.state.semantic_diffs_storage._db
+
+    deleted_diff_count = db.semantic_diffs.delete_many({"pair_key": pair_key}).deleted_count
+    deleted_job_count = db.semantic_diff_jobs.delete_many({"pair_key": pair_key}).deleted_count
+
+    return {
+        "deleted": True,
+        "pair_key": pair_key,
+        "submission_a_id": submission_a_id,
+        "submission_b_id": submission_b_id,
+        "deleted_diff_count": deleted_diff_count,
+        "deleted_job_count": deleted_job_count,
+    }
+
 
 @app.get("/")
 def serve_root_page():
