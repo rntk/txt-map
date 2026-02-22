@@ -12,6 +12,7 @@ Key pages:
 - `/page/text/{submission_id}`: submission result view with live status polling
 - `/page/tasks`: task queue management view
 - `/page/texts`: submission list view
+- `/page/diff`: semantic diff view for comparing two submissions
 - `/page/topics`: topics cloud view
 - `/page/themed-topic` and `/page/themed-topic/{topic}`: themed topic pages
 

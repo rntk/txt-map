@@ -1,6 +1,6 @@
 # Content Analysis Platform
 
-This is a FastAPI + worker system that processes submitted HTML content into structured analysis results (topics, summaries, mindmap, and insights), then serves them in a React UI.
+This is a FastAPI + worker system that processes submitted HTML content into structured analysis results (topics, summaries, mindmap, and insights), computes topic-aware semantic diffs between submissions, then serves them in a React UI.
 
 ## Documentation Map
 
@@ -18,10 +18,11 @@ FastAPI API
   -> stores submission + queues tasks in MongoDB
 Worker(s)
   -> process queued tasks via LLamaCPP
+  -> process queued semantic diff jobs
 MongoDB
-  -> stores submission status/results + task queue
+  -> stores submission status/results + task queue + semantic diffs
 React Frontend
-  -> polls status and renders results
+  -> polls status, renders results, and provides a diff UI
 ```
 
 ## Core Components
@@ -31,6 +32,7 @@ React Frontend
 - API handlers: `handlers/`
 - Task implementations: `lib/tasks/`
 - MongoDB storage helpers: `lib/storage/`
+- Semantic diff logic: `lib/diff/semantic_diff.py`
 
 ## Processing Pipeline
 
@@ -84,6 +86,15 @@ API is available at `http://127.0.0.1:8000`.
 - `DELETE /api/task-queue/{task_id}`: delete a queue entry
 - `GET /api/topics`: aggregated topics from stored posts
 - `GET /api/themed-topic` and `GET /api/themed-topic/{topic}`: topic-filtered post view data
+- `GET /api/diff?left_submission_id=...&right_submission_id=...`: fetch oriented diff payload and diff/job state
+- `POST /api/diff/calculate`: enqueue semantic diff calculation for a submission pair
+
+## Semantic Diff Model
+
+- Uses sentence-level topic units derived from `results.topics` ranges and `results.sentences`.
+- Similarity metric is TF-IDF (character n-grams 3..6) + cosine similarity.
+- A semantic diff job is persisted in `semantic_diff_jobs`; computed payload is stored in `semantic_diffs`.
+- Current algorithm version: `semantic-v3-topic-aware-charwb-3-6-th0.25-cr0.5-topk-shared`.
 
 Interactive docs:
 
