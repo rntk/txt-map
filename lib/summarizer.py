@@ -1,5 +1,5 @@
 import hashlib
-import datetime
+from datetime import datetime, UTC
 
 def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
     """
@@ -37,7 +37,7 @@ def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_gr
                     "prompt_hash": prompt_hash,
                     "prompt": prompt,
                     "response": resp,
-                    "created_at": datetime.datetime.now()
+                    "created_at": datetime.now(UTC)
                 }},
                 upsert=True
             )

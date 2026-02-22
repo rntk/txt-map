@@ -3,7 +3,7 @@ Topic extraction task - extracts topics from text using sentence tagging approac
 """
 from lib.storage.submissions import SubmissionsStorage
 import hashlib
-import datetime
+from datetime import datetime, UTC
 import re
 import logging
 from typing import List, Tuple, Dict, Set, Optional
@@ -66,7 +66,7 @@ Sentences:
                 "prompt_hash": prompt_hash,
                 "prompt": prompt,
                 "response": response,
-                "created_at": datetime.datetime.now()
+                "created_at": datetime.now(UTC)
             }},
             upsert=True
         )
@@ -389,7 +389,7 @@ Output:"""
                         "prompt_hash": prompt_hash,
                         "prompt": prompt,
                         "response": response,
-                        "created_at": datetime.datetime.now()
+                        "created_at": datetime.now(UTC)
                     }},
                     upsert=True
                 )

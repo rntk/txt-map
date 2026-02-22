@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -274,7 +274,7 @@ def compute_topic_aware_semantic_diff(
             "threshold": threshold,
             "nearest_min_similarity": nearest_min_similarity,
             "top_k_nearest": top_k_nearest,
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "units_a": len(units_a),
             "units_b": len(units_b),
             "topics_a": len({u["topic"] for u in units_a}),

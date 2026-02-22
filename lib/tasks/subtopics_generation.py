@@ -2,7 +2,7 @@
 Subtopics generation task - generates subtopics for existing topics.
 """
 from lib.storage.submissions import SubmissionsStorage
-import datetime
+from datetime import datetime, UTC
 import hashlib
 import re
 
@@ -53,7 +53,7 @@ Sentences:
                     "prompt_hash": prompt_hash,
                     "prompt": prompt,
                     "response": response,
-                    "created_at": datetime.datetime.now(),
+                    "created_at": datetime.now(UTC),
                 }
             },
             upsert=True,
