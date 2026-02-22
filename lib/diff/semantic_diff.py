@@ -112,6 +112,7 @@ def _compute_directional(
     source_units: List[dict],
     target_units: List[dict],
     *,
+    similarity_matrix: Optional[np.ndarray] = None,
     threshold: float,
     nearest_min_similarity: float,
     top_k_nearest: int,
@@ -142,13 +143,14 @@ def _compute_directional(
             "unmatched_target_indices": [],
         }
 
-    corpus = [u["text"] for u in source_units] + [u["text"] for u in target_units]
-    vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
-    tfidf_matrix = vectorizer.fit_transform(corpus)
+    if similarity_matrix is None:
+        corpus = [u["text"] for u in source_units] + [u["text"] for u in target_units]
+        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
+        tfidf_matrix = vectorizer.fit_transform(corpus)
 
-    source_matrix = tfidf_matrix[: len(source_units)]
-    target_matrix = tfidf_matrix[len(source_units) :]
-    similarity_matrix = cosine_similarity(source_matrix, target_matrix)
+        source_matrix = tfidf_matrix[: len(source_units)]
+        target_matrix = tfidf_matrix[len(source_units) :]
+        similarity_matrix = cosine_similarity(source_matrix, target_matrix)
 
     nearest: List[dict] = []
     matched_target_indices: set[int] = set()
@@ -233,9 +235,19 @@ def compute_topic_aware_semantic_diff(
             f"Topic prerequisites are not ready: left={missing_a or []}, right={missing_b or []}"
         )
 
+    similarity_a_to_b: Optional[np.ndarray] = None
+    if units_a and units_b:
+        corpus = [u["text"] for u in units_a] + [u["text"] for u in units_b]
+        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
+        tfidf_matrix = vectorizer.fit_transform(corpus)
+        matrix_a = tfidf_matrix[: len(units_a)]
+        matrix_b = tfidf_matrix[len(units_a) :]
+        similarity_a_to_b = cosine_similarity(matrix_a, matrix_b)
+
     a_to_b = _compute_directional(
         units_a,
         units_b,
+        similarity_matrix=similarity_a_to_b,
         threshold=threshold,
         nearest_min_similarity=nearest_min_similarity,
         top_k_nearest=top_k_nearest,
@@ -245,6 +257,7 @@ def compute_topic_aware_semantic_diff(
     b_to_a = _compute_directional(
         units_b,
         units_a,
+        similarity_matrix=similarity_a_to_b.T if similarity_a_to_b is not None else None,
         threshold=threshold,
         nearest_min_similarity=nearest_min_similarity,
         top_k_nearest=top_k_nearest,
