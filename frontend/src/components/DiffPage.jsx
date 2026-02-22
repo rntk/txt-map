@@ -43,6 +43,7 @@ function DiffPage() {
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [pendingJumpRowId, setPendingJumpRowId] = useState(null);
 
   const fetchSubmissions = useCallback(async () => {
     setLoadingSubmissions(true);
@@ -281,6 +282,15 @@ function DiffPage() {
   }, [query, filteredRows.length]);
 
   useEffect(() => {
+    if (!pendingJumpRowId || query.trim() !== '') return;
+    const targetIndex = filteredRows.findIndex((row) => row.id === pendingJumpRowId);
+    if (targetIndex >= 0) {
+      setActiveIndex(targetIndex);
+    }
+    setPendingJumpRowId(null);
+  }, [filteredRows, pendingJumpRowId, query]);
+
+  useEffect(() => {
     if (activeIndex < 0 || activeIndex >= filteredRows.length) return;
     const row = document.getElementById(`diff-row-${filteredRows[activeIndex].id}`);
     if (row) {
@@ -307,14 +317,7 @@ function DiffPage() {
     const targetInAll = rows.find((row) => row.rightSentenceIndex === sentenceIndex);
     if (!targetInAll) return;
     setQuery('');
-    window.setTimeout(() => {
-      const targetAfterReset = rows.find((row) => row.rightSentenceIndex === sentenceIndex);
-      if (!targetAfterReset) return;
-      const targetIndex = rows.findIndex((row) => row.id === targetAfterReset.id);
-      if (targetIndex >= 0) {
-        setActiveIndex(targetIndex);
-      }
-    }, 0);
+    setPendingJumpRowId(targetInAll.id);
   }, [filteredRows, rows]);
 
   const jumpToLeftSentence = useCallback((sentenceIndex) => {
@@ -328,18 +331,8 @@ function DiffPage() {
     const targetInAll = rows.find((row) => row.leftSentenceIndex === sentenceIndex);
     if (!targetInAll) return;
     setQuery('');
-    window.setTimeout(() => {
-      const targetAfterReset = rows.find((row) => row.leftSentenceIndex === sentenceIndex);
-      if (!targetAfterReset) return;
-      const targetIndex = rows.findIndex((row) => row.id === targetAfterReset.id);
-      if (targetIndex >= 0) {
-        setActiveIndex(targetIndex);
-      }
-    }, 0);
+    setPendingJumpRowId(targetInAll.id);
   }, [filteredRows, rows]);
-
-  const leftOptions = submissions;
-  const rightOptions = submissions;
 
   return (
     <div className="app diff-page">
@@ -358,7 +351,7 @@ function DiffPage() {
           Left document
           <select value={leftId} onChange={(event) => setLeftId(event.target.value)}>
             <option value="">Select document</option>
-            {leftOptions.map((submission) => (
+            {submissions.map((submission) => (
               <option key={submission.submission_id} value={submission.submission_id}>
                 {submission.source_url || '(no source)'} [{submission.submission_id.slice(0, 8)}] {formatDate(submission.created_at)}
               </option>
@@ -369,7 +362,7 @@ function DiffPage() {
           Right document
           <select value={rightId} onChange={(event) => setRightId(event.target.value)}>
             <option value="">Select document</option>
-            {rightOptions.map((submission) => (
+            {submissions.map((submission) => (
               <option key={submission.submission_id} value={submission.submission_id}>
                 {submission.source_url || '(no source)'} [{submission.submission_id.slice(0, 8)}] {formatDate(submission.created_at)}
               </option>
