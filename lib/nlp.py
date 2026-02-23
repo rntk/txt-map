@@ -9,13 +9,20 @@ from typing import List
 
 import nltk
 from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords, wordnet
+from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
 
 # Module-level singletons, initialised lazily.
 _lemmatizer: WordNetLemmatizer | None = None
 _stop_words: set | None = None
+
+# WordNet POS tags as plain strings to avoid importing/initializing corpus
+# readers for constants.
+WN_ADJ = "a"
+WN_VERB = "v"
+WN_ADV = "r"
+WN_NOUN = "n"
 
 
 def ensure_nltk_data() -> None:
@@ -44,19 +51,27 @@ def _lemmatizer_instance() -> WordNetLemmatizer:
 def _stop_words_set() -> set:
     global _stop_words
     if _stop_words is None:
-        _stop_words = set(stopwords.words("english"))
+        try:
+            _stop_words = set(stopwords.words("english"))
+        except LookupError:
+            # Keep endpoint functional if corpus download is unavailable.
+            _stop_words = {
+                "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+                "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
+                "to", "was", "were", "will", "with",
+            }
     return _stop_words
 
 
 def _wordnet_pos(treebank_tag: str) -> str:
     """Map a Penn Treebank POS tag to the closest WordNet POS constant."""
     if treebank_tag.startswith("J"):
-        return wordnet.ADJ
+        return WN_ADJ
     if treebank_tag.startswith("V"):
-        return wordnet.VERB
+        return WN_VERB
     if treebank_tag.startswith("R"):
-        return wordnet.ADV
-    return wordnet.NOUN  # default (covers NN, NNS, NNP, …)
+        return WN_ADV
+    return WN_NOUN  # default (covers NN, NNS, NNP, …)
 
 
 def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[dict]:
@@ -73,8 +88,15 @@ def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[dict]:
     stop_words = _stop_words_set()
 
     combined = " ".join(texts)
-    tokens = word_tokenize(combined.lower())
-    tagged = nltk.pos_tag(tokens)
+    try:
+        tokens = word_tokenize(combined.lower())
+    except LookupError:
+        tokens = re.findall(r"[a-z]+", combined.lower())
+
+    try:
+        tagged = nltk.pos_tag(tokens)
+    except LookupError:
+        tagged = [(token, "NN") for token in tokens]
 
     freq: collections.Counter = collections.Counter()
     for token, pos in tagged:
@@ -86,7 +108,10 @@ def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[dict]:
         if token in stop_words:
             continue
 
-        lemma = lemmatizer.lemmatize(token, pos=_wordnet_pos(pos))
+        try:
+            lemma = lemmatizer.lemmatize(token, pos=_wordnet_pos(pos))
+        except LookupError:
+            lemma = token
 
         if len(lemma) < 3 or lemma in stop_words:
             continue
