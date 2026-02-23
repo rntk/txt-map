@@ -93,10 +93,33 @@ function buildTopicWordCloud(topics, navPath) {
     .map(([word, frequency]) => ({ word, frequency }));
 }
 
+function getSentenceIndicesForPath(topics, navPath) {
+  const topicMatches = (name) => {
+    const parts = (name || '').split('>').map(s => s.trim());
+    if (parts.length < navPath.length) return false;
+    return navPath.every((seg, i) => parts[i] === seg);
+  };
+
+  const indices = new Set();
+  topics
+    .filter(topic => topicMatches(topic.name))
+    .forEach((topic) => {
+      (topic.sentences || []).forEach((idx) => {
+        const num = Number(idx);
+        if (Number.isInteger(num)) {
+          indices.add(num);
+        }
+      });
+    });
+
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 function TopicsTagCloud({ submissionId, topics, sentences }) {
   const [navPath, setNavPath] = useState([]);
+  const [selectedKeyword, setSelectedKeyword] = useState(null);
 
   // Sentence word cloud fetched from backend
   const [sentenceWords, setSentenceWords] = useState([]);
@@ -108,6 +131,25 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
     () => buildTopicWordCloud(topics, navPath),
     [topics, navPath]
   );
+
+  const scopedSentenceIndices = useMemo(
+    () => getSentenceIndicesForPath(topics, navPath),
+    [topics, navPath]
+  );
+
+  const scopedSentences = useMemo(
+    () => scopedSentenceIndices
+      .filter(idx => idx >= 1 && idx <= (sentences?.length || 0))
+      .map(idx => ({ index: idx, text: sentences[idx - 1] || '' })),
+    [scopedSentenceIndices, sentences]
+  );
+
+  const keywordSentences = useMemo(() => {
+    if (!selectedKeyword) return [];
+    const safeKeyword = selectedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${safeKeyword}\\b`, 'i');
+    return scopedSentences.filter(({ text }) => pattern.test(text));
+  }, [selectedKeyword, scopedSentences]);
 
   // Fetch sentence word cloud from backend whenever the path changes.
   const fetchWordCloud = useCallback(async (path) => {
@@ -135,9 +177,16 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
     fetchWordCloud(navPath);
   }, [fetchWordCloud, navPath]);
 
+  useEffect(() => {
+    setSelectedKeyword(null);
+  }, [navPath]);
+
   const isRoot = navPath.length === 0;
 
   const handleTopicClick = (word) => setNavPath(prev => [...prev, word]);
+  const handleKeywordClick = (word) => {
+    setSelectedKeyword(prev => (prev === word ? null : word));
+  };
   const handleBack = () => setNavPath(prev => prev.slice(0, -1));
   const handleBreadcrumbClick = (index) => setNavPath(navPath.slice(0, index + 1));
 
@@ -208,11 +257,16 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
 
       {/* Sentence word cloud (from backend) */}
       <div>
-        <div style={{ marginBottom: '10px', fontSize: '14px', fontWeight: '600', color: '#444' }}>
-          {isRoot ? 'All text' : navPath.join(' › ')} — key words
-          {!loadingCloud && (
-            <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
-              from {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
+          <div style={{ marginBottom: '10px', fontSize: '14px', fontWeight: '600', color: '#444' }}>
+            {isRoot ? 'All text' : navPath.join(' › ')} — key words
+            {!loadingCloud && sentenceWords.length > 0 && (
+              <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
+                — click a keyword to see matching sentences
+              </span>
+            )}
+            {!loadingCloud && (
+              <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
+                from {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
             </span>
           )}
           {loadingCloud && (
@@ -238,10 +292,46 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
         ) : (
           <WordCloudDisplay
             words={sentenceWords}
+            onWordClick={handleKeywordClick}
             emptyMessage="No sentences found for this topic."
           />
         )}
       </div>
+
+      {/* Sentences for selected keyword */}
+      {selectedKeyword && (
+        <div style={{ marginTop: '32px' }}>
+          <div style={{ marginBottom: '10px', fontSize: '14px', fontWeight: '600', color: '#444' }}>
+            Sentences containing "{selectedKeyword}"
+            <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
+              {keywordSentences.length} match{keywordSentences.length !== 1 ? 'es' : ''}
+            </span>
+          </div>
+          <div style={{
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef',
+            padding: '14px 16px',
+          }}>
+            {keywordSentences.length === 0 ? (
+              <div style={{ color: '#888', fontStyle: 'italic' }}>
+                No matching sentences in this topic scope.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {keywordSentences.map(({ index, text }) => (
+                  <div key={index} style={{ fontSize: '14px', lineHeight: 1.5, color: '#333' }}>
+                    <span style={{ color: '#888', marginRight: '8px', fontSize: '12px' }}>
+                      #{index}
+                    </span>
+                    {text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
