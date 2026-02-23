@@ -22,10 +22,10 @@ class LLamaCPP:
         conn = self.get_connection()
         body = json.dumps(
             {
-                "model": "gpt-oss-120b",
+                "model": "openai/gpt-oss-20b",
                 "messages": [{"role": "user", "content": user_msgs[0]}],
-                #"temperature": temperature,
-                #"cache_prompt": True
+                "temperature": temperature,
+                "cache_prompt": True
             }
         )
         headers = {'Content-type': 'application/json'}
