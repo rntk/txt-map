@@ -9,6 +9,7 @@ import PrefixTreeResults from './PrefixTreeResults';
 import FullScreenGraph from './FullScreenGraph';
 import TopicsTagCloud from './TopicsTagCloud';
 import CircularPackingChart from './CircularPackingChart';
+import GridView from './GridView';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -673,6 +674,15 @@ function TextPage() {
                       >
                         ⬤ Circles
                       </button>
+                      <button
+                        className={activeTab === 'grid_view' ? 'active' : ''}
+                        onClick={() => {
+                          setActiveTab('grid_view');
+                          setFullscreenGraph('grid_view');
+                        }}
+                      >
+                        Grid View
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -794,6 +804,13 @@ function TextPage() {
                     submissionId={submissionId}
                     topics={safeTopics}
                     sentences={safeSentences}
+                  />
+                ) : activeTab === 'grid_view' ? (
+                  <GridView
+                    topics={safeTopics}
+                    topicSummaries={results.topic_summaries || {}}
+                    sentences={safeSentences}
+                    onClose={closeFullscreenGraph}
                   />
                 ) : activeTab === 'circular_packing' ? (
                   <div style={{ padding: '20px' }}>
