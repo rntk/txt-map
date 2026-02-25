@@ -119,20 +119,47 @@ function SummaryBackground({ items, cols }) {
 function ArticleMinimap({ sentences, highlightedIndices }) {
   const highlightSet = useMemo(() => new Set(highlightedIndices), [highlightedIndices]);
 
-  // Use sentence length to derive a bar width (40–100%) for a realistic document feel
+  // Use sentence length to derive a text-line width for a realistic document feel.
   const maxLen = useMemo(() => Math.max(...sentences.map(s => s.length), 1), [sentences]);
+
+  const minimapRows = useMemo(() => {
+    return sentences.flatMap((sentence, sentenceIdx) => {
+      const baseWidth = Math.round(52 + (sentence.length / maxLen) * 44);
+      const lineCount = Math.max(2, Math.min(8, Math.ceil(sentence.length / 24)));
+      const paragraphBreak = sentenceIdx > 0 && sentenceIdx % 6 === 0;
+
+      return Array.from({ length: lineCount }, (_, lineIdx) => {
+        const tailDrop = lineIdx === lineCount - 1 ? 16 : 0;
+        const steppedDrop = lineIdx * 5;
+        const rhythmOffset = ((sentenceIdx + lineIdx) % 3) * 2;
+        const widthPct = Math.max(30, Math.min(98, baseWidth - steppedDrop - tailDrop + rhythmOffset));
+        return {
+          key: `${sentenceIdx}-${lineIdx}`,
+          paragraphBreak: paragraphBreak && lineIdx === 0,
+          widthPct,
+          isHighlight: highlightSet.has(sentenceIdx + 1),
+          isContinuation: lineIdx > 0,
+        };
+      });
+    });
+  }, [sentences, maxLen, highlightSet]);
 
   return (
     <div className="grid-view-minimap">
-      {sentences.map((sentence, i) => {
-        const isHighlight = highlightSet.has(i + 1);
-        const widthPct = Math.round(40 + (sentence.length / maxLen) * 60);
+      {minimapRows.map((row) => {
+        const highlightClass = row.isHighlight
+          ? (row.isContinuation ? ' grid-view-minimap-bar--highlight-soft' : ' grid-view-minimap-bar--highlight')
+          : '';
         return (
           <div
-            key={i}
-            className={`grid-view-minimap-bar${isHighlight ? ' grid-view-minimap-bar--highlight' : ''}`}
-            style={{ width: `${widthPct}%` }}
-          />
+            key={row.key}
+            className={`grid-view-minimap-row${row.paragraphBreak ? ' grid-view-minimap-row--break' : ''}`}
+          >
+            <div
+              className={`grid-view-minimap-bar${highlightClass}`}
+              style={{ width: `${row.widthPct}%` }}
+            />
+          </div>
         );
       })}
     </div>
@@ -158,7 +185,6 @@ function SentenceList({ sentenceIndices, sentences }) {
 
 function GridView({ topics, topicSummaries, sentences, onClose }) {
   const [currentPath, setCurrentPath] = useState([]);
-  const [showMinimap, setShowMinimap] = useState(false);
 
   const currentKey = currentPath.length > 0 ? currentPath.join('>') : '';
 
@@ -181,38 +207,17 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
     return Array.from(indices).sort((a, b) => a - b);
   }, [matchingTopics]);
 
-  // Reset minimap when path changes
-  const pathKey = currentPath.join('>');
-  const [lastPathKey, setLastPathKey] = useState('');
-  if (pathKey !== lastPathKey) {
-    setLastPathKey(pathKey);
-    if (showMinimap) setShowMinimap(false);
-  }
-
   const handleNavigate = (newPath) => {
     setCurrentPath(newPath);
   };
 
   const handleTileClick = (item) => {
-    if (item.action === 'minimap') {
-      setShowMinimap(true);
-    } else if (item.segment !== undefined) {
+    if (item.segment !== undefined) {
       setCurrentPath(prev => [...prev, item.segment]);
     }
   };
 
   const renderContent = () => {
-    // ── Minimap view (deepest level) ──────────────────────────────────────────
-    if (showMinimap) {
-      return (
-        <div className="grid-view-container">
-          <div className="grid-view-foreground">
-            <ArticleMinimap sentences={sentences} highlightedIndices={allHighlightedIndices} />
-          </div>
-        </div>
-      );
-    }
-
     // ── Leaf / sentence view ──────────────────────────────────────────────────
     // Triggered when we've drilled all the way into a single leaf topic
     // (no more sub-segments from current path)
@@ -222,28 +227,24 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
 
       return (
         <div className="grid-view-container grid-view-container--leaf">
-          {/* Background: article minimap with highlighted sentences */}
-          <div className="grid-view-background">
-            <ArticleMinimap sentences={sentences} highlightedIndices={allHighlightedIndices} />
-          </div>
-
-          {/* Foreground: summary + sentence list + minimap link (semi-transparent so minimap shows through) */}
-          <div className="grid-view-foreground">
-            {leafSummary && (
-              <div className="grid-view-summary-block">
-                <h3>Summary</h3>
-                <p>{leafSummary}</p>
+          <div className="grid-view-leaf-layout">
+            <div className="grid-view-leaf-main">
+              {leafSummary && (
+                <div className="grid-view-summary-block">
+                  <h3>Summary</h3>
+                  <p>{leafSummary}</p>
+                </div>
+              )}
+              <SentenceList sentenceIndices={allHighlightedIndices} sentences={sentences} />
+            </div>
+            <div className="grid-view-leaf-minimap-panel">
+              <div className="grid-view-leaf-minimap-title">
+                Article Minimap
               </div>
-            )}
-            <SentenceList sentenceIndices={allHighlightedIndices} sentences={sentences} />
-            <div
-              className="grid-view-tile grid-view-tile-interactive grid-view-minimap-link"
-              onClick={() => setShowMinimap(true)}
-            >
-              <div className="grid-view-tile-label">View Article Minimap</div>
-              <div className="grid-view-tile-subtitle">
+              <div className="grid-view-leaf-minimap-subtitle">
                 {allHighlightedIndices.length} highlighted sentences in full article
               </div>
+              <ArticleMinimap sentences={sentences} highlightedIndices={allHighlightedIndices} />
             </div>
           </div>
         </div>
