@@ -32,19 +32,125 @@ const segmentIsLeaf = (topics, currentPath, segment) => {
   return exactMatch && !hasChildren;
 };
 
-const getFontSize = (itemCount) => {
-  if (itemCount === 1) return '4rem';
-  if (itemCount <= 2) return '3rem';
-  if (itemCount <= 4) return '2.5rem';
-  if (itemCount <= 9) return '1.8rem';
-  return '1.2rem';
+const TILE_GRID_COLS = 2;
+
+const COMMON_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'for',
+  'from', 'had', 'has', 'have', 'he', 'her', 'hers', 'him', 'his', 'i', 'if', 'in',
+  'into', 'is', 'it', 'its', 'itself', 'me', 'my', 'of', 'on', 'or', 'our', 'ours',
+  'she', 'so', 'that', 'the', 'their', 'theirs', 'them', 'they', 'this', 'those',
+  'to', 'too', 'us', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who',
+  'will', 'with', 'you', 'your', 'yours'
+]);
+
+const tokenizeSentence = (sentence) => {
+  const text = String(sentence || '').toLowerCase();
+  if (!text) return [];
+
+  // Prefer locale-aware segmentation so tags work for non-ASCII languages too.
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
+    return Array.from(segmenter.segment(text))
+      .filter((part) => part.isWordLike)
+      .map((part) => part.segment.replace(/^['-]+|['-]+$/g, ''))
+      .filter(Boolean);
+  }
+
+  return text
+    .match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || [];
 };
 
-const getGridCols = (itemCount) => {
-  if (itemCount === 1) return 1;
-  if (itemCount <= 4) return 2;
-  if (itemCount <= 9) return 3;
-  return 4;
+const collectScopedSentences = (segmentTopics, allSentences) => {
+  const sentenceCount = allSentences?.length || 0;
+  if (sentenceCount === 0) return [];
+
+  const rawIndices = [];
+  segmentTopics.forEach((topic) => {
+    (topic.sentences || []).forEach((idx) => {
+      const num = Number(idx);
+      if (Number.isInteger(num)) rawIndices.push(num);
+    });
+  });
+
+  if (rawIndices.length === 0) return [];
+
+  const resolveByMode = (assumeZeroBased) => {
+    const texts = [];
+    const seen = new Set();
+    rawIndices.forEach((idx) => {
+      const zeroBasedIdx = assumeZeroBased ? idx : idx - 1;
+      if (zeroBasedIdx < 0 || zeroBasedIdx >= sentenceCount) return;
+      if (seen.has(zeroBasedIdx)) return;
+      seen.add(zeroBasedIdx);
+      const sentence = allSentences[zeroBasedIdx];
+      if (sentence) texts.push(sentence);
+    });
+    return texts;
+  };
+
+  // Primary mode: 1-based indices. If it resolves nothing, fall back to 0-based.
+  const oneBased = resolveByMode(false);
+  return oneBased.length > 0 ? oneBased : resolveByMode(true);
+};
+
+const buildTopTags = (segmentTopics, allSentences, limit = 6) => {
+  const frequencies = new Map();
+  const scopedSentences = collectScopedSentences(segmentTopics, allSentences);
+
+  // Tags are extracted strictly from sentence text (never from topic/subtopic labels).
+  scopedSentences.forEach((sentence) => {
+    const words = tokenizeSentence(sentence);
+    words.forEach((word) => {
+      const normalized = word.replace(/^'+|'+$/g, '');
+      const isAsciiToken = /^[a-z0-9]+$/i.test(normalized);
+      if (isAsciiToken && normalized.length < 2) return;
+      if (COMMON_STOP_WORDS.has(normalized)) return;
+      frequencies.set(normalized, (frequencies.get(normalized) || 0) + 1);
+    });
+  });
+
+  // Fallback: if strict filters remove everything but sentences exist,
+  // still build a cloud from sentence tokens.
+  if (frequencies.size === 0 && scopedSentences.length > 0) {
+    scopedSentences.forEach((sentence) => {
+      tokenizeSentence(sentence).forEach((word) => {
+        const normalized = word.replace(/^'+|'+$/g, '');
+        if (!normalized) return;
+        frequencies.set(normalized, (frequencies.get(normalized) || 0) + 1);
+      });
+    });
+  }
+
+  const topTags = Array.from(frequencies.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit);
+
+  if (topTags.length === 0) return [];
+
+  const minFrequency = topTags[topTags.length - 1][1];
+  const maxFrequency = topTags[0][1];
+  const minFontSize = 12;
+  const maxFontSize = 16;
+
+  return topTags.map(([label, count]) => {
+    const ratio = maxFrequency === minFrequency
+      ? 0.5
+      : (count - minFrequency) / (maxFrequency - minFrequency);
+    const fontSize = minFontSize + ratio * (maxFontSize - minFontSize);
+    return { label, count, fontSize };
+  });
+};
+
+const truncateWithEllipsis = (text, maxChars) => {
+  if (!text) return '';
+  const normalized = String(text).replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxChars) return normalized;
+  return normalized.slice(0, maxChars).trimEnd() + '...';
+};
+
+const getFirstScopedSentence = (segmentTopics, sentences) => {
+  const scopedSentences = collectScopedSentences(segmentTopics, sentences);
+  return scopedSentences[0] || '';
 };
 
 function Breadcrumb({ path, onNavigate }) {
@@ -71,24 +177,58 @@ function Breadcrumb({ path, onNavigate }) {
   );
 }
 
-function TileGrid({ items, onTileClick, fontSize, cols, isBackground }) {
+function TileGrid({ items, onTileClick, isBackground }) {
   return (
     <div className={isBackground ? 'grid-view-background' : 'grid-view-foreground'}>
       <div
         className="grid-view-tiles"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${TILE_GRID_COLS}, 1fr)` }}
       >
         {items.map((item, i) => (
           <div
             key={item.label + i}
             className={`grid-view-tile ${isBackground ? '' : 'grid-view-tile-interactive'}`}
-            style={{ fontSize }}
             onClick={!isBackground && onTileClick ? () => onTileClick(item) : undefined}
           >
-            <div className="grid-view-tile-label">{item.label}</div>
-            {item.subtitle && (
-              <div className="grid-view-tile-subtitle">{item.subtitle}</div>
-            )}
+            <div className="grid-view-tile-subtiles">
+              <div className="grid-view-subtile grid-view-subtile-title">
+                <div className="grid-view-tile-label">{item.label}</div>
+                {item.previewLabel && (
+                  <div className="grid-view-tile-preview-label">{item.previewLabel}</div>
+                )}
+                {item.previewText && (
+                  <div className="grid-view-tile-preview">
+                    {item.previewText}
+                  </div>
+                )}
+              </div>
+              <div className="grid-view-subtile grid-view-subtile-tags">
+                {item.tags && item.tags.length > 0 ? (
+                  <div className="grid-view-tags-cloud">
+                    {item.tags.map((tag) => (
+                      <span
+                        key={tag.label}
+                        className="grid-view-tag-chip"
+                        style={{ fontSize: `${tag.fontSize.toFixed(1)}px` }}
+                        title={`Frequency: ${tag.count}`}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid-view-tags-empty">No tags</div>
+                )}
+              </div>
+              <div className="grid-view-subtile grid-view-subtile-stat">
+                <div className="grid-view-subtile-stat-value">{item.topicCount ?? 0}</div>
+                <div className="grid-view-subtile-stat-label">Topics</div>
+              </div>
+              <div className="grid-view-subtile grid-view-subtile-stat">
+                <div className="grid-view-subtile-stat-value">{item.sentenceCount ?? 0}</div>
+                <div className="grid-view-subtile-stat-label">Sentences</div>
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -254,23 +394,28 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
     // ── Topic tiles view (intermediate + leaf-parent levels) ─────────────────
     const foregroundItems = Array.from(hierarchy.entries()).map(([segment, data]) => {
       const isLeaf = segmentIsLeaf(topics, currentPath, segment);
+      const tilePath = [...currentPath, segment];
+      const fullPath = tilePath.join('>');
+      const summary = topicSummaries[fullPath] || '';
+      const fallbackSentence = getFirstScopedSentence(data.topics, sentences);
+      const previewText = truncateWithEllipsis(summary || fallbackSentence, 150);
+      const previewLabel = summary ? 'Summary' : '';
       return {
         label: segment,
-        subtitle: isLeaf
-          ? `${data.sentenceCount} sentence${data.sentenceCount !== 1 ? 's' : ''}`
-          : `${data.topics.length} topic${data.topics.length !== 1 ? 's' : ''}, ${data.sentenceCount} sentences`,
+        previewLabel,
+        previewText,
+        tags: buildTopTags(data.topics, sentences),
+        topicCount: data.topics.length,
+        sentenceCount: data.sentenceCount,
         segment,
         isLeaf,
       };
     });
 
-    const fgCount = foregroundItems.length;
-
     // Determine if ALL foreground tiles are leaf topics
     const allLeaves = foregroundItems.every(item => item.isLeaf);
 
     let backgroundItems = [];
-    let bgCount = 0;
 
     if (allLeaves) {
       // Background: summary tiles for each leaf topic
@@ -284,18 +429,28 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
           summary,
         };
       });
-      bgCount = backgroundItems.length;
     } else {
       // Background: next-level preview from the first non-leaf foreground tile
       const firstNonLeaf = foregroundItems.find(item => !item.isLeaf);
       if (firstNonLeaf) {
         const nextPath = [...currentPath, firstNonLeaf.segment];
         const nextHierarchy = buildHierarchy(topics, nextPath);
-        backgroundItems = Array.from(nextHierarchy.entries()).map(([segment, data]) => ({
-          label: segment,
-          subtitle: `${data.sentenceCount} sentences`,
-        }));
-        bgCount = backgroundItems.length;
+        backgroundItems = Array.from(nextHierarchy.entries()).map(([segment, data]) => {
+          const tilePath = [...nextPath, segment];
+          const fullPath = tilePath.join('>');
+          const summary = topicSummaries[fullPath] || '';
+          const fallbackSentence = getFirstScopedSentence(data.topics, sentences);
+          const previewText = truncateWithEllipsis(summary || fallbackSentence, 150);
+          const previewLabel = summary ? 'Summary' : '';
+          return {
+            label: segment,
+            previewLabel,
+            previewText,
+            tags: buildTopTags(data.topics, sentences),
+            topicCount: data.topics.length,
+            sentenceCount: data.sentenceCount,
+          };
+        });
       }
     }
 
@@ -306,13 +461,11 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
           allLeaves ? (
             <SummaryBackground
               items={backgroundItems}
-              cols={getGridCols(bgCount)}
+              cols={TILE_GRID_COLS}
             />
           ) : (
             <TileGrid
               items={backgroundItems}
-              fontSize={getFontSize(bgCount)}
-              cols={getGridCols(bgCount)}
               isBackground={true}
             />
           )
@@ -322,8 +475,6 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
         <TileGrid
           items={foregroundItems}
           onTileClick={handleTileClick}
-          fontSize={getFontSize(fgCount)}
-          cols={getGridCols(fgCount)}
           isBackground={false}
         />
       </div>
