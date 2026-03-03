@@ -129,7 +129,7 @@ export default function CircularPackingChart({ topics }) {
     if (!svgRef.current || !containerRef.current) return;
 
     const containerWidth = containerRef.current.clientWidth || 800;
-    const size = Math.min(containerWidth, 900);
+    const size = Math.max(320, containerWidth);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -301,7 +301,7 @@ export default function CircularPackingChart({ topics }) {
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+    <div ref={containerRef} style={{ position: 'relative', display: 'block', width: '100%' }}>
       <button
         onClick={resetZoom}
         style={{

@@ -813,10 +813,21 @@ function TextPage() {
                     onClose={closeFullscreenGraph}
                   />
                 ) : activeTab === 'circular_packing' ? (
-                  <div style={{ padding: '20px' }}>
+                  <div
+                    style={{
+                      padding: '20px',
+                      minHeight: '80vh',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
                     <h2>Topic Circles</h2>
-                    <p>Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.</p>
-                    <CircularPackingChart topics={safeTopics} />
+                    <p style={{ marginBottom: '12px' }}>
+                      Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
+                    </p>
+                    <div style={{ flex: 1, minHeight: 'calc(80vh - 120px)' }}>
+                      <CircularPackingChart topics={safeTopics} />
+                    </div>
                   </div>
                 ) : (
                   articles.map((article, index) => (
