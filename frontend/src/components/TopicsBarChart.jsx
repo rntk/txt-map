@@ -9,6 +9,7 @@ import React, { useMemo, useState } from 'react';
  */
 function TopicsBarChart({ topics, sentences = [] }) {
     const [hoveredBar, setHoveredBar] = useState(null);
+    const MAX_BAR_WIDTH_PERCENT = 78;
 
     const chartData = useMemo(() => {
         if (!topics || topics.length === 0) return [];
@@ -186,7 +187,10 @@ function TopicsBarChart({ topics, sentences = [] }) {
                 padding: '16px 20px 12px',
             }}>
                 {chartData.map((item, index) => {
-                    const barWidthPercent = Math.max((item.totalChars / maxChars) * 100, 8);
+                    // Reserve horizontal room so right-side labels remain visible,
+                    // even when the largest bar dominates the chart.
+                    const scaledBarWidthPercent = (item.totalChars / maxChars) * MAX_BAR_WIDTH_PERCENT;
+                    const barWidthPercent = Math.max(scaledBarWidthPercent, 8);
                     const color = colorScale[item.topLevel] || '#999';
                     const isHovered = hoveredBar === index;
                     const isLast = index === chartData.length - 1;
