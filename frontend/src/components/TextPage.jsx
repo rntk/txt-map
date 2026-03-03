@@ -10,6 +10,7 @@ import FullScreenGraph from './FullScreenGraph';
 import TopicsTagCloud from './TopicsTagCloud';
 import CircularPackingChart from './CircularPackingChart';
 import GridView from './GridView';
+import TopicsBarChart from './TopicsBarChart';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -617,6 +618,12 @@ function TextPage() {
                         Article
                       </button>
                       <button
+                        className={activeTab === 'topics' ? 'active' : ''}
+                        onClick={() => setActiveTab('topics')}
+                      >
+                        Topics
+                      </button>
+                      <button
                         className={activeTab === 'summary' ? 'active' : ''}
                         onClick={() => setActiveTab('summary')}
                       >
@@ -687,7 +694,11 @@ function TextPage() {
                   </div>
                 </div>
 
-                {activeTab === 'summary' ? (
+                {activeTab === 'topics' ? (
+                  <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
+                    <TopicsBarChart topics={allTopics} sentences={safeSentences} />
+                  </div>
+                ) : activeTab === 'summary' ? (
                   <div className="summary-content">
                     <h2>Summary</h2>
                     <div className="summary-text">

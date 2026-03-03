@@ -1,91 +1,128 @@
 import React, { useMemo, useState } from 'react';
 
 /**
- * TopicsBarChart - Displays subtopics (level 2+) as horizontal bars.
- * Bar width = number of characters in sentences for that subtopic.
- * Title format: "TopLevel > SecondLevel"
- * Subtitle row: shows remaining path levels (3+)
+ * TopicsBarChart
+ * - Creates one bar per second-level subtopic: TopLevel>SecondLevel
+ * - Bar width is based on sentence character count
+ * - Infographic style: bars sorted smallest-to-largest (top to bottom),
+ *   value inside bar, label to the right
  */
-function TopicsBarChart({ topics }) {
+function TopicsBarChart({ topics, sentences = [] }) {
     const [hoveredBar, setHoveredBar] = useState(null);
 
-    // Process topics to extract level 2+ subtopics with character counts
     const chartData = useMemo(() => {
         if (!topics || topics.length === 0) return [];
 
-        // Group by top-level > second-level combination
         const subtopicMap = new Map();
+        const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
 
         topics.forEach(topic => {
             const parts = topic.name.split('>').map(p => p.trim());
-            
-            // Skip if less than 2 levels (we only show level 2+)
+
+            // Skip top-level topics; only second-level and deeper create bars.
             if (parts.length < 2) return;
 
             const topLevel = parts[0];
             const secondLevel = parts[1];
-            const barTitle = `${topLevel} > ${secondLevel}`;
-            
-            // Get remaining levels (3+) for subtitle
-            const remainingLevels = parts.length > 2 
-                ? parts.slice(2).join(' > ') 
-                : null;
-
-            // Calculate total characters from sentences
-            const totalChars = topic.totalChars || 0;
-            const sentenceCount = topic.sentences ? topic.sentences.length : 0;
-
-            const key = `${barTitle}${remainingLevels ? ` > ${remainingLevels}` : ''}`;
+            const barTitle = `${topLevel}>${secondLevel}`;
+            const key = barTitle;
 
             if (!subtopicMap.has(key)) {
                 subtopicMap.set(key, {
+                    id: key,
                     barTitle,
-                    subTitle: remainingLevels,
                     topLevel,
-                    secondLevel,
-                    totalChars,
-                    sentenceCount,
-                    fullPath: topic.name
+                    deeperPaths: new Set(),
+                    sentenceIndices: new Set(),
+                    fallbackChars: 0
                 });
-            } else {
-                // Aggregate if same barTitle + subTitle combination appears multiple times
-                const existing = subtopicMap.get(key);
-                existing.totalChars += totalChars;
-                existing.sentenceCount += sentenceCount;
+            }
+
+            const entry = subtopicMap.get(key);
+
+            if (parts.length > 2) {
+                entry.deeperPaths.add(parts.slice(2).join('>'));
+            }
+
+            const topicSentenceIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
+            if (topicSentenceIndices.length > 0) {
+                topicSentenceIndices.forEach((index) => {
+                    const oneBased = Number(index);
+                    if (Number.isInteger(oneBased) && oneBased > 0) {
+                        entry.sentenceIndices.add(oneBased);
+                    }
+                });
+            } else if (!hasSentenceText && Number.isFinite(topic.totalChars)) {
+                entry.fallbackChars += topic.totalChars;
             }
         });
 
-        // Convert to array and sort by totalChars descending
-        const result = Array.from(subtopicMap.values())
-            .sort((a, b) => b.totalChars - a.totalChars);
+        const getCharsFromSentenceIndices = (indices) => {
+            let total = 0;
+            indices.forEach((oneBased) => {
+                const sentence = sentences[oneBased - 1];
+                if (typeof sentence === 'string') {
+                    total += sentence.length;
+                }
+            });
+            return total;
+        };
+
+        const result = Array.from(subtopicMap.values()).map((entry) => {
+            const totalChars = hasSentenceText
+                ? getCharsFromSentenceIndices(entry.sentenceIndices)
+                : entry.fallbackChars;
+
+            return {
+                id: entry.id,
+                barTitle: entry.barTitle,
+                topLevel: entry.topLevel,
+                deeperTopics: Array.from(entry.deeperPaths).sort(),
+                totalChars,
+                sentenceCount: entry.sentenceIndices.size
+            };
+        })
+            // Sort smallest to largest (top to bottom), like the infographic
+            .sort((a, b) => a.totalChars - b.totalChars || a.barTitle.localeCompare(b.barTitle));
 
         return result;
-    }, [topics]);
+    }, [topics, sentences]);
 
-    // Calculate max chars for scaling
     const maxChars = useMemo(() => {
         if (chartData.length === 0) return 100;
-        return Math.max(...chartData.map(d => d.totalChars));
+        const max = Math.max(...chartData.map(d => d.totalChars));
+        return max > 0 ? max : 1;
     }, [chartData]);
 
-    // Color scale based on top-level topic
+    // Warm, muted color palette inspired by the infographic
     const colorScale = useMemo(() => {
         const colors = {};
         const baseColors = [
-            '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f',
-            '#edc949', '#af7aa1', '#ff9da7', '#9c755f', '#bab5ac',
-            '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-            '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5'
+            '#a8c4d8', // light steel blue
+            '#c4a882', // warm tan
+            '#9ab8a0', // sage green
+            '#d4917a', // muted coral
+            '#5a5a5a', // charcoal
+            '#b8a9c8', // dusty lavender
+            '#c9b458', // muted gold
+            '#8aafaf', // teal gray
+            '#c48e8e', // dusty rose
+            '#8b9dc3', // slate blue
         ];
-        
-        chartData.forEach((item, index) => {
+
+        chartData.forEach((item) => {
             if (!colors[item.topLevel]) {
                 const colorIndex = Object.keys(colors).length % baseColors.length;
                 colors[item.topLevel] = baseColors[colorIndex];
             }
         });
-        
+
         return colors;
+    }, [chartData]);
+
+    // Compute total chars across all bars for the header
+    const totalAllChars = useMemo(() => {
+        return chartData.reduce((sum, item) => sum + item.totalChars, 0);
     }, [chartData]);
 
     if (chartData.length === 0) {
@@ -96,142 +133,133 @@ function TopicsBarChart({ topics }) {
                 color: '#888',
                 fontSize: '14px'
             }}>
-                No subtopic data available. Subtopics are displayed for topics with 2+ levels (split by '&gt;').
+                No second-level subtopic data available.
             </div>
         );
     }
 
     return (
         <div style={{
-            padding: '20px',
-            backgroundColor: '#fafafa',
-            borderRadius: '8px',
-            border: '1px solid #eee'
+            backgroundColor: '#f0ece4',
+            borderRadius: '6px',
+            border: '2px solid #888',
+            overflow: 'hidden',
+            fontFamily: 'Georgia, "Times New Roman", serif'
         }}>
-            <h2 style={{ marginBottom: '10px', fontSize: '18px', color: '#333' }}>
-                Topics Overview
-            </h2>
-            <p style={{ marginBottom: '20px', color: '#666', fontSize: '13px' }}>
-                Horizontal bars represent subtopics (level 2+). Bar width shows character count in sentences.
-            </p>
-
+            {/* Header */}
             <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
+                padding: '16px 20px 12px',
+                textAlign: 'center',
+                borderBottom: '3px solid #c0392b'
+            }}>
+                <h2 style={{
+                    margin: '0 0 4px',
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#2c2c2c'
+                }}>
+                    Topics Overview
+                </h2>
+                <p style={{
+                    margin: '0 0 6px',
+                    fontSize: '13px',
+                    color: '#555',
+                    fontStyle: 'italic'
+                }}>
+                    &ndash; character count by subtopic (second-level) &ndash;
+                </p>
+                <div style={{
+                    display: 'inline-block',
+                    backgroundColor: '#fffbe6',
+                    border: '1px solid #c0392b',
+                    padding: '2px 12px',
+                    fontSize: '13px',
+                    fontStyle: 'italic',
+                    color: '#c0392b'
+                }}>
+                    Total: {totalAllChars.toLocaleString()} characters
+                </div>
+            </div>
+
+            {/* Chart body */}
+            <div style={{
+                padding: '16px 20px 12px',
             }}>
                 {chartData.map((item, index) => {
-                    const barWidthPercent = (item.totalChars / maxChars) * 100;
+                    const barWidthPercent = Math.max((item.totalChars / maxChars) * 100, 8);
                     const color = colorScale[item.topLevel] || '#999';
                     const isHovered = hoveredBar === index;
+                    const isLast = index === chartData.length - 1;
 
                     return (
                         <div
-                            key={item.fullPath}
+                            key={item.id}
                             style={{
                                 display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: '12px',
-                                padding: '8px 0',
-                                borderBottom: '1px solid #eee'
+                                alignItems: 'center',
+                                padding: '10px 0',
+                                borderBottom: isLast ? 'none' : '1px dashed #b0a898',
                             }}
                             onMouseEnter={() => setHoveredBar(index)}
                             onMouseLeave={() => setHoveredBar(null)}
                         >
-                            {/* Label column */}
+                            {/* Bar */}
                             <div style={{
-                                width: '280px',
-                                flexShrink: 0,
-                                paddingTop: '8px'
+                                width: `${barWidthPercent}%`,
+                                minHeight: '44px',
+                                backgroundColor: isHovered ? color : color,
+                                opacity: isHovered ? 1 : 0.85,
+                                border: `1.5px solid ${isHovered ? '#333' : '#777'}`,
+                                borderRadius: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '4px 8px',
+                                boxSizing: 'border-box',
+                                transition: 'opacity 0.15s ease',
+                                position: 'relative',
+                                cursor: 'default'
+                            }}>
+                                <span style={{
+                                    fontSize: '18px',
+                                    fontWeight: '700',
+                                    color: '#2c2c2c',
+                                    textShadow: '0 0 4px rgba(255,255,255,0.6)',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {item.totalChars.toLocaleString()}
+                                </span>
+                            </div>
+
+                            {/* Label to the right of the bar */}
+                            <div style={{
+                                marginLeft: '12px',
+                                flex: 1,
+                                minWidth: 0
                             }}>
                                 <div style={{
-                                    fontWeight: '600',
                                     fontSize: '13px',
-                                    color: '#333',
-                                    marginBottom: '2px'
+                                    fontWeight: '600',
+                                    color: '#2c2c2c',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
                                 }}>
                                     {item.barTitle}
                                 </div>
-                                {item.subTitle && (
+                                {item.deeperTopics.length > 0 && (
                                     <div style={{
                                         fontSize: '11px',
-                                        color: '#888',
-                                        fontStyle: 'italic'
+                                        color: '#777',
+                                        fontStyle: 'italic',
+                                        marginTop: '2px',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
                                     }}>
-                                        {item.subTitle}
+                                        ({item.deeperTopics.join(', ')})
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Bar column */}
-                            <div style={{
-                                flex: 1,
-                                position: 'relative',
-                                minHeight: '36px',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}>
-                                <div style={{
-                                    width: '100%',
-                                    height: '28px',
-                                    backgroundColor: '#e8e8e8',
-                                    borderRadius: '3px',
-                                    position: 'relative',
-                                    overflow: 'hidden'
-                                }}>
-                                    <div
-                                        style={{
-                                            width: `${barWidthPercent}%`,
-                                            height: '100%',
-                                            backgroundColor: color,
-                                            opacity: isHovered ? 0.9 : 0.8,
-                                            transition: 'opacity 0.2s ease',
-                                            borderRadius: '3px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'flex-end',
-                                            paddingRight: '8px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    >
-                                        {barWidthPercent > 15 && (
-                                            <span style={{
-                                                color: '#fff',
-                                                fontSize: '11px',
-                                                fontWeight: '600',
-                                                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                                            }}>
-                                                {item.totalChars.toLocaleString()} chars
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                
-                                {/* Character count label (outside bar if too small) */}
-                                {barWidthPercent <= 15 && (
-                                    <span style={{
-                                        position: 'absolute',
-                                        left: `${barWidthPercent}%`,
-                                        marginLeft: '8px',
-                                        fontSize: '11px',
-                                        color: '#666',
-                                        fontWeight: '500'
-                                    }}>
-                                        {item.totalChars.toLocaleString()} chars
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Stats column */}
-                            <div style={{
-                                width: '100px',
-                                flexShrink: 0,
-                                paddingTop: '8px',
-                                textAlign: 'right',
-                                fontSize: '11px',
-                                color: '#888'
-                            }}>
-                                {item.sentenceCount} sent.
                             </div>
                         </div>
                     );
@@ -240,12 +268,12 @@ function TopicsBarChart({ topics }) {
 
             {/* Legend */}
             <div style={{
-                marginTop: '20px',
-                paddingTop: '15px',
-                borderTop: '1px solid #eee',
+                padding: '10px 20px 14px',
+                borderTop: '1px solid #c8c0b4',
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: '12px'
+                gap: '14px',
+                justifyContent: 'center'
             }}>
                 {Object.entries(colorScale).map(([topLevel, color]) => (
                     <div
@@ -258,12 +286,13 @@ function TopicsBarChart({ topics }) {
                         }}
                     >
                         <div style={{
-                            width: '14px',
-                            height: '14px',
+                            width: '16px',
+                            height: '16px',
                             backgroundColor: color,
-                            borderRadius: '2px'
+                            border: '1px solid #777',
+                            borderRadius: '1px'
                         }} />
-                        <span style={{ color: '#555' }}>{topLevel}</span>
+                        <span style={{ color: '#444' }}>{topLevel}</span>
                     </div>
                 ))}
             </div>
