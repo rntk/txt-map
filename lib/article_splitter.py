@@ -116,7 +116,7 @@ def split_article(
     splitter = SparseRegexSentenceSplitter(
         anchor_every_words=anchor_every_words, html_aware=True
     )
-    html_cleaner = HTMLParserTagStripCleaner()
+    html_cleaner = HTMLParserTagStripCleaner(strip_tags={"style", "script"})
     offset_restorer = MappingOffsetRestorer()
 
     if llm is None:
