@@ -11,6 +11,7 @@ import TopicsTagCloud from './TopicsTagCloud';
 import CircularPackingChart from './CircularPackingChart';
 import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
+import RadarChart from './RadarChart';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -682,6 +683,12 @@ function TextPage() {
                         ⬤ Circles
                       </button>
                       <button
+                        className={activeTab === 'radar_chart' ? 'active' : ''}
+                        onClick={() => setActiveTab('radar_chart')}
+                      >
+                         Radar Chart
+                      </button>
+                      <button
                         className={activeTab === 'grid_view' ? 'active' : ''}
                         onClick={() => {
                           setActiveTab('grid_view');
@@ -839,6 +846,17 @@ function TextPage() {
                     <div style={{ flex: 1, minHeight: 'calc(80vh - 120px)' }}>
                       <CircularPackingChart topics={safeTopics} />
                     </div>
+                  </div>
+                ) : activeTab === 'radar_chart' ? (
+                  <div
+                    style={{
+                      padding: '20px',
+                      minHeight: '80vh',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    <RadarChart topics={safeTopics} sentences={safeSentences} />
                   </div>
                 ) : (
                   articles.map((article, index) => (
