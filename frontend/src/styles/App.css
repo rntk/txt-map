@@ -3150,7 +3150,7 @@
   padding: 0;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
   transition: all 0.3s ease;
   min-height: 0;
   overflow: hidden;
@@ -3162,7 +3162,7 @@
 
 .grid-view-tile-interactive:hover {
   border-color: #007bff;
-  background: rgba(0, 123, 255, 0.05);
+  background: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 2px 12px rgba(0, 123, 255, 0.15);
 }
@@ -3228,10 +3228,6 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f2f6fb;
-  border: 1px solid #dbe5f0;
   color: #35506b;
   transition: font-size 120ms ease;
 }

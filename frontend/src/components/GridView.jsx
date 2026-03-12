@@ -93,7 +93,7 @@ const collectScopedSentences = (segmentTopics, allSentences) => {
   return oneBased.length > 0 ? oneBased : resolveByMode(true);
 };
 
-const buildTopTags = (segmentTopics, allSentences, limit = 6) => {
+const buildTopTags = (segmentTopics, allSentences, limit = 20) => {
   const frequencies = new Map();
   const scopedSentences = collectScopedSentences(segmentTopics, allSentences);
 
@@ -129,8 +129,8 @@ const buildTopTags = (segmentTopics, allSentences, limit = 6) => {
 
   const minFrequency = topTags[topTags.length - 1][1];
   const maxFrequency = topTags[0][1];
-  const minFontSize = 12;
-  const maxFontSize = 16;
+  const minFontSize = 11;
+  const maxFontSize = 22;
 
   return topTags.map(([label, count]) => {
     const ratio = maxFrequency === minFrequency
