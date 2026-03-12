@@ -3601,3 +3601,93 @@
   color: #888;
   font-size: 14px;
 }
+
+.circular-packing-chart {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.circular-packing-level-selector {
+  padding: 12px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.circular-packing-level-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+
+.circular-packing-level-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.circular-packing-level-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  background-color: #e9ecef;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.circular-packing-level-btn.active {
+  font-weight: 700;
+  color: #fff;
+  background-color: #7ba3cc;
+  border: 2px solid #5a8ab8;
+}
+
+.circular-packing-level-btn:hover {
+  background-color: #dee2e6;
+}
+
+.circular-packing-level-btn.active:hover {
+  background-color: #6a95c0;
+}
+
+.circular-packing-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.circular-packing-body {
+  position: relative;
+  min-height: 320px;
+}
+
+.circular-packing-no-data {
+  color: #666;
+  font-style: italic;
+  padding: 24px 0;
+}
+
+.circular-packing-reset-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.circular-packing-svg {
+  display: block;
+  margin: 0 auto;
+}
