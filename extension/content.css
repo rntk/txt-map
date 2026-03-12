@@ -12,8 +12,10 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   display: flex;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+  max-width: 340px;
   animation: rsstag-slideDown 0.2s ease-out;
 }
 
@@ -26,6 +28,12 @@
     transform: translateX(-50%) translateY(0);
     opacity: 1;
   }
+}
+
+#rsstag-toolbar-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 #rsstag-selection-toolbar button {
@@ -64,17 +72,82 @@
 #rsstag-cancel-btn {
   background: #ef4444;
   color: #fff;
+  margin-left: auto;
 }
 
 #rsstag-selection-toolbar button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
-#rsstag-toolbar-text {
-  font-size: 13px;
-  font-weight: 500;
+/* Block list */
+#rsstag-block-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
+#rsstag-block-list:empty {
+  display: none;
+}
+
+.rsstag-block-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #374151;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: default;
+  user-select: none;
+  border: 2px solid transparent;
+  transition: border-color 0.1s ease;
+}
+
+.rsstag-block-item.rsstag-drag-over {
+  border-color: #60a5fa;
+}
+
+.rsstag-block-item.rsstag-dragging {
+  opacity: 0.4;
+}
+
+.rsstag-drag-handle {
+  cursor: grab;
+  color: #9ca3af;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.rsstag-drag-handle:active {
+  cursor: grabbing;
+}
+
+.rsstag-block-label {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.rsstag-remove-btn {
+  background: transparent !important;
+  color: #9ca3af !important;
+  padding: 0 4px !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  border-radius: 4px !important;
+  line-height: 1;
+}
+
+.rsstag-remove-btn:hover:not(:disabled) {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  transform: none !important;
+}
+
+/* Page element states */
 .rsstag-element-highlight {
   outline: 2px solid #60a5fa !important;
   outline-offset: 2px;

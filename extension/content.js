@@ -2,7 +2,9 @@
 (function () {
   let selectionToolbar = null;
   let selectionMode = false;
-  let selectedElement = null;
+  let selectedElements = []; // ordered list of { el, originalNumber } objects
+  let pickCounter = 0;
+  let dragSrcIndex = null;
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "startSelection") {
@@ -20,39 +22,34 @@
     selectionToolbar = document.createElement('div');
     selectionToolbar.id = 'rsstag-selection-toolbar';
     selectionToolbar.innerHTML = `
-      <span id="rsstag-toolbar-text">Pick a block on the page.</span>
-      <button id="rsstag-pick-btn" type="button">Pick Block</button>
-      <button id="rsstag-submit-btn" type="button" disabled>Submit</button>
-      <button id="rsstag-cancel-btn" type="button">Cancel</button>
+      <div id="rsstag-toolbar-top">
+        <button id="rsstag-pick-btn" type="button">Pick Block</button>
+        <button id="rsstag-submit-btn" type="button" disabled>Submit</button>
+        <button id="rsstag-cancel-btn" type="button">Cancel</button>
+      </div>
+      <ul id="rsstag-block-list"></ul>
     `;
 
     document.body.appendChild(selectionToolbar);
 
-    const pickBtn = document.getElementById('rsstag-pick-btn');
-    const submitBtn = document.getElementById('rsstag-submit-btn');
-    const cancelBtn = document.getElementById('rsstag-cancel-btn');
+    document.getElementById('rsstag-pick-btn').addEventListener('click', toggleSelectionMode);
+    document.getElementById('rsstag-submit-btn').addEventListener('click', submitSelection);
+    document.getElementById('rsstag-cancel-btn').addEventListener('click', cleanupSelection);
 
-    pickBtn.addEventListener('click', toggleSelectionMode);
-    submitBtn.addEventListener('click', submitSelection);
-    cancelBtn.addEventListener('click', cleanupSelection);
-
-    updateSubmitState();
+    renderBlockList();
   }
 
   function toggleSelectionMode() {
     selectionMode = !selectionMode;
     const pickBtn = document.getElementById('rsstag-pick-btn');
-    const toolbarText = document.getElementById('rsstag-toolbar-text');
 
     if (selectionMode) {
       pickBtn.classList.add('active');
-      pickBtn.textContent = 'Picking...';
-      toolbarText.textContent = 'Click a block to select it.';
+      pickBtn.textContent = 'Picking…';
       enableSelection();
     } else {
       pickBtn.classList.remove('active');
       pickBtn.textContent = 'Pick Block';
-      toolbarText.textContent = selectedElement ? 'Block selected. Submit when ready.' : 'Pick a block on the page.';
       disableSelection();
     }
   }
@@ -67,7 +64,6 @@
     document.removeEventListener('mouseover', highlightElement);
     document.removeEventListener('mouseout', unhighlightElement);
     document.removeEventListener('click', selectElement, true);
-
     document.querySelectorAll('.rsstag-element-highlight').forEach(el => {
       el.classList.remove('rsstag-element-highlight');
     });
@@ -76,20 +72,18 @@
   function highlightElement(event) {
     if (!selectionMode) return;
     if (event.target.closest('#rsstag-selection-toolbar')) return;
-
-    const element = event.target;
-    if (element && element !== document.body && element !== document.documentElement) {
-      element.classList.add('rsstag-element-highlight');
+    const el = event.target;
+    if (el && el !== document.body && el !== document.documentElement) {
+      el.classList.add('rsstag-element-highlight');
     }
   }
 
   function unhighlightElement(event) {
     if (!selectionMode) return;
     if (event.target.closest('#rsstag-selection-toolbar')) return;
-
-    const element = event.target;
-    if (element && !element.classList.contains('rsstag-selected')) {
-      element.classList.remove('rsstag-element-highlight');
+    const el = event.target;
+    if (el && !selectedElements.some(entry => entry.el === el)) {
+      el.classList.remove('rsstag-element-highlight');
     }
   }
 
@@ -100,32 +94,105 @@
     event.preventDefault();
     event.stopPropagation();
 
-    if (selectedElement) {
-      selectedElement.classList.remove('rsstag-selected');
-    }
-
-    selectedElement = event.target;
-    selectedElement.classList.add('rsstag-selected');
-
-    const toolbarText = document.getElementById('rsstag-toolbar-text');
-    toolbarText.textContent = 'Block selected. Submit when ready.';
+    const el = event.target;
+    el.classList.add('rsstag-selected');
+    pickCounter += 1;
+    selectedElements.push({ el, originalNumber: pickCounter });
 
     selectionMode = false;
     disableSelection();
 
     const pickBtn = document.getElementById('rsstag-pick-btn');
     pickBtn.classList.remove('active');
-    pickBtn.textContent = 'Pick Another';
+    pickBtn.textContent = 'Pick Block';
 
+    renderBlockList();
     updateSubmitState();
   }
+
+  function renderBlockList() {
+    const list = document.getElementById('rsstag-block-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    selectedElements.forEach(({ el, originalNumber }, index) => {
+      const item = document.createElement('li');
+      item.className = 'rsstag-block-item';
+      item.draggable = true;
+      item.dataset.index = index;
+
+      item.innerHTML = `
+        <span class="rsstag-drag-handle" title="Drag to reorder">&#9776;</span>
+        <span class="rsstag-block-label">Block ${originalNumber}</span>
+        <button class="rsstag-remove-btn" type="button" title="Remove block">&#10005;</button>
+      `;
+
+      item.querySelector('.rsstag-remove-btn').addEventListener('click', () => removeBlock(index));
+
+      item.addEventListener('dragstart', onDragStart);
+      item.addEventListener('dragover', onDragOver);
+      item.addEventListener('drop', onDrop);
+      item.addEventListener('dragend', onDragEnd);
+
+      list.appendChild(item);
+    });
+  }
+
+  function removeBlock(index) {
+    const entry = selectedElements[index];
+    if (entry) {
+      entry.el.classList.remove('rsstag-selected');
+    }
+    selectedElements.splice(index, 1);
+    renderBlockList();
+    updateSubmitState();
+  }
+
+  // --- Drag and drop ---
+
+  function onDragStart(event) {
+    dragSrcIndex = parseInt(event.currentTarget.dataset.index);
+    event.currentTarget.classList.add('rsstag-dragging');
+    event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const target = event.currentTarget;
+    document.querySelectorAll('.rsstag-block-item').forEach(i => i.classList.remove('rsstag-drag-over'));
+    if (parseInt(target.dataset.index) !== dragSrcIndex) {
+      target.classList.add('rsstag-drag-over');
+    }
+  }
+
+  function onDrop(event) {
+    event.preventDefault();
+    const destIndex = parseInt(event.currentTarget.dataset.index);
+    if (dragSrcIndex === null || dragSrcIndex === destIndex) return;
+
+    const moved = selectedElements.splice(dragSrcIndex, 1)[0];
+    selectedElements.splice(destIndex, 0, moved);
+
+    renderBlockList();
+    updateSubmitState();
+  }
+
+  function onDragEnd(event) {
+    dragSrcIndex = null;
+    document.querySelectorAll('.rsstag-block-item').forEach(i => {
+      i.classList.remove('rsstag-dragging', 'rsstag-drag-over');
+    });
+  }
+
+  // --- Submit / state ---
 
   function updateSubmitState() {
     const submitBtn = document.getElementById('rsstag-submit-btn');
     if (!submitBtn) return;
-    const hasSelection = !!selectedElement;
-    submitBtn.disabled = !hasSelection;
-    submitBtn.textContent = hasSelection ? 'Submit Block' : 'Submit';
+    const count = selectedElements.length;
+    submitBtn.disabled = count === 0;
+    submitBtn.textContent = count > 0 ? `Submit (${count})` : 'Submit';
   }
 
   function submitSelection(event) {
@@ -133,20 +200,17 @@
       event.preventDefault();
       event.stopPropagation();
     }
-    if (!selectedElement) {
-      alert('Please pick a block first.');
+    if (selectedElements.length === 0) {
+      alert('Please pick at least one block first.');
       return;
     }
 
     const sourceUrl = window.location.href;
-    const html = selectedElement.innerHTML;
+    const html = selectedElements.map(({ el }) => el.innerHTML).join('\n');
 
     browser.runtime.sendMessage({
       action: "submitSelection",
-      payload: {
-        html: html,
-        source_url: sourceUrl
-      }
+      payload: { html, source_url: sourceUrl }
     })
       .then(result => {
         if (!result || !result.ok) {
@@ -157,10 +221,7 @@
           throw new Error('Missing redirect_url in response');
         }
         const redirectUrl = `http://127.0.0.1:8000${data.redirect_url}`;
-        browser.runtime.sendMessage({
-          action: "openNewTab",
-          url: redirectUrl
-        });
+        browser.runtime.sendMessage({ action: "openNewTab", url: redirectUrl });
       })
       .catch(error => {
         console.error("Error submitting content:", error);
@@ -177,10 +238,9 @@
       selectionToolbar = null;
     }
 
-    if (selectedElement) {
-      selectedElement.classList.remove('rsstag-selected');
-      selectedElement = null;
-    }
+    selectedElements.forEach(({ el }) => el.classList.remove('rsstag-selected'));
+    selectedElements = [];
+    pickCounter = 0;
 
     selectionMode = false;
     disableSelection();
