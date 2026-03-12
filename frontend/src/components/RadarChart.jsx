@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import * as d3 from 'd3';
 import '../styles/App.css';
 
@@ -11,8 +11,22 @@ import '../styles/App.css';
 function RadarChart({ topics, sentences = [] }) {
     const [selectedLevel, setSelectedLevel] = useState(0);
     const [hoveredTopic, setHoveredTopic] = useState(null);
+    const [containerSize, setContainerSize] = useState(600);
     const svgRef = useRef(null);
     const containerRef = useRef(null);
+    const zoomRef = useRef(null);
+
+    // Track container width via ResizeObserver
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+            const w = entries[0].contentRect.width;
+            if (w > 0) setContainerSize(w);
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     // Parse topics and compute character counts per topic at selected level
     const chartData = useMemo(() => {
@@ -122,20 +136,39 @@ function RadarChart({ topics, sentences = [] }) {
         return chartData.reduce((sum, item) => sum + item.totalChars, 0);
     }, [chartData]);
 
+    const resetZoom = useCallback(() => {
+        if (!svgRef.current || !zoomRef.current) return;
+        d3.select(svgRef.current)
+            .transition().duration(350)
+            .call(zoomRef.current.transform, d3.zoomIdentity);
+    }, []);
+
+    const zoomIn = useCallback(() => {
+        if (!svgRef.current || !zoomRef.current) return;
+        d3.select(svgRef.current)
+            .transition().duration(300)
+            .call(zoomRef.current.scaleBy, 1.3);
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        if (!svgRef.current || !zoomRef.current) return;
+        d3.select(svgRef.current)
+            .transition().duration(300)
+            .call(zoomRef.current.scaleBy, 0.7);
+    }, []);
+
     // Draw the radar chart
     useEffect(() => {
         if (!svgRef.current || chartData.length === 0) return;
 
-        const container = containerRef.current;
-        const containerWidth = container ? container.clientWidth : 600;
-        const size = Math.min(containerWidth, 600);
+        const size = containerSize;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove();
 
         const width = size;
         const height = size;
-        const margin = 80;
+        const margin = 100;
         const radius = (Math.min(width, height) / 2) - margin;
 
         svg
@@ -144,7 +177,9 @@ function RadarChart({ topics, sentences = [] }) {
             .attr('viewBox', `0 0 ${width} ${height}`)
             .attr('preserveAspectRatio', 'xMidYMid meet');
 
+        // Zoomable group
         const g = svg.append('g')
+            .attr('class', 'radar-zoom-group')
             .attr('transform', `translate(${width / 2}, ${height / 2})`);
 
         const angleSlice = (Math.PI * 2) / chartData.length;
@@ -178,6 +213,9 @@ function RadarChart({ topics, sentences = [] }) {
             }
         }
 
+        // Dynamic label offset: more topics → push labels further out
+        const labelOffset = 40 + Math.max(0, (chartData.length - 8) * 3);
+
         // Draw axes and labels
         chartData.forEach((d, i) => {
             const angle = angleSlice * i - Math.PI / 2;
@@ -194,8 +232,8 @@ function RadarChart({ topics, sentences = [] }) {
                 .attr('stroke-width', '1px');
 
             // Label
-            const labelX = Math.cos(angle) * (radius + 40);
-            const labelY = Math.sin(angle) * (radius + 40);
+            const labelX = Math.cos(angle) * (radius + labelOffset);
+            const labelY = Math.sin(angle) * (radius + labelOffset);
 
             const labelGroup = g.append('g')
                 .attr('transform', `translate(${labelX}, ${labelY})`)
@@ -335,7 +373,20 @@ function RadarChart({ topics, sentences = [] }) {
                 });
         });
 
-    }, [chartData, colorScale]);
+        // Set up zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.5, 5])
+            .on('zoom', (event) => {
+                svg.select('.radar-zoom-group')
+                    .attr('transform', `translate(${width / 2 + event.transform.x}, ${height / 2 + event.transform.y}) scale(${event.transform.k})`);
+            });
+
+        zoomRef.current = zoom;
+        svg.call(zoom);
+        svg.call(zoom.transform, d3.zoomIdentity);
+        svg.on('dblclick.zoom', null);
+
+    }, [chartData, colorScale, containerSize]);
 
     if (!topics || topics.length === 0) {
         return (
@@ -366,7 +417,12 @@ function RadarChart({ topics, sentences = [] }) {
                     {Array.from({ length: maxLevel + 1 }, (_, i) => (
                         <button
                             key={i}
-                            onClick={() => setSelectedLevel(i)}
+                            onClick={() => {
+                                setSelectedLevel(i);
+                                if (i !== selectedLevel) {
+                                    zoomRef.current = null;
+                                }
+                            }}
                             className={`radar-chart-level-btn${selectedLevel === i ? ' active' : ''}`}
                             onMouseEnter={(e) => {
                                 if (selectedLevel !== i) {
@@ -392,7 +448,29 @@ function RadarChart({ topics, sentences = [] }) {
                         No data available at level {selectedLevel}. Try selecting a different level.
                     </p>
                 ) : (
-                    <svg ref={svgRef} className="radar-chart-svg" />
+                    <div className="radar-chart-canvas-wrapper">
+                        <div className="radar-chart-zoom-controls">
+                            <button
+                                type="button"
+                                className="radar-chart-zoom-btn"
+                                onClick={zoomIn}
+                                title="Zoom in"
+                            >+</button>
+                            <button
+                                type="button"
+                                className="radar-chart-zoom-btn"
+                                onClick={zoomOut}
+                                title="Zoom out"
+                            >−</button>
+                            <button
+                                type="button"
+                                className="radar-chart-zoom-btn"
+                                onClick={resetZoom}
+                                title="Reset zoom"
+                            >⊙</button>
+                        </div>
+                        <svg ref={svgRef} className="radar-chart-svg" />
+                    </div>
                 )}
             </div>
 
