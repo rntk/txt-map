@@ -12,6 +12,7 @@ import CircularPackingChart from './CircularPackingChart';
 import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
+import ArticleStructureChart from './ArticleStructureChart';
 import '../styles/App.css';
 
 function StatusIndicator({ tasks }) {
@@ -697,6 +698,12 @@ function TextPage() {
                       >
                         Grid View
                       </button>
+                      <button
+                        className={activeTab === 'article_structure' ? 'active' : ''}
+                        onClick={() => setActiveTab('article_structure')}
+                      >
+                        Article Structure
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -857,6 +864,10 @@ function TextPage() {
                     }}
                   >
                     <RadarChart topics={safeTopics} sentences={safeSentences} />
+                  </div>
+                ) : activeTab === 'article_structure' ? (
+                  <div style={{ padding: '20px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                    <ArticleStructureChart topics={safeTopics} sentences={safeSentences} />
                   </div>
                 ) : (
                   articles.map((article, index) => (
