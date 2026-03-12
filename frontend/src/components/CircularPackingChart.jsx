@@ -9,6 +9,9 @@ const PALETTE = [
 ];
 
 const CHAR_ASPECT = 0.58; // approximate width/height ratio per character
+const PACK_PADDING = 1;
+const PACK_AREA_RATIO = 0.7;
+const CIRCLE_ENLARGE_FACTOR = 1.6;
 
 function getTopicParts(topic) {
   return String(topic?.name || '')
@@ -184,7 +187,13 @@ export default function CircularPackingChart({ topics }) {
       .sum((d) => d.value || 0)
       .sort((a, b) => b.value - a.value);
 
-    d3.pack().size([size, size]).padding(5)(root);
+    function translateSubtree(node, dx, dy) {
+      node.x += dx;
+      node.y += dy;
+      if (node.children) {
+        node.children.forEach((child) => translateSubtree(child, dx, dy));
+      }
+    }
 
     function scaleSubtree(node, pivotX, pivotY, scale) {
       node.x = pivotX + (node.x - pivotX) * scale;
@@ -205,7 +214,13 @@ export default function CircularPackingChart({ topics }) {
       node.children.forEach((child) => applySingleChildShrink(child));
     }
 
+    const packSize = size * PACK_AREA_RATIO;
+    const packOffset = (size - packSize) / 2;
+    d3.pack().size([packSize, packSize]).padding(PACK_PADDING)(root);
+    translateSubtree(root, packOffset, packOffset);
+
     applySingleChildShrink(root);
+    scaleSubtree(root, size / 2, size / 2, CIRCLE_ENLARGE_FACTOR);
 
     const topLevelNames = (hierarchyData.children || []).map((child) => child.name);
     const colorScale = d3.scaleOrdinal().domain(topLevelNames).range(PALETTE);
