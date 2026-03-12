@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
-from handlers import submission_handler, task_queue_handler, diff_handler
+from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler
 from pymongo import MongoClient
+from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.posts import PostsStorage
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.semantic_diffs import SemanticDiffsStorage
@@ -37,6 +38,7 @@ if vite_assets_dir.is_dir():
 app.include_router(submission_handler.router, prefix="/api")
 app.include_router(task_queue_handler.router, prefix="/api")
 app.include_router(diff_handler.router, prefix="/api")
+app.include_router(llm_cache_handler.router, prefix="/api")
 
 import os
 mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
@@ -53,6 +55,9 @@ semantic_diffs_storage.prepare()
 app.state.posts_storage = posts_storage
 app.state.submissions_storage = submissions_storage
 app.state.semantic_diffs_storage = semantic_diffs_storage
+llm_cache_store = MongoLLMCacheStore(client["rss"])
+llm_cache_store.prepare()
+app.state.llm_cache_store = llm_cache_store
 
 
 @app.delete("/api/diff")
@@ -99,6 +104,10 @@ def serve_texts_page():
 
 @app.get("/page/diff")
 def serve_diff_page():
+    return FileResponse("frontend/build/index.html")
+
+@app.get("/page/cache")
+def serve_cache_page():
     return FileResponse("frontend/build/index.html")
 
 if __name__ == "__main__":

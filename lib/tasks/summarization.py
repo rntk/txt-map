@@ -2,11 +2,20 @@
 Summarization task - generates summaries for sentences and topics
 """
 from lib.storage.submissions import SubmissionsStorage
-import hashlib
-from datetime import datetime, UTC
+from txt_splitt.cache import CachingLLMCallable
 
 
-def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
+class _LLMAdapter:
+    """Adapter for LLamaCPP to txt_splitt LLMCallable protocol."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def call(self, prompt: str, temperature: float = 0.0) -> str:
+        return self._client.call([prompt], temperature=temperature)
+
+
+def summarize_by_sentence_groups(sent_list, cached_llm, llm_client, max_groups_tokens_buffer=400):
     """
     Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
     summaries equals the number of sentence groups. Each summary gets a mapping to its single
@@ -19,7 +28,7 @@ def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_gr
     )
 
     template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
-    max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer
+    max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer  # noqa: SLF001
 
     all_summary_sentences = []
     summary_mappings = []
@@ -27,22 +36,8 @@ def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_gr
     for idx, s in enumerate(sent_list):
         sentences_text = s
         prompt = prompt_template.replace("{sentence}", sentences_text)
-        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
-        cached = cache_collection.find_one({"prompt_hash": prompt_hash})
-        if cached:
-            resp = cached["response"]
-        else:
-            resp = llm_client.call([prompt])
-            cache_collection.update_one(
-                {"prompt_hash": prompt_hash},
-                {"$set": {
-                    "prompt_hash": prompt_hash,
-                    "prompt": prompt,
-                    "response": resp,
-                    "created_at": datetime.now(UTC)
-                }},
-                upsert=True
-            )
+
+        resp = cached_llm.call(prompt, 0.0)
 
         summary_text = resp.strip()
         if summary_text:
@@ -57,7 +52,7 @@ def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_gr
     return all_summary_sentences, summary_mappings
 
 
-def process_summarization(submission: dict, db, llm):
+def process_summarization(submission: dict, db, llm, cache_store=None):
     """
     Process summarization task for a submission.
     Generates both overall summaries and topic-specific summaries.
@@ -66,6 +61,7 @@ def process_summarization(submission: dict, db, llm):
         submission: Submission document from DB
         db: MongoDB database instance
         llm: LLamaCPP client instance
+        cache_store: Optional MongoLLMCacheStore instance.
     """
     submission_id = submission["submission_id"]
     results = submission.get("results", {})
@@ -76,19 +72,16 @@ def process_summarization(submission: dict, db, llm):
     if not sentences:
         raise ValueError("Text splitting must be completed first")
 
-    # Ensure LLM cache collection exists
-    cache_collection = db.llm_cache
-    if "llm_cache" not in db.list_collection_names():
-        db.create_collection("llm_cache")
-        try:
-            db.llm_cache.create_index("prompt_hash", unique=True)
-        except:
-            pass
+    llm_adapter = _LLMAdapter(llm)
+    if cache_store is not None:
+        cached_llm = CachingLLMCallable(llm_adapter, cache_store, namespace="summarization")
+    else:
+        cached_llm = llm_adapter
 
     # Generate overall summary for all sentences
     print(f"Generating overall summary for {len(sentences)} sentences")
     summary_sentences, summary_mappings = summarize_by_sentence_groups(
-        sentences, llm, cache_collection
+        sentences, cached_llm, llm
     )
 
     # Generate summaries for each topic
@@ -106,7 +99,7 @@ def process_summarization(submission: dict, db, llm):
                 if topic_sentences_text:
                     # Summarize topic sentences
                     ts_summary, _ = summarize_by_sentence_groups(
-                        topic_sentences_text, llm, cache_collection
+                        topic_sentences_text, cached_llm, llm
                     )
                     topic_summaries[topic["name"]] = " ".join(ts_summary)
 

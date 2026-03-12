@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+import logging
 
 from txt_splitt import (
     BracketMarker,
@@ -16,6 +17,9 @@ from txt_splitt import (
     Tracer,
     TracingLLMCallable,
 )
+from txt_splitt.cache import CachingLLMCallable
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -31,7 +35,12 @@ class _LLMCallableAdapter:
         self._llm_client = llm_client
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
-        return self._llm_client.call([prompt], temperature=temperature)
+        prompt_preview = prompt[:300] + "..." if len(prompt) > 300 else prompt
+        logger.info(f"LLMCallableAdapter sending chunk ({len(prompt)} chars): {prompt_preview}")
+        result = self._llm_client.call([prompt], temperature=temperature)
+        result_preview = result[:300] + "..." if len(result) > 300 else result
+        logger.info(f"LLMCallableAdapter received response ({len(result)} chars): {result_preview}")
+        return result
 
 
 def _groups_to_topics(groups, sentence_objects) -> List[Dict]:
@@ -96,6 +105,7 @@ def split_article(
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
+    cache_store=None,
 ) -> ArticleSplitResult:
     """
     Split an article into sentences and topic ranges using txt_splitt.
@@ -128,7 +138,12 @@ def split_article(
         )
 
     llm_adapter = _LLMCallableAdapter(llm)
-    llm_callable = TracingLLMCallable(llm_adapter, tracer) if tracer else llm_adapter
+    cached_adapter = (
+        CachingLLMCallable(llm_adapter, cache_store, namespace="article-split")
+        if cache_store is not None
+        else llm_adapter
+    )
+    llm_callable = TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
 
     pipeline = Pipeline(
         splitter=splitter,
@@ -148,6 +163,9 @@ def split_article(
         tracer=tracer,
     )
 
+    article_preview = article[:500] + "..." if len(article) > 500 else article
+    logger.info(f"Running pipeline on article ({len(article)} chars): {article_preview}")
+    
     split_result = pipeline.run(article)
     sentences = [s.text for s in split_result.sentences]
     topics = _groups_to_topics(split_result.groups, split_result.sentences)
@@ -161,6 +179,7 @@ def split_article_with_markers(
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
+    cache_store=None,
 ) -> ArticleSplitResult:
     """Backward-compatible alias for split_article."""
     return split_article(
@@ -169,4 +188,5 @@ def split_article_with_markers(
         tracer=tracer,
         anchor_every_words=anchor_every_words,
         max_chunk_chars=max_chunk_chars,
+        cache_store=cache_store,
     )

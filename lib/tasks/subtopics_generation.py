@@ -1,15 +1,28 @@
 """
 Subtopics generation task - generates subtopics for existing topics.
 """
-from lib.storage.submissions import SubmissionsStorage
-from datetime import datetime, UTC
-import hashlib
 import re
 
+from lib.storage.submissions import SubmissionsStorage
+from txt_splitt.cache import CachingLLMCallable
 
-def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, llm, cache_collection):
+
+class _LLMAdapter:
+    """Adapter for LLamaCPP to txt_splitt LLMCallable protocol."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def call(self, prompt: str, temperature: float = 0.0) -> str:
+        return self._client.call([prompt], temperature=temperature)
+
+
+def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, cached_llm):
     """
     Generate subtopics for a specific topic.
+
+    Args:
+        cached_llm: An LLMCallable (possibly wrapped with CachingLLMCallable).
     """
     if not sentences or topic_name == "no_topic":
         return []
@@ -38,26 +51,8 @@ Sentences:
         prompt_template.replace("{topic_name}", topic_name)
         .replace("{sentences_text}", sentences_text)
     )
-    prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
 
-    cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
-
-    if cached_response:
-        response = cached_response["response"]
-    else:
-        response = llm.call([prompt])
-        cache_collection.update_one(
-            {"prompt_hash": prompt_hash},
-            {
-                "$set": {
-                    "prompt_hash": prompt_hash,
-                    "prompt": prompt,
-                    "response": response,
-                    "created_at": datetime.now(UTC),
-                }
-            },
-            upsert=True,
-        )
+    response = cached_llm.call(prompt, 0.0)
 
     subtopics = []
     for line in response.strip().split("\n"):
@@ -81,7 +76,7 @@ Sentences:
     return subtopics
 
 
-def process_subtopics_generation(submission: dict, db, llm):
+def process_subtopics_generation(submission: dict, db, llm, cache_store=None):
     """
     Process subtopics generation for a submission.
 
@@ -89,6 +84,7 @@ def process_subtopics_generation(submission: dict, db, llm):
         submission: Submission document from DB.
         db: MongoDB database instance.
         llm: LLamaCPP client instance.
+        cache_store: Optional MongoLLMCacheStore instance.
     """
     submission_id = submission["submission_id"]
     results = submission.get("results", {})
@@ -105,13 +101,11 @@ def process_subtopics_generation(submission: dict, db, llm):
         print(f"Subtopics generation completed for submission {submission_id}: 0 subtopics")
         return
 
-    cache_collection = db.llm_cache
-    if "llm_cache" not in db.list_collection_names():
-        db.create_collection("llm_cache")
-        try:
-            db.llm_cache.create_index("prompt_hash", unique=True)
-        except Exception:
-            pass
+    llm_adapter = _LLMAdapter(llm)
+    if cache_store is not None:
+        cached_llm = CachingLLMCallable(llm_adapter, cache_store, namespace="subtopics")
+    else:
+        cached_llm = llm_adapter
 
     all_subtopics = []
 
@@ -132,8 +126,7 @@ def process_subtopics_generation(submission: dict, db, llm):
             topic_name,
             topic_sentences,
             topic_sentence_indices,
-            llm,
-            cache_collection,
+            cached_llm,
         )
         all_subtopics.extend(subtopics)
 

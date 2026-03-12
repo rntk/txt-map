@@ -19,6 +19,12 @@ const menuItems = [
         description: 'Compare two documents with topic-aware semantic matching and sentence-level links.',
         icon: '⇄',
         link: '/page/diff'
+    },
+    {
+        title: 'LLM Cache',
+        description: 'Browse, filter, and delete cached LLM responses to save compute and speed up reprocessing.',
+        icon: '🗄️',
+        link: '/page/cache'
     }
 ];
 

@@ -4,13 +4,15 @@ import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
 import MainPage from './components/MainPage';
 import DiffPage from './components/DiffPage';
+import CachePage from './components/CachePage';
 import './styles/App.css';
 
 const globalMenuItems = [
   { title: 'Home', link: '/page/menu' },
   { title: 'Texts List', link: '/page/texts' },
   { title: 'Task Control', link: '/page/tasks' },
-  { title: 'Diff', link: '/page/diff' }
+  { title: 'Diff', link: '/page/diff' },
+  { title: 'LLM Cache', link: '/page/cache' },
 ];
 
 function App() {
@@ -63,6 +65,11 @@ function App() {
   // Diff page
   if (pageType === 'diff') {
     return renderWithGlobalMenu(<DiffPage />);
+  }
+
+  // LLM Cache page
+  if (pageType === 'cache') {
+    return renderWithGlobalMenu(<CachePage />);
   }
 
   // Text submission page

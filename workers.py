@@ -15,6 +15,7 @@ from lib.diff.semantic_diff import (
     stale_reasons,
 )
 from lib.llm.llamacpp import LLamaCPP
+from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
 
@@ -61,9 +62,10 @@ TASK_HANDLERS = {
 
 
 class Worker:
-    def __init__(self, db, llm):
+    def __init__(self, db, llm, cache_store=None):
         self.db = db
         self.llm = llm
+        self.cache_store = cache_store
         self.running = True
         self.worker_id = f"worker-{os.getpid()}"
         self.submissions_storage = SubmissionsStorage(db)
@@ -174,8 +176,12 @@ class Worker:
             if not submission:
                 raise ValueError(f"Submission {submission_id} not found")
 
-            # Execute the handler
-            handler(submission, self.db, self.llm)
+            # Execute the handler (pass cache_store to LLM-using tasks)
+            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization"}
+            if task_type in cache_tasks:
+                handler(submission, self.db, self.llm, cache_store=self.cache_store)
+            else:
+                handler(submission, self.db, self.llm)
 
             # Mark task as completed
             self._mark_task_completed(task)
@@ -346,12 +352,15 @@ def main():
     # Initialize connections
     client = MongoClient(mongodb_url)
     db = client["rss"]
-    llm = LLamaCPP(host=llamacpp_url, token=token)
+    # Use higher retries and delay for split topic generation which processes large articles
+    llm = LLamaCPP(host=llamacpp_url, token=token, max_retries=5, retry_delay=2.0)
 
     # Create and run worker
     SubmissionsStorage(db).prepare()
     SemanticDiffsStorage(db).prepare()
-    worker = Worker(db, llm)
+    cache_store = MongoLLMCacheStore(db)
+    cache_store.prepare()
+    worker = Worker(db, llm, cache_store=cache_store)
 
     try:
         worker.run()

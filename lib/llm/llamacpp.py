@@ -1,48 +1,109 @@
 import json
 import os
+import time
+import random
 from typing import List, Union, Optional, Dict, Any
 import logging
 from urllib.parse import urlparse
 from http.client import HTTPConnection, HTTPSConnection
 
 class LLamaCPP:
-    def __init__(self, host: str, max_context_tokens: int = 11000, token: Optional[str] = None):
+    def __init__(self, host: str, max_context_tokens: int = 11000, token: Optional[str] = None, max_retries: int = 3, retry_delay: float = 1.0):
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
         self.__max_context_tokens = max_context_tokens  # Leave some buffer from the actual context size
         # Token can be passed in explicitly or read from the environment variable TOKEN
         self.__token = token or os.getenv("TOKEN")
+        self.__max_retries = max_retries
+        self.__retry_delay = retry_delay
 
     def estimate_tokens(self, text: str) -> int:
         """Rough estimation: ~4 characters per token on average"""
         return len(text) // 4
 
-    def call(self, user_msgs: List[str], temperature: float=0.0) -> str:
-        conn = self.get_connection()
-        body = json.dumps(
-            {
-                "model": "openai/gpt-oss-20b",
-                "messages": [{"role": "user", "content": user_msgs[0]}],
-                "temperature": temperature,
-                "cache_prompt": True
-            }
-        )
-        headers = {'Content-type': 'application/json'}
-        if self.__token:
-            headers['Authorization'] = f"Bearer {self.__token}"
-        #conn.request("POST", "/openai/v1/chat/completions", body, headers)
-        conn.request("POST", "/v1/chat/completions", body, headers)
-        res = conn.getresponse()
-        resp_body = res.read()
-        #logging.info("server response: %s", resp_body)
-        if res.status != 200:
-            err_msg = f"{res.status} - {res.reason} - {resp_body}"
-            logging.error(err_msg)
-            return err_msg
-        resp = json.loads(resp_body)
+    def call(self, user_msgs: List[str], temperature: float=0.0, retries: Optional[int] = None) -> str:
+        """
+        Call the LLM with retry logic for transient failures.
+        
+        Args:
+            user_msgs: List of user messages (only first is used)
+            temperature: Temperature for generation
+            retries: Number of retries (overrides default if specified)
+            
+        Returns:
+            LLM response content
+            
+        Raises:
+            RuntimeError: If LLM call fails after all retries
+        """
+        max_retries = retries if retries is not None else self.__max_retries
+        
+        for attempt in range(max_retries + 1):
+            try:
+                return self._call_single(user_msgs, temperature)
+            except RuntimeError as e:
+                if attempt < max_retries:
+                    # Exponential backoff with jitter
+                    delay = self.__retry_delay * (2 ** attempt) + random.uniform(0, 0.5)
+                    logging.warning(
+                        f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
+                        f"Retrying in {delay:.2f}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    logging.error(f"LLM call failed after {max_retries + 1} attempts: {e}")
+                    raise
 
-        return resp["choices"][0]["message"]["content"]
+    def _call_single(self, user_msgs: List[str], temperature: float) -> str:
+        """Single attempt to call the LLM without retry logic."""
+        conn = self.get_connection()
+        try:
+            prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]
+            logging.info(f"LLM request (preview): {prompt_preview}")
+            logging.info(f"LLM request full length: {len(user_msgs[0])} chars")
+            
+            body = json.dumps(
+                {
+                    "model": "openai/gpt-oss-20b",
+                    "messages": [{"role": "user", "content": user_msgs[0]}],
+                    "temperature": temperature,
+                    "cache_prompt": True
+                }
+            )
+            headers = {'Content-type': 'application/json'}
+            if self.__token:
+                headers['Authorization'] = f"Bearer {self.__token}"
+            conn.request("POST", "/v1/chat/completions", body, headers)
+            res = conn.getresponse()
+            resp_body = res.read()
+            if res.status != 200:
+                err_msg = f"{res.status} - {res.reason} - {resp_body}"
+                logging.error(err_msg)
+                raise RuntimeError(f"LLM API error: {res.status} {res.reason}")
+            resp = json.loads(resp_body)
+
+            content = resp.get("choices", [{}])[0].get("message", {}).get("content")
+            logging.info(f"LLM raw response: {resp}")
+            if content is None:
+                logging.error("LLM response missing 'choices[0].message.content'")
+                logging.error(f"Full response: {resp}")
+                raise RuntimeError("LLM returned empty response")
+            content_preview = content[:500] + "..." if len(content) > 500 else content
+            logging.info(f"LLM response content (preview): {content_preview}")
+            return content
+        except json.JSONDecodeError as e:
+            err_msg = f"JSON decode error: {e}"
+            logging.error(err_msg)
+            raise RuntimeError(f"Invalid JSON response from LLM: {e}") from e
+        except RuntimeError:
+            raise
+        except Exception as e:
+            err_msg = f"LLM call exception: {type(e).__name__}: {e}"
+            logging.error(err_msg)
+            raise RuntimeError(f"LLM call failed: {e}") from e
+        finally:
+            conn.close()
 
     def get_connection(self) -> Union[HTTPConnection, HTTPSConnection]:
         if self.__is_https:
@@ -52,31 +113,36 @@ class LLamaCPP:
 
     def embeddings(self, texts: List[str]) -> Optional[List[List[float]]]:
         conn = self.get_connection()
-        body = json.dumps(
-            {
-                #"model":"GPT-4",
-                "model":"text-embedding-3-small",
-                "encoding_format": "float",
-                "input": texts
-            }
-        )
-        headers = {'Content-type': 'application/json'}
-        if self.__token:
-            headers['Authorization'] = f"Bearer {self.__token}"
-        conn.request("POST", "/v1/embeddings", body, headers)
-        res = conn.getresponse()
-        resp_body = res.read()
-        #logging.info("server response: %s", resp_body)
-        if res.status != 200:
-            err_msg = f"{res.status} - {res.reason} - {resp_body}"
+        try:
+            body = json.dumps(
+                {
+                    "model":"text-embedding-3-small",
+                    "encoding_format": "float",
+                    "input": texts
+                }
+            )
+            headers = {'Content-type': 'application/json'}
+            if self.__token:
+                headers['Authorization'] = f"Bearer {self.__token}"
+            conn.request("POST", "/v1/embeddings", body, headers)
+            res = conn.getresponse()
+            resp_body = res.read()
+            if res.status != 200:
+                err_msg = f"{res.status} - {res.reason} - {resp_body}"
+                logging.error(err_msg)
+                return None
+            resp = json.loads(resp_body)
+            embeds = []
+            for emb in resp["data"]:
+                embeds.append(emb["embedding"])
+
+            return embeds
+        except Exception as e:
+            err_msg = f"Embeddings exception: {type(e).__name__}: {e}"
             logging.error(err_msg)
             return None
-        resp = json.loads(resp_body)
-        embeds = []
-        for emb in resp["data"]:
-            embeds.append(emb["embedding"])
-
-        return embeds
+        finally:
+            conn.close()
 
     def rerank(self, query: str, documents: List[str], top_n: int = None) -> Optional[List[Dict[str, Any]]]:
         """
@@ -95,29 +161,36 @@ class LLamaCPP:
             Sorted by relevance_score in descending order, or None if the API call fails.
         """
         conn = self.get_connection()
-        request_body = {
-            "query": query,
-            "documents": documents
-        }
+        try:
+            request_body = {
+                "query": query,
+                "documents": documents
+            }
 
-        if top_n is not None:
-            request_body["top_n"] = top_n
+            if top_n is not None:
+                request_body["top_n"] = top_n
 
-        body = json.dumps(request_body)
-        headers = {'Content-type': 'application/json'}
-        if self.__token:
-            headers['Authorization'] = f"Bearer {self.__token}"
+            body = json.dumps(request_body)
+            headers = {'Content-type': 'application/json'}
+            if self.__token:
+                headers['Authorization'] = f"Bearer {self.__token}"
 
-        conn.request("POST", "/v1/rerank", body, headers)
-        res = conn.getresponse()
-        resp_body = res.read()
+            conn.request("POST", "/v1/rerank", body, headers)
+            res = conn.getresponse()
+            resp_body = res.read()
 
-        if res.status != 200:
-            err_msg = f"{res.status} - {res.reason} - {resp_body}"
+            if res.status != 200:
+                err_msg = f"{res.status} - {res.reason} - {resp_body}"
+                logging.error(err_msg)
+
+                return None
+
+            resp = json.loads(resp_body)
+
+            return resp.get("results", [])
+        except Exception as e:
+            err_msg = f"Rerank exception: {type(e).__name__}: {e}"
             logging.error(err_msg)
-
             return None
-
-        resp = json.loads(resp_body)
-
-        return resp.get("results", [])
+        finally:
+            conn.close()
