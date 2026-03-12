@@ -190,43 +190,41 @@ function TileGrid({ items, onTileClick, isBackground }) {
             className={`grid-view-tile ${isBackground ? '' : 'grid-view-tile-interactive'}`}
             onClick={!isBackground && onTileClick ? () => onTileClick(item) : undefined}
           >
-            <div className="grid-view-tile-subtiles">
-              <div className="grid-view-subtile grid-view-subtile-title">
-                <div className="grid-view-tile-label">{item.label}</div>
-                {item.previewLabel && (
-                  <div className="grid-view-tile-preview-label">{item.previewLabel}</div>
-                )}
-                {item.previewText && (
-                  <div className="grid-view-tile-preview">
-                    {item.previewText}
-                  </div>
-                )}
+            {/* Top zone: text content */}
+            <div className="grid-view-tile-content">
+              <div className="grid-view-tile-label">{item.label}</div>
+              {item.previewLabel && (
+                <div className="grid-view-tile-preview-label">{item.previewLabel}</div>
+              )}
+              {item.previewText && (
+                <div className="grid-view-tile-preview">{item.previewText}</div>
+              )}
+              {item.tags && item.tags.length > 0 ? (
+                <div className="grid-view-tags-cloud">
+                  {item.tags.map((tag) => (
+                    <span
+                      key={tag.label}
+                      className="grid-view-tag-chip"
+                      style={{ fontSize: `${tag.fontSize.toFixed(1)}px` }}
+                      title={`Frequency: ${tag.count}`}
+                    >
+                      {tag.label}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid-view-tags-empty">No tags</div>
+              )}
+            </div>
+            {/* Bottom zone: stats */}
+            <div className="grid-view-tile-stats">
+              <div className="grid-view-tile-stat">
+                <div className="grid-view-tile-stat-value">{item.topicCount ?? 0}</div>
+                <div className="grid-view-tile-stat-label">Topics</div>
               </div>
-              <div className="grid-view-subtile grid-view-subtile-tags">
-                {item.tags && item.tags.length > 0 ? (
-                  <div className="grid-view-tags-cloud">
-                    {item.tags.map((tag) => (
-                      <span
-                        key={tag.label}
-                        className="grid-view-tag-chip"
-                        style={{ fontSize: `${tag.fontSize.toFixed(1)}px` }}
-                        title={`Frequency: ${tag.count}`}
-                      >
-                        {tag.label}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid-view-tags-empty">No tags</div>
-                )}
-              </div>
-              <div className="grid-view-subtile grid-view-subtile-stat">
-                <div className="grid-view-subtile-stat-value">{item.topicCount ?? 0}</div>
-                <div className="grid-view-subtile-stat-label">Topics</div>
-              </div>
-              <div className="grid-view-subtile grid-view-subtile-stat">
-                <div className="grid-view-subtile-stat-value">{item.sentenceCount ?? 0}</div>
-                <div className="grid-view-subtile-stat-label">Sentences</div>
+              <div className="grid-view-tile-stat grid-view-tile-stat--hero">
+                <div className="grid-view-tile-stat-value">{item.sentenceCount ?? 0}</div>
+                <div className="grid-view-tile-stat-label">Sentences</div>
               </div>
             </div>
           </div>
