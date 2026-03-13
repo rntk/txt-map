@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import './TopicsBarChart.css';
 
 /**
  * TopicsBarChart
@@ -128,64 +129,29 @@ function TopicsBarChart({ topics, sentences = [] }) {
 
     if (chartData.length === 0) {
         return (
-            <div style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                color: '#888',
-                fontSize: '14px'
-            }}>
+            <div className="topics-bar-chart-empty-state">
                 No second-level subtopic data available.
             </div>
         );
     }
 
     return (
-        <div style={{
-            backgroundColor: '#f0ece4',
-            borderRadius: '6px',
-            border: '2px solid #888',
-            overflow: 'hidden',
-            fontFamily: 'Georgia, "Times New Roman", serif'
-        }}>
+        <div className="topics-bar-chart">
             {/* Header */}
-            <div style={{
-                padding: '16px 20px 12px',
-                textAlign: 'center',
-                borderBottom: '3px solid #c0392b'
-            }}>
-                <h2 style={{
-                    margin: '0 0 4px',
-                    fontSize: '20px',
-                    fontWeight: '700',
-                    color: '#2c2c2c'
-                }}>
+            <div className="topics-bar-chart__header">
+                <h2 className="topics-bar-chart__title">
                     Topics Overview
                 </h2>
-                <p style={{
-                    margin: '0 0 6px',
-                    fontSize: '13px',
-                    color: '#555',
-                    fontStyle: 'italic'
-                }}>
+                <p className="topics-bar-chart__subtitle">
                     &ndash; character count by subtopic (second-level) &ndash;
                 </p>
-                <div style={{
-                    display: 'inline-block',
-                    backgroundColor: '#fffbe6',
-                    border: '1px solid #c0392b',
-                    padding: '2px 12px',
-                    fontSize: '13px',
-                    fontStyle: 'italic',
-                    color: '#c0392b'
-                }}>
+                <div className="topics-bar-chart__total">
                     Total: {totalAllChars.toLocaleString()} characters
                 </div>
             </div>
 
             {/* Chart body */}
-            <div style={{
-                padding: '16px 20px 12px',
-            }}>
+            <div className="topics-bar-chart__body" data-testid="topics-bar-chart-scroll">
                 {chartData.map((item, index) => {
                     // Reserve horizontal room so right-side labels remain visible,
                     // even when the largest bar dominates the chart.
@@ -198,69 +164,31 @@ function TopicsBarChart({ topics, sentences = [] }) {
                     return (
                         <div
                             key={item.id}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 0',
-                                borderBottom: isLast ? 'none' : '1px dashed #b0a898',
-                            }}
+                            className={`topics-bar-chart__row${isLast ? ' topics-bar-chart__row--last' : ''}`}
                             onMouseEnter={() => setHoveredBar(index)}
                             onMouseLeave={() => setHoveredBar(null)}
                         >
                             {/* Bar */}
-                            <div style={{
-                                width: `${barWidthPercent}%`,
-                                minHeight: '44px',
-                                backgroundColor: isHovered ? color : color,
-                                opacity: isHovered ? 1 : 0.85,
-                                border: `1.5px solid ${isHovered ? '#333' : '#777'}`,
-                                borderRadius: '2px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '4px 8px',
-                                boxSizing: 'border-box',
-                                transition: 'opacity 0.15s ease',
-                                position: 'relative',
-                                cursor: 'default'
-                            }}>
-                                <span style={{
-                                    fontSize: '18px',
-                                    fontWeight: '700',
-                                    color: '#2c2c2c',
-                                    textShadow: '0 0 4px rgba(255,255,255,0.6)',
-                                    whiteSpace: 'nowrap'
-                                }}>
+                            <div
+                                className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}`}
+                                style={{
+                                    width: `${barWidthPercent}%`,
+                                    backgroundColor: color,
+                                    borderColor: isHovered ? '#333' : '#777',
+                                }}
+                            >
+                                <span className="topics-bar-chart__bar-value">
                                     {item.totalChars.toLocaleString()}
                                 </span>
                             </div>
 
                             {/* Label to the right of the bar */}
-                            <div style={{
-                                marginLeft: '12px',
-                                flex: 1,
-                                minWidth: 0
-                            }}>
-                                <div style={{
-                                    fontSize: '13px',
-                                    fontWeight: '600',
-                                    color: '#2c2c2c',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                }}>
+                            <div className="topics-bar-chart__label-group">
+                                <div className="topics-bar-chart__label">
                                     {item.barTitle}
                                 </div>
                                 {item.deeperTopics.length > 0 && (
-                                    <div style={{
-                                        fontSize: '11px',
-                                        color: '#777',
-                                        fontStyle: 'italic',
-                                        marginTop: '2px',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                    }}>
+                                    <div className="topics-bar-chart__deeper-topics">
                                         ({item.deeperTopics.join(', ')})
                                     </div>
                                 )}
@@ -271,32 +199,17 @@ function TopicsBarChart({ topics, sentences = [] }) {
             </div>
 
             {/* Legend */}
-            <div style={{
-                padding: '10px 20px 14px',
-                borderTop: '1px solid #c8c0b4',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '14px',
-                justifyContent: 'center'
-            }}>
+            <div className="topics-bar-chart__legend">
                 {Object.entries(colorScale).map(([topLevel, color]) => (
                     <div
                         key={topLevel}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px'
-                        }}
+                        className="topics-bar-chart__legend-item"
                     >
-                        <div style={{
-                            width: '16px',
-                            height: '16px',
-                            backgroundColor: color,
-                            border: '1px solid #777',
-                            borderRadius: '1px'
-                        }} />
-                        <span style={{ color: '#444' }}>{topLevel}</span>
+                        <div
+                            className="topics-bar-chart__legend-swatch"
+                            style={{ backgroundColor: color }}
+                        />
+                        <span className="topics-bar-chart__legend-label">{topLevel}</span>
                     </div>
                 ))}
             </div>
