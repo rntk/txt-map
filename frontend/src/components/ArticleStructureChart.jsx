@@ -337,6 +337,7 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                             const showMenu = block.width >= 60;
                             const btnX = MARGIN.left + block.x + block.width - 20;
                             const btnY = MARGIN.top + 8;
+                            const fontSize = block.width > 100 ? 12 : 10;
 
                             return (
                                 <g key={`lbl-${block.fullPath}`}>
@@ -344,8 +345,8 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                                         x={cx}
                                         y={cy}
                                         textAnchor="middle"
-                                        fontSize={block.width > 100 ? 12 : 10}
-                                        fontWeight="700"
+                                        fontSize={fontSize}
+                                        fontWeight="800"
                                         fill={colorScale[block.fullPath]}
                                         style={{ pointerEvents: 'none', userSelect: 'none' }}
                                     >
