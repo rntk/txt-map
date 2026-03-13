@@ -3027,6 +3027,14 @@
   position: relative;
 }
 
+.fullscreen-graph-content .marimekko-container {
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .fullscreen-graph-content .mindmap-results-container {
   width: 100%;
   height: 100%;
