@@ -763,6 +763,120 @@
   background-color: #0056b3;
 }
 
+/* Vertical timeline layout for Summary tab */
+.summary-timeline {
+  position: relative;
+  padding: 10px 0 20px 0;
+}
+
+.summary-timeline::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #d0d7de;
+  transform: translateX(-50%);
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  margin-bottom: 28px;
+  align-items: flex-start;
+}
+
+.timeline-item--left {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.timeline-item--right {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  width: 12px;
+  height: 12px;
+  background-color: #007bff;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #007bff;
+}
+
+.timeline-card {
+  width: calc(50% - 28px);
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.timeline-item--left .timeline-card {
+  margin-right: auto;
+}
+
+.timeline-item--right .timeline-card {
+  margin-left: auto;
+}
+
+.timeline-label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #007bff;
+  background-color: #e7f3ff;
+  border-radius: 4px;
+  padding: 1px 7px;
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+}
+
+/* Highlighted (topic selected) overrides */
+.timeline-item.summary-paragraph-highlighted .timeline-card {
+  border-color: #f0c040;
+  background-color: #fffacd;
+}
+
+.timeline-item.summary-paragraph-highlighted .timeline-dot {
+  background-color: #f0c040;
+  box-shadow: 0 0 0 2px #f0c040;
+}
+
+@media (max-width: 768px) {
+  .summary-timeline::before {
+    left: 16px;
+    transform: none;
+  }
+
+  .timeline-item,
+  .timeline-item--left,
+  .timeline-item--right {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeline-dot {
+    left: 16px;
+    transform: translateX(-50%);
+  }
+
+  .timeline-card {
+    width: calc(100% - 44px);
+    margin-left: 36px !important;
+    margin-right: 0 !important;
+  }
+}
+
 .summary-modal-overlay {
   position: fixed;
   top: 0;

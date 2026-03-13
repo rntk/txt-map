@@ -746,35 +746,49 @@ function TextPage() {
                 {activeTab === 'summary' ? (
                   <div className="summary-content">
                     <h2>Summary</h2>
-                    <div className="summary-text">
+                    <div className="summary-timeline">
                       {Array.isArray(results.summary) && results.summary.length > 0 ? (
                         results.summary_mappings && results.summary_mappings.length > 0 ? (
                           results.summary.map((summaryText, i) => {
                             const mapping = results.summary_mappings.find(m => m.summary_index === i);
+                            const side = i % 2 === 0 ? 'left' : 'right';
                             return (
-                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`summary-paragraph-wrapper${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
-                                <p className="summary-paragraph-text">
-                                  {summaryText}
-                                  {mapping && (
-                                    <>
-                                      {' '}
-                                      <button
-                                        className="summary-source-link"
-                                        onClick={() => handleSummaryClick(mapping, articles[0])}
-                                        title="View source sentences"
-                                      >
-                                        [source]
-                                      </button>
-                                    </>
-                                  )}
-                                </p>
+                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`timeline-item timeline-item--${side}${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
+                                <div className="timeline-dot" />
+                                <div className="timeline-card">
+                                  <span className="timeline-label">§{i + 1}</span>
+                                  <p className="summary-paragraph-text">
+                                    {summaryText}
+                                    {mapping && (
+                                      <>
+                                        {' '}
+                                        <button
+                                          className="summary-source-link"
+                                          onClick={() => handleSummaryClick(mapping, articles[0])}
+                                          title="View source sentences"
+                                        >
+                                          [source]
+                                        </button>
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
                               </div>
                             );
                           })
                         ) : (
-                          results.summary.map((p, i) => (
-                            <p key={i}>{p}</p>
-                          ))
+                          results.summary.map((p, i) => {
+                            const side = i % 2 === 0 ? 'left' : 'right';
+                            return (
+                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`timeline-item timeline-item--${side}${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
+                                <div className="timeline-dot" />
+                                <div className="timeline-card">
+                                  <span className="timeline-label">§{i + 1}</span>
+                                  <p className="summary-paragraph-text">{p}</p>
+                                </div>
+                              </div>
+                            );
+                          })
                         )
                       ) : (
                         <p>No summary available. Processing may still be in progress...</p>
