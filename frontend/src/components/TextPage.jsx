@@ -35,6 +35,141 @@ const FULLSCREEN_TABS = [
   { key: 'article_structure', label: 'Article Structure' },
 ];
 
+function normalizeCharRange(range, textLength) {
+  const start = Number(range?.start);
+  const end = Number(range?.end);
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return null;
+  }
+
+  const clampedStart = Math.max(0, Math.min(textLength, start));
+  const clampedEnd = Math.max(0, Math.min(textLength, end));
+
+  if (clampedEnd <= clampedStart) {
+    return null;
+  }
+
+  return { start: clampedStart, end: clampedEnd };
+}
+
+function buildTopicStateRanges(topics, selectedTopics, hoveredTopic, readTopics, textLength) {
+  const highlightRanges = [];
+  const fadeRanges = [];
+  const selectedNames = new Set((Array.isArray(selectedTopics) ? selectedTopics : []).map((topic) => topic?.name));
+  const hoveredName = hoveredTopic?.name || null;
+  const readNames = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+
+  (Array.isArray(topics) ? topics : []).forEach((topic) => {
+    const topicName = topic?.name;
+    const ranges = Array.isArray(topic?.ranges) ? topic.ranges : [];
+    if (!topicName || ranges.length === 0) {
+      return;
+    }
+
+    const isHighlighted = selectedNames.has(topicName) || hoveredName === topicName;
+    const isFaded = readNames.has(topicName);
+
+    ranges.forEach((range) => {
+      const normalizedRange = normalizeCharRange(range, textLength);
+      if (!normalizedRange) {
+        return;
+      }
+
+      if (isHighlighted) {
+        highlightRanges.push(normalizedRange);
+      } else if (isFaded) {
+        fadeRanges.push(normalizedRange);
+      }
+    });
+  });
+
+  return { highlightRanges, fadeRanges };
+}
+
+function buildRawTextSegments(rawText, highlightRanges, fadeRanges) {
+  if (!rawText) {
+    return [];
+  }
+
+  const boundaries = new Set([0, rawText.length]);
+  [...highlightRanges, ...fadeRanges].forEach((range) => {
+    boundaries.add(range.start);
+    boundaries.add(range.end);
+  });
+
+  const sortedBoundaries = Array.from(boundaries)
+    .filter((value) => Number.isFinite(value) && value >= 0 && value <= rawText.length)
+    .sort((a, b) => a - b);
+
+  const overlapsRange = (start, end, ranges) => ranges.some((range) => start < range.end && end > range.start);
+  const segments = [];
+
+  for (let i = 0; i < sortedBoundaries.length - 1; i += 1) {
+    const start = sortedBoundaries[i];
+    const end = sortedBoundaries[i + 1];
+
+    if (end <= start) {
+      continue;
+    }
+
+    let state = null;
+    if (overlapsRange(start, end, highlightRanges)) {
+      state = 'highlighted';
+    } else if (overlapsRange(start, end, fadeRanges)) {
+      state = 'faded';
+    }
+
+    const text = rawText.slice(start, end);
+    if (!text) {
+      continue;
+    }
+
+    const previous = segments[segments.length - 1];
+    if (previous && previous.state === state && previous.end === start) {
+      previous.text += text;
+      previous.end = end;
+      continue;
+    }
+
+    segments.push({ start, end, text, state });
+  }
+
+  return segments;
+}
+
+function RawTextDisplay({ rawText, articleIndex, highlightRanges, fadeRanges }) {
+  if (!rawText) {
+    return (
+      <pre className="raw-text-content raw-text-content-page">No raw text available.</pre>
+    );
+  }
+
+  const segments = buildRawTextSegments(rawText, highlightRanges, fadeRanges);
+
+  return (
+    <pre className="raw-text-content raw-text-content-page">
+      {segments.map((segment) => (
+        segment.state ? (
+          <span
+            key={`${segment.start}-${segment.end}-${segment.state}`}
+            className={`raw-text-token ${segment.state}`}
+            data-article-index={articleIndex}
+            data-char-start={segment.start}
+            data-char-end={segment.end}
+          >
+            {segment.text}
+          </span>
+        ) : (
+          <React.Fragment key={`${segment.start}-${segment.end}-plain`}>
+            {segment.text}
+          </React.Fragment>
+        )
+      ))}
+    </pre>
+  );
+}
+
 function StatusIndicator({ tasks }) {
   const getStatusColor = (status) => {
     switch (status) {
@@ -315,12 +450,25 @@ function TextPage() {
 
     const ranges = Array.isArray(related.ranges) ? related.ranges : [];
     const anchors = ranges
-      .map((range) => ({
-        charStart: Number(range?.start),
-        charEnd: Number(range?.end),
-        sentenceStart: Number(range?.sentence_start) - 1
-      }))
-      .filter((target) => Number.isFinite(target.charStart) && Number.isFinite(target.charEnd))
+      .map((range) => {
+        const normalizedRange = activeTab === 'raw_text'
+          ? normalizeCharRange(range, rawText.length)
+          : {
+            start: Number(range?.start),
+            end: Number(range?.end)
+          };
+
+        if (!normalizedRange) {
+          return null;
+        }
+
+        return {
+          charStart: normalizedRange.start,
+          charEnd: normalizedRange.end,
+          sentenceStart: Number(range?.sentence_start) - 1
+        };
+      })
+      .filter((target) => target && Number.isFinite(target.charStart) && Number.isFinite(target.charEnd))
       .sort((a, b) => a.charStart - b.charStart);
 
     if (anchors.length > 0) {
@@ -550,6 +698,13 @@ function TextPage() {
   }));
 
   const rawText = submission.text_content || '';
+  const { highlightRanges: rawTextHighlightRanges, fadeRanges: rawTextFadeRanges } = buildTopicStateRanges(
+    safeTopics,
+    selectedTopics,
+    hoveredTopic,
+    readTopics,
+    rawText.length
+  );
 
   // Map: { [topicName]: [summaryParaIndex, ...] } -- which summary paragraphs overlap with each topic's sentences
   const topicSummaryParaMap = (() => {
@@ -846,7 +1001,12 @@ function TextPage() {
                     <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
                       {rawText.length.toLocaleString()} characters
                     </div>
-                    <pre className="raw-text-content raw-text-content-page">{rawText || 'No raw text available.'}</pre>
+                    <RawTextDisplay
+                      rawText={rawText}
+                      articleIndex={0}
+                      highlightRanges={rawTextHighlightRanges}
+                      fadeRanges={rawTextFadeRanges}
+                    />
                   </div>
                 ) : (
                   articles.map((article, index) => (

@@ -278,6 +278,10 @@
   overflow-y: visible;
 }
 
+.raw-text-token {
+  display: inline;
+}
+
 .root-list {
   list-style: none;
   padding: 0;
