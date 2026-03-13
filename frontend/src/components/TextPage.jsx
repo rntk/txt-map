@@ -13,6 +13,7 @@ import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
+import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import '../styles/App.css';
 
 const SIDEBAR_TABS = [
@@ -584,6 +585,12 @@ function TextPage() {
     return set;
   })();
 
+  const summaryTimelineItems = buildSummaryTimelineItems(
+    results.summary,
+    results.summary_mappings,
+    safeTopics
+  );
+
   return (
     <div className="app">
       <div style={{ padding: '10px 20px' }}>
@@ -748,48 +755,61 @@ function TextPage() {
                     <h2>Summary</h2>
                     <div className="summary-timeline">
                       {Array.isArray(results.summary) && results.summary.length > 0 ? (
-                        results.summary_mappings && results.summary_mappings.length > 0 ? (
-                          results.summary.map((summaryText, i) => {
-                            const mapping = results.summary_mappings.find(m => m.summary_index === i);
-                            const side = i % 2 === 0 ? 'left' : 'right';
-                            return (
-                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`timeline-item timeline-item--${side}${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
-                                <div className="timeline-dot" />
-                                <div className="timeline-card">
-                                  <span className="timeline-label">§{i + 1}</span>
-                                  <p className="summary-paragraph-text">
-                                    {summaryText}
-                                    {mapping && (
-                                      <>
-                                        {' '}
-                                        <button
-                                          className="summary-source-link"
-                                          onClick={() => handleSummaryClick(mapping, articles[0])}
-                                          title="View source sentences"
-                                        >
-                                          [source]
-                                        </button>
-                                      </>
-                                    )}
-                                  </p>
-                                </div>
+                        summaryTimelineItems.map((item) => (
+                          <React.Fragment key={item.index}>
+                            {item.showSectionLabel && item.topLevelLabel && (
+                              <div
+                                className="timeline-section-marker"
+                                style={{
+                                  '--timeline-section-bg': item.topicColor?.sectionSurface,
+                                  '--timeline-section-border': item.topicColor?.sectionBorder,
+                                  '--timeline-section-text': item.topicColor?.sectionText,
+                                  '--timeline-section-dot': item.topicColor?.dot
+                                }}
+                              >
+                                <span className="timeline-section-pill">{item.topLevelLabel}</span>
                               </div>
-                            );
-                          })
-                        ) : (
-                          results.summary.map((p, i) => {
-                            const side = i % 2 === 0 ? 'left' : 'right';
-                            return (
-                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`timeline-item timeline-item--${side}${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
-                                <div className="timeline-dot" />
-                                <div className="timeline-card">
-                                  <span className="timeline-label">§{i + 1}</span>
-                                  <p className="summary-paragraph-text">{p}</p>
-                                </div>
+                            )}
+                            <div
+                              id={`summary-para-${item.index}`}
+                              data-summary-index={item.index}
+                              className={`timeline-item${highlightedSummaryParas.has(item.index) ? ' summary-paragraph-highlighted' : ''}`}
+                              style={{
+                                '--timeline-topic-accent': item.topicColor?.accent,
+                                '--timeline-topic-dot': item.topicColor?.dot,
+                                '--timeline-topic-surface': item.topicColor?.surface,
+                                '--timeline-topic-border': item.topicColor?.border,
+                                '--timeline-subtopic-color': item.topicColor?.subtopicText
+                              }}
+                            >
+                              <div
+                                className={`timeline-subtopic${item.subtopicLabel ? '' : ' timeline-subtopic--empty'}`}
+                                aria-hidden={item.subtopicLabel ? undefined : 'true'}
+                              >
+                                {item.subtopicLabel}
                               </div>
-                            );
-                          })
-                        )
+                              <div className="timeline-dot" />
+                              <div className="timeline-card">
+                                <span className="timeline-label">§{item.index + 1}</span>
+                                <p className="summary-paragraph-text">
+                                  {item.summaryText}
+                                  {item.mapping && (
+                                    <>
+                                      {' '}
+                                      <button
+                                        className="summary-source-link"
+                                        onClick={() => handleSummaryClick(item.mapping, articles[0])}
+                                        title="View source sentences"
+                                      >
+                                        [source]
+                                      </button>
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        ))
                       ) : (
                         <p>No summary available. Processing may still be in progress...</p>
                       )}
