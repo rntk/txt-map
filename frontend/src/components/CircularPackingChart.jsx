@@ -1,5 +1,13 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
+import {
+  getTopicParts,
+  isWithinScope,
+  getScopedMaxLevel,
+  getScopeLabel,
+  getLevelLabel,
+  hasDeeperChildren
+} from '../utils/topicHierarchy';
 
 const PALETTE = [
   '#7ba3cc', '#e8a87c', '#85bb65', '#c9a0dc',
@@ -13,45 +21,30 @@ const PACK_PADDING = 1;
 const PACK_AREA_RATIO = 0.7;
 const CIRCLE_ENLARGE_FACTOR = 1.6;
 
-function getTopicParts(topic) {
-  return String(topic?.name || '')
-    .split('>')
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-export function getMaxTopicLevel(topics) {
-  const safeTopics = Array.isArray(topics) ? topics : [];
-
-  return safeTopics.reduce((maxLevel, topic) => {
-    const level = Math.max(0, getTopicParts(topic).length - 1);
-    return Math.max(maxLevel, level);
-  }, 0);
-}
-
-export function buildHierarchy(topics, selectedLevel = 0) {
+export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) {
   const root = { name: 'root', fullPath: '', children: [] };
   const nodeMap = new Map();
   nodeMap.set('', root);
 
   const safeTopics = Array.isArray(topics) ? topics : [];
   const safeLevel = Math.max(0, selectedLevel);
+  const absoluteDepth = scopePath.length + safeLevel;
 
   const sorted = [...safeTopics].sort((a, b) => getTopicParts(a).length - getTopicParts(b).length);
 
   sorted.forEach((topic) => {
     const parts = getTopicParts(topic);
-    if (parts.length === 0 || parts.length <= safeLevel) {
+    if (!isWithinScope(parts, scopePath) || parts.length <= absoluteDepth) {
       return;
     }
 
-    const visibleParts = parts.slice(safeLevel);
+    const visibleParts = parts.slice(absoluteDepth);
 
     for (let i = 0; i < visibleParts.length; i += 1) {
       const segment = visibleParts[i];
-      const originalParts = parts.slice(0, safeLevel + i + 1);
+      const originalParts = parts.slice(0, absoluteDepth + i + 1);
       const pathKey = originalParts.join('>');
-      const parentPath = i === 0 ? '' : parts.slice(0, safeLevel + i).join('>');
+      const parentPath = i === 0 ? '' : parts.slice(0, absoluteDepth + i).join('>');
 
       if (!nodeMap.has(pathKey)) {
         const isLeaf = i === visibleParts.length - 1;
@@ -135,23 +128,103 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   });
 }
 
-function getLevelLabel(level) {
-  if (level === 0) return 'Main Topics';
-  if (level === 1) return 'Subtopics';
-  return `Depth ${level}`;
+function Breadcrumbs({ scopePath, onNavigate }) {
+  return (
+    <div className="article-structure-breadcrumbs" style={{ marginBottom: '10px' }}>
+      <button
+        type="button"
+        className={`article-structure-breadcrumb-link${scopePath.length === 0 ? ' current' : ''}`}
+        onClick={() => onNavigate([])}
+        disabled={scopePath.length === 0}
+      >
+        All Topics
+      </button>
+      {scopePath.map((segment, index) => {
+        const isCurrent = index === scopePath.length - 1;
+        return (
+          <React.Fragment key={`${segment}-${index}`}>
+            <span className="article-structure-breadcrumb-separator">&gt;</span>
+            <button
+              type="button"
+              className={`article-structure-breadcrumb-link${isCurrent ? ' current' : ''}`}
+              onClick={() => onNavigate(scopePath.slice(0, index + 1))}
+              disabled={isCurrent}
+            >
+              {segment}
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 }
 
-export default function CircularPackingChart({ topics }) {
+function TopicSentencesModal({ topic, sentences, onClose }) {
+  useEffect(() => {
+    const handleKey = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  if (!topic) return null;
+
+  const sortedIndices = [...topic.sentenceIndices].sort((a, b) => a - b);
+
+  return (
+    <div
+      className="article-structure-modal-overlay"
+      onClick={onClose}
+    >
+      <div
+        className="article-structure-modal"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="article-structure-modal-header">
+          <h3>{topic.displayName}</h3>
+          <div className="article-structure-modal-toolbar" />
+          <button
+            type="button"
+            className="article-structure-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="article-structure-modal-body">
+          {sortedIndices.length === 0 ? (
+            <p>No sentences found for this topic.</p>
+          ) : (
+            sortedIndices.map(idx => {
+              const text = sentences[idx - 1];
+              return (
+                <div key={idx} className="article-structure-modal-sentence">
+                  <span className="article-structure-modal-sentence-num">{idx}.</span>
+                  <span className="article-structure-modal-sentence-text">{text || ''}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CircularPackingChart({ topics, sentences = [] }) {
   const [selectedLevel, setSelectedLevel] = useState(0);
+  const [scopePath, setScopePath] = useState([]);
+  const [modalTopic, setModalTopic] = useState(null);
+
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const zoomRef = useRef(null);
 
-  const maxLevel = useMemo(() => getMaxTopicLevel(topics), [topics]);
+  const maxLevel = useMemo(() => getScopedMaxLevel(topics, scopePath), [topics, scopePath]);
 
   const hierarchyData = useMemo(
-    () => buildHierarchy(topics, selectedLevel),
-    [topics, selectedLevel]
+    () => buildScopedHierarchy(topics, scopePath, selectedLevel),
+    [topics, scopePath, selectedLevel]
   );
 
   const hasHierarchyData = (hierarchyData.children || []).length > 0;
@@ -288,6 +361,25 @@ export default function CircularPackingChart({ topics }) {
       })
       .on('mouseout', () => tooltip.style('opacity', 0));
 
+    circles
+      .on('click', (event, node) => {
+        event.stopPropagation();
+        const isDrillable = hasDeeperChildren(topics, node.data.fullPath);
+        if (isDrillable) {
+          setScopePath(getTopicParts(node.data.fullPath));
+          setSelectedLevel(0);
+        } else {
+          const topicData = node.data.topic;
+          if (topicData) {
+            setModalTopic({
+              displayName: node.data.name,
+              fullPath: node.data.fullPath,
+              sentenceIndices: Array.isArray(topicData.sentences) ? topicData.sentences : []
+            });
+          }
+        }
+      });
+
     nodes.forEach((node) => {
       if (isLeaf(node)) {
         if (node.r < 16) return;
@@ -333,7 +425,13 @@ export default function CircularPackingChart({ topics }) {
       tooltip.remove();
       svg.selectAll('*').remove();
     };
-  }, [hierarchyData, hasHierarchyData]);
+  }, [hierarchyData, hasHierarchyData, topics]);
+
+  const scopeLabel = getScopeLabel(scopePath);
+
+  const subtitle = scopePath.length === 0
+    ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`
+    : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`;
 
   if (!topics || topics.length === 0) {
     return <p style={{ color: '#666', fontStyle: 'italic' }}>No topics available.</p>;
@@ -341,6 +439,11 @@ export default function CircularPackingChart({ topics }) {
 
   return (
     <div ref={containerRef} className="circular-packing-chart">
+      <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
+        setScopePath(path);
+        setSelectedLevel(0);
+      }} />
+
       <div className="circular-packing-level-selector">
         <span className="circular-packing-level-label">Topic Level:</span>
         <div className="circular-packing-level-buttons">
@@ -363,13 +466,13 @@ export default function CircularPackingChart({ topics }) {
       </div>
 
       <p className="circular-packing-subtitle">
-        {`Showing topics starting at level ${selectedLevel}. Circle size reflects sentence count.`}
+        {subtitle}
       </p>
 
       {!hasHierarchyData ? (
         <div className="circular-packing-body">
           <p className="circular-packing-no-data">
-            {`No topics available at level ${selectedLevel}. Try selecting a different level.`}
+            {`No topics available inside ${scopeLabel} at relative level ${selectedLevel}. Try a different level.`}
           </p>
         </div>
       ) : (
@@ -384,6 +487,14 @@ export default function CircularPackingChart({ topics }) {
           </button>
           <svg ref={svgRef} className="circular-packing-svg" style={{ display: 'block', margin: '0 auto' }} />
         </div>
+      )}
+
+      {modalTopic && (
+        <TopicSentencesModal
+          topic={modalTopic}
+          sentences={sentences}
+          onClose={() => setModalTopic(null)}
+        />
       )}
     </div>
   );

@@ -1107,7 +1107,7 @@ function TextPage() {
                   Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
                 </p>
                 <div style={{ flex: 1 }}>
-                  <CircularPackingChart topics={safeTopics} />
+                  <CircularPackingChart topics={safeTopics} sentences={safeSentences} />
                 </div>
               </div>
             </FullScreenGraph>

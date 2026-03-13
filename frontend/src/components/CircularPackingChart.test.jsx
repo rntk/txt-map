@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import CircularPackingChart, { buildHierarchy, getMaxTopicLevel } from './CircularPackingChart';
+import CircularPackingChart, { buildScopedHierarchy } from './CircularPackingChart';
 
 describe('CircularPackingChart hierarchy helpers', () => {
   const topics = [
@@ -12,19 +12,15 @@ describe('CircularPackingChart hierarchy helpers', () => {
     { name: 'Arts>Music', sentences: [9] },
   ];
 
-  it('computes the deepest available topic level', () => {
-    expect(getMaxTopicLevel(topics)).toBe(2);
-  });
-
-  it('builds the full hierarchy at level 0', () => {
-    const hierarchy = buildHierarchy(topics, 0);
+  it('builds the full hierarchy at level 0 with empty scope', () => {
+    const hierarchy = buildScopedHierarchy(topics, [], 0);
 
     expect(hierarchy.children.map((child) => child.name)).toEqual(['Science', 'Arts']);
     expect(hierarchy.children[0].children.map((child) => child.name)).toEqual(['Physics', 'Biology']);
   });
 
-  it('re-roots the hierarchy from the selected level', () => {
-    const hierarchy = buildHierarchy(topics, 1);
+  it('re-roots the hierarchy from the selected level with empty scope', () => {
+    const hierarchy = buildScopedHierarchy(topics, [], 1);
 
     expect(hierarchy.children.map((child) => child.name)).toEqual(['Physics', 'Biology', 'Music']);
     expect(hierarchy.children[0].fullPath).toBe('Science>Physics');
@@ -32,7 +28,20 @@ describe('CircularPackingChart hierarchy helpers', () => {
   });
 
   it('drops branches that do not reach the selected level', () => {
-    const hierarchy = buildHierarchy(topics, 2);
+    const hierarchy = buildScopedHierarchy(topics, [], 2);
+
+    expect(hierarchy.children.map((child) => child.name)).toEqual(['Quantum']);
+  });
+
+  it('builds hierarchy correctly when scoped to a specific path', () => {
+    const hierarchy = buildScopedHierarchy(topics, ['Science'], 0);
+
+    expect(hierarchy.children.map((child) => child.name)).toEqual(['Physics', 'Biology']);
+    expect(hierarchy.children[0].children.map((child) => child.name)).toEqual(['Quantum']);
+  });
+
+  it('builds hierarchy correctly when scoped with selected level', () => {
+    const hierarchy = buildScopedHierarchy(topics, ['Science'], 1);
 
     expect(hierarchy.children.map((child) => child.name)).toEqual(['Quantum']);
   });
@@ -51,7 +60,7 @@ describe('CircularPackingChart component', () => {
     expect(screen.getByText('Topic Level:')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Level 0 (Main Topics)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Level 1 (Subtopics)' })).toBeInTheDocument();
-    expect(screen.getByText('Showing topics starting at level 0. Circle size reflects sentence count.')).toBeInTheDocument();
+    expect(screen.getByText('Showing all topics at relative level 0 (Main Topics). Circle size reflects sentence count.')).toBeInTheDocument();
   });
 
   it('updates the subtitle when the selected level changes', () => {
@@ -59,7 +68,7 @@ describe('CircularPackingChart component', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Level 1 (Subtopics)' }));
 
-    expect(screen.getByText('Showing topics starting at level 1. Circle size reflects sentence count.')).toBeInTheDocument();
+    expect(screen.getByText('Showing all topics at relative level 1 (Subtopics). Circle size reflects sentence count.')).toBeInTheDocument();
   });
 
   it('shows the empty-state copy when there are no topics', () => {
