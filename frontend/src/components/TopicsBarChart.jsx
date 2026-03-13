@@ -1,94 +1,148 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './TopicsBarChart.css';
+import {
+    buildScopedChartData,
+    getDirectChildLabels,
+    getLevelLabel,
+    getScopeLabel,
+    getScopedMaxLevel,
+    getTopicParts,
+    hasDeeperChildren,
+    sanitizePathForTestId,
+} from '../utils/topicHierarchy';
+
+const BASE_COLORS = [
+    '#a8c4d8',
+    '#c4a882',
+    '#9ab8a0',
+    '#d4917a',
+    '#5a5a5a',
+    '#b8a9c8',
+    '#c9b458',
+    '#8aafaf',
+    '#c48e8e',
+    '#8b9dc3',
+];
+
+function TopicSentencesModal({ topic, sentences, onClose }) {
+    useEffect(() => {
+        const handleKey = e => {
+            if (e.key === 'Escape') onClose();
+        };
+
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [onClose]);
+
+    if (!topic) return null;
+
+    const sortedIndices = [...topic.sentenceIndices].sort((a, b) => a - b);
+
+    return (
+        <div className="topics-bar-chart__modal-overlay" onClick={onClose}>
+            <div
+                className="topics-bar-chart__modal"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="topics-bar-chart__modal-header">
+                    <h3>{topic.displayName}</h3>
+                    <button
+                        type="button"
+                        className="topics-bar-chart__modal-close"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div className="topics-bar-chart__modal-body">
+                    {sortedIndices.length === 0 ? (
+                        <p>No sentences found for this topic.</p>
+                    ) : (
+                        sortedIndices.map(idx => (
+                            <div key={idx} className="topics-bar-chart__modal-sentence">
+                                <span className="topics-bar-chart__modal-sentence-num">{idx}.</span>
+                                <span className="topics-bar-chart__modal-sentence-text">
+                                    {sentences[idx - 1] || ''}
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function Breadcrumbs({ scopePath, onNavigate }) {
+    return (
+        <div className="topics-bar-chart__breadcrumbs">
+            <button
+                type="button"
+                className={`topics-bar-chart__breadcrumb-link${scopePath.length === 0 ? ' current' : ''}`}
+                onClick={() => onNavigate([])}
+                disabled={scopePath.length === 0}
+            >
+                All Topics
+            </button>
+            {scopePath.map((segment, index) => {
+                const isCurrent = index === scopePath.length - 1;
+                return (
+                    <React.Fragment key={`${segment}-${index}`}>
+                        <span className="topics-bar-chart__breadcrumb-separator">&gt;</span>
+                        <button
+                            type="button"
+                            className={`topics-bar-chart__breadcrumb-link${isCurrent ? ' current' : ''}`}
+                            onClick={() => onNavigate(scopePath.slice(0, index + 1))}
+                            disabled={isCurrent}
+                        >
+                            {segment}
+                        </button>
+                    </React.Fragment>
+                );
+            })}
+        </div>
+    );
+}
 
 /**
  * TopicsBarChart
- * - Creates one bar per second-level subtopic: TopLevel>SecondLevel
+ * - Creates one bar for the current scope and relative topic level
  * - Bar width is based on sentence character count
  * - Infographic style: bars sorted smallest-to-largest (top to bottom),
  *   value inside bar, label to the right
+ * - Click a drillable topic to navigate into its subtopics
  */
 function TopicsBarChart({ topics, sentences = [] }) {
     const [hoveredBar, setHoveredBar] = useState(null);
+    const [selectedLevel, setSelectedLevel] = useState(0);
+    const [scopePath, setScopePath] = useState([]);
+    const [modalTopic, setModalTopic] = useState(null);
     const MAX_BAR_WIDTH_PERCENT = 78;
 
+    const maxLevel = useMemo(() => getScopedMaxLevel(topics, scopePath), [topics, scopePath]);
+
+    useEffect(() => {
+        if (selectedLevel > maxLevel) {
+            setSelectedLevel(maxLevel);
+        }
+    }, [selectedLevel, maxLevel]);
+
+    useEffect(() => {
+        setHoveredBar(null);
+    }, [scopePath, selectedLevel]);
+
     const chartData = useMemo(() => {
-        if (!topics || topics.length === 0) return [];
+        const scopedData = buildScopedChartData(topics, sentences, scopePath, selectedLevel);
 
-        const subtopicMap = new Map();
-        const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
-
-        topics.forEach(topic => {
-            const parts = topic.name.split('>').map(p => p.trim());
-
-            // Skip top-level topics; only second-level and deeper create bars.
-            if (parts.length < 2) return;
-
-            const topLevel = parts[0];
-            const secondLevel = parts[1];
-            const barTitle = `${topLevel}>${secondLevel}`;
-            const key = barTitle;
-
-            if (!subtopicMap.has(key)) {
-                subtopicMap.set(key, {
-                    id: key,
-                    barTitle,
-                    topLevel,
-                    deeperPaths: new Set(),
-                    sentenceIndices: new Set(),
-                    fallbackChars: 0
-                });
-            }
-
-            const entry = subtopicMap.get(key);
-
-            if (parts.length > 2) {
-                entry.deeperPaths.add(parts.slice(2).join('>'));
-            }
-
-            const topicSentenceIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
-            if (topicSentenceIndices.length > 0) {
-                topicSentenceIndices.forEach((index) => {
-                    const oneBased = Number(index);
-                    if (Number.isInteger(oneBased) && oneBased > 0) {
-                        entry.sentenceIndices.add(oneBased);
-                    }
-                });
-            } else if (!hasSentenceText && Number.isFinite(topic.totalChars)) {
-                entry.fallbackChars += topic.totalChars;
-            }
-        });
-
-        const getCharsFromSentenceIndices = (indices) => {
-            let total = 0;
-            indices.forEach((oneBased) => {
-                const sentence = sentences[oneBased - 1];
-                if (typeof sentence === 'string') {
-                    total += sentence.length;
-                }
-            });
-            return total;
-        };
-
-        const result = Array.from(subtopicMap.values()).map((entry) => {
-            const totalChars = hasSentenceText
-                ? getCharsFromSentenceIndices(entry.sentenceIndices)
-                : entry.fallbackChars;
-
-            return {
-                id: entry.id,
-                barTitle: entry.barTitle,
-                topLevel: entry.topLevel,
-                deeperTopics: Array.from(entry.deeperPaths).sort(),
-                totalChars,
-                sentenceCount: entry.sentenceIndices.size
-            };
-        })
-            // Sort smallest to largest (top to bottom), like the infographic
-            .sort((a, b) => a.totalChars - b.totalChars || a.barTitle.localeCompare(b.barTitle));
-
-        return result;
-    }, [topics, sentences]);
+        return scopedData
+            .map(item => ({
+                ...item,
+                childLabels: getDirectChildLabels(topics, item.fullPath),
+                isDrillable: hasDeeperChildren(topics, item.fullPath),
+            }))
+            .sort((a, b) => a.totalChars - b.totalChars || a.fullPath.localeCompare(b.fullPath));
+    }, [topics, sentences, scopePath, selectedLevel]);
 
     const maxChars = useMemo(() => {
         if (chartData.length === 0) return 100;
@@ -96,123 +150,172 @@ function TopicsBarChart({ topics, sentences = [] }) {
         return max > 0 ? max : 1;
     }, [chartData]);
 
-    // Warm, muted color palette inspired by the infographic
     const colorScale = useMemo(() => {
         const colors = {};
-        const baseColors = [
-            '#a8c4d8', // light steel blue
-            '#c4a882', // warm tan
-            '#9ab8a0', // sage green
-            '#d4917a', // muted coral
-            '#5a5a5a', // charcoal
-            '#b8a9c8', // dusty lavender
-            '#c9b458', // muted gold
-            '#8aafaf', // teal gray
-            '#c48e8e', // dusty rose
-            '#8b9dc3', // slate blue
-        ];
-
-        chartData.forEach((item) => {
-            if (!colors[item.topLevel]) {
-                const colorIndex = Object.keys(colors).length % baseColors.length;
-                colors[item.topLevel] = baseColors[colorIndex];
-            }
+        chartData.forEach((item, index) => {
+            colors[item.fullPath] = BASE_COLORS[index % BASE_COLORS.length];
         });
-
         return colors;
     }, [chartData]);
 
-    // Compute total chars across all bars for the header
     const totalAllChars = useMemo(() => {
         return chartData.reduce((sum, item) => sum + item.totalChars, 0);
     }, [chartData]);
 
-    if (chartData.length === 0) {
+    const scopeLabel = getScopeLabel(scopePath);
+    const scopeCopy = scopePath.length === 0
+        ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`
+        : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`;
+
+    const handleNavigate = nextScopePath => {
+        setScopePath(nextScopePath);
+    };
+
+    const handleRowClick = item => {
+        if (!item.isDrillable) return;
+        setScopePath(getTopicParts(item.fullPath));
+        setSelectedLevel(0);
+    };
+
+    const handleOpenModal = item => {
+        setModalTopic({
+            displayName: item.displayName,
+            fullPath: item.fullPath,
+            sentenceIndices: item.sentenceIndices || [],
+        });
+    };
+
+    if (!topics || topics.length === 0) {
         return (
             <div className="topics-bar-chart-empty-state">
-                No second-level subtopic data available.
+                No topic data available.
             </div>
         );
     }
 
     return (
         <div className="topics-bar-chart">
-            {/* Header */}
             <div className="topics-bar-chart__header">
-                <h2 className="topics-bar-chart__title">
-                    Topics Overview
-                </h2>
+                <h2 className="topics-bar-chart__title">Topics Overview</h2>
                 <p className="topics-bar-chart__subtitle">
-                    &ndash; character count by subtopic (second-level) &ndash;
+                    Character count by topic. Click a topic to drill into its subtopics.
                 </p>
                 <div className="topics-bar-chart__total">
                     Total: {totalAllChars.toLocaleString()} characters
                 </div>
             </div>
 
-            {/* Chart body */}
-            <div className="topics-bar-chart__body" data-testid="topics-bar-chart-scroll">
-                {chartData.map((item, index) => {
-                    // Reserve horizontal room so right-side labels remain visible,
-                    // even when the largest bar dominates the chart.
-                    const scaledBarWidthPercent = (item.totalChars / maxChars) * MAX_BAR_WIDTH_PERCENT;
-                    const barWidthPercent = Math.max(scaledBarWidthPercent, 8);
-                    const color = colorScale[item.topLevel] || '#999';
-                    const isHovered = hoveredBar === index;
-                    const isLast = index === chartData.length - 1;
+            <div className="topics-bar-chart__controls">
+                <Breadcrumbs scopePath={scopePath} onNavigate={handleNavigate} />
 
-                    return (
-                        <div
-                            key={item.id}
-                            className={`topics-bar-chart__row${isLast ? ' topics-bar-chart__row--last' : ''}`}
-                            onMouseEnter={() => setHoveredBar(index)}
-                            onMouseLeave={() => setHoveredBar(null)}
-                        >
-                            {/* Bar */}
-                            <div
-                                className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}`}
-                                style={{
-                                    width: `${barWidthPercent}%`,
-                                    backgroundColor: color,
-                                    borderColor: isHovered ? '#333' : '#777',
-                                }}
+                <div className="topics-bar-chart__level-selector">
+                    <span className="topics-bar-chart__level-label">Topic Level:</span>
+                    <div className="topics-bar-chart__level-buttons">
+                        {Array.from({ length: maxLevel + 1 }, (_, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                className={`topics-bar-chart__level-btn${selectedLevel === i ? ' active' : ''}`}
+                                onClick={() => setSelectedLevel(i)}
                             >
-                                <span className="topics-bar-chart__bar-value">
-                                    {item.totalChars.toLocaleString()}
-                                </span>
-                            </div>
-
-                            {/* Label to the right of the bar */}
-                            <div className="topics-bar-chart__label-group">
-                                <div className="topics-bar-chart__label">
-                                    {item.barTitle}
-                                </div>
-                                {item.deeperTopics.length > 0 && (
-                                    <div className="topics-bar-chart__deeper-topics">
-                                        ({item.deeperTopics.join(', ')})
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Legend */}
-            <div className="topics-bar-chart__legend">
-                {Object.entries(colorScale).map(([topLevel, color]) => (
-                    <div
-                        key={topLevel}
-                        className="topics-bar-chart__legend-item"
-                    >
-                        <div
-                            className="topics-bar-chart__legend-swatch"
-                            style={{ backgroundColor: color }}
-                        />
-                        <span className="topics-bar-chart__legend-label">{topLevel}</span>
+                                Level {i} ({getLevelLabel(i)})
+                            </button>
+                        ))}
                     </div>
-                ))}
+                </div>
+
+                <p className="topics-bar-chart__scope-copy">{scopeCopy}</p>
             </div>
+
+            {chartData.length === 0 ? (
+                <p className="topics-bar-chart__no-data">
+                    No topics found inside {scopeLabel} at relative level {selectedLevel}. Try a different level or use the breadcrumbs.
+                </p>
+            ) : (
+                <>
+                    <div className="topics-bar-chart__body" data-testid="topics-bar-chart-scroll">
+                        {chartData.map((item, index) => {
+                            const scaledBarWidthPercent = (item.totalChars / maxChars) * MAX_BAR_WIDTH_PERCENT;
+                            const barWidthPercent = Math.max(scaledBarWidthPercent, 8);
+                            const color = colorScale[item.fullPath] || '#999';
+                            const isHovered = hoveredBar === index;
+                            const isLast = index === chartData.length - 1;
+
+                            return (
+                                <div
+                                    key={item.fullPath}
+                                    className={`topics-bar-chart__row${isLast ? ' topics-bar-chart__row--last' : ''}${item.isDrillable ? ' topics-bar-chart__row--drillable' : ''}`}
+                                    onMouseEnter={() => setHoveredBar(index)}
+                                    onMouseLeave={() => setHoveredBar(null)}
+                                >
+                                    <button
+                                        type="button"
+                                        className="topics-bar-chart__row-main"
+                                        data-testid={`topics-bar-chart-row-${sanitizePathForTestId(item.fullPath)}`}
+                                        aria-label={item.fullPath}
+                                        aria-disabled={item.isDrillable ? undefined : 'true'}
+                                        onClick={() => handleRowClick(item)}
+                                        title={item.fullPath}
+                                    >
+                                        <div
+                                            className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}`}
+                                            style={{
+                                                width: `${barWidthPercent}%`,
+                                                backgroundColor: color,
+                                                borderColor: isHovered ? '#333' : '#777',
+                                            }}
+                                        >
+                                            <span className="topics-bar-chart__bar-value">
+                                                {item.totalChars.toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        <div className="topics-bar-chart__label-group">
+                                            <div className="topics-bar-chart__label">{item.displayName}</div>
+                                            {item.childLabels.length > 0 && (
+                                                <div className="topics-bar-chart__deeper-topics">
+                                                    ({item.childLabels.join(', ')})
+                                                </div>
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="topics-bar-chart__row-action"
+                                        aria-label={`View sentences for ${item.displayName}`}
+                                        onClick={() => handleOpenModal(item)}
+                                    >
+                                        <span />
+                                        <span />
+                                        <span />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="topics-bar-chart__legend">
+                        {chartData.map(item => (
+                            <div key={item.fullPath} className="topics-bar-chart__legend-item">
+                                <div
+                                    className="topics-bar-chart__legend-swatch"
+                                    style={{ backgroundColor: colorScale[item.fullPath] }}
+                                />
+                                <span className="topics-bar-chart__legend-label">{item.displayName}</span>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {modalTopic && (
+                <TopicSentencesModal
+                    topic={modalTopic}
+                    sentences={sentences}
+                    onClose={() => setModalTopic(null)}
+                />
+            )}
         </div>
     );
 }
