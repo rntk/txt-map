@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
+import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import {
   getTopicParts,
   isWithinScope,
@@ -444,26 +445,17 @@ export default function CircularPackingChart({ topics, sentences = [] }) {
         setSelectedLevel(0);
       }} />
 
-      <div className="circular-packing-level-selector">
-        <span className="circular-packing-level-label">Topic Level:</span>
-        <div className="circular-packing-level-buttons">
-          {Array.from({ length: maxLevel + 1 }, (_, level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => {
-                setSelectedLevel(level);
-                if (level !== selectedLevel) {
-                  zoomRef.current = null;
-                }
-              }}
-              className={`circular-packing-level-btn${selectedLevel === level ? ' active' : ''}`}
-            >
-              {`Level ${level} (${getLevelLabel(level)})`}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TopicLevelSwitcher
+        className="circular-packing-level-switcher"
+        selectedLevel={selectedLevel}
+        maxLevel={maxLevel}
+        onChange={(level) => {
+          setSelectedLevel(level);
+          if (level !== selectedLevel) {
+            zoomRef.current = null;
+          }
+        }}
+      />
 
       <p className="circular-packing-subtitle">
         {subtitle}

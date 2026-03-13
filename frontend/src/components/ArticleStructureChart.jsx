@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import '../styles/App.css';
+import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import {
     buildScopedChartData,
     getLevelLabel,
@@ -255,21 +256,11 @@ function ArticleStructureChart({ topics, sentences = [] }) {
             <div className="article-structure-controls">
                 <Breadcrumbs scopePath={scopePath} onNavigate={handleNavigate} />
 
-                <div className="article-structure-level-selector">
-                    <span className="article-structure-level-label">Topic Level:</span>
-                    <div className="article-structure-level-buttons">
-                        {Array.from({ length: maxLevel + 1 }, (_, i) => (
-                            <button
-                                key={i}
-                                type="button"
-                                className={`article-structure-level-btn${selectedLevel === i ? ' active' : ''}`}
-                                onClick={() => setSelectedLevel(i)}
-                            >
-                                Level {i} ({getLevelLabel(i)})
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <TopicLevelSwitcher
+                    selectedLevel={selectedLevel}
+                    maxLevel={maxLevel}
+                    onChange={setSelectedLevel}
+                />
 
                 <p className="article-structure-scope-copy">{subtitle}</p>
             </div>

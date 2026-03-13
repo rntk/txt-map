@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './TopicsBarChart.css';
 import TopicSentencesModal from './shared/TopicSentencesModal';
+import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import {
     buildScopedChartData,
     getDirectChildLabels,
@@ -159,21 +160,11 @@ function TopicsBarChart({ topics, sentences = [] }) {
             <div className="topics-bar-chart__controls">
                 <Breadcrumbs scopePath={scopePath} onNavigate={handleNavigate} />
 
-                <div className="topics-bar-chart__level-selector">
-                    <span className="topics-bar-chart__level-label">Topic Level:</span>
-                    <div className="topics-bar-chart__level-buttons">
-                        {Array.from({ length: maxLevel + 1 }, (_, i) => (
-                            <button
-                                key={i}
-                                type="button"
-                                className={`topics-bar-chart__level-btn${selectedLevel === i ? ' active' : ''}`}
-                                onClick={() => setSelectedLevel(i)}
-                            >
-                                Level {i} ({getLevelLabel(i)})
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <TopicLevelSwitcher
+                    selectedLevel={selectedLevel}
+                    maxLevel={maxLevel}
+                    onChange={setSelectedLevel}
+                />
 
                 <p className="topics-bar-chart__scope-copy">{scopeCopy}</p>
             </div>

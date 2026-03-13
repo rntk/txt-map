@@ -88,40 +88,40 @@
   font-size: 12px;
 }
 
-.topics-bar-chart__level-selector {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+.topics-bar-chart .topic-level-switcher,
+.topics-river-chart .topic-level-switcher {
+  color: #473f35;
 }
 
-.topics-bar-chart__level-label {
+.topics-bar-chart .topic-level-switcher__label,
+.topics-river-chart .topic-level-switcher__label {
   color: #473f35;
-  font-size: 13px;
   font-weight: 700;
 }
 
-.topics-bar-chart__level-buttons {
-  display: flex;
-  flex-wrap: wrap;
+.topics-bar-chart .topic-level-switcher__buttons,
+.topics-river-chart .topic-level-switcher__buttons {
   gap: 8px;
 }
 
-.topics-bar-chart__level-btn {
+.topics-bar-chart .topic-level-switcher__button,
+.topics-river-chart .topic-level-switcher__button {
   padding: 5px 10px;
   color: #5d5142;
-  font: inherit;
-  font-size: 12px;
   background: #f8f2e6;
-  border: 1px solid #b9aa92;
+  border-color: #b9aa92;
   border-radius: 999px;
-  cursor: pointer;
 }
 
-.topics-bar-chart__level-btn.active {
+.topics-bar-chart .topic-level-switcher__button.active,
+.topics-river-chart .topic-level-switcher__button.active {
   color: #fff8ef;
   background: #7a261c;
   border-color: #7a261c;
+}
+
+.topics-river-chart__level-switcher {
+  padding: 0 20px 10px;
 }
 
 .topics-bar-chart__scope-copy {

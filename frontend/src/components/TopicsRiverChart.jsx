@@ -3,8 +3,9 @@ import * as d3 from 'd3';
 import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale } from '../utils/chart-utils';
 import RiverLegend from './shared/RiverLegend';
 import TopicSentencesModal from './shared/TopicSentencesModal';
-import { getScopedMaxLevel, buildScopedChartData, getLevelLabel } from '../utils/topicHierarchy';
-import './TopicsBarChart.css'; // Reuse the level selector CSS
+import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
+import { getScopedMaxLevel, buildScopedChartData } from '../utils/topicHierarchy';
+import './TopicsBarChart.css';
 
 const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
     const svgRef = useRef(null);
@@ -276,21 +277,12 @@ const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
             display: 'flex',
             flexDirection: 'column'
         }}>
-            <div className="topics-bar-chart__level-selector" style={{ padding: '0 20px 10px', borderBottom: 'none' }}>
-                <span className="topics-bar-chart__level-label">Topic Level:</span>
-                <div className="topics-bar-chart__level-buttons">
-                    {Array.from({ length: maxLevel + 1 }, (_, i) => (
-                        <button
-                            key={i}
-                            type="button"
-                            className={`topics-bar-chart__level-btn${selectedLevel === i ? ' active' : ''}`}
-                            onClick={() => setSelectedLevel(i)}
-                        >
-                            Level {i} ({getLevelLabel(i)})
-                        </button>
-                    ))}
-                </div>
-            </div>
+            <TopicLevelSwitcher
+                className="topics-river-chart__level-switcher"
+                selectedLevel={selectedLevel}
+                maxLevel={maxLevel}
+                onChange={setSelectedLevel}
+            />
 
             <div style={{ height: '520px', width: '100%' }}>
                 <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>

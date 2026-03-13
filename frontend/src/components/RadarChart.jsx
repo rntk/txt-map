@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import * as d3 from 'd3';
+import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import '../styles/App.css';
+import { getLevelLabel, getScopedMaxLevel } from '../utils/topicHierarchy';
 
 /**
  * RadarChart
@@ -104,16 +106,13 @@ function RadarChart({ topics, sentences = [] }) {
     }, [topics, sentences, selectedLevel]);
 
     // Determine max level available
-    const maxLevel = useMemo(() => {
-        if (!topics || topics.length === 0) return 0;
-        let max = 0;
-        topics.forEach(topic => {
-            const parts = topic.name.split('>').map(p => p.trim());
-            const level = parts.length - 1;
-            if (level > max) max = level;
-        });
-        return max;
-    }, [topics]);
+    const maxLevel = useMemo(() => getScopedMaxLevel(topics, []), [topics]);
+
+    useEffect(() => {
+        if (selectedLevel > maxLevel) {
+            setSelectedLevel(maxLevel);
+        }
+    }, [selectedLevel, maxLevel]);
 
     // Color scale for topics
     const colorScale = useMemo(() => {
@@ -409,37 +408,18 @@ function RadarChart({ topics, sentences = [] }) {
             </div>
 
             {/* Level Selector */}
-            <div className="radar-chart-level-selector">
-                <span className="radar-chart-level-label">
-                    Topic Level:
-                </span>
-                <div className="radar-chart-level-buttons">
-                    {Array.from({ length: maxLevel + 1 }, (_, i) => (
-                        <button
-                            key={i}
-                            onClick={() => {
-                                setSelectedLevel(i);
-                                if (i !== selectedLevel) {
-                                    zoomRef.current = null;
-                                }
-                            }}
-                            className={`radar-chart-level-btn${selectedLevel === i ? ' active' : ''}`}
-                            onMouseEnter={(e) => {
-                                if (selectedLevel !== i) {
-                                    e.target.classList.add('hover');
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (selectedLevel !== i) {
-                                    e.target.classList.remove('hover');
-                                }
-                            }}
-                        >
-                            Level {i} ({i === 0 ? 'Main Topics' : i === 1 ? 'Subtopics' : `Depth ${i}`})
-                        </button>
-                    ))}
-                </div>
-            </div>
+            <TopicLevelSwitcher
+                className="radar-chart-level-switcher"
+                selectedLevel={selectedLevel}
+                maxLevel={maxLevel}
+                onChange={(level) => {
+                    setSelectedLevel(level);
+                    if (level !== selectedLevel) {
+                        zoomRef.current = null;
+                    }
+                }}
+                getOptionLabel={level => `Level ${level} (${getLevelLabel(level)})`}
+            />
 
             {/* Chart */}
             <div className="radar-chart-body">
