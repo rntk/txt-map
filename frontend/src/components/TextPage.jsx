@@ -15,6 +15,25 @@ import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import '../styles/App.css';
 
+const SIDEBAR_TABS = [
+  { key: 'article', label: 'Article' },
+  { key: 'summary', label: 'Summary' },
+  { key: 'raw_text', label: 'Raw Text' },
+];
+
+const FULLSCREEN_TABS = [
+  { key: 'topics', label: 'Topics' },
+  { key: 'topics_river', label: 'Topics River' },
+  { key: 'marimekko', label: 'Marimekko' },
+  { key: 'mindmap', label: '🧠 Mindmap' },
+  { key: 'prefix_tree', label: '🌳 Prefix Tree' },
+  { key: 'tags_cloud', label: '☁️ Tags Cloud' },
+  { key: 'circular_packing', label: '⬤ Circles' },
+  { key: 'radar_chart', label: 'Radar Chart' },
+  { key: 'grid_view', label: 'Grid View' },
+  { key: 'article_structure', label: 'Article Structure' },
+];
+
 function StatusIndicator({ tasks }) {
   const getStatusColor = (status) => {
     switch (status) {
@@ -131,6 +150,12 @@ function TextPage() {
   const closeFullscreenGraph = useCallback(() => {
     setFullscreenGraph(null);
     setActiveTab('article');
+  }, []);
+
+  const handleTabClick = useCallback((tabKey) => {
+    const isFullscreen = FULLSCREEN_TABS.some(t => t.key === tabKey);
+    setActiveTab(tabKey);
+    setFullscreenGraph(isFullscreen ? tabKey : null);
   }, []);
 
   const submissionId = window.location.pathname.split('/')[3];
@@ -525,6 +550,33 @@ function TextPage() {
           {actionMessage && <div className="text-management-message" style={{ marginTop: '4px', fontSize: '11px' }}>{actionMessage}</div>}
         </div>
 
+        {articles.length > 0 && (
+          <div className="tab-bar">
+            <div className="tab-group">
+              <span className="tab-group-label">Views</span>
+              <div className="tabs">
+                {SIDEBAR_TABS.map(tab => (
+                  <button key={tab.key} className={activeTab === tab.key ? 'active' : ''}
+                    onClick={() => handleTabClick(tab.key)}>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="tab-group">
+              <span className="tab-group-label">Visualizations</span>
+              <div className="tabs">
+                {FULLSCREEN_TABS.map(tab => (
+                  <button key={tab.key} className={activeTab === tab.key ? 'active' : ''}
+                    onClick={() => handleTabClick(tab.key)}>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {isProcessing && (
           <div style={{
             padding: '15px',
@@ -538,6 +590,7 @@ function TextPage() {
         )}
 
         {articles.length > 0 ? (
+          <>
           <div className="container">
             <div className="left-column">
               <h1>Topics</h1>
@@ -611,108 +664,9 @@ function TextPage() {
                   <div className="article-title-section">
                     <h1>Analyzed Text ({safeTopics.length} topics)</h1>
                   </div>
-                  <div className="article-controls">
-                    <div className="tabs">
-                      <button
-                        className={activeTab === 'article' ? 'active' : ''}
-                        onClick={() => setActiveTab('article')}
-                      >
-                        Article
-                      </button>
-                      <button
-                        className={activeTab === 'topics' ? 'active' : ''}
-                        onClick={() => setActiveTab('topics')}
-                      >
-                        Topics
-                      </button>
-                      <button
-                        className={activeTab === 'summary' ? 'active' : ''}
-                        onClick={() => setActiveTab('summary')}
-                      >
-                        Summary
-                      </button>
-                      <button
-                        className={activeTab === 'raw_text' ? 'active' : ''}
-                        onClick={() => setActiveTab('raw_text')}
-                      >
-                        Raw Text
-                      </button>
-                      <button
-                        className={activeTab === 'topics_river' ? 'active' : ''}
-                        onClick={() => setActiveTab('topics_river')}
-                      >
-                        Topics River
-                      </button>
-                      <button
-                        className={activeTab === 'marimekko' ? 'active' : ''}
-                        onClick={() => setActiveTab('marimekko')}
-                      >
-                        Marimekko
-                      </button>
-                      <button
-                        className={activeTab === 'mindmap' ? 'active' : ''}
-                        onClick={() => {
-                          setActiveTab('mindmap');
-                          setFullscreenGraph('mindmap');
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        title="Open mindmap in full screen"
-                      >
-                        🧠 Mindmap
-                      </button>
-                      <button
-                        className={activeTab === 'prefix_tree' ? 'active' : ''}
-                        onClick={() => {
-                          setActiveTab('prefix_tree');
-                          setFullscreenGraph('prefix_tree');
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        title="Open prefix tree in full screen"
-                      >
-                        🌳 Prefix Tree
-                      </button>
-                      <button
-                        className={activeTab === 'tags_cloud' ? 'active' : ''}
-                        onClick={() => setActiveTab('tags_cloud')}
-                      >
-                        ☁️ Tags Cloud
-                      </button>
-                      <button
-                        className={activeTab === 'circular_packing' ? 'active' : ''}
-                        onClick={() => setActiveTab('circular_packing')}
-                      >
-                        ⬤ Circles
-                      </button>
-                      <button
-                        className={activeTab === 'radar_chart' ? 'active' : ''}
-                        onClick={() => setActiveTab('radar_chart')}
-                      >
-                         Radar Chart
-                      </button>
-                      <button
-                        className={activeTab === 'grid_view' ? 'active' : ''}
-                        onClick={() => {
-                          setActiveTab('grid_view');
-                          setFullscreenGraph('grid_view');
-                        }}
-                      >
-                        Grid View
-                      </button>
-                      <button
-                        className={activeTab === 'article_structure' ? 'active' : ''}
-                        onClick={() => setActiveTab('article_structure')}
-                      >
-                        Article Structure
-                      </button>
-                    </div>
-                  </div>
                 </div>
 
-                {activeTab === 'topics' ? (
-                  <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
-                    <TopicsBarChart topics={allTopics} sentences={safeSentences} />
-                  </div>
-                ) : activeTab === 'summary' ? (
+                {activeTab === 'summary' ? (
                   <div className="summary-content">
                     <h2>Summary</h2>
                     <div className="summary-text">
@@ -783,92 +737,6 @@ function TextPage() {
                     </div>
                     <pre className="raw-text-content raw-text-content-page">{rawText || 'No raw text available.'}</pre>
                   </div>
-                ) : activeTab === 'topics_river' ? (
-                  <div className="topics-river-container" style={{ padding: '20px' }}>
-                    <div style={{ marginBottom: '60px' }}>
-                      <h2>Topics River</h2>
-                      <p>Visualization of topic density across the article.</p>
-                      <TopicsRiverChart topics={safeTopics} articleLength={safeSentences.length} />
-                    </div>
-                    <div className="subtopics-river-section">
-                      <h2>Subtopics River</h2>
-                      <p>Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
-                      {results.subtopics ? (
-                        <SubtopicsRiverChart
-                          topics={safeTopics}
-                          subtopics={results.subtopics}
-                          articleLength={safeSentences.length}
-                        />
-                      ) : (
-                        <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
-                      )}
-                    </div>
-                  </div>
-                ) : activeTab === 'marimekko' ? (
-                  <div className="marimekko-container" style={{ padding: '20px' }}>
-                    <MarimekkoChartTab topics={safeTopics} subtopics={results.subtopics} />
-                  </div>
-                ) : activeTab === 'mindmap' ? (
-                  <MindmapResults
-                    mindmapData={{
-                      topic_mindmaps: results.topic_mindmaps || {},
-                      sentences: safeSentences,
-                    }}
-                    fullscreen={true}
-                    onCloseFullscreen={closeFullscreenGraph}
-                  />
-                ) : activeTab === 'prefix_tree' ? (
-                  <PrefixTreeResults
-                    treeData={results.prefix_tree || {}}
-                    sentences={safeSentences}
-                    fullscreen={true}
-                    onCloseFullscreen={closeFullscreenGraph}
-                  />
-                ) : activeTab === 'tags_cloud' ? (
-                  <TopicsTagCloud
-                    submissionId={submissionId}
-                    topics={safeTopics}
-                    sentences={safeSentences}
-                  />
-                ) : activeTab === 'grid_view' ? (
-                  <GridView
-                    topics={safeTopics}
-                    topicSummaries={results.topic_summaries || {}}
-                    sentences={safeSentences}
-                    onClose={closeFullscreenGraph}
-                  />
-                ) : activeTab === 'circular_packing' ? (
-                  <div
-                    style={{
-                      padding: '20px',
-                      minHeight: '80vh',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                  >
-                    <h2>Topic Circles</h2>
-                    <p style={{ marginBottom: '12px' }}>
-                      Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
-                    </p>
-                    <div style={{ flex: 1, minHeight: 'calc(80vh - 120px)' }}>
-                      <CircularPackingChart topics={safeTopics} />
-                    </div>
-                  </div>
-                ) : activeTab === 'radar_chart' ? (
-                  <div
-                    style={{
-                      padding: '20px',
-                      minHeight: '80vh',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                  >
-                    <RadarChart topics={safeTopics} sentences={safeSentences} />
-                  </div>
-                ) : activeTab === 'article_structure' ? (
-                  <div style={{ padding: '20px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-                    <ArticleStructureChart topics={safeTopics} sentences={safeSentences} />
-                  </div>
                 ) : (
                   articles.map((article, index) => (
                     <TextDisplay
@@ -889,7 +757,116 @@ function TextPage() {
               </div>
             </div>
           </div>
-        ) : (
+
+          {fullscreenGraph === 'topics' && (
+            <FullScreenGraph title="Topics" onClose={closeFullscreenGraph}>
+              <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
+                <TopicsBarChart topics={allTopics} sentences={safeSentences} />
+              </div>
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'topics_river' && (
+            <FullScreenGraph title="Topics River" onClose={closeFullscreenGraph}>
+              <div className="topics-river-container" style={{ padding: '20px' }}>
+                <div style={{ marginBottom: '60px' }}>
+                  <h2>Topics River</h2>
+                  <p>Visualization of topic density across the article.</p>
+                  <TopicsRiverChart topics={safeTopics} articleLength={safeSentences.length} />
+                </div>
+                <div className="subtopics-river-section">
+                  <h2>Subtopics River</h2>
+                  <p>Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
+                  {results.subtopics ? (
+                    <SubtopicsRiverChart
+                      topics={safeTopics}
+                      subtopics={results.subtopics}
+                      articleLength={safeSentences.length}
+                    />
+                  ) : (
+                    <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
+                  )}
+                </div>
+              </div>
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'marimekko' && (
+            <FullScreenGraph title="Marimekko" onClose={closeFullscreenGraph}>
+              <div className="marimekko-container" style={{ padding: '20px' }}>
+                <MarimekkoChartTab topics={safeTopics} subtopics={results.subtopics} />
+              </div>
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'mindmap' && (
+            <MindmapResults
+              mindmapData={{
+                topic_mindmaps: results.topic_mindmaps || {},
+                sentences: safeSentences,
+              }}
+              fullscreen={true}
+              onCloseFullscreen={closeFullscreenGraph}
+            />
+          )}
+
+          {fullscreenGraph === 'prefix_tree' && (
+            <PrefixTreeResults
+              treeData={results.prefix_tree || {}}
+              sentences={safeSentences}
+              fullscreen={true}
+              onCloseFullscreen={closeFullscreenGraph}
+            />
+          )}
+
+          {fullscreenGraph === 'tags_cloud' && (
+            <FullScreenGraph title="Tags Cloud" onClose={closeFullscreenGraph}>
+              <TopicsTagCloud
+                submissionId={submissionId}
+                topics={safeTopics}
+                sentences={safeSentences}
+              />
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'circular_packing' && (
+            <FullScreenGraph title="Topic Circles" onClose={closeFullscreenGraph}>
+              <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <p style={{ marginBottom: '12px' }}>
+                  Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
+                </p>
+                <div style={{ flex: 1 }}>
+                  <CircularPackingChart topics={safeTopics} />
+                </div>
+              </div>
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'radar_chart' && (
+            <FullScreenGraph title="Radar Chart" onClose={closeFullscreenGraph}>
+              <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <RadarChart topics={safeTopics} sentences={safeSentences} />
+              </div>
+            </FullScreenGraph>
+          )}
+
+          {fullscreenGraph === 'grid_view' && (
+            <GridView
+              topics={safeTopics}
+              topicSummaries={results.topic_summaries || {}}
+              sentences={safeSentences}
+              onClose={closeFullscreenGraph}
+            />
+          )}
+
+          {fullscreenGraph === 'article_structure' && (
+            <FullScreenGraph title="Article Structure" onClose={closeFullscreenGraph}>
+              <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <ArticleStructureChart topics={safeTopics} sentences={safeSentences} />
+              </div>
+            </FullScreenGraph>
+          )}
+        </>) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
             <p>No results yet. Processing is in progress...</p>
           </div>
