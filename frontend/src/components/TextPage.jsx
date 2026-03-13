@@ -1039,11 +1039,11 @@ function TextPage() {
 
           {fullscreenGraph === 'topics_river' && (
             <FullScreenGraph title="Topics River" onClose={closeFullscreenGraph}>
-              <div className="topics-river-container" style={{ padding: '20px' }}>
+              <div className="topics-river-container" style={{ padding: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
                 <div style={{ marginBottom: '60px' }}>
                   <h2>Topics River</h2>
                   <p>Visualization of topic density across the article.</p>
-                  <TopicsRiverChart topics={safeTopics} articleLength={safeSentences.length} />
+                  <TopicsRiverChart topics={safeTopics} sentences={safeSentences} articleLength={safeSentences.length} />
                 </div>
                 <div className="subtopics-river-section">
                   <h2>Subtopics River</h2>
@@ -1052,6 +1052,7 @@ function TextPage() {
                     <SubtopicsRiverChart
                       topics={safeTopics}
                       subtopics={results.subtopics}
+                      sentences={safeSentences}
                       articleLength={safeSentences.length}
                     />
                   ) : (

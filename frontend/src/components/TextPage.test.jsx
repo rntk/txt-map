@@ -79,6 +79,9 @@ describe('TextPage raw text navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
 
+    // Need to select the topic to make its range highlighted
+    fireEvent.click(screen.getByRole('checkbox'));
+
     await waitFor(() => {
       expect(document.querySelector('.raw-text-token')).toBeInTheDocument();
     });
@@ -99,12 +102,11 @@ describe('TextPage raw text navigation', () => {
     await screen.findByText('Text Analysis Results');
 
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unreaded' }));
 
     await waitFor(() => {
       expect(document.querySelector('.raw-text-token')).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Unreaded' }));
 
     const betaToken = await screen.findByText('Beta');
     expect(betaToken).toHaveClass('raw-text-token');

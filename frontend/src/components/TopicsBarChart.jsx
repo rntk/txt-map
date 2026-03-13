@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './TopicsBarChart.css';
+import TopicSentencesModal from './shared/TopicSentencesModal';
 import {
     buildScopedChartData,
     getDirectChildLabels,
@@ -23,56 +24,6 @@ const BASE_COLORS = [
     '#c48e8e',
     '#8b9dc3',
 ];
-
-function TopicSentencesModal({ topic, sentences, onClose }) {
-    useEffect(() => {
-        const handleKey = e => {
-            if (e.key === 'Escape') onClose();
-        };
-
-        document.addEventListener('keydown', handleKey);
-        return () => document.removeEventListener('keydown', handleKey);
-    }, [onClose]);
-
-    if (!topic) return null;
-
-    const sortedIndices = [...topic.sentenceIndices].sort((a, b) => a - b);
-
-    return (
-        <div className="topics-bar-chart__modal-overlay" onClick={onClose}>
-            <div
-                className="topics-bar-chart__modal"
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="topics-bar-chart__modal-header">
-                    <h3>{topic.displayName}</h3>
-                    <button
-                        type="button"
-                        className="topics-bar-chart__modal-close"
-                        onClick={onClose}
-                        aria-label="Close"
-                    >
-                        &times;
-                    </button>
-                </div>
-                <div className="topics-bar-chart__modal-body">
-                    {sortedIndices.length === 0 ? (
-                        <p>No sentences found for this topic.</p>
-                    ) : (
-                        sortedIndices.map(idx => (
-                            <div key={idx} className="topics-bar-chart__modal-sentence">
-                                <span className="topics-bar-chart__modal-sentence-num">{idx}.</span>
-                                <span className="topics-bar-chart__modal-sentence-text">
-                                    {sentences[idx - 1] || ''}
-                                </span>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
 
 function Breadcrumbs({ scopePath, onNavigate }) {
     return (

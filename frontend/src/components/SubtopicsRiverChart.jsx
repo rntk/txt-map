@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale } from '../utils/chart-utils';
 import RiverLegend from './shared/RiverLegend';
+import TopicSentencesModal from './shared/TopicSentencesModal';
 
-const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
+const SubtopicsRiverChart = ({ topics, subtopics, sentences = [], articleLength }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [activeSubtopic, setActiveSubtopic] = useState(null);
+    const [selectedSubtopicForModal, setSelectedSubtopicForModal] = useState(null);
 
     // Calculate effective length based on actual sentence coverage
     const effectiveLength = useMemo(() => {
@@ -123,7 +125,6 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
             .domain([minVal, maxVal])
             .range([innerHeight, 0]);
 
-
         const area = d3.area()
             .curve(d3.curveBasis)
             .x(d => x((d.data.rangeStart + d.data.rangeEnd) / 2))
@@ -157,7 +158,7 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
             .on("mouseover", (event, d) => {
                 setActiveSubtopic(d.key);
                 const subInfo = orderedSubtopics.find(st => st.name === d.key);
-                const totalSentences = subInfo?.sentences.length || 0;
+                const totalSentences = subInfo?.sentences?.length || 0;
                 const parentTopic = subInfo?.parent_topic || "Unknown";
 
                 tooltip.style("opacity", 1)
@@ -172,6 +173,15 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
             .on("mouseout", () => {
                 setActiveSubtopic(null);
                 tooltip.style("opacity", 0);
+            })
+            .on("click", (event, d) => {
+                const subInfo = orderedSubtopics.find(st => st.name === d.key);
+                if (subInfo) {
+                    setSelectedSubtopicForModal({
+                        displayName: subInfo.name,
+                        sentenceIndices: subInfo.sentences || []
+                    });
+                }
             });
 
         // Add X-Axis (Chapters)
@@ -303,6 +313,14 @@ const SubtopicsRiverChart = ({ topics, subtopics, articleLength }) => {
                 setActiveItem={setActiveSubtopic}
                 colorScale={colorScale}
             />
+
+            {selectedSubtopicForModal && (
+                <TopicSentencesModal
+                    topic={selectedSubtopicForModal}
+                    sentences={sentences}
+                    onClose={() => setSelectedSubtopicForModal(null)}
+                />
+            )}
         </div>
     );
 };

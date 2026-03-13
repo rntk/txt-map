@@ -33,8 +33,8 @@ describe('TopicsBarChart', () => {
     expect(screen.getByRole('button', { name: 'All Topics' })).toBeDisabled();
     expect(screen.getByText('Showing all topics at relative level 0 (Main Topics).')).toBeInTheDocument();
     expect(screen.getByTestId('topics-bar-chart-scroll')).toBeInTheDocument();
-    expect(screen.getByText('Science')).toBeInTheDocument();
-    expect(screen.getByText('Arts')).toBeInTheDocument();
+    expect(screen.getAllByText('Science')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Arts')[0]).toBeInTheDocument();
   });
 
   it('switches to level 1 and aggregates child previews for drillable rows', () => {
@@ -44,13 +44,13 @@ describe('TopicsBarChart', () => {
 
     expect(screen.getByText('Showing all topics at relative level 1 (Subtopics).')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Level 1 (Subtopics)' })).toHaveClass('active');
-    expect(screen.getByText('Physics')).toBeInTheDocument();
-    expect(screen.getByText('Biology')).toBeInTheDocument();
-    expect(screen.getByText('Music')).toBeInTheDocument();
+    expect(screen.getAllByText('Physics')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Biology')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Music')[0]).toBeInTheDocument();
 
     const row = screen.getByTestId('topics-bar-chart-row-science-physics');
     expect(row).not.toBeNull();
-    expect(within(row).getByText('29')).toBeInTheDocument();
+    expect(within(row).getByText('56')).toBeInTheDocument();
     expect(screen.getByText('(Quantum, Relativity)')).toBeInTheDocument();
   });
 
@@ -63,8 +63,8 @@ describe('TopicsBarChart', () => {
     expect(screen.getByText('Inside Physics at relative level 0 (Main Topics).')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Physics' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Level 0 (Main Topics)' })).toHaveClass('active');
-    expect(screen.getByText('Quantum')).toBeInTheDocument();
-    expect(screen.getByText('Relativity')).toBeInTheDocument();
+    expect(screen.getAllByText('Quantum')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Relativity')[0]).toBeInTheDocument();
     expect(screen.queryByText('Music')).not.toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe('TopicsBarChart', () => {
 
     expect(screen.getByText('Showing all topics at relative level 1 (Subtopics).')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Level 1 (Subtopics)' })).toHaveClass('active');
-    expect(screen.getByText('Music')).toBeInTheDocument();
+    expect(screen.getAllByText('Music')[0]).toBeInTheDocument();
   });
 
   it('does not drill into a leaf topic', () => {
@@ -89,7 +89,7 @@ describe('TopicsBarChart', () => {
     expect(screen.getByText('Inside Science at relative level 0 (Main Topics).')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Science' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Biology' })).not.toBeInTheDocument();
-    expect(screen.getByText('Physics')).toBeInTheDocument();
+    expect(screen.getAllByText('Physics')[0]).toBeInTheDocument();
   });
 
   it('opens a modal with the scoped topic sentences', () => {

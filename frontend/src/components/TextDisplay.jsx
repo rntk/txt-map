@@ -144,13 +144,13 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const highlightedIndices = new Set();
   safeSelectedTopics.forEach(topic => {
     const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
-    if (relatedTopic) {
+    if (relatedTopic && relatedTopic.sentences) {
       relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
     }
   });
   if (hoveredTopic) {
     const relatedTopic = safeArticleTopics.find(t => t.name === hoveredTopic.name);
-    if (relatedTopic) {
+    if (relatedTopic && relatedTopic.sentences) {
       relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
     }
   }

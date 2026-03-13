@@ -2,14 +2,37 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale } from '../utils/chart-utils';
 import RiverLegend from './shared/RiverLegend';
+import TopicSentencesModal from './shared/TopicSentencesModal';
+import { getScopedMaxLevel, buildScopedChartData, getLevelLabel } from '../utils/topicHierarchy';
+import './TopicsBarChart.css'; // Reuse the level selector CSS
 
-const TopicsRiverChart = ({ topics, articleLength }) => {
+const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [activeTopic, setActiveTopic] = useState(null);
+    const [selectedLevel, setSelectedLevel] = useState(0);
+    const [selectedTopicForModal, setSelectedTopicForModal] = useState(null);
 
-    // Memoize keys and color scale
-    const keys = useMemo(() => topics ? topics.map(t => t.name) : [], [topics]);
+    const maxLevel = useMemo(() => getScopedMaxLevel(topics, []), [topics]);
+
+    // Ensure selected level is valid
+    useEffect(() => {
+        if (selectedLevel > maxLevel) {
+            setSelectedLevel(maxLevel);
+        }
+    }, [selectedLevel, maxLevel]);
+
+    const scopedData = useMemo(() => {
+        const data = buildScopedChartData(topics, sentences, [], selectedLevel);
+        return data.map(d => ({
+            ...d,
+            sentences: d.sentenceIndices,
+            avgCharsPerSentence: (d.totalChars && d.sentenceIndices.length) ? d.totalChars / d.sentenceIndices.length : 100
+        }));
+    }, [topics, sentences, selectedLevel]);
+
+    // Memoize keys and color scale based on current scope
+    const keys = useMemo(() => scopedData.map(t => t.name), [scopedData]);
     const colorScale = useMemo(() => getRiverColorScale(keys), [keys]);
 
     // Process data for the streamgraph
@@ -49,16 +72,16 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
 
     // Draw Chart
     useEffect(() => {
-        if (!effectiveLength || !topics || topics.length === 0 || !svgRef.current) return;
+        if (!effectiveLength || !scopedData || scopedData.length === 0 || !svgRef.current) return;
 
         const container = containerRef.current || svgRef.current.parentElement;
         const containerWidth = container.clientWidth || 800;
 
         // Use shared utils for data processing
         const binCount = Math.max(15, Math.min(60, Math.floor(containerWidth / 40)));
-        let data = calculateBins(binCount, topics, 0, effectiveLength);
-        data = smoothBins(data, topics);
-        data = estimateCharacterCounts(data, topics);
+        let data = calculateBins(binCount, scopedData, 0, effectiveLength);
+        data = smoothBins(data, scopedData);
+        data = estimateCharacterCounts(data, scopedData);
 
         if (!data.length) return;
 
@@ -80,7 +103,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const totalSentencesPerTopic = {};
-        topics.forEach(topic => {
+        scopedData.forEach(topic => {
             totalSentencesPerTopic[topic.name] = topic.sentences ? topic.sentences.length : 0;
         });
 
@@ -125,6 +148,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("fill", d => colorScale(d.key))
             .attr("d", area)
             .style("opacity", 0.85)
+            .style("cursor", "pointer")
             .on("mouseover", function (event, d) {
                 setActiveTopic(d.key);
                 const totalSentences = totalSentencesPerTopic[d.key];
@@ -140,6 +164,15 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .on("mouseout", function (event, d) {
                 setActiveTopic(null);
                 tooltip.style("opacity", 0);
+            })
+            .on("click", function (event, d) {
+                const topicObj = scopedData.find(t => t.name === d.key);
+                if (topicObj) {
+                    setSelectedTopicForModal({
+                        displayName: topicObj.displayName || topicObj.name,
+                        sentenceIndices: topicObj.sentences
+                    });
+                }
             });
 
         const xAxisScale = d3.scaleLinear().domain([0, effectiveLength]).range([0, innerWidth]);
@@ -231,7 +264,7 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             .style("fill", "#333")
             .text("Topic Distribution Across Article");
 
-    }, [effectiveLength, topics, keys, colorScale]);
+    }, [effectiveLength, scopedData, keys, colorScale]);
 
     return (
         <div ref={containerRef} className="topics-river-chart" style={{
@@ -243,16 +276,40 @@ const TopicsRiverChart = ({ topics, articleLength }) => {
             display: 'flex',
             flexDirection: 'column'
         }}>
+            <div className="topics-bar-chart__level-selector" style={{ padding: '0 20px 10px', borderBottom: 'none' }}>
+                <span className="topics-bar-chart__level-label">Topic Level:</span>
+                <div className="topics-bar-chart__level-buttons">
+                    {Array.from({ length: maxLevel + 1 }, (_, i) => (
+                        <button
+                            key={i}
+                            type="button"
+                            className={`topics-bar-chart__level-btn${selectedLevel === i ? ' active' : ''}`}
+                            onClick={() => setSelectedLevel(i)}
+                        >
+                            Level {i} ({getLevelLabel(i)})
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div style={{ height: '520px', width: '100%' }}>
                 <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>
             </div>
 
             <RiverLegend
-                items={topics}
+                items={scopedData}
                 activeItem={activeTopic}
                 setActiveItem={setActiveTopic}
                 colorScale={colorScale}
             />
+
+            {selectedTopicForModal && (
+                <TopicSentencesModal
+                    topic={selectedTopicForModal}
+                    sentences={sentences}
+                    onClose={() => setSelectedTopicForModal(null)}
+                />
+            )}
         </div>
     );
 };
