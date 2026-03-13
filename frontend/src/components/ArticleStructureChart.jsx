@@ -139,6 +139,7 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
                 displayName: entry.displayName,
                 totalChars,
                 sentenceCount: entry.sentenceIndices.size,
+                sentenceIndices: indices,
                 firstSentence,
             };
         })
@@ -177,12 +178,65 @@ function Breadcrumbs({ scopePath, onNavigate }) {
     );
 }
 
+function TopicSentencesModal({ topic, sentences, onClose }) {
+    useEffect(() => {
+        const handleKey = e => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [onClose]);
+
+    if (!topic) return null;
+
+    const sortedIndices = [...topic.sentenceIndices].sort((a, b) => a - b);
+
+    return (
+        <div
+            className="article-structure-modal-overlay"
+            onClick={onClose}
+        >
+            <div
+                className="article-structure-modal"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="article-structure-modal-header">
+                    <h3>{topic.displayName}</h3>
+                    <div className="article-structure-modal-toolbar" />
+                    <button
+                        type="button"
+                        className="article-structure-modal-close"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div className="article-structure-modal-body">
+                    {sortedIndices.length === 0 ? (
+                        <p>No sentences found for this topic.</p>
+                    ) : (
+                        sortedIndices.map(idx => {
+                            const text = sentences[idx - 1];
+                            return (
+                                <div key={idx} className="article-structure-modal-sentence">
+                                    <span className="article-structure-modal-sentence-num">{idx}.</span>
+                                    <span className="article-structure-modal-sentence-text">{text || ''}</span>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function ArticleStructureChart({ topics, sentences = [] }) {
     const [selectedLevel, setSelectedLevel] = useState(0);
     const [scopePath, setScopePath] = useState([]);
     const [hoveredTopic, setHoveredTopic] = useState(null);
     const [tooltip, setTooltip] = useState(null);
     const [containerWidth, setContainerWidth] = useState(800);
+    const [modalTopic, setModalTopic] = useState(null);
     const containerRef = useRef(null);
 
     useEffect(() => {
@@ -391,20 +445,50 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                                 ? block.displayName.slice(0, maxChars - 1) + '...'
                                 : block.displayName;
 
-                            return block.width >= 32 ? (
-                                <text
-                                    key={`lbl-${block.fullPath}`}
-                                    x={MARGIN.left + block.x + block.width / 2}
-                                    y={MARGIN.top + 16}
-                                    textAnchor="middle"
-                                    fontSize={block.width > 100 ? 12 : 10}
-                                    fontWeight="700"
-                                    fill={colorScale[block.fullPath]}
-                                    style={{ pointerEvents: 'none', userSelect: 'none' }}
-                                >
-                                    {label}
-                                </text>
-                            ) : null;
+                            if (block.width < 32) return null;
+
+                            const cx = MARGIN.left + block.x + block.width / 2;
+                            const cy = MARGIN.top + 16;
+                            const showMenu = block.width >= 60;
+                            const btnX = MARGIN.left + block.x + block.width - 20;
+                            const btnY = MARGIN.top + 8;
+
+                            return (
+                                <g key={`lbl-${block.fullPath}`}>
+                                    <text
+                                        x={cx}
+                                        y={cy}
+                                        textAnchor="middle"
+                                        fontSize={block.width > 100 ? 12 : 10}
+                                        fontWeight="700"
+                                        fill={colorScale[block.fullPath]}
+                                        style={{ pointerEvents: 'none', userSelect: 'none' }}
+                                    >
+                                        {label}
+                                    </text>
+                                    {showMenu && (
+                                        <g
+                                            className="article-structure-menu-btn"
+                                            transform={`translate(${btnX}, ${btnY})`}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setModalTopic({
+                                                    displayName: block.displayName,
+                                                    fullPath: block.fullPath,
+                                                    sentenceIndices: block.sentenceIndices || [],
+                                                });
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                            aria-label={`View sentences for ${block.displayName}`}
+                                        >
+                                            <rect x="-8" y="-4" width="16" height="18" rx="3" fill="rgba(255,255,255,0.7)" />
+                                            <line x1="-5" y1="0" x2="5" y2="0" stroke="#555" strokeWidth="1.5" strokeLinecap="round" />
+                                            <line x1="-5" y1="4" x2="5" y2="4" stroke="#555" strokeWidth="1.5" strokeLinecap="round" />
+                                            <line x1="-5" y1="8" x2="5" y2="8" stroke="#555" strokeWidth="1.5" strokeLinecap="round" />
+                                        </g>
+                                    )}
+                                </g>
+                            );
                         })}
 
                         {yTicks.map(({ y }, i) => (
@@ -523,6 +607,14 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                         {tooltip.data.totalChars.toLocaleString()} chars &bull; {tooltip.data.sentenceCount} sentence{tooltip.data.sentenceCount !== 1 ? 's' : ''}
                     </div>
                 </div>
+            )}
+
+            {modalTopic && (
+                <TopicSentencesModal
+                    topic={modalTopic}
+                    sentences={sentences}
+                    onClose={() => setModalTopic(null)}
+                />
             )}
         </div>
     );

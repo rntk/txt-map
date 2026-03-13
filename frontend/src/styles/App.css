@@ -3951,3 +3951,114 @@
   display: block;
   margin: 0 auto;
 }
+
+/* Article Structure Modal */
+.article-structure-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.article-structure-modal {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 900px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.article-structure-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 2px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.article-structure-modal-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+  color: #333;
+  flex: 0 0 auto;
+}
+
+.article-structure-modal-toolbar {
+  flex: 1;
+}
+
+.article-structure-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s, color 0.2s;
+  flex: 0 0 auto;
+}
+
+.article-structure-modal-close:hover {
+  background-color: #e9ecef;
+  color: #333;
+}
+
+.article-structure-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.article-structure-modal-sentence {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #7ba3cc;
+  background-color: #f0f5fb;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.article-structure-modal-sentence-num {
+  color: #7ba3cc;
+  font-weight: 700;
+  font-size: 0.85em;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+.article-structure-modal-sentence-text {
+  color: #333;
+  font-size: 0.95em;
+}
+
+.article-structure-menu-btn rect {
+  transition: fill 0.15s;
+}
+
+.article-structure-menu-btn:hover rect {
+  fill: rgba(255, 255, 255, 0.95);
+}
+
+.article-structure-menu-btn:hover line {
+  stroke: #222;
+}
