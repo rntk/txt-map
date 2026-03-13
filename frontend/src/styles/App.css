@@ -679,6 +679,13 @@
   background-color: #fffacd !important;
 }
 
+.summary-paragraph-highlighted {
+  background-color: #fffacd;
+  border-left: 3px solid #f0c040;
+  padding-left: 8px;
+  transition: background-color 0.2s ease;
+}
+
 .faded {
   opacity: 0.1 !important;
   color: #999 !important;

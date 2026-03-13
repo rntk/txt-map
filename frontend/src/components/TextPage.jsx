@@ -337,6 +337,49 @@ function TextPage() {
   };
 
   const navigateTopicSentence = (topic, direction = 'next') => {
+    if (activeTab === 'summary') {
+      const paraIndices = topicSummaryParaMap[topic.name];
+      if (!paraIndices || paraIndices.length === 0) return;
+
+      if (direction === 'focus') {
+        const el = document.getElementById(`summary-para-${paraIndices[0]}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const viewportTop = window.scrollY || document.documentElement.scrollTop || 0;
+      const viewportBottom = viewportTop + (window.innerHeight || document.documentElement.clientHeight || 0);
+      const margin = 8;
+
+      let targetEl = null;
+      if (direction === 'next') {
+        for (const idx of paraIndices) {
+          const el = document.getElementById(`summary-para-${idx}`);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top + window.scrollY > viewportBottom - margin) {
+              targetEl = el;
+              break;
+            }
+          }
+        }
+      } else {
+        for (let i = paraIndices.length - 1; i >= 0; i -= 1) {
+          const el = document.getElementById(`summary-para-${paraIndices[i]}`);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.bottom + window.scrollY < viewportTop + margin) {
+              targetEl = el;
+              break;
+            }
+          }
+        }
+      }
+
+      if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     const targets = getTopicAnchors(topic);
     if (targets.length === 0) return;
 
@@ -507,6 +550,40 @@ function TextPage() {
 
   const rawText = submission.text_content || '';
 
+  // Map: { [topicName]: [summaryParaIndex, ...] } -- which summary paragraphs overlap with each topic's sentences
+  const topicSummaryParaMap = (() => {
+    const mappings = results.summary_mappings;
+    if (!Array.isArray(mappings) || mappings.length === 0) return {};
+    const map = {};
+    for (const topic of safeTopics) {
+      if (!topic.name || !Array.isArray(topic.sentences)) continue;
+      const topicSentenceSet = new Set(topic.sentences);
+      const paraIndices = [];
+      for (const mapping of mappings) {
+        if (!Array.isArray(mapping.source_sentences)) continue;
+        if (mapping.source_sentences.some(s => topicSentenceSet.has(s))) {
+          paraIndices.push(mapping.summary_index);
+        }
+      }
+      if (paraIndices.length > 0) {
+        map[topic.name] = paraIndices;
+      }
+    }
+    return map;
+  })();
+
+  // Set of summary paragraph indices highlighted by currently selected topics
+  const highlightedSummaryParas = (() => {
+    const set = new Set();
+    for (const topic of selectedTopics) {
+      const indices = topicSummaryParaMap[topic.name];
+      if (Array.isArray(indices)) {
+        for (const idx of indices) set.add(idx);
+      }
+    }
+    return set;
+  })();
+
   return (
     <div className="app">
       <div style={{ padding: '10px 20px' }}>
@@ -675,7 +752,7 @@ function TextPage() {
                           results.summary.map((summaryText, i) => {
                             const mapping = results.summary_mappings.find(m => m.summary_index === i);
                             return (
-                              <div key={i} className="summary-paragraph-wrapper">
+                              <div key={i} id={`summary-para-${i}`} data-summary-index={i} className={`summary-paragraph-wrapper${highlightedSummaryParas.has(i) ? ' summary-paragraph-highlighted' : ''}`}>
                                 <p className="summary-paragraph-text">
                                   {summaryText}
                                   {mapping && (
