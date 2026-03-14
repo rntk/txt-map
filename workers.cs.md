@@ -19,6 +19,7 @@ On startup:
 2. Call `prepare()` on `SubmissionsStorage`, `SemanticDiffsStorage`, and `MongoLLMCacheStore` (index/collection setup).
 3. Instantiate and run a `Worker`.
 4. Close the MongoDB connection on exit.
+5. remove the completed tasks which are older than 2 days on the worker start
 
 ---
 
