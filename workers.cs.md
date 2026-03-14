@@ -1,0 +1,103 @@
+# Background Worker
+
+A single-process background worker that polls MongoDB for pending jobs and executes them sequentially. The worker handles two independent job types: submission tasks and semantic diff jobs.
+
+---
+
+## Startup (`main`)
+
+Configuration is read from environment variables:
+
+| Variable | Default |
+|---|---|
+| `MONGODB_URL` | `mongodb://localhost:8765/` |
+| `LLAMACPP_URL` | `http://localhost:8989` |
+| `TOKEN` | _(none)_ |
+
+On startup:
+1. Connect to MongoDB (`rss` database) and initialize a `LLamaCPP` client (5 max retries, 2 s retry delay).
+2. Call `prepare()` on `SubmissionsStorage`, `SemanticDiffsStorage`, and `MongoLLMCacheStore` (index/collection setup).
+3. Instantiate and run a `Worker`.
+4. Close the MongoDB connection on exit.
+
+---
+
+## Worker
+
+Constructed with `(db, llm, cache_store=None)`. The worker ID is `worker-<PID>`. Registers SIGINT/SIGTERM handlers that set `running = False` for graceful shutdown.
+
+### Main Loop (`run`, poll interval default 2 s)
+
+Repeats until `running` is `False`:
+
+1. Attempt to claim a **submission task** (`claim_task`). If one is claimed, process it.
+2. Otherwise, attempt to claim a **semantic diff job** (`claim_diff_job`). If one is claimed, process it.
+3. Otherwise, sleep for the poll interval.
+
+Any unhandled exception in the loop is logged and the loop sleeps before retrying.
+
+---
+
+## Submission Tasks
+
+### Task Types, Priorities, and Dependencies
+
+| Task type | Priority | Depends on |
+|---|---|---|
+| `split_topic_generation` | 1 | — |
+| `subtopics_generation` | 2 | `split_topic_generation` |
+| `summarization` | 3 | `split_topic_generation` |
+| `mindmap` | 3 | `subtopics_generation` |
+| `prefix_tree` | 3 | `split_topic_generation` |
+
+Priority 1 is highest. Tasks with equal priority are ordered by `created_at` (ascending) within the queue.
+
+### Claiming a Task (`claim_task`)
+
+Iterates over task types in ascending priority order. For each type, attempts an atomic `find_one_and_update` on `task_queue` matching `{ status: "pending", task_type: <type> }`, sorted by `(priority ASC, created_at ASC)`. The matched document is updated to `{ status: "processing", started_at: <now UTC>, worker_id: <worker_id> }`.
+
+If a task is claimed but its dependencies are not yet completed (checked against the submission's `tasks` map in `SubmissionsStorage`), the task is immediately returned to `pending` (`started_at` and `worker_id` cleared) and iteration continues to the next type.
+
+Returns the first successfully claimed and dependency-satisfied task, or `None`.
+
+### Processing a Task (`process_task`)
+
+1. Resolves the handler from `TASK_HANDLERS`; marks the task failed if no handler exists.
+2. Sets the submission's task status to `"processing"` via `SubmissionsStorage.update_task_status`.
+3. Fetches the full submission document; raises if not found.
+4. Calls the handler:
+   - Tasks `split_topic_generation`, `subtopics_generation`, `summarization`: called as `handler(submission, db, llm, cache_store=cache_store)`.
+   - All other tasks: called as `handler(submission, db, llm)`.
+5. On success: marks the task completed in both `task_queue` and the submission.
+6. On exception: logs the error and marks the task failed.
+
+### Task Status Updates
+
+**Completed** — sets `task_queue` document: `{ status: "completed", completed_at: <now UTC> }`. Sets submission task status to `"completed"`.
+
+**Failed** — sets `task_queue` document: `{ status: "failed", completed_at: <now UTC>, error: <message> }` and increments `retry_count` by 1. Sets submission task status to `"failed"` with the error message.
+
+---
+
+## Semantic Diff Jobs
+
+### Claiming (`claim_diff_job`)
+
+Delegates to `SemanticDiffsStorage.claim_job(worker_id)` atomically.
+
+### Processing (`process_diff_job`)
+
+Required job fields: `pair_key`, `submission_a_id`, `submission_b_id`. Missing fields cause an immediate failure.
+
+1. Fetch both submissions; fail if either is missing.
+2. Check topic readiness for both via `check_submission_topic_readiness`; fail if either is not ready, including the list of missing prerequisites in the error.
+3. Unless `force_recalculate` is set, fetch any existing diff for `pair_key` and check staleness via `stale_reasons(existing_diff, submission_a, submission_b, algorithm_version=ALGORITHM_VERSION)`. If no stale reasons exist, mark the job completed without recomputing.
+4. Compute the diff via `compute_topic_aware_semantic_diff(submission_a, submission_b)`.
+5. Upsert the result via `SemanticDiffsStorage.upsert_diff`, persisting `pair_key`, both submission IDs, `ALGORITHM_VERSION`, both submissions' `updated_at` timestamps, and the computed payload.
+6. Mark the job completed.
+
+Any exception causes the job to be marked failed with the error message.
+
+### Diff Job Status Updates
+
+Delegated to `SemanticDiffsStorage.mark_job_completed` and `SemanticDiffsStorage.mark_job_failed`.

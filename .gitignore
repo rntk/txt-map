@@ -7,3 +7,5 @@ frontend/build
 .idea
 .vscode
 .env
+# CodeSpeak
+.codespeak/ignored/

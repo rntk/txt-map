@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "profile_name": "mixed_mode",
+  "specs": [
+    "main.cs.md",
+    "workers.cs.md",
+    "handlers/__init__.cs.md",
+    "lib/__init__.cs.md",
+    "lib/llm/__init__.cs.md",
+    "lib/diff/__init__.cs.md",
+    "lib/storage/llm_cache.cs.md",
+    "lib/tasks/__init__.cs.md"
+  ]
+}
