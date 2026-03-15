@@ -76,11 +76,11 @@ function TextPageActionsPortal({ children }) {
 
 const SIDEBAR_TABS = [
   { key: 'article', label: 'Article' },
-  { key: 'summary', label: 'Summary' },
   { key: 'raw_text', label: 'Raw Text' },
 ];
 
 const FULLSCREEN_TABS = [
+  { key: 'summary', label: 'Topic Summaries' },
   { key: 'topics', label: 'Topics' },
   { key: 'topics_river', label: 'Topics River' },
   { key: 'marimekko', label: 'Marimekko' },
@@ -1013,97 +1013,7 @@ function TextPage() {
                   )}
                 </div>
 
-                {activeTab === 'summary' ? (
-                  <div className="summary-content">
-                    <h2>Summary</h2>
-                    <div className="summary-timeline">
-                      {Array.isArray(results.summary) && results.summary.length > 0 ? (
-                        summaryTimelineItems.map((item) => (
-                          <React.Fragment key={item.index}>
-                            {item.showSectionLabel && item.topLevelLabel && (
-                              <div
-                                className="timeline-section-marker"
-                                style={{
-                                  '--timeline-section-bg': item.topicColor?.sectionSurface,
-                                  '--timeline-section-border': item.topicColor?.sectionBorder,
-                                  '--timeline-section-text': item.topicColor?.sectionText,
-                                  '--timeline-section-dot': item.topicColor?.dot
-                                }}
-                              >
-                                <span className="timeline-section-pill">{item.topLevelLabel}</span>
-                              </div>
-                            )}
-                            <div
-                              id={`summary-para-${item.index}`}
-                              data-summary-index={item.index}
-                              className={`timeline-item${highlightedSummaryParas.has(item.index) ? ' summary-paragraph-highlighted' : ''}`}
-                              style={{
-                                '--timeline-topic-accent': item.topicColor?.accent,
-                                '--timeline-topic-dot': item.topicColor?.dot,
-                                '--timeline-topic-surface': item.topicColor?.surface,
-                                '--timeline-topic-border': item.topicColor?.border,
-                                '--timeline-subtopic-color': item.topicColor?.subtopicText
-                              }}
-                            >
-                              <div
-                                className={`timeline-subtopic${item.subtopicLabel ? '' : ' timeline-subtopic--empty'}`}
-                                aria-hidden={item.subtopicLabel ? undefined : 'true'}
-                              >
-                                {item.subtopicLabel}
-                              </div>
-                              <div className="timeline-dot" />
-                              <div className="timeline-card">
-                                <span className="timeline-label">§{item.index + 1}</span>
-                                <p className="summary-paragraph-text">
-                                  {item.summaryText}
-                                  {item.mapping && (
-                                    <>
-                                      {' '}
-                                      <button
-                                        className="summary-source-link"
-                                        onClick={() => handleSummaryClick(item.mapping, articles[0])}
-                                        title="View source sentences"
-                                      >
-                                        [source]
-                                      </button>
-                                    </>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </React.Fragment>
-                        ))
-                      ) : (
-                        <p>No summary available. Processing may still be in progress...</p>
-                      )}
-                    </div>
-                    {summaryModalData && (
-                      <div className="summary-modal-overlay" onClick={closeSummaryModal}>
-                        <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
-                          <div className="modal-header">
-                            <h3>Source Sentences</h3>
-                            <button className="modal-close" onClick={closeSummaryModal}>×</button>
-                          </div>
-                          <div className="modal-body">
-                            <div className="modal-summary-sentence">
-                              <strong>Summary:</strong> {summaryModalData.summarySentence}
-                            </div>
-                            <div className="modal-divider"></div>
-                            <div className="modal-source-sentences">
-                              <strong>Original sentences:</strong>
-                              {summaryModalData.sentences.map((sent, idx) => (
-                                <div key={idx} className="modal-sentence">
-                                  <span className="sentence-number">{idx + 1}.</span>
-                                  <span className="sentence-text">{sent}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : activeTab === 'raw_text' ? (
+                {activeTab === 'raw_text' ? (
                   <div className="summary-content">
                     <h2>Raw Text</h2>
                     <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
@@ -1139,6 +1049,99 @@ function TextPage() {
               </div>
             </div>
           </div>
+
+          {fullscreenGraph === 'summary' && (
+            <FullScreenGraph title="Topic Summaries" onClose={closeFullscreenGraph}>
+              <div className="summary-content" style={{ padding: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
+                <div className="summary-timeline">
+                  {Array.isArray(results.summary) && results.summary.length > 0 ? (
+                    summaryTimelineItems.map((item) => (
+                      <React.Fragment key={item.index}>
+                        {item.showSectionLabel && item.topLevelLabel && (
+                          <div
+                            className="timeline-section-marker"
+                            style={{
+                              '--timeline-section-bg': item.topicColor?.sectionSurface,
+                              '--timeline-section-border': item.topicColor?.sectionBorder,
+                              '--timeline-section-text': item.topicColor?.sectionText,
+                              '--timeline-section-dot': item.topicColor?.dot
+                            }}
+                          >
+                            <span className="timeline-section-pill">{item.topLevelLabel}</span>
+                          </div>
+                        )}
+                        <div
+                          id={`summary-para-${item.index}`}
+                          data-summary-index={item.index}
+                          className={`timeline-item${highlightedSummaryParas.has(item.index) ? ' summary-paragraph-highlighted' : ''}`}
+                          style={{
+                            '--timeline-topic-accent': item.topicColor?.accent,
+                            '--timeline-topic-dot': item.topicColor?.dot,
+                            '--timeline-topic-surface': item.topicColor?.surface,
+                            '--timeline-topic-border': item.topicColor?.border,
+                            '--timeline-subtopic-color': item.topicColor?.subtopicText
+                          }}
+                        >
+                          <div
+                            className={`timeline-subtopic${item.subtopicLabel ? '' : ' timeline-subtopic--empty'}`}
+                            aria-hidden={item.subtopicLabel ? undefined : 'true'}
+                          >
+                            {item.subtopicLabel}
+                          </div>
+                          <div className="timeline-dot" />
+                          <div className="timeline-card">
+                            <span className="timeline-label">§{item.index + 1}</span>
+                            <p className="summary-paragraph-text">
+                              {item.summaryText}
+                              {item.mapping && (
+                                <>
+                                  {' '}
+                                  <button
+                                    className="summary-source-link"
+                                    onClick={() => handleSummaryClick(item.mapping, articles[0])}
+                                    title="View source sentences"
+                                  >
+                                    [source]
+                                  </button>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <p>No summary available. Processing may still be in progress...</p>
+                  )}
+                </div>
+                {summaryModalData && (
+                  <div className="summary-modal-overlay" onClick={closeSummaryModal}>
+                    <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="modal-header">
+                        <h3>Source Sentences</h3>
+                        <button className="modal-close" onClick={closeSummaryModal}>×</button>
+                      </div>
+                      <div className="modal-body">
+                        <div className="modal-summary-sentence">
+                          <strong>Summary:</strong> {summaryModalData.summarySentence}
+                        </div>
+                        <div className="modal-divider"></div>
+                        <div className="modal-source-sentences">
+                          <strong>Original sentences:</strong>
+                          {summaryModalData.sentences.map((sent, idx) => (
+                            <div key={idx} className="modal-sentence">
+                              <span className="sentence-number">{idx + 1}.</span>
+                              <span className="sentence-text">{sent}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FullScreenGraph>
+          )}
 
           {fullscreenGraph === 'topics' && (
             <FullScreenGraph title="Topics" onClose={closeFullscreenGraph}>
