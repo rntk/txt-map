@@ -412,7 +412,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
             <p key={paraIdx} className="article-paragraph">
               {para.map(({ text, index }) => (
                 <React.Fragment key={index}>
-                  <div
+                  <span
                     id={`sentence-${articleIndex}-${index}`}
                     data-article-index={articleIndex}
                     data-sentence-index={index}
@@ -451,7 +451,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         <p className="article-text">
           {safeSentences.map((sentence, index) => (
             <React.Fragment key={index}>
-              <div
+              <span
                 id={`sentence-${articleIndex}-${index}`}
                 data-article-index={articleIndex}
                 data-sentence-index={index}

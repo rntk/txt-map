@@ -21,7 +21,7 @@ vi.mock('../utils/summaryTimeline', () => ({
 
 describe('TextPage raw text navigation', () => {
   const mockSubmission = {
-    source_url: '',
+    source_url: 'http://example.com',
     text_content: 'Alpha Beta Gamma',
     html_content: '',
     status: {
@@ -50,6 +50,10 @@ describe('TextPage raw text navigation', () => {
   beforeEach(() => {
     window.history.pushState({}, '', '/submission/view/test-submission-id');
 
+    if (typeof navigator.sendBeacon === 'undefined') {
+      navigator.sendBeacon = vi.fn();
+    }
+
     global.fetch = vi.fn(async (url) => {
       if (String(url).includes('/api/submission/test-submission-id/status')) {
         return {
@@ -75,7 +79,7 @@ describe('TextPage raw text navigation', () => {
   it('renders highlighted raw text and focuses a raw-text anchor from the topic list', async () => {
     render(<TextPage />);
 
-    await screen.findByText('Text Analysis Results');
+    await screen.findByText('Source:');
 
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
 
@@ -99,10 +103,10 @@ describe('TextPage raw text navigation', () => {
   it('applies faded styling in raw text for read topics that are not selected', async () => {
     render(<TextPage />);
 
-    await screen.findByText('Text Analysis Results');
+    await screen.findByText('Source:');
 
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Unreaded' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Read' }));
 
     await waitFor(() => {
       expect(document.querySelector('.raw-text-token')).toBeInTheDocument();
