@@ -79,6 +79,7 @@ class SubmissionsStorage:
                     "error": None
                 }
             },
+            "read_topics": [],
             "results": {
                 "sentences": [],
                 "topics": [],
@@ -141,6 +142,14 @@ class SubmissionsStorage:
                     "updated_at": datetime.now(UTC)
                 }
             }
+        )
+        return result.modified_count > 0
+
+    def update_read_topics(self, submission_id: str, read_topics: List[str]) -> bool:
+        """Update the list of read topic names for a submission"""
+        result = self._db.submissions.update_one(
+            {"submission_id": submission_id},
+            {"$set": {"read_topics": read_topics, "updated_at": datetime.now(UTC)}}
         )
         return result.modified_count > 0
 

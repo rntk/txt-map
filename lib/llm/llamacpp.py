@@ -65,7 +65,7 @@ class LLamaCPP:
             
             body = json.dumps(
                 {
-                    "model": "openai/gpt-oss-20b",
+                    "model": "moonshotai/Kimi-K2.5",
                     "messages": [{"role": "user", "content": user_msgs[0]}],
                     "temperature": temperature,
                     "cache_prompt": True

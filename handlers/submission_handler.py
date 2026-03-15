@@ -16,6 +16,10 @@ class RefreshRequest(BaseModel):
     tasks: Optional[List[str]] = None
 
 
+class ReadTopicsRequest(BaseModel):
+    read_topics: List[str]
+
+
 router = APIRouter()
 
 
@@ -201,7 +205,29 @@ def get_submission(
             "overall": overall_status,
             "tasks": submission["tasks"]
         },
-        "results": submission["results"]
+        "results": submission["results"],
+        "read_topics": submission.get("read_topics", [])
+    }
+
+
+@router.put("/submission/{submission_id}/read-topics")
+def put_read_topics(
+    submission_id: str,
+    body: ReadTopicsRequest,
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Persist the list of read topic names for a submission
+    """
+    submission = submissions_storage.get_by_id(submission_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    submissions_storage.update_read_topics(submission_id, body.read_topics)
+
+    return {
+        "submission_id": submission_id,
+        "read_topics": body.read_topics
     }
 
 

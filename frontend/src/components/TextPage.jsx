@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import TopicsRiverChart from './TopicsRiverChart';
@@ -279,6 +279,9 @@ function TextPage() {
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap'
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
+  const hasLoadedRef = useRef(false);
+  const lastSyncedRef = useRef('');
+  const pendingSaveRef = useRef(null);
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
   const [fullscreenGraph, setFullscreenGraph] = useState(null); // 'mindmap' | 'prefix_tree' | null
@@ -306,6 +309,11 @@ function TextPage() {
 
       const data = await response.json();
       setSubmission(data);
+      if (!hasLoadedRef.current && data.read_topics?.length) {
+        setReadTopics(new Set(data.read_topics));
+        lastSyncedRef.current = JSON.stringify([...data.read_topics].sort());
+      }
+      hasLoadedRef.current = true;
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -343,6 +351,39 @@ function TextPage() {
     return () => clearInterval(interval);
   }, [fetchSubmission, submissionId]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current) {
+        const { id, topics } = pendingSaveRef.current;
+        const blob = new Blob([JSON.stringify({ read_topics: topics })], { type: 'application/json' });
+        navigator.sendBeacon(`http://127.0.0.1:8000/api/submission/${id}/read-topics`, blob);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    const topicsArr = [...readTopics];
+    const serialized = JSON.stringify([...topicsArr].sort());
+    if (serialized === lastSyncedRef.current) return;
+
+    pendingSaveRef.current = { id: submissionId, topics: topicsArr };
+
+    const timer = setTimeout(() => {
+      fetch(`http://127.0.0.1:8000/api/submission/${submissionId}/read-topics`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read_topics: topicsArr }),
+      })
+      .then(() => {
+        lastSyncedRef.current = serialized;
+        pendingSaveRef.current = null;
+      })
+      .catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [readTopics, submissionId]);
+
   const toggleTopic = (topic) => {
     setSelectedTopics(prev => {
       const isCurrentlySelected = prev.some(t => t.name === topic.name);
@@ -372,6 +413,18 @@ function TextPage() {
       return newSet;
     });
   };
+
+  const toggleReadAll = useCallback(() => {
+    const allTopicNames = (submission?.results?.topics || [])
+      .filter(t => t?.name)
+      .map(t => t.name);
+    const allRead = allTopicNames.length > 0 && allTopicNames.every(n => readTopics.has(n));
+    if (allRead) {
+      setReadTopics(new Set());
+    } else {
+      setReadTopics(new Set(allTopicNames));
+    }
+  }, [submission, readTopics]);
 
   const getTopicSelectionKey = (topicOrTopics) => {
     if (!topicOrTopics) return '';
@@ -845,6 +898,7 @@ function TextPage() {
                 panelTopic={panelTopic}
                 onToggleShowPanel={toggleShowPanel}
                 onNavigateTopic={navigateTopicSentence}
+                onToggleReadAll={toggleReadAll}
               />
             </div>
             <div className="right-column">

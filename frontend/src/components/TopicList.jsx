@@ -10,7 +10,8 @@ function TopicList({
   showPanel = false,
   panelTopic = null,
   onToggleShowPanel = () => { },
-  onNavigateTopic
+  onNavigateTopic,
+  onToggleReadAll = () => { },
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,6 +232,18 @@ function TopicList({
     });
   }, [getAllNonLeafPaths]);
 
+  const allRead = useMemo(() => {
+    const leaves = [];
+    const collect = (treeNode) => {
+      if (treeNode.node.isLeaf && treeNode.node.topic) {
+        leaves.push(treeNode.node.topic.name);
+      }
+      treeNode.children.forEach(child => collect(child));
+    };
+    topicTree.forEach(root => collect(root));
+    return leaves.length > 0 && leaves.every(name => safeReadTopics.has(name));
+  }, [topicTree, safeReadTopics]);
+
   const getTopicSelectionKey = (topicOrTopics) => {
     if (!topicOrTopics) return '';
     if (Array.isArray(topicOrTopics)) {
@@ -440,7 +453,7 @@ function TopicList({
                       ...(isLeafRead ? styles.buttonActive : {})
                     }}
                   >
-                    {isLeafRead ? 'Readed' : 'Unreaded'}
+                    {isLeafRead ? 'Mark Unread' : 'Mark Read'}
                   </button>
                   <button
                     onClick={() => onToggleShowPanel(topic)}
@@ -472,7 +485,7 @@ function TopicList({
                       ...(isNodeRead ? styles.buttonActive : {})
                     }}
                   >
-                    {isNodeRead ? 'Readed' : 'Unreaded'}
+                    {isNodeRead ? 'Mark Unread' : 'Mark Read'}
                   </button>
                   <button
                     onClick={() => {
@@ -528,6 +541,9 @@ function TopicList({
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center' }}>
             <button onClick={toggleExpandAll} style={styles.button}>
               {allExpanded ? 'Fold All' : 'Unfold All'}
+            </button>
+            <button onClick={onToggleReadAll} style={{ ...styles.button, ...(allRead ? styles.buttonActive : {}) }}>
+              {allRead ? 'Unread All' : 'Read All'}
             </button>
             <input
               type="text"
