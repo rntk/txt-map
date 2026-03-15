@@ -1,5 +1,11 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { sanitizeHTML } from '../utils/sanitize';
+
+// Tooltip configuration constants
+const TOOLTIP_WIDTH = 260;
+const TOOLTIP_HEIGHT_ESTIMATE = 100;
+const TOOLTIP_VIEWPORT_MARGIN = 10;
+const TOOLTIP_HIDE_DELAY_MS = 200;
 
 function isInAnyRange(start, end, ranges) {
   return ranges.some(r => start < r.end && end > r.start);
@@ -210,6 +216,15 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const [tooltip, setTooltip] = useState(null); // {x, y, topics: [{topic, rangeCount}]}
   const hideTimeoutRef = useRef(null);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const showTooltip = useCallback((topics, x, y) => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -221,7 +236,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const scheduleHide = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setTooltip(null);
-    }, 200);
+    }, TOOLTIP_HIDE_DELAY_MS);
   }, []);
 
   const cancelHide = useCallback(() => {
@@ -230,6 +245,14 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       hideTimeoutRef.current = null;
     }
   }, []);
+
+  // Handler for toggling read status from tooltip
+  const handleToggleRead = useCallback((topic) => {
+    if (onToggleRead) {
+      onToggleRead(topic);
+    }
+    setTooltip(null);
+  }, [onToggleRead]);
 
   // Find topics for a char range
   const findTopicsForChar = useCallback((charStart, charEnd) => {
@@ -268,16 +291,13 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     if (matchedTopics.length === 0) return;
 
     // Clamp tooltip to viewport
-    const margin = 10;
-    const tooltipWidth = 260;
-    const tooltipHeight = 100; // rough estimate
     let x = e.clientX + 12;
     let y = e.clientY + 12;
-    if (x + tooltipWidth > window.innerWidth - margin) {
-      x = e.clientX - tooltipWidth - 12;
+    if (x + TOOLTIP_WIDTH > window.innerWidth - TOOLTIP_VIEWPORT_MARGIN) {
+      x = e.clientX - TOOLTIP_WIDTH - 12;
     }
-    if (y + tooltipHeight > window.innerHeight - margin) {
-      y = e.clientY - tooltipHeight - 12;
+    if (y + TOOLTIP_HEIGHT_ESTIMATE > window.innerHeight - TOOLTIP_VIEWPORT_MARGIN) {
+      y = e.clientY - TOOLTIP_HEIGHT_ESTIMATE - 12;
     }
 
     showTooltip(matchedTopics, x, y);
@@ -322,7 +342,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
               )}
               <button
                 className="text-topic-tooltip-btn"
-                onClick={() => { onToggleRead(topic); setTooltip(null); }}
+                onClick={() => handleToggleRead(topic)}
               >
                 {isRead ? 'Mark Unread' : 'Mark Read'}
               </button>
