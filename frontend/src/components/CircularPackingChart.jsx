@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
+import TopicSentencesModal from './shared/TopicSentencesModal';
 import {
   getTopicParts,
   isWithinScope,
@@ -160,57 +161,6 @@ function Breadcrumbs({ scopePath, onNavigate }) {
   );
 }
 
-function TopicSentencesModal({ topic, sentences, onClose }) {
-  useEffect(() => {
-    const handleKey = e => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  if (!topic) return null;
-
-  const sortedIndices = [...topic.sentenceIndices].sort((a, b) => a - b);
-
-  return (
-    <div
-      className="article-structure-modal-overlay"
-      onClick={onClose}
-    >
-      <div
-        className="article-structure-modal"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="article-structure-modal-header">
-          <h3>{topic.displayName}</h3>
-          <div className="article-structure-modal-toolbar" />
-          <button
-            type="button"
-            className="article-structure-modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
-        <div className="article-structure-modal-body">
-          {sortedIndices.length === 0 ? (
-            <p>No sentences found for this topic.</p>
-          ) : (
-            sortedIndices.map(idx => {
-              const text = sentences[idx - 1];
-              return (
-                <div key={idx} className="article-structure-modal-sentence">
-                  <span className="article-structure-modal-sentence-num">{idx}.</span>
-                  <span className="article-structure-modal-sentence-text">{text || ''}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function CircularPackingChart({ topics, sentences = [] }) {
   const [selectedLevel, setSelectedLevel] = useState(0);

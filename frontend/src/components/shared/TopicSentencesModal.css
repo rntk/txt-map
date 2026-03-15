@@ -82,6 +82,46 @@
     line-height: 1.5;
 }
 
+.topic-sentences-modal__sentence--extended {
+    background: #fdf9e3;
+}
+
+.topic-sentences-modal__range-group {
+    margin-bottom: 8px;
+}
+
+.topic-sentences-modal__range-separator {
+    border-top: 2px dashed #ddd;
+    margin: 12px 0;
+}
+
+.topic-sentences-modal__extend-btn {
+    display: block;
+    width: 100%;
+    padding: 4px 8px;
+    background: #f0f4ff;
+    border: 1px dashed #aac;
+    border-radius: 4px;
+    color: #557;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: center;
+    margin: 4px 0;
+}
+
+.topic-sentences-modal__extend-btn:hover {
+    background: #e0e8ff;
+    border-color: #88a;
+}
+
+.topic-sentences-modal__header-extra {
+    padding: 10px 20px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #eee;
+    font-size: 0.95rem;
+    color: #444;
+}
+
 @keyframes fadeInModal {
     from {
         opacity: 0;

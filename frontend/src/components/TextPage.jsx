@@ -15,6 +15,7 @@ import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import GroupedByTopicsView from './GroupedByTopicsView';
+import TopicSentencesModal from './shared/TopicSentencesModal';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import '../styles/App.css';
 
@@ -338,7 +339,7 @@ function TextPage() {
       setHighlightedGroupedTopic(null);
     }
   }, [selectedTopics, highlightedGroupedTopic]);
-  const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
+  const [summaryModalTopic, setSummaryModalTopic] = useState(null); // For summary source modal
   const [readTopics, setReadTopics] = useState(new Set());
   const hasLoadedRef = useRef(false);
   const lastSyncedRef = useRef('');
@@ -736,15 +737,17 @@ function TextPage() {
 
   const handleSummaryClick = (mapping, article) => {
     if (mapping && mapping.source_sentences) {
-      setSummaryModalData({
-        sentences: mapping.source_sentences.map(idx => article.sentences[idx - 1]),
-        summarySentence: mapping.summary_sentence
+      setSummaryModalTopic({
+        displayName: 'Source Sentences',
+        sentenceIndices: mapping.source_sentences,
+        _summarySentence: mapping.summary_sentence,
+        _sentences: article.sentences,
       });
     }
   };
 
   const closeSummaryModal = () => {
-    setSummaryModalData(null);
+    setSummaryModalTopic(null);
   };
 
   const runRefresh = async (tasks, successMessage) => {
@@ -1170,30 +1173,17 @@ function TextPage() {
                     <p>No summary available. Processing may still be in progress...</p>
                   )}
                 </div>
-                {summaryModalData && (
-                  <div className="summary-modal-overlay" onClick={closeSummaryModal}>
-                    <div className="summary-modal" onClick={(e) => e.stopPropagation()}>
-                      <div className="modal-header">
-                        <h3>Source Sentences</h3>
-                        <button className="modal-close" onClick={closeSummaryModal}>×</button>
+                {summaryModalTopic && (
+                  <TopicSentencesModal
+                    topic={summaryModalTopic}
+                    sentences={summaryModalTopic._sentences}
+                    onClose={closeSummaryModal}
+                    headerExtra={
+                      <div>
+                        <strong>Summary:</strong> {summaryModalTopic._summarySentence}
                       </div>
-                      <div className="modal-body">
-                        <div className="modal-summary-sentence">
-                          <strong>Summary:</strong> {summaryModalData.summarySentence}
-                        </div>
-                        <div className="modal-divider"></div>
-                        <div className="modal-source-sentences">
-                          <strong>Original sentences:</strong>
-                          {summaryModalData.sentences.map((sent, idx) => (
-                            <div key={idx} className="modal-sentence">
-                              <span className="sentence-number">{idx + 1}.</span>
-                              <span className="sentence-text">{sent}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    }
+                  />
                 )}
               </div>
             </FullScreenGraph>
