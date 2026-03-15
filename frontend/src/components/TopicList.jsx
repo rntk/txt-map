@@ -13,6 +13,7 @@ function TopicList({
   onNavigateTopic
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
@@ -200,6 +201,26 @@ function TopicList({
     return paths;
   }, [topicTree]);
 
+  const filteredTree = useMemo(() => {
+    if (!searchQuery.trim()) return topicTree;
+    const q = searchQuery.trim().toLowerCase();
+
+    const filterNode = (treeNode) => {
+      if (treeNode.node.isLeaf) {
+        return treeNode.node.fullPath.toLowerCase().includes(q) ? treeNode : null;
+      }
+      const filteredChildren = new Map();
+      treeNode.children.forEach((child, key) => {
+        const filtered = filterNode(child);
+        if (filtered) filteredChildren.set(key, filtered);
+      });
+      if (filteredChildren.size === 0) return null;
+      return { ...treeNode, children: filteredChildren };
+    };
+
+    return topicTree.map(filterNode).filter(Boolean);
+  }, [topicTree, searchQuery]);
+
   const [allExpanded, setAllExpanded] = useState(false);
 
   const toggleExpandAll = useCallback(() => {
@@ -326,7 +347,7 @@ function TopicList({
   const TreeNode = ({ treeNode, depth = 0 }) => {
     const { node, children } = treeNode;
     const hasChildren = children.size > 0;
-    const isExpanded = expandedNodes.has(node.fullPath);
+    const isExpanded = searchQuery.trim() ? true : expandedNodes.has(node.fullPath);
     const { totalTopics, totalSentences } = getSubtreeStats(treeNode);
     const isNodeSelected = isSubtreeSelected(treeNode);
     const isNodeRead = isSubtreeRead(treeNode);
@@ -504,16 +525,35 @@ function TopicList({
         <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center' }}>
             <button onClick={toggleExpandAll} style={styles.button}>
               {allExpanded ? 'Fold All' : 'Unfold All'}
             </button>
+            <input
+              type="text"
+              placeholder="Filter topics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                fontSize: '12px',
+                padding: '2px 6px',
+                border: '1px solid #ddd',
+                borderRadius: '3px',
+                outline: 'none',
+                flex: 1,
+                minWidth: 0,
+              }}
+            />
           </div>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {topicTree.map((treeNode) => (
-              <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
-            ))}
-          </ul>
+          {filteredTree.length === 0 ? (
+            <div style={{ color: '#888', fontSize: '13px' }}>No matching topics.</div>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {filteredTree.map((treeNode) => (
+                <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
+              ))}
+            </ul>
+          )}
         </>
       )}
     </div>
