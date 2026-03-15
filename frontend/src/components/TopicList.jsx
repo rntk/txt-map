@@ -288,7 +288,8 @@ function TopicList({
       fontSize: '13px',
       lineHeight: '1.4',
       paddingBottom: '6px',
-      height: 'calc(100vh - 100px)',
+      flex: 1,
+      minHeight: 0,
       overflowY: 'auto',
       paddingRight: '5px',
       marginRight: '-5px',
@@ -564,35 +565,37 @@ function TopicList({
   };
 
   return (
-    <div style={styles.topicList}>
-      {topicTree.length === 0 ? (
-        <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center' }}>
-            <button onClick={toggleExpandAll} style={styles.button}>
-              {allExpanded ? 'Fold All' : 'Unfold All'}
-            </button>
-            <button onClick={onToggleReadAll} style={{ ...styles.button, ...(allRead ? styles.buttonActive : {}) }}>
-              {allRead ? 'Unread All' : 'Read All'}
-            </button>
-            <input
-              type="text"
-              placeholder="Filter topics..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                fontSize: '12px',
-                padding: '2px 6px',
-                border: '1px solid #ddd',
-                borderRadius: '3px',
-                outline: 'none',
-                flex: 1,
-                minWidth: 0,
-              }}
-            />
-          </div>
-          {filteredTree.length === 0 ? (
+    <>
+      {topicTree.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center', flex: '0 0 auto' }}>
+          <button onClick={toggleExpandAll} style={styles.button}>
+            {allExpanded ? 'Fold All' : 'Unfold All'}
+          </button>
+          <button onClick={onToggleReadAll} style={{ ...styles.button, ...(allRead ? styles.buttonActive : {}) }}>
+            {allRead ? 'Unread All' : 'Read All'}
+          </button>
+          <input
+            type="text"
+            placeholder="Filter topics..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              fontSize: '12px',
+              padding: '2px 6px',
+              border: '1px solid #ddd',
+              borderRadius: '3px',
+              outline: 'none',
+              flex: 1,
+              minWidth: 0,
+            }}
+          />
+        </div>
+      )}
+      <div style={styles.topicList}>
+        {topicTree.length === 0 ? (
+          <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
+        ) : (
+          filteredTree.length === 0 ? (
             <div style={{ color: '#888', fontSize: '13px' }}>No matching topics.</div>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -600,10 +603,10 @@ function TopicList({
                 <TreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} />
               ))}
             </ul>
-          )}
-        </>
-      )}
-    </div>
+          )
+        )}
+      </div>
+    </>
   );
 }
 

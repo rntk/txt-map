@@ -1,6 +1,13 @@
+body {
+  margin: 0;
+}
+
 .app {
   font-family: Arial, sans-serif;
-  margin: 5px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .article-section {
@@ -93,6 +100,9 @@
 .container {
   display: flex;
   gap: 15px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .left-column {
@@ -104,11 +114,10 @@
   /* Maximum width to prevent it from being too wide */
   border-right: 1px solid #ccc;
   padding-right: 15px;
-  position: sticky;
-  top: 10px;
-  align-self: flex-start;
-  height: calc(100vh - 20px);
+  height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background-color: #fff;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
   z-index: 10;
@@ -124,6 +133,8 @@
   /* Takes remaining space */
   min-width: 0;
   /* Allows shrinking if needed */
+  overflow-y: auto;
+  height: 100%;
 }
 
 .topic-list {

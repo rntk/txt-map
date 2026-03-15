@@ -801,7 +801,7 @@ function TextPage() {
 
   return (
     <div className="app">
-      <div style={{ padding: '5px 5px' }}>
+      <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
         <div className="text-management" style={{ padding: '6px 12px', margin: '0 0 12px 0' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -860,19 +860,20 @@ function TextPage() {
 
         {isProcessing && (
           <div style={{
-            padding: '15px',
+            padding: '8px 15px',
             background: '#fff3cd',
             borderRadius: '5px',
-            marginBottom: '20px',
+            margin: '0 0 8px 0',
             textAlign: 'center'
           }}>
             <strong>Processing in progress...</strong> Results will appear as tasks complete.
           </div>
         )}
+      </div>
 
-        {articles.length > 0 ? (
+      {articles.length > 0 ? (
           <>
-          <div className="container">
+          <div className="container" style={{ padding: '0 5px 5px' }}>
             <div className="left-column">
               <h1>Topics ({safeTopics.length})</h1>
               <TopicList
@@ -1191,7 +1192,6 @@ function TextPage() {
             <p>No results yet. Processing is in progress...</p>
           </div>
         )}
-      </div>
     </div>
   );
 }
