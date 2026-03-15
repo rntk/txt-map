@@ -10,3 +10,5 @@ python-multipart
 PyMuPDF>=1.27.0
 nltk
 git+https://github.com/rntk/txt-splitt.git@v0.0.11
+openai
+anthropic

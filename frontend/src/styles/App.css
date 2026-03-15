@@ -2627,13 +2627,27 @@
   background: #ffffff;
   border-bottom: 1px solid #dfe3e8;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  padding: 10px 14px;
+  padding: 5px 7px;
+  display: flex;
+  align-items: center;
 }
 
 .global-menu-links {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.llm-provider-badge {
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .global-menu-link {
@@ -2660,7 +2674,7 @@
 }
 
 .global-page-content {
-  padding-top: 12px;
+  padding-top: 5px;
 }
 
 @media (max-width: 640px) {

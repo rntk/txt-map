@@ -1,59 +1,25 @@
 import json
 import os
-import time
-import random
-from typing import List, Union, Optional, Dict, Any
 import logging
+from typing import List, Union, Optional, Dict, Any
 from urllib.parse import urlparse
 from http.client import HTTPConnection, HTTPSConnection
 
-class LLamaCPP:
+from lib.llm.base import LLMClient
+
+
+class LLamaCPP(LLMClient):
     def __init__(self, host: str, max_context_tokens: int = 11000, token: Optional[str] = None, max_retries: int = 3, retry_delay: float = 1.0):
+        super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
-        self.__max_context_tokens = max_context_tokens  # Leave some buffer from the actual context size
         # Token can be passed in explicitly or read from the environment variable TOKEN
         self.__token = token or os.getenv("TOKEN")
-        self.__max_retries = max_retries
-        self.__retry_delay = retry_delay
 
-    def estimate_tokens(self, text: str) -> int:
-        """Rough estimation: ~4 characters per token on average"""
-        return len(text) // 4
-
-    def call(self, user_msgs: List[str], temperature: float=0.0, retries: Optional[int] = None) -> str:
-        """
-        Call the LLM with retry logic for transient failures.
-        
-        Args:
-            user_msgs: List of user messages (only first is used)
-            temperature: Temperature for generation
-            retries: Number of retries (overrides default if specified)
-            
-        Returns:
-            LLM response content
-            
-        Raises:
-            RuntimeError: If LLM call fails after all retries
-        """
-        max_retries = retries if retries is not None else self.__max_retries
-        
-        for attempt in range(max_retries + 1):
-            try:
-                return self._call_single(user_msgs, temperature)
-            except RuntimeError as e:
-                if attempt < max_retries:
-                    # Exponential backoff with jitter
-                    delay = self.__retry_delay * (2 ** attempt) + random.uniform(0, 0.5)
-                    logging.warning(
-                        f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
-                        f"Retrying in {delay:.2f}s..."
-                    )
-                    time.sleep(delay)
-                else:
-                    logging.error(f"LLM call failed after {max_retries + 1} attempts: {e}")
-                    raise
+    @property
+    def provider_name(self) -> str:
+        return "LlamaCPP"
 
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         """Single attempt to call the LLM without retry logic."""
@@ -62,7 +28,7 @@ class LLamaCPP:
             prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]
             logging.info(f"LLM request (preview): {prompt_preview}")
             logging.info(f"LLM request full length: {len(user_msgs[0])} chars")
-            
+
             body = json.dumps(
                 {
                     "model": "moonshotai/Kimi-K2.5",
@@ -116,7 +82,7 @@ class LLamaCPP:
         try:
             body = json.dumps(
                 {
-                    "model":"text-embedding-3-small",
+                    "model": "text-embedding-3-small",
                     "encoding_format": "float",
                     "input": texts
                 }

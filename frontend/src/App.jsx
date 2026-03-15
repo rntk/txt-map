@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import TextPage from './components/TextPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
@@ -16,6 +16,15 @@ const globalMenuItems = [
 ];
 
 function App() {
+  const [llmProvider, setLlmProvider] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((data) => setLlmProvider(data.llm_provider))
+      .catch(() => {});
+  }, []);
+
   const renderWithGlobalMenu = (content) => {
     const currentPath = window.location.pathname;
 
@@ -36,6 +45,9 @@ function App() {
               );
             })}
           </div>
+          {llmProvider && (
+            <span className="llm-provider-badge">LLM: {llmProvider}</span>
+          )}
         </nav>
         <main className="global-page-content">{content}</main>
       </>

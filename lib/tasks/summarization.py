@@ -28,7 +28,7 @@ def summarize_by_sentence_groups(sent_list, cached_llm, llm_client, max_groups_t
     )
 
     template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
-    max_text_tokens = llm_client._LLamaCPP__max_context_tokens - template_tokens - max_groups_tokens_buffer  # noqa: SLF001
+    max_text_tokens = llm_client.max_context_tokens - template_tokens - max_groups_tokens_buffer
 
     all_summary_sentences = []
     summary_mappings = []

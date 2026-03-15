@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
-from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler
+from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler
 from pymongo import MongoClient
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.posts import PostsStorage
@@ -39,6 +39,7 @@ app.include_router(submission_handler.router, prefix="/api")
 app.include_router(task_queue_handler.router, prefix="/api")
 app.include_router(diff_handler.router, prefix="/api")
 app.include_router(llm_cache_handler.router, prefix="/api")
+app.include_router(settings_handler.router, prefix="/api")
 
 import os
 mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")

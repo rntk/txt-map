@@ -14,7 +14,7 @@ from lib.diff.semantic_diff import (
     compute_topic_aware_semantic_diff,
     stale_reasons,
 )
-from lib.llm.llamacpp import LLamaCPP
+from lib.llm import create_llm_client
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
@@ -343,17 +343,14 @@ def main():
     """Main entry point for the worker process"""
     # Get configuration from environment
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
-    llamacpp_url = os.getenv("LLAMACPP_URL", "http://localhost:8989")
-    token = os.getenv("TOKEN")
 
     logger.info(f"Connecting to MongoDB: {mongodb_url}")
-    logger.info(f"Connecting to LLamaCPP: {llamacpp_url}")
 
     # Initialize connections
     client = MongoClient(mongodb_url)
     db = client["rss"]
-    # Use higher retries and delay for split topic generation which processes large articles
-    llm = LLamaCPP(host=llamacpp_url, token=token, max_retries=5, retry_delay=2.0)
+    llm = create_llm_client()
+    logger.info(f"Using LLM provider: {llm.provider_name}")
 
     # Create and run worker
     SubmissionsStorage(db).prepare()

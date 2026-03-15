@@ -801,29 +801,7 @@ function TextPage() {
 
   return (
     <div className="app">
-      <div style={{ padding: '10px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-          <div>
-            <h1 style={{ margin: '0 0 2px 0', fontSize: '22px' }}>Text Analysis Results</h1>
-            {submission.source_url && (
-              <div style={{ fontSize: '11px', color: '#666' }}>
-                Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
-              </div>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={true} />
-            <button
-              className="action-btn danger"
-              onClick={handleDelete}
-              disabled={actionLoading}
-              style={{ padding: '3px 10px', fontSize: '12px' }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-
+      <div style={{ padding: '5px 5px' }}>
         <div className="text-management" style={{ padding: '6px 12px', margin: '0 0 12px 0' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -837,6 +815,17 @@ function TextPage() {
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
               <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+              <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={true} />
+              <button
+                className="action-btn danger"
+                onClick={handleDelete}
+                disabled={actionLoading}
+                style={{ padding: '3px 10px', fontSize: '12px' }}
+              >
+                Delete
+              </button>
             </div>
           </div>
           {actionMessage && <div className="text-management-message" style={{ marginTop: '4px', fontSize: '11px' }}>{actionMessage}</div>}
@@ -885,7 +874,7 @@ function TextPage() {
           <>
           <div className="container">
             <div className="left-column">
-              <h1>Topics</h1>
+              <h1>Topics ({safeTopics.length})</h1>
               <TopicList
                 topics={allTopics}
                 selectedTopics={selectedTopics}
@@ -954,9 +943,11 @@ function TextPage() {
               })()}
               <div className="article-section">
                 <div className="article-header">
-                  <div className="article-title-section">
-                    <h1>Analyzed Text ({safeTopics.length} topics)</h1>
-                  </div>
+                  {submission.source_url && (
+                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                      Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
+                    </div>
+                  )}
                 </div>
 
                 {activeTab === 'summary' ? (

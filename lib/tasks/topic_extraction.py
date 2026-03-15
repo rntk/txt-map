@@ -311,7 +311,7 @@ Output:"""
 
     # Token/Chunking Estimation
     try:
-        context_size = getattr(llm, "context_size", getattr(llm, "_LLamaCPP__max_context_tokens", 64000))
+        context_size = getattr(llm, "context_size", getattr(llm, "max_context_tokens", 64000))
     except Exception:
         context_size = 64000
 
