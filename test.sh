@@ -6,14 +6,26 @@
 #   ./test.sh tests/unit/test_submission_handler.py  # Run specific test file
 #   ./test.sh --cov=.            # Run with coverage
 #   ./test.sh --cov-report=html  # Generate HTML coverage report
+#   ./test.sh --rebuild          # Force rebuild the test image, then run tests
 
 set -e
 
 IMAGE_NAME="rss-tests"
 PROJECT_DIR="$(pwd)"
 
-# Build the test image if it doesn't exist
-if ! docker images "$IMAGE_NAME" --format '{{.Repository}}' | grep -q "$IMAGE_NAME"; then
+# Check for --rebuild flag
+REBUILD=false
+ARGS=()
+for arg in "$@"; do
+    if [ "$arg" = "--rebuild" ]; then
+        REBUILD=true
+    else
+        ARGS+=("$arg")
+    fi
+done
+
+# Build the test image if it doesn't exist or --rebuild was requested
+if $REBUILD || ! docker images "$IMAGE_NAME" --format '{{.Repository}}' | grep -q "$IMAGE_NAME"; then
     echo "Building test image..."
     docker build -f Dockerfile.tests -t "$IMAGE_NAME" .
 fi
@@ -23,4 +35,4 @@ docker run --rm \
     -v "$PROJECT_DIR:/app" \
     -w /app \
     "$IMAGE_NAME" \
-    pytest "$@"
+    pytest "${ARGS[@]}"

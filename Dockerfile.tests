@@ -39,7 +39,8 @@ COPY lib/ ./lib/
 COPY tests/ ./tests/
 
 # Create __init__.py files if missing for test discovery
-RUN touch tests/__init__.py tests/unit/__init__.py tests/unit/test_tasks/__init__.py tests/integration/__init__.py 2>/dev/null || true
+RUN mkdir -p tests/integration && \
+    touch tests/__init__.py tests/unit/__init__.py tests/unit/test_tasks/__init__.py tests/integration/__init__.py
 
 # Set PYTHONPATH
 ENV PYTHONPATH=/app
