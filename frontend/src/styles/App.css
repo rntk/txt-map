@@ -2709,6 +2709,69 @@ body {
   padding-top: 5px;
 }
 
+/* Grouped by topics toggle */
+.grouped-topics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+}
+
+.grouped-topics-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Grouped topics view */
+.grouped-topics-list {
+  padding: 0;
+}
+
+.grouped-topic-section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.grouped-topic-section:last-child {
+  border-bottom: none;
+}
+
+.grouped-topic-title {
+  font-weight: 600;
+  font-size: 13px;
+  background: #f4f4f4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.grouped-topic-text {
+  line-height: 1.6;
+  font-size: 14px;
+  color: #222;
+  white-space: pre-wrap;
+}
+
+.grouped-topic-text.raw {
+  font-family: monospace;
+  font-size: 12px;
+  background: #f9f9f9;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.grouped-topics-empty {
+  color: #888;
+  font-size: 13px;
+  padding: 16px 0;
+}
+
 @media (max-width: 640px) {
   .global-menu {
     padding: 8px 10px;

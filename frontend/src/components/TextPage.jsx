@@ -14,6 +14,7 @@ import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
+import GroupedByTopicsView from './GroupedByTopicsView';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import '../styles/App.css';
 
@@ -330,6 +331,7 @@ function TextPage() {
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap'
+  const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
   const hasLoadedRef = useRef(false);
@@ -1004,6 +1006,14 @@ function TextPage() {
                   Raw Text
                 </button>
               </div>
+              <label className="grouped-topics-toggle">
+                <input
+                  type="checkbox"
+                  checked={groupedByTopics}
+                  onChange={() => setGroupedByTopics(prev => !prev)}
+                />
+                Grouped by topics
+              </label>
               {submission.source_url && (
                 <div style={{ fontSize: '11px', color: '#666' }}>
                   Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
@@ -1012,7 +1022,14 @@ function TextPage() {
             </div>
 
             <div className="article-body">
-              {activeTab === 'raw_text' ? (
+              {groupedByTopics ? (
+                <GroupedByTopicsView
+                  topics={safeTopics}
+                  rawHtml={articles[0]?.raw_html || ''}
+                  sentences={articles[0]?.sentences || []}
+                  isRawTextMode={activeTab === 'raw_text'}
+                />
+              ) : activeTab === 'raw_text' ? (
                 <div className="summary-content">
                   <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
                     {rawText.length.toLocaleString()} characters
