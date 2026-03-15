@@ -45,8 +45,9 @@ function App() {
               );
             })}
           </div>
+          <div id="global-menu-portal-target" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}></div>
           {llmProvider && (
-            <span className="llm-provider-badge">LLM: {llmProvider}</span>
+            <span className="llm-provider-badge" style={{ marginLeft: '10px' }}>LLM: {llmProvider}</span>
           )}
         </nav>
         <main className="global-page-content">{content}</main>

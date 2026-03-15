@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import TopicsRiverChart from './TopicsRiverChart';
@@ -15,6 +16,63 @@ import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import '../styles/App.css';
+
+function DropdownMenu({ buttonContent, children }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <button 
+        className="action-btn" 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: isOpen ? '#e0e0e0' : undefined, color: isOpen ? '#333' : undefined }}
+      >
+        {buttonContent}
+      </button>
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '4px',
+          background: 'white',
+          border: '1px solid #ddd',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          padding: '8px',
+          zIndex: 1000,
+          minWidth: '200px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          color: '#333'
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TextPageActionsPortal({ children }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  const target = document.getElementById('global-menu-portal-target');
+  if (!target) return null;
+  return createPortal(children, target);
+}
 
 const SIDEBAR_TABS = [
   { key: 'article', label: 'Article' },
@@ -802,34 +860,38 @@ function TextPage() {
   return (
     <div className="app">
       <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
-        <div className="text-management" style={{ padding: '6px 12px', margin: '0 0 12px 0' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>Status:</span>
-              <StatusIndicator tasks={status.tasks} />
+        <TextPageActionsPortal>
+          <DropdownMenu buttonContent={<span>Status</span>}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Task Status</div>
+            <StatusIndicator tasks={status.tasks} />
+          </DropdownMenu>
+
+          <DropdownMenu buttonContent={<><span style={{ fontSize: '14px', lineHeight: 1 }}>☰</span> Menu</>}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>Recalculate</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>Recalculate:</span>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
-              <button className="action-btn" style={{ padding: '1px 6px', fontSize: '10px' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-              <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={true} />
+            
+            <hr style={{ margin: '4px 0', border: 'none', borderTop: '1px solid #eee' }} />
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={false} />
               <button
                 className="action-btn danger"
                 onClick={handleDelete}
                 disabled={actionLoading}
-                style={{ padding: '3px 10px', fontSize: '12px' }}
+                style={{ padding: '6px 10px', fontSize: '12px', textAlign: 'center' }}
               >
                 Delete
               </button>
             </div>
-          </div>
-          {actionMessage && <div className="text-management-message" style={{ marginTop: '4px', fontSize: '11px' }}>{actionMessage}</div>}
-        </div>
+            {actionMessage && <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '4px', borderRadius: '4px' }}>{actionMessage}</div>}
+          </DropdownMenu>
+        </TextPageActionsPortal>
 
         {articles.length > 0 && (
           <div className="tab-bar">
