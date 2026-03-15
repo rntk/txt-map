@@ -147,6 +147,28 @@ function TopicList({
   const toggleReadInSubtree = useCallback((treeNode) => {
     const allRead = isSubtreeRead(treeNode);
 
+    // Check if any leaf in the subtree has split ranges
+    const hasSplitRanges = (() => {
+      let found = false;
+      const check = (node) => {
+        if (node.node.isLeaf && node.node.topic) {
+          const r = node.node.topic.ranges;
+          if (Array.isArray(r) && r.length > 1) found = true;
+        }
+        if (!found) node.children.forEach(child => check(child));
+      };
+      check(treeNode);
+      return found;
+    })();
+
+    if (hasSplitRanges) {
+      const action = allRead ? 'unread' : 'read';
+      const ok = window.confirm(
+        `Some topics in this group have multiple separate ranges. Mark all as ${action}?`
+      );
+      if (!ok) return;
+    }
+
     const traverse = (node) => {
       if (node.node.isLeaf && node.node.topic) {
         const isRead = safeReadTopics.has(node.node.topic.name);
@@ -447,7 +469,16 @@ function TopicList({
               {node.isLeaf && topic ? (
                 <>
                   <button
-                    onClick={() => onToggleRead(topic)}
+                    onClick={() => {
+                      const ranges = topic.ranges;
+                      if (Array.isArray(ranges) && ranges.length > 1 && !isLeafRead) {
+                        const ok = window.confirm(
+                          `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
+                        );
+                        if (!ok) return;
+                      }
+                      onToggleRead(topic);
+                    }}
                     style={{
                       ...styles.button,
                       ...(isLeafRead ? styles.buttonActive : {})

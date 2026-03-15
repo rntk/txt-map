@@ -1076,6 +1076,9 @@ function TextPage() {
                       paragraphMap={article.paragraph_map}
                       rawHtml={article.raw_html}
                       markerWordIndices={article.marker_word_indices}
+                      onToggleRead={toggleRead}
+                      onToggleTopic={toggleTopic}
+                      onNavigateTopic={navigateTopicSentence}
                     />
                   ))
                 )}

@@ -675,6 +675,13 @@
   display: inline;
 }
 
+.word-token:hover,
+.sentence-token:hover {
+  outline: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
 .sentence-token {
   display: inline;
 }
@@ -693,6 +700,52 @@
 .faded {
   opacity: 0.1 !important;
   color: #999 !important;
+}
+
+.faded:hover {
+  opacity: 0.3 !important;
+}
+
+/* Topic hover tooltip */
+.text-topic-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: #222;
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  max-width: 260px;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+
+.text-topic-tooltip-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.text-topic-tooltip-warning {
+  color: #ffd86e;
+  font-size: 11px;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.text-topic-tooltip-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.text-topic-tooltip-btn:hover {
+  background: #555;
 }
 
 .article-separator {

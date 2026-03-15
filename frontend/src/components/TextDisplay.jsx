@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { sanitizeHTML } from '../utils/sanitize';
 
 function isInAnyRange(start, end, ranges) {
@@ -100,7 +100,7 @@ function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, highlight
   return sanitizeHTML(result);
 }
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
@@ -174,13 +174,193 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     }
   });
 
+  // --- Reverse mapping: char position -> topic(s) ---
+  const charToTopics = useMemo(() => {
+    // Sorted flat array of {start, end, topic}
+    const entries = [];
+    safeArticleTopics.forEach(topic => {
+      const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
+      ranges.forEach(range => {
+        const s = Number(range.start);
+        const e = Number(range.end);
+        if (Number.isFinite(s) && Number.isFinite(e)) {
+          entries.push({ start: s, end: e, topic });
+        }
+      });
+    });
+    entries.sort((a, b) => a.start - b.start);
+    return entries;
+  }, [safeArticleTopics]);
+
+  // Reverse mapping: sentence index -> topic(s)
+  const sentenceToTopicsMap = useMemo(() => {
+    const map = new Map();
+    safeArticleTopics.forEach(topic => {
+      const sents = Array.isArray(topic.sentences) ? topic.sentences : [];
+      sents.forEach(num => {
+        const idx = num - 1;
+        if (!map.has(idx)) map.set(idx, []);
+        map.get(idx).push(topic);
+      });
+    });
+    return map;
+  }, [safeArticleTopics]);
+
+  // --- Tooltip state ---
+  const [tooltip, setTooltip] = useState(null); // {x, y, topics: [{topic, rangeCount}]}
+  const hideTimeoutRef = useRef(null);
+
+  const showTooltip = useCallback((topics, x, y) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setTooltip({ x, y, topics });
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    hideTimeoutRef.current = setTimeout(() => {
+      setTooltip(null);
+    }, 200);
+  }, []);
+
+  const cancelHide = useCallback(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Find topics for a char range
+  const findTopicsForChar = useCallback((charStart, charEnd) => {
+    const cs = Number(charStart);
+    const ce = Number(charEnd);
+    if (!Number.isFinite(cs) || !Number.isFinite(ce)) return [];
+    return charToTopics.filter(e => cs < e.end && ce > e.start).map(e => ({
+      topic: e.topic,
+      rangeCount: Array.isArray(e.topic.ranges) ? e.topic.ranges.length : 1,
+    }));
+  }, [charToTopics]);
+
+  // Find topics for a sentence index
+  const findTopicsForSentence = useCallback((sentenceIdx) => {
+    const idx = Number(sentenceIdx);
+    const topics = sentenceToTopicsMap.get(idx) || [];
+    return topics.map(t => ({
+      topic: t,
+      rangeCount: Array.isArray(t.ranges) ? t.ranges.length : 0,
+    }));
+  }, [sentenceToTopicsMap]);
+
+  // Event delegation handler
+  const handleMouseOver = useCallback((e) => {
+    if (!onToggleRead) return;
+    const token = e.target.closest('.word-token, .sentence-token');
+    if (!token) return;
+
+    let matchedTopics = [];
+    if (token.dataset.charStart !== undefined && token.dataset.charEnd !== undefined) {
+      matchedTopics = findTopicsForChar(token.dataset.charStart, token.dataset.charEnd);
+    } else if (token.dataset.sentenceIndex !== undefined) {
+      matchedTopics = findTopicsForSentence(token.dataset.sentenceIndex);
+    }
+
+    if (matchedTopics.length === 0) return;
+
+    // Clamp tooltip to viewport
+    const margin = 10;
+    const tooltipWidth = 260;
+    const tooltipHeight = 100; // rough estimate
+    let x = e.clientX + 12;
+    let y = e.clientY + 12;
+    if (x + tooltipWidth > window.innerWidth - margin) {
+      x = e.clientX - tooltipWidth - 12;
+    }
+    if (y + tooltipHeight > window.innerHeight - margin) {
+      y = e.clientY - tooltipHeight - 12;
+    }
+
+    showTooltip(matchedTopics, x, y);
+  }, [onToggleRead, findTopicsForChar, findTopicsForSentence, showTooltip]);
+
+  const handleMouseOut = useCallback((e) => {
+    const token = e.target.closest('.word-token, .sentence-token');
+    if (!token) return;
+    scheduleHide();
+  }, [scheduleHide]);
+
+  // Tooltip JSX
+  const tooltipEl = tooltip && onToggleRead ? (
+    <div
+      className="text-topic-tooltip"
+      style={{ left: tooltip.x, top: tooltip.y }}
+      onMouseEnter={cancelHide}
+      onMouseLeave={scheduleHide}
+    >
+      {tooltip.topics.map(({ topic, rangeCount }, i) => {
+        const isRead = readTopicsSet.has(topic.name);
+        const isSelected = safeSelectedTopics.some(t => t.name === topic.name);
+        return (
+          <div key={topic.name} style={{ marginBottom: i < tooltip.topics.length - 1 ? 10 : 0 }}>
+            <div className="text-topic-tooltip-name">{topic.name}</div>
+            {rangeCount > 1 && (
+              <div className="text-topic-tooltip-warning">
+                This topic has {rangeCount} separate ranges. Some may not be visible.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+              {onToggleTopic && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', color: '#ddd' }}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleTopic(topic)}
+                    style={{ margin: 0, cursor: 'pointer' }}
+                  />
+                  Highlight
+                </label>
+              )}
+              <button
+                className="text-topic-tooltip-btn"
+                onClick={() => { onToggleRead(topic); setTooltip(null); }}
+              >
+                {isRead ? 'Mark Unread' : 'Mark Read'}
+              </button>
+              {onNavigateTopic && (
+                <>
+                  <button
+                    className="text-topic-tooltip-btn"
+                    onClick={() => onNavigateTopic(topic, 'prev')}
+                    title="Scroll to previous occurrence"
+                  >
+                    ‹ Prev
+                  </button>
+                  <button
+                    className="text-topic-tooltip-btn"
+                    onClick={() => onNavigateTopic(topic, 'next')}
+                    title="Scroll to next occurrence"
+                  >
+                    Next ›
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
+
   if (highlightedRawHtml) {
     return (
       <div className="text-display">
         <div
           className="text-content"
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
         />
+        {tooltipEl}
       </div>
     );
   }
@@ -203,7 +383,11 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
     return (
       <div className="text-display">
-        <div className="text-content">
+        <div
+          className="text-content"
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
+        >
           {paragraphs.map((para, paraIdx) => (
             <p key={paraIdx} className="article-paragraph">
               {para.map(({ text, index }) => (
@@ -232,13 +416,18 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
             </p>
           ))}
         </div>
+        {tooltipEl}
       </div>
     );
   }
 
   return (
     <div className="text-display">
-      <div className="text-content">
+      <div
+        className="text-content"
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
+      >
         <p className="article-text">
           {safeSentences.map((sentence, index) => (
             <React.Fragment key={index}>
@@ -265,6 +454,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           ))}
         </p>
       </div>
+      {tooltipEl}
     </div>
   );
 }
