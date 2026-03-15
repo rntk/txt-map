@@ -1,0 +1,40 @@
+version: '3.8'
+
+# Docker Compose for running tests
+# Usage:
+#   docker-compose -f docker-compose.test.yml run --rm tests
+#   docker-compose -f docker-compose.test.yml run --rm tests pytest tests/unit/test_submission_handler.py -v
+#   docker-compose -f docker-compose.test.yml run --rm tests pytest --cov=. --cov-report=html
+
+services:
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017/
+      - PYTHONPATH=/app
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["pytest", "-v", "--tb=short"]
+    networks:
+      - test-network
+
+  mongodb:
+    image: mongo:8
+    environment:
+      - MONGO_INITDB_DATABASE=rss
+    volumes:
+      - mongodb_test_data:/data/db
+    networks:
+      - test-network
+
+volumes:
+  mongodb_test_data:
+
+networks:
+  test-network:
+    driver: bridge

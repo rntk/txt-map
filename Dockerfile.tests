@@ -1,0 +1,48 @@
+# Dockerfile for running tests
+# Usage:
+#   docker build -f Dockerfile.tests -t rss-tests .
+#   docker run --rm -v $(pwd):/app rss-tests pytest
+#   docker run --rm -v $(pwd):/app rss-tests pytest tests/unit/test_submission_handler.py -v
+#   docker run --rm -v $(pwd):/app rss-tests pytest --cov=. --cov-report=html
+
+FROM python:3.13-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install test dependencies
+COPY requirements-test.txt .
+RUN pip install --no-cache-dir -r requirements-test.txt
+
+# Copy application code
+COPY main.py .
+COPY workers.py .
+COPY handlers/ ./handlers/
+COPY lib/ ./lib/
+
+# Copy test files
+COPY tests/ ./tests/
+
+# Create __init__.py files if missing for test discovery
+RUN touch tests/__init__.py tests/unit/__init__.py tests/unit/test_tasks/__init__.py tests/integration/__init__.py 2>/dev/null || true
+
+# Set PYTHONPATH
+ENV PYTHONPATH=/app
+
+# Default command: run all tests with verbose output
+CMD ["pytest", "-v", "--tb=short"]
