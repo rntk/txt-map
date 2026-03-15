@@ -8,7 +8,7 @@ function stripHtml(html) {
   }
 }
 
-export default function GroupedByTopicsView({ topics, rawHtml, sentences, isRawTextMode }) {
+export default function GroupedByTopicsView({ topics, rawHtml, sentences, isRawTextMode, highlightedTopicName }) {
   const sortedTopics = useMemo(() => {
     if (!Array.isArray(topics) || topics.length === 0) return [];
 
@@ -55,8 +55,13 @@ export default function GroupedByTopicsView({ topics, rawHtml, sentences, isRawT
           extractedText = frags.join(' ');
         }
 
+        const isHighlighted = highlightedTopicName === topic.name;
         return (
-          <div key={topic.name} className="grouped-topic-section">
+          <div
+            key={topic.name}
+            id={`grouped-topic-${topic.name}`}
+            className={`grouped-topic-section${isHighlighted ? ' grouped-topic-highlight' : ''}`}
+          >
             <div className="grouped-topic-title">{topic.name}</div>
             {isRawTextMode ? (
               <pre className="grouped-topic-text raw">{extractedText || '(no text)'}</pre>

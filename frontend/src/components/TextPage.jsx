@@ -332,6 +332,12 @@ function TextPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('article'); // 'article' | 'summary' | 'raw_text' | 'topics_river' | 'mindmap'
   const [groupedByTopics, setGroupedByTopics] = useState(false);
+  const [highlightedGroupedTopic, setHighlightedGroupedTopic] = useState(null);
+  useEffect(() => {
+    if (highlightedGroupedTopic && !selectedTopics.some(t => t.name === highlightedGroupedTopic)) {
+      setHighlightedGroupedTopic(null);
+    }
+  }, [selectedTopics, highlightedGroupedTopic]);
   const [summaryModalData, setSummaryModalData] = useState(null); // For modal window
   const [readTopics, setReadTopics] = useState(new Set());
   const hasLoadedRef = useRef(false);
@@ -594,6 +600,39 @@ function TextPage() {
   };
 
   const navigateTopicSentence = (topic, direction = 'next') => {
+    if (groupedByTopics) {
+      const isSelected = (name) => selectedTopics.some(t => t.name === name);
+      const highlightSection = (name) => {
+        setHighlightedGroupedTopic(name);
+        if (!isSelected(name)) {
+          setTimeout(() => setHighlightedGroupedTopic(null), 1500);
+        }
+      };
+      if (direction === 'focus') {
+        const el = document.getElementById(`grouped-topic-${topic.name}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          highlightSection(topic.name);
+        }
+      } else {
+        const allSections = Array.from(document.querySelectorAll('[id^="grouped-topic-"]'));
+        const currentId = `grouped-topic-${topic.name}`;
+        const currentIdx = allSections.findIndex(el => el.id === currentId);
+        let targetIdx = currentIdx;
+        if (direction === 'next') {
+          targetIdx = currentIdx < allSections.length - 1 ? currentIdx + 1 : currentIdx;
+        } else {
+          targetIdx = currentIdx > 0 ? currentIdx - 1 : 0;
+        }
+        const targetEl = allSections[targetIdx];
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          highlightSection(targetEl.id.replace('grouped-topic-', ''));
+        }
+      }
+      return;
+    }
+
     if (activeTab === 'summary') {
       const paraIndices = topicSummaryParaMap[topic.name];
       if (!paraIndices || paraIndices.length === 0) return;
@@ -1028,6 +1067,7 @@ function TextPage() {
                   rawHtml={articles[0]?.raw_html || ''}
                   sentences={articles[0]?.sentences || []}
                   isRawTextMode={activeTab === 'raw_text'}
+                  highlightedTopicName={highlightedGroupedTopic}
                 />
               ) : activeTab === 'raw_text' ? (
                 <div className="summary-content">
