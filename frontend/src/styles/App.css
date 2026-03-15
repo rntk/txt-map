@@ -25,6 +25,25 @@ body {
   gap: 15px;
 }
 
+.article-header-sticky {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  border-bottom: 1px solid #dfe3e8;
+  padding: 4px 12px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-left: -5px;
+  margin-right: -5px;
+}
+
+.article-body {
+  padding: 0 10px;
+}
+
 .article-title-section {
   flex: 0 1 auto;
 }

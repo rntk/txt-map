@@ -74,11 +74,6 @@ function TextPageActionsPortal({ children }) {
   return createPortal(children, target);
 }
 
-const SIDEBAR_TABS = [
-  { key: 'article', label: 'Article' },
-  { key: 'raw_text', label: 'Raw Text' },
-];
-
 const FULLSCREEN_TABS = [
   { key: 'summary', label: 'Topic Summaries' },
   { key: 'topics', label: 'Topics' },
@@ -896,17 +891,6 @@ function TextPage() {
         {articles.length > 0 && (
           <div className="tab-bar">
             <div className="tab-group">
-              <span className="tab-group-label">Views</span>
-              <div className="tabs">
-                {SIDEBAR_TABS.map(tab => (
-                  <button key={tab.key} className={activeTab === tab.key ? 'active' : ''}
-                    onClick={() => handleTabClick(tab.key)}>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="tab-group">
               <span className="tab-group-label">Visualizations</span>
               <div className="tabs">
                 {FULLSCREEN_TABS.map(tab => (
@@ -1004,49 +988,64 @@ function TextPage() {
                   </div>
                 );
               })()}
-              <div className="article-section">
-                <div className="article-header">
-                  {submission.source_url && (
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
-                      Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
-                    </div>
-                  )}
-                </div>
-
-                {activeTab === 'raw_text' ? (
-                  <div className="summary-content">
-                    <h2>Raw Text</h2>
-                    <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
-                      {rawText.length.toLocaleString()} characters
-                    </div>
-                    <RawTextDisplay
-                      rawText={rawText}
-                      articleIndex={0}
-                      highlightRanges={rawTextHighlightRanges}
-                      fadeRanges={rawTextFadeRanges}
-                    />
-                  </div>
-                ) : (
-                  articles.map((article, index) => (
-                    <TextDisplay
-                      key={index}
-                      sentences={article.sentences}
-                      selectedTopics={selectedTopics}
-                      hoveredTopic={hoveredTopic}
-                      readTopics={readTopics}
-                      articleTopics={article.topics}
-                      articleIndex={index}
-                      topicSummaries={article.topic_summaries}
-                      paragraphMap={article.paragraph_map}
-                      rawHtml={article.raw_html}
-                      markerWordIndices={article.marker_word_indices}
-                      onToggleRead={toggleRead}
-                      onToggleTopic={toggleTopic}
-                      onNavigateTopic={navigateTopicSentence}
-                    />
-                  ))
-                )}
+          <div className="article-section">
+            <div className="article-header-sticky">
+              <div className="global-menu-links">
+                <button 
+                  className={`global-menu-link${activeTab === 'article' ? ' active' : ''}`}
+                  onClick={() => handleTabClick('article')}
+                >
+                  Article
+                </button>
+                <button 
+                  className={`global-menu-link${activeTab === 'raw_text' ? ' active' : ''}`}
+                  onClick={() => handleTabClick('raw_text')}
+                >
+                  Raw Text
+                </button>
               </div>
+              {submission.source_url && (
+                <div style={{ fontSize: '11px', color: '#666' }}>
+                  Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
+                </div>
+              )}
+            </div>
+
+            <div className="article-body">
+              {activeTab === 'raw_text' ? (
+                <div className="summary-content">
+                  <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
+                    {rawText.length.toLocaleString()} characters
+                  </div>
+                  <RawTextDisplay
+                    rawText={rawText}
+                    articleIndex={0}
+                    highlightRanges={rawTextHighlightRanges}
+                    fadeRanges={rawTextFadeRanges}
+                  />
+                </div>
+              ) : (
+                articles.map((article, index) => (
+                  <TextDisplay
+                    key={index}
+                    sentences={article.sentences}
+                    selectedTopics={selectedTopics}
+                    hoveredTopic={hoveredTopic}
+                    readTopics={readTopics}
+                    articleTopics={article.topics}
+                    articleIndex={index}
+                    topicSummaries={article.topic_summaries}
+                    paragraphMap={article.paragraph_map}
+                    rawHtml={article.raw_html}
+                    markerWordIndices={article.marker_word_indices}
+                    onToggleRead={toggleRead}
+                    onToggleTopic={toggleTopic}
+                    onNavigateTopic={navigateTopicSentence}
+                  />
+                ))
+              )}
+            </div>
+          </div>
             </div>
           </div>
 
