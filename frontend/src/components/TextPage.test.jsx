@@ -84,7 +84,11 @@ describe('TextPage raw text navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
 
     // Need to select the topic to make its range highlighted
-    fireEvent.click(screen.getByRole('checkbox'));
+    // Use getAllByRole since there may be multiple checkboxes (e.g. "Grouped by topics" toggle)
+    const topicCheckbox = screen.getAllByRole('checkbox').find(
+      el => el.closest('li') !== null
+    );
+    fireEvent.click(topicCheckbox);
 
     await waitFor(() => {
       expect(document.querySelector('.raw-text-token')).toBeInTheDocument();
