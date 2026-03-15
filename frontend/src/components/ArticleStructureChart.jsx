@@ -326,8 +326,8 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                             const cx = MARGIN.left + block.x + block.width / 2;
                             const cy = MARGIN.top + 16;
                             const showMenu = block.width >= 60;
-                            const btnX = MARGIN.left + block.x + block.width - 20;
-                            const btnY = MARGIN.top + 8;
+                            const btnX = cx;
+                            const btnY = MARGIN.top + 34;
                             const fontSize = block.width > 100 ? 12 : 10;
 
                             return (
