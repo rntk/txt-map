@@ -1,110 +1,12 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { sanitizeHTML } from '../utils/sanitize';
+import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
 
 // Tooltip configuration constants
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 const TOOLTIP_HIDE_DELAY_MS = 200;
-
-function isInAnyRange(start, end, ranges) {
-  return ranges.some(r => start < r.end && end > r.start);
-}
-
-function wrapWord(htmlWord, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges) {
-  const wordEnd = wordStart + htmlWord.length;
-
-  if (!isInAnyRange(wordStart, wordEnd, allTopicRanges)) {
-    return htmlWord;
-  }
-
-  const classes = ['word-token'];
-  if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
-    classes.push('highlighted');
-  } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
-    classes.push('faded');
-  }
-
-  return `<span class="${classes.join(' ')}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
-}
-
-function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, highlightRanges, fadeRanges) {
-  if (!rawHtml) return '';
-
-  const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
-  const allTopicRanges = [];
-  safeTopics.forEach(topic => {
-    (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
-      const s = Number(range.start);
-      const e = Number(range.end);
-      if (Number.isFinite(s) && Number.isFinite(e)) {
-        allTopicRanges.push({ start: s, end: e });
-      }
-    });
-  });
-
-  if (allTopicRanges.length === 0) {
-    return sanitizeHTML(rawHtml);
-  }
-
-  // Scan the raw HTML string character by character.
-  // The ranges are in raw-HTML-string coordinates, so we work directly
-  // with the string to match positions correctly.
-  let result = '';
-  let inTag = false;
-  let inQuote = false;
-  let quoteChar = '';
-  let wordBuffer = '';
-  let wordStart = -1;
-
-  for (let i = 0; i < rawHtml.length; i++) {
-    const ch = rawHtml[i];
-
-    if (inTag) {
-      if (inQuote) {
-        if (ch === quoteChar) inQuote = false;
-      } else if (ch === '"' || ch === "'") {
-        inQuote = true;
-        quoteChar = ch;
-      } else if (ch === '>') {
-        inTag = false;
-      }
-      result += ch;
-    } else if (ch === '<') {
-      // Flush any accumulated word before entering tag
-      if (wordBuffer) {
-        result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
-        wordBuffer = '';
-        wordStart = -1;
-      }
-      inTag = true;
-      result += ch;
-    } else {
-      // Text content
-      if (/\s/.test(ch)) {
-        // Whitespace: flush word buffer
-        if (wordBuffer) {
-          result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
-          wordBuffer = '';
-          wordStart = -1;
-        }
-        result += ch;
-      } else {
-        // Non-whitespace: accumulate into word
-        if (wordStart === -1) wordStart = i;
-        wordBuffer += ch;
-      }
-    }
-  }
-
-  // Flush remaining word
-  if (wordBuffer) {
-    result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges);
-  }
-
-  // Sanitize the final HTML (preserves our span wrappers with data-* attrs)
-  return sanitizeHTML(result);
-}
 
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
