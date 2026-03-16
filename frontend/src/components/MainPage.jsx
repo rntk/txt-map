@@ -133,8 +133,10 @@ function UploadCard() {
 function MainPage() {
     return (
         <div className="main-page">
+            <header className="main-header">
+                <h1 className="main-header-title">Dashboard</h1>
+            </header>
             <div className="main-container">
-                <h1 className="main-title">Dashboard</h1>
                 <div className="menu-grid">
                     {menuItems.map((item, index) => (
                         <a key={index} href={item.link} className="menu-card">

@@ -50,7 +50,7 @@ function GlobalTopicsPage() {
   };
 
   const handleNavigateTopic = (topic) => {
-    const key = `${topic.name}`;
+    const key = topic.name;
     const el = groupRefs.current[key];
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });

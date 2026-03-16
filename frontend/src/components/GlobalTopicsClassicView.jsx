@@ -3,11 +3,11 @@ import React from 'react';
 function GlobalTopicsClassicView({ groups, groupRefs }) {
   return (
     <>
-      {groups.map((group, i) => {
+      {groups.map((group) => {
         const refKey = group.topic_name;
         return (
           <div
-            key={i}
+            key={group.submission_id}
             className="global-topic-group"
             ref={(el) => {
               if (el) groupRefs.current[refKey] = el;

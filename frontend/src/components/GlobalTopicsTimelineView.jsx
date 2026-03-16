@@ -1,44 +1,55 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { splitTopicPath, getTopicColorTokens } from '../utils/summaryTimeline';
 
 function GlobalTopicsTimelineView({ groups, groupRefs }) {
-  const sorted = [...groups].sort((a, b) => a.topic_name.localeCompare(b.topic_name));
-  const aggregated = [];
-  sorted.forEach((group) => {
-    const last = aggregated[aggregated.length - 1];
-    if (last && last.topic_name === group.topic_name) {
-      last.items.push(group);
-    } else {
-      aggregated.push({ topic_name: group.topic_name, items: [group] });
-    }
-  });
+  const aggregated = useMemo(() => {
+    const sorted = [...groups].sort((a, b) => a.topic_name.localeCompare(b.topic_name));
+    const aggResult = [];
+    sorted.forEach((group) => {
+      const last = aggResult[aggResult.length - 1];
+      if (last && last.topic_name === group.topic_name) {
+        last.items.push(group);
+      } else {
+        aggResult.push({ topic_name: group.topic_name, items: [group] });
+      }
+    });
 
-  let previousTopLevelLabel = null;
+    return aggResult.map((agg, i, arr) => {
+      const segments = splitTopicPath(agg.topic_name);
+      const topLevelLabel = segments[0] || agg.topic_name;
+      const subtopicLabel = segments[segments.length - 1] || agg.topic_name;
+      const prevSegments = i > 0 ? splitTopicPath(arr[i - 1].topic_name) : [];
+      const prevTopLevelLabel = prevSegments[0] || (i > 0 ? arr[i - 1].topic_name : null);
+      const showSection = i === 0 || topLevelLabel !== prevTopLevelLabel;
+
+      return {
+        ...agg,
+        topLevelLabel,
+        subtopicLabel,
+        showSection,
+        colors: getTopicColorTokens(topLevelLabel),
+      };
+    });
+  }, [groups]);
 
   return (
     <div className="summary-timeline">
-      {aggregated.map((agg, i) => {
+      {aggregated.map((agg) => {
         const refKey = agg.topic_name;
-        const segments = splitTopicPath(agg.topic_name);
-        const topLevelLabel = segments[0] || agg.topic_name;
-        const subtopicLabel = segments[segments.length - 1] || agg.topic_name;
-        const showSection = topLevelLabel !== previousTopLevelLabel;
-        if (showSection) previousTopLevelLabel = topLevelLabel;
-        const colors = getTopicColorTokens(topLevelLabel);
 
         return (
-          <React.Fragment key={i}>
-            {showSection && (
+          <React.Fragment key={agg.topic_name}>
+            {agg.showSection && (
               <div className="timeline-section-marker">
                 <span
                   className="timeline-section-pill"
                   style={{
-                    background: colors.sectionSurface,
-                    borderColor: colors.sectionBorder,
-                    color: colors.sectionText,
+                    background: agg.colors.sectionSurface,
+                    borderColor: agg.colors.sectionBorder,
+                    color: agg.colors.sectionText,
                   }}
                 >
-                  {topLevelLabel}
+                  {agg.topLevelLabel}
                 </span>
               </div>
             )}
@@ -50,23 +61,23 @@ function GlobalTopicsTimelineView({ groups, groupRefs }) {
             >
               <div
                 className="timeline-subtopic"
-                style={{ color: colors.subtopicText }}
+                style={{ color: agg.colors.subtopicText }}
               >
-                {subtopicLabel !== topLevelLabel ? subtopicLabel : ''}
+                {agg.subtopicLabel !== agg.topLevelLabel ? agg.subtopicLabel : ''}
               </div>
               <div
                 className="timeline-dot"
-                style={{ background: colors.dot }}
+                style={{ background: agg.colors.dot }}
               />
               <div
                 className="timeline-cards-group"
-                style={{ borderColor: colors.border, background: colors.surface }}
+                style={{ borderColor: agg.colors.border, background: agg.colors.surface }}
               >
-                {agg.items.map((group, k) => (
+                {agg.items.map((group) => (
                   <div
-                    key={k}
+                    key={group.submission_id}
                     className="timeline-card"
-                    style={{ borderColor: colors.border, background: colors.surface }}
+                    style={{ borderColor: agg.colors.border, background: agg.colors.surface }}
                   >
                     <div className="global-topic-group-source" style={{ marginBottom: '6px' }}>
                       {group.source_url ? (
