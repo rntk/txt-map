@@ -25,6 +25,12 @@ const menuItems = [
         description: 'Browse, filter, and delete cached LLM responses to save compute and speed up reprocessing.',
         icon: '🗄️',
         link: '/page/cache'
+    },
+    {
+        title: 'Global Topics',
+        description: 'Explore topics aggregated across all submissions. See sentences from multiple sources grouped by topic.',
+        icon: '🌐',
+        link: '/page/topics'
     }
 ];
 

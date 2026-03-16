@@ -111,6 +111,10 @@ def serve_diff_page():
 def serve_cache_page():
     return FileResponse("frontend/build/index.html")
 
+@app.get("/page/topics")
+def serve_topics_page():
+    return FileResponse("frontend/build/index.html")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -5,6 +5,7 @@ import TextListPage from './components/TextListPage';
 import MainPage from './components/MainPage';
 import DiffPage from './components/DiffPage';
 import CachePage from './components/CachePage';
+import GlobalTopicsPage from './components/GlobalTopicsPage';
 import './styles/App.css';
 
 const globalMenuItems = [
@@ -13,6 +14,7 @@ const globalMenuItems = [
   { title: 'Task Control', link: '/page/tasks' },
   { title: 'Diff', link: '/page/diff' },
   { title: 'LLM Cache', link: '/page/cache' },
+  { title: 'Global Topics', link: '/page/topics' },
 ];
 
 function App() {
@@ -29,7 +31,7 @@ function App() {
     const currentPath = window.location.pathname;
 
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <nav className="global-menu" aria-label="Global navigation">
           <div className="global-menu-links">
             {globalMenuItems.map((item) => {
@@ -51,7 +53,7 @@ function App() {
           )}
         </nav>
         <main className="global-page-content">{content}</main>
-      </>
+      </div>
     );
   };
 
@@ -83,6 +85,11 @@ function App() {
   // LLM Cache page
   if (pageType === 'cache') {
     return renderWithGlobalMenu(<CachePage />);
+  }
+
+  // Global Topics page
+  if (pageType === 'topics') {
+    return renderWithGlobalMenu(<GlobalTopicsPage />);
   }
 
   // Text submission page

@@ -371,6 +371,80 @@ def get_word_cloud(
     return {"words": words, "sentence_count": len(sentence_indices)}
 
 
+@router.get("/global-topics")
+def get_global_topics(
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Return aggregated topic tree across all completed submissions.
+    """
+    db = submissions_storage._db
+    pipeline = [
+        {"$match": {"tasks.split_topic_generation.status": "completed"}},
+        {"$unwind": "$results.topics"},
+        {"$group": {
+            "_id": "$results.topics.name",
+            "total_sentences": {"$sum": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}},
+            "sources": {"$push": {
+                "submission_id": "$submission_id",
+                "source_url": "$source_url",
+                "sentence_count": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}
+            }}
+        }},
+        {"$project": {
+            "_id": 0,
+            "name": "$_id",
+            "total_sentences": 1,
+            "source_count": {"$size": "$sources"},
+            "sources": 1
+        }},
+        {"$sort": {"name": 1}}
+    ]
+    topics = list(db.submissions.aggregate(pipeline))
+    return {"topics": topics}
+
+
+@router.get("/global-topics/sentences")
+def get_global_topics_sentences(
+    topic_name: List[str] = Query(default=[]),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+):
+    """
+    Return sentence texts for selected topics across all submissions.
+    """
+    if not topic_name:
+        return {"groups": []}
+
+    db = submissions_storage._db
+    submissions = list(db.submissions.find(
+        {"tasks.split_topic_generation.status": "completed"},
+        {"submission_id": 1, "source_url": 1, "results.topics": 1, "results.sentences": 1}
+    ))
+
+    groups = []
+    for submission in submissions:
+        results = submission.get("results") or {}
+        all_sentences = results.get("sentences") or []
+        topics = results.get("topics") or []
+        for topic in topics:
+            if topic.get("name") not in topic_name:
+                continue
+            indices = topic.get("sentences") or []
+            texts = [
+                all_sentences[idx - 1]
+                for idx in indices
+                if 1 <= idx <= len(all_sentences)
+            ]
+            if texts:
+                groups.append({
+                    "submission_id": submission["submission_id"],
+                    "source_url": submission.get("source_url", ""),
+                    "topic_name": topic["name"],
+                    "sentences": texts
+                })
+    return {"groups": groups}
+
+
 @router.get("/submissions")
 def list_submissions(
     submission_id: Optional[str] = None,
