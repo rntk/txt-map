@@ -24,6 +24,7 @@ class OpenAIClient(LLMClient):
                 model=self._model,
                 messages=[{"role": "user", "content": user_msgs[0]}],
                 temperature=temperature,
+                service_tier="flex",
             )
             content = response.choices[0].message.content
             if content is None:
