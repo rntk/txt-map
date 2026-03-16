@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { normalizeCharRange } from '../utils/textHighlight';
 
 export function useTopicNavigation({
@@ -97,7 +98,7 @@ export function useTopicNavigation({
       }));
   };
 
-  const navigateTopicSentence = (topic, direction = 'next') => {
+  const navigateTopicSentence = useCallback((topic, direction = 'next') => {
     if (groupedByTopics) {
       const isSelected = (name) => selectedTopics.some(t => t.name === name);
       const highlightSection = (name) => {
@@ -229,7 +230,7 @@ export function useTopicNavigation({
     if (targetEl) {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  };
+  }, [activeTab, rawText, safeTopics, groupedByTopics, selectedTopics, topicSummaryParaMap, setHighlightedGroupedTopic]);
 
   return { navigateTopicSentence };
 }

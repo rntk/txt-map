@@ -8,8 +8,10 @@ import {
   truncateWithEllipsis,
   getFirstScopedSentence,
 } from '../utils/gridUtils';
-
-const TILE_GRID_COLS = 2;
+import TileGrid from './grid/TileGrid';
+import SummaryBackground from './grid/SummaryBackground';
+import ArticleMinimap from './grid/ArticleMinimap';
+import SentenceList from './grid/SentenceList';
 
 function Breadcrumb({ path, onNavigate }) {
   return (
@@ -35,149 +37,7 @@ function Breadcrumb({ path, onNavigate }) {
   );
 }
 
-function TileGrid({ items, onTileClick, isBackground }) {
-  return (
-    <div className={isBackground ? 'grid-view-background' : 'grid-view-foreground'}>
-      <div
-        className="grid-view-tiles"
-        style={{ gridTemplateColumns: `repeat(${TILE_GRID_COLS}, 1fr)` }}
-      >
-        {items.map((item, i) => (
-          <div
-            key={item.label + i}
-            className={`grid-view-tile ${isBackground ? '' : 'grid-view-tile-interactive'}`}
-            onClick={!isBackground && onTileClick ? () => onTileClick(item) : undefined}
-          >
-            {/* Top zone: text content */}
-            <div className="grid-view-tile-content">
-              <div className="grid-view-tile-label">{item.label}</div>
-              {item.previewLabel && (
-                <div className="grid-view-tile-preview-label">{item.previewLabel}</div>
-              )}
-              {item.previewText && (
-                <div className="grid-view-tile-preview">{item.previewText}</div>
-              )}
-              {item.tags && item.tags.length > 0 ? (
-                <div className="grid-view-tags-cloud">
-                  {item.tags.map((tag) => (
-                    <span
-                      key={tag.label}
-                      className="grid-view-tag-chip"
-                      style={{ fontSize: `${tag.fontSize.toFixed(1)}px` }}
-                      title={`Frequency: ${tag.count}`}
-                    >
-                      {tag.label}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid-view-tags-empty">No tags</div>
-              )}
-            </div>
-            {/* Bottom zone: stats */}
-            <div className="grid-view-tile-stats">
-              <div className="grid-view-tile-stat">
-                <div className="grid-view-tile-stat-value">{item.topicCount ?? 0}</div>
-                <div className="grid-view-tile-stat-label">Topics</div>
-              </div>
-              <div className="grid-view-tile-stat grid-view-tile-stat--hero">
-                <div className="grid-view-tile-stat-value">{item.sentenceCount ?? 0}</div>
-                <div className="grid-view-tile-stat-label">Sentences</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SummaryBackground({ items, cols }) {
-  return (
-    <div className="grid-view-background">
-      <div
-        className="grid-view-tiles"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
-      >
-        {items.map((item, i) => (
-          <div key={item.label + i} className="grid-view-tile grid-view-tile-summary-bg">
-            <div className="grid-view-tile-label">{item.label}</div>
-            {item.summary && (
-              <div className="grid-view-tile-summary-text">{item.summary}</div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ArticleMinimap({ sentences, highlightedIndices }) {
-  const highlightSet = useMemo(() => new Set(highlightedIndices), [highlightedIndices]);
-
-  // Use sentence length to derive a text-line width for a realistic document feel.
-  const maxLen = useMemo(() => Math.max(...sentences.map(s => s.length), 1), [sentences]);
-
-  const minimapRows = useMemo(() => {
-    return sentences.flatMap((sentence, sentenceIdx) => {
-      const baseWidth = Math.round(52 + (sentence.length / maxLen) * 44);
-      const lineCount = Math.max(2, Math.min(8, Math.ceil(sentence.length / 24)));
-      const paragraphBreak = sentenceIdx > 0 && sentenceIdx % 6 === 0;
-
-      return Array.from({ length: lineCount }, (_, lineIdx) => {
-        const tailDrop = lineIdx === lineCount - 1 ? 16 : 0;
-        const steppedDrop = lineIdx * 5;
-        const rhythmOffset = ((sentenceIdx + lineIdx) % 3) * 2;
-        const widthPct = Math.max(30, Math.min(98, baseWidth - steppedDrop - tailDrop + rhythmOffset));
-        return {
-          key: `${sentenceIdx}-${lineIdx}`,
-          paragraphBreak: paragraphBreak && lineIdx === 0,
-          widthPct,
-          isHighlight: highlightSet.has(sentenceIdx + 1),
-          isContinuation: lineIdx > 0,
-        };
-      });
-    });
-  }, [sentences, maxLen, highlightSet]);
-
-  return (
-    <div className="grid-view-minimap">
-      {minimapRows.map((row) => {
-        const highlightClass = row.isHighlight
-          ? (row.isContinuation ? ' grid-view-minimap-bar--highlight-soft' : ' grid-view-minimap-bar--highlight')
-          : '';
-        return (
-          <div
-            key={row.key}
-            className={`grid-view-minimap-row${row.paragraphBreak ? ' grid-view-minimap-row--break' : ''}`}
-          >
-            <div
-              className={`grid-view-minimap-bar${highlightClass}`}
-              style={{ width: `${row.widthPct}%` }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function SentenceList({ sentenceIndices, sentences }) {
-  return (
-    <div className="grid-view-sentences">
-      {sentenceIndices.map((idx, i) => {
-        const sentence = sentences[idx - 1];
-        if (!sentence) return null;
-        return (
-          <div key={i} className="grid-view-sentence-item">
-            <span className="grid-view-sentence-num">{idx}</span>
-            <span>{sentence}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+const TILE_GRID_COLS = 2;
 
 function GridView({ topics, topicSummaries, sentences, onClose }) {
   const [currentPath, setCurrentPath] = useState([]);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const styles = {
   treeNode: {
@@ -41,6 +41,10 @@ const styles = {
   },
   topicTitleHover: {
     textDecoration: 'underline',
+  },
+  topicTitleClickable: {
+    cursor: 'pointer',
+    fontWeight: '500',
   },
   stats: {
     fontSize: '11px',
@@ -116,8 +120,6 @@ function TopicTreeNode({
   const isLeafSelected = topic && safeSelectedTopics.some(t => t.name === topic.name);
   const isLeafRead = topic && safeReadTopics.has(topic.name);
 
-  const [isTitleHovered, setIsTitleHovered] = useState(false);
-
   const childProps = {
     searchQuery,
     expandedNodes,
@@ -183,16 +185,14 @@ function TopicTreeNode({
                   style={styles.checkbox}
                 />
                 <span
+                  className="topic-tree-node-title"
                   style={{
                     ...styles.topicTitle,
-                    ...(isTitleHovered ? styles.topicTitleHover : {}),
                     ...(isLeafRead ? { color: '#888' } : {})
                   }}
                   onClick={() => {
                     onNavigateTopic && onNavigateTopic(topic, 'focus');
                   }}
-                  onMouseEnter={() => setIsTitleHovered(true)}
-                  onMouseLeave={() => setIsTitleHovered(false)}
                 >
                   {node.name}
                 </span>
@@ -306,4 +306,4 @@ function TopicTreeNode({
   );
 }
 
-export default TopicTreeNode;
+export default React.memo(TopicTreeNode);

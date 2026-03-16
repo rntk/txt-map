@@ -51,4 +51,4 @@ function TopicSentencePanel({ panelTopic, articles, onClose }) {
   );
 }
 
-export default TopicSentencePanel;
+export default React.memo(TopicSentencePanel);

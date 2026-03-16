@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import '../styles/App.css';
+import { formatDate } from '../utils/chartConstants';
 
 const TASK_TYPES = [
   'split_topic_generation',
@@ -39,7 +40,7 @@ function TaskControlPage() {
     setError(null);
     try {
       const query = buildQuery();
-      const response = await fetch(`http://127.0.0.1:8000/api/task-queue?${query}`);
+      const response = await fetch(`/api/task-queue?${query}`);
       if (!response.ok) {
         throw new Error(await response.text());
       }
@@ -59,7 +60,7 @@ function TaskControlPage() {
   const handleDelete = async (taskId) => {
     setActionMessage('');
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/task-queue/${taskId}`, {
+      const response = await fetch(`/api/task-queue/${taskId}`, {
         method: 'DELETE'
       });
       if (!response.ok) {
@@ -75,7 +76,7 @@ function TaskControlPage() {
   const handleRepeat = async (taskId) => {
     setActionMessage('');
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/task-queue/${taskId}/repeat`, {
+      const response = await fetch(`/api/task-queue/${taskId}/repeat`, {
         method: 'POST'
       });
       if (!response.ok) {
@@ -107,7 +108,7 @@ function TaskControlPage() {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/task-queue/add', {
+      const response = await fetch('/api/task-queue/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -121,12 +122,6 @@ function TaskControlPage() {
     } catch (err) {
       setActionMessage(`Add failed: ${err.message}`);
     }
-  };
-
-  const formatDate = (iso) => {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleString();
   };
 
   const handleFilterSubmit = (event) => {

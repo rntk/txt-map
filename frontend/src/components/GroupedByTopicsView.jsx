@@ -8,7 +8,7 @@ function stripHtml(html) {
   }
 }
 
-export default function GroupedByTopicsView({ topics, rawHtml, sentences, isRawTextMode, highlightedTopicName }) {
+function GroupedByTopicsView({ topics, rawHtml, sentences, isRawTextMode, highlightedTopicName }) {
   const sortedTopics = useMemo(() => {
     if (!Array.isArray(topics) || topics.length === 0) return [];
 
@@ -74,3 +74,5 @@ export default function GroupedByTopicsView({ topics, rawHtml, sentences, isRawT
     </div>
   );
 }
+
+export default React.memo(GroupedByTopicsView);

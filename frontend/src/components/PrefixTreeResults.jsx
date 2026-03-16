@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import FullScreenGraph from './FullScreenGraph';
 import HierarchicalTree, { buildPrefixTreeHierarchy } from './shared/HierarchicalTree';
 import '../styles/App.css';
@@ -30,7 +30,7 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
 
   const hierarchyData = useMemo(() => buildPrefixTreeHierarchy(treeData), [treeData]);
 
-  const handleNodeClick = (name, sentenceIndices, path) => {
+  const handleNodeClick = useCallback((name, sentenceIndices, path) => {
     if (!path) return;
     setSelectedPanels((prev) => {
       const existingIndex = prev.findIndex((panel) => panel.path === path);
@@ -42,9 +42,9 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
       const nextPanel = { path, name, sentenceIndices: sentenceIndices || [] };
       return [...prev, nextPanel];
     });
-  };
+  }, []);
 
-  const handlePanelDrag = (path, x, y) => {
+  const handlePanelDrag = useCallback((path, x, y) => {
     setSelectedPanels((prev) => {
       const index = prev.findIndex((p) => p.path === path);
       if (index === -1) return prev;
@@ -52,11 +52,11 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
       updated[index] = { ...updated[index], x, y };
       return updated;
     });
-  };
+  }, []);
 
-  const closePanel = (path) => {
+  const closePanel = useCallback((path) => {
     setSelectedPanels((prev) => prev.filter((panel) => panel.path !== path));
-  };
+  }, []);
 
   const handleClose = () => {
     if (onCloseFullscreen) {

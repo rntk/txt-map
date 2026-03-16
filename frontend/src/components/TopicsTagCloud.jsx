@@ -158,7 +158,7 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
       const params = new URLSearchParams();
       path.forEach(seg => params.append('path', seg));
       const res = await fetch(
-        `http://127.0.0.1:8000/api/submission/${submissionId}/word-cloud?${params}`
+        `/api/submission/${submissionId}/word-cloud?${params}`
       );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();

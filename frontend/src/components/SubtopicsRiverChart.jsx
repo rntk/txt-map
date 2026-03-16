@@ -292,6 +292,9 @@ const SubtopicsRiverChart = ({ topics, subtopics, sentences = [], articleLength 
             .style("fill", "#1a1a1a")
             .text("Detailed Subtopic Streams Across Chapters");
 
+        return () => {
+            d3.select('body').selectAll('.river-tooltip').remove();
+        };
     }, [orderedSubtopics, effectiveLength, colorScale, topics]);
 
     return (

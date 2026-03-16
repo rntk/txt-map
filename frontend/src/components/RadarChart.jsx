@@ -2,7 +2,10 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import * as d3 from 'd3';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import '../styles/App.css';
-import { getLevelLabel, getScopedMaxLevel } from '../utils/topicHierarchy';
+import { getLevelLabel } from '../utils/topicHierarchy';
+import { BASE_COLORS } from '../utils/chartConstants';
+import { useTopicLevel } from '../hooks/useTopicLevel';
+import { useContainerSize } from '../hooks/useContainerSize';
 
 /**
  * RadarChart
@@ -11,24 +14,11 @@ import { getLevelLabel, getScopedMaxLevel } from '../utils/topicHierarchy';
  * - Level selector allows viewing different hierarchy levels (0 = top level, 1 = subtopics, etc.)
  */
 function RadarChart({ topics, sentences = [] }) {
-    const [selectedLevel, setSelectedLevel] = useState(0);
+    const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
     const [hoveredTopic, setHoveredTopic] = useState(null);
-    const [containerSize, setContainerSize] = useState(600);
+    const { containerRef, containerSize } = useContainerSize(600);
     const svgRef = useRef(null);
-    const containerRef = useRef(null);
     const zoomRef = useRef(null);
-
-    // Track container width via ResizeObserver
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver(entries => {
-            const w = entries[0].contentRect.width;
-            if (w > 0) setContainerSize(w);
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
 
     // Parse topics and compute character counts per topic at selected level
     const chartData = useMemo(() => {
@@ -105,28 +95,12 @@ function RadarChart({ topics, sentences = [] }) {
         return result;
     }, [topics, sentences, selectedLevel]);
 
-    // Determine max level available
-    const maxLevel = useMemo(() => getScopedMaxLevel(topics, []), [topics]);
-
-    useEffect(() => {
-        if (selectedLevel > maxLevel) {
-            setSelectedLevel(maxLevel);
-        }
-    }, [selectedLevel, maxLevel]);
-
     // Color scale for topics
     const colorScale = useMemo(() => {
         const colors = {};
-        const baseColors = [
-            '#7ba3cc', '#e8a87c', '#85bb65', '#c9a0dc',
-            '#d4a5a5', '#a0c4a9', '#cfb997', '#9db4c0',
-            '#c2b280', '#b5c7d3', '#d4a76a', '#a5b8d0',
-        ];
-
         chartData.forEach((item, index) => {
-            colors[item.name] = baseColors[index % baseColors.length];
+            colors[item.name] = BASE_COLORS[index % BASE_COLORS.length];
         });
-
         return colors;
     }, [chartData]);
 

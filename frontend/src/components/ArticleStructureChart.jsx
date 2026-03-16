@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import '../styles/App.css';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import TopicSentencesModal from './shared/TopicSentencesModal';
@@ -7,18 +7,16 @@ import {
     getLevelLabel,
     getScopeLabel,
     getScopedMaxLevel,
-    getTopicParts,
     hasDeeperChildren,
     sanitizePathForTestId,
 } from '../utils/topicHierarchy';
+import { BASE_COLORS } from '../utils/chartConstants';
+import Breadcrumbs from './shared/Breadcrumbs';
+import { useTopicLevel } from '../hooks/useTopicLevel';
+import { useScopeNavigation } from '../hooks/useScopeNavigation';
+import { useContainerSize } from '../hooks/useContainerSize';
 
 export { buildScopedChartData, getScopedMaxLevel };
-
-const BASE_COLORS = [
-    '#7ba3cc', '#e8a87c', '#85bb65', '#c9a0dc',
-    '#d4a5a5', '#a0c4a9', '#cfb997', '#9db4c0',
-    '#c2b280', '#b5c7d3', '#d4a76a', '#a5b8d0',
-];
 
 const MIN_BLOCK_WIDTH = 120;
 const MARGIN = { top: 36, right: 24, bottom: 50, left: 68 };
@@ -34,65 +32,13 @@ function rollingAverage(data, windowSize) {
     });
 }
 
-function Breadcrumbs({ scopePath, onNavigate }) {
-    return (
-        <div className="article-structure-breadcrumbs">
-            <button
-                type="button"
-                className={`article-structure-breadcrumb-link${scopePath.length === 0 ? ' current' : ''}`}
-                onClick={() => onNavigate([])}
-                disabled={scopePath.length === 0}
-            >
-                All Topics
-            </button>
-            {scopePath.map((segment, index) => {
-                const isCurrent = index === scopePath.length - 1;
-                return (
-                    <React.Fragment key={`${segment}-${index}`}>
-                        <span className="article-structure-breadcrumb-separator">&gt;</span>
-                        <button
-                            type="button"
-                            className={`article-structure-breadcrumb-link${isCurrent ? ' current' : ''}`}
-                            onClick={() => onNavigate(scopePath.slice(0, index + 1))}
-                            disabled={isCurrent}
-                        >
-                            {segment}
-                        </button>
-                    </React.Fragment>
-                );
-            })}
-        </div>
-    );
-}
-
-
 function ArticleStructureChart({ topics, sentences = [] }) {
-    const [selectedLevel, setSelectedLevel] = useState(0);
-    const [scopePath, setScopePath] = useState([]);
+    const { scopePath, navigateTo, drillInto } = useScopeNavigation();
+    const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const [hoveredTopic, setHoveredTopic] = useState(null);
     const [tooltip, setTooltip] = useState(null);
-    const [containerWidth, setContainerWidth] = useState(800);
+    const { containerRef, containerSize: containerWidth } = useContainerSize(800);
     const [modalTopic, setModalTopic] = useState(null);
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver(entries => {
-            const w = entries[0].contentRect.width;
-            if (w > 0) setContainerWidth(w);
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
-
-    const maxLevel = useMemo(() => getScopedMaxLevel(topics, scopePath), [topics, scopePath]);
-
-    useEffect(() => {
-        if (selectedLevel > maxLevel) {
-            setSelectedLevel(maxLevel);
-        }
-    }, [selectedLevel, maxLevel]);
 
     useEffect(() => {
         setHoveredTopic(null);
@@ -180,13 +126,9 @@ function ArticleStructureChart({ topics, sentences = [] }) {
         ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`
         : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`;
 
-    const handleNavigate = nextScopePath => {
-        setScopePath(nextScopePath);
-    };
-
     const handleBlockClick = block => {
         if (!block.isDrillable) return;
-        setScopePath(getTopicParts(block.fullPath));
+        drillInto(block.fullPath);
         setSelectedLevel(0);
     };
 
@@ -204,7 +146,7 @@ function ArticleStructureChart({ topics, sentences = [] }) {
             </div>
 
             <div className="article-structure-controls">
-                <Breadcrumbs scopePath={scopePath} onNavigate={handleNavigate} />
+                <Breadcrumbs scopePath={scopePath} onNavigate={navigateTo} />
 
                 <TopicLevelSwitcher
                     selectedLevel={selectedLevel}

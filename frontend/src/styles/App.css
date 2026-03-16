@@ -2,6 +2,15 @@ body {
   margin: 0;
 }
 
+.topic-tree-node-title {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.topic-tree-node-title:hover {
+  text-decoration: underline;
+}
+
 :root {
   --z-base: 1;
   --z-sticky: 10;
@@ -12,7 +21,6 @@ body {
 }
 
 html {
-  scroll-behavior: smooth;
 }
 
 .app {
@@ -709,7 +717,7 @@ html {
 .article-paragraph {
   margin-bottom: 1em;
   line-height: 1.6;
-  text-align: justify;
+  text-align: left;
 }
 
 .article-paragraph:last-child {
@@ -749,18 +757,18 @@ html {
 }
 
 .faded {
-  opacity: 0.1 !important;
+  opacity: 0.35 !important;
   color: #999 !important;
 }
 
 .faded:hover {
-  opacity: 0.3 !important;
+  opacity: 0.6 !important;
 }
 
 /* Topic hover tooltip */
 .text-topic-tooltip {
   position: fixed;
-  z-index: calc(var(--z-fullscreen) - 1);
+  z-index: var(--z-global-menu);
   background: #222;
   color: #fff;
   border-radius: 6px;
@@ -906,7 +914,7 @@ html {
   --timeline-topic-dot: #2f7fd6;
   --timeline-topic-surface: #ffffff;
   --timeline-topic-border: #d8dee4;
-  --timeline-subtopic-color: rgba(60, 70, 80, 0.42);
+  --timeline-subtopic-color: rgba(60, 70, 80, 0.7);
 }
 
 .timeline-section-marker {

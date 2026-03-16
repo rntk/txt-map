@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './TopicsBarChart.css';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
+import Breadcrumbs from './shared/Breadcrumbs';
+import { useTopicLevel } from '../hooks/useTopicLevel';
+import { useScopeNavigation } from '../hooks/useScopeNavigation';
 import {
     buildScopedChartData,
     getDirectChildLabels,
     getLevelLabel,
     getScopeLabel,
-    getScopedMaxLevel,
-    getTopicParts,
     hasDeeperChildren,
     sanitizePathForTestId,
 } from '../utils/topicHierarchy';
@@ -26,37 +27,6 @@ const BASE_COLORS = [
     '#8b9dc3',
 ];
 
-function Breadcrumbs({ scopePath, onNavigate }) {
-    return (
-        <div className="topics-bar-chart__breadcrumbs">
-            <button
-                type="button"
-                className={`topics-bar-chart__breadcrumb-link${scopePath.length === 0 ? ' current' : ''}`}
-                onClick={() => onNavigate([])}
-                disabled={scopePath.length === 0}
-            >
-                All Topics
-            </button>
-            {scopePath.map((segment, index) => {
-                const isCurrent = index === scopePath.length - 1;
-                return (
-                    <React.Fragment key={`${segment}-${index}`}>
-                        <span className="topics-bar-chart__breadcrumb-separator">&gt;</span>
-                        <button
-                            type="button"
-                            className={`topics-bar-chart__breadcrumb-link${isCurrent ? ' current' : ''}`}
-                            onClick={() => onNavigate(scopePath.slice(0, index + 1))}
-                            disabled={isCurrent}
-                        >
-                            {segment}
-                        </button>
-                    </React.Fragment>
-                );
-            })}
-        </div>
-    );
-}
-
 /**
  * TopicsBarChart
  * - Creates one bar for the current scope and relative topic level
@@ -67,18 +37,10 @@ function Breadcrumbs({ scopePath, onNavigate }) {
  */
 function TopicsBarChart({ topics, sentences = [] }) {
     const [hoveredBar, setHoveredBar] = useState(null);
-    const [selectedLevel, setSelectedLevel] = useState(0);
-    const [scopePath, setScopePath] = useState([]);
+    const { scopePath, navigateTo, drillInto } = useScopeNavigation();
+    const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const [modalTopic, setModalTopic] = useState(null);
     const MAX_BAR_WIDTH_PERCENT = 78;
-
-    const maxLevel = useMemo(() => getScopedMaxLevel(topics, scopePath), [topics, scopePath]);
-
-    useEffect(() => {
-        if (selectedLevel > maxLevel) {
-            setSelectedLevel(maxLevel);
-        }
-    }, [selectedLevel, maxLevel]);
 
     useEffect(() => {
         setHoveredBar(null);
@@ -119,13 +81,9 @@ function TopicsBarChart({ topics, sentences = [] }) {
         ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`
         : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`;
 
-    const handleNavigate = nextScopePath => {
-        setScopePath(nextScopePath);
-    };
-
     const handleRowClick = item => {
         if (!item.isDrillable) return;
-        setScopePath(getTopicParts(item.fullPath));
+        drillInto(item.fullPath);
         setSelectedLevel(0);
     };
 
@@ -158,7 +116,7 @@ function TopicsBarChart({ topics, sentences = [] }) {
             </div>
 
             <div className="topics-bar-chart__controls">
-                <Breadcrumbs scopePath={scopePath} onNavigate={handleNavigate} />
+                <Breadcrumbs scopePath={scopePath} onNavigate={navigateTo} classPrefix="topics-bar-chart__" />
 
                 <TopicLevelSwitcher
                     selectedLevel={selectedLevel}

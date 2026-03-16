@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { buildTopicTree, getSubtreeStats as getSubtreeStatsUtil } from '../utils/topicTree';
 import TopicTreeNode from './TopicTreeNode';
+import { getTopicSelectionKey } from '../utils/chartConstants';
 
 function TopicList({
   topics = [],
@@ -24,35 +25,47 @@ function TopicList({
 
   const getSubtreeStats = useCallback((treeNode) => getSubtreeStatsUtil(treeNode), []);
 
-  const isSubtreeSelected = useCallback((treeNode) => {
-    let hasSelected = false;
-    const traverse = (node) => {
+  const selectedNamesSet = useMemo(
+    () => new Set(safeSelectedTopics.map(t => t.name)),
+    [safeSelectedTopics]
+  );
+
+  const subtreeStateMap = useMemo(() => {
+    const map = new Map();
+    const compute = (node) => {
       if (node.node.isLeaf && node.node.topic) {
-        if (safeSelectedTopics.some(t => t.name === node.node.topic.name)) {
-          hasSelected = true;
-        }
+        const name = node.node.topic.name;
+        const hasSelected = selectedNamesSet.has(name);
+        const allRead = safeReadTopics.has(name);
+        const entry = { hasSelected, allRead, hasLeaves: true };
+        map.set(node.node.fullPath, entry);
+        return entry;
       }
-      node.children.forEach(child => traverse(child));
+      let hasSelected = false;
+      let allRead = true;
+      let hasLeaves = false;
+      node.children.forEach(child => {
+        const childEntry = compute(child);
+        if (childEntry.hasSelected) hasSelected = true;
+        if (!childEntry.allRead || !childEntry.hasLeaves) allRead = false;
+        if (childEntry.hasLeaves) hasLeaves = true;
+      });
+      const entry = { hasSelected, allRead: hasLeaves && allRead, hasLeaves };
+      map.set(node.node.fullPath, entry);
+      return entry;
     };
-    traverse(treeNode);
-    return hasSelected;
-  }, [safeSelectedTopics]);
+    topicTree.forEach(root => compute(root));
+    return map;
+  }, [topicTree, selectedNamesSet, safeReadTopics]);
+
+  const isSubtreeSelected = useCallback((treeNode) => {
+    return subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false;
+  }, [subtreeStateMap]);
 
   const isSubtreeRead = useCallback((treeNode) => {
-    let allRead = true;
-    let hasLeaves = false;
-    const traverse = (node) => {
-      if (node.node.isLeaf && node.node.topic) {
-        hasLeaves = true;
-        if (!safeReadTopics.has(node.node.topic.name)) {
-          allRead = false;
-        }
-      }
-      node.children.forEach(child => traverse(child));
-    };
-    traverse(treeNode);
-    return hasLeaves && allRead;
-  }, [safeReadTopics]);
+    const entry = subtreeStateMap.get(treeNode.node.fullPath);
+    return entry ? entry.hasLeaves && entry.allRead : false;
+  }, [subtreeStateMap]);
 
   const toggleAllInSubtree = useCallback((treeNode) => {
     const allSelected = isSubtreeSelected(treeNode);
@@ -210,18 +223,6 @@ function TopicList({
     return leaves.length > 0 && leaves.every(name => safeReadTopics.has(name));
   }, [topicTree, safeReadTopics]);
 
-  const getTopicSelectionKey = (topicOrTopics) => {
-    if (!topicOrTopics) return '';
-    if (Array.isArray(topicOrTopics)) {
-      return topicOrTopics
-        .map(topic => topic?.name)
-        .filter(Boolean)
-        .sort()
-        .join('|');
-    }
-    return topicOrTopics.name || '';
-  };
-
   const isPanelSelection = (topic) => {
     return showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic);
   };
@@ -301,4 +302,4 @@ function TopicList({
   );
 }
 
-export default TopicList;
+export default React.memo(TopicList);

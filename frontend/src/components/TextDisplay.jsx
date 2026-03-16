@@ -387,4 +387,4 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   );
 }
 
-export default TextDisplay;
+export default React.memo(TextDisplay);

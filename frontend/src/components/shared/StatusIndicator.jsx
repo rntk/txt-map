@@ -1,24 +1,24 @@
 import React from 'react';
 
+function getStatusColor(status) {
+  switch (status) {
+    case 'completed': return '#4caf50';
+    case 'processing': return '#2196f3';
+    case 'failed': return '#f44336';
+    default: return '#9e9e9e';
+  }
+}
+
+function getStatusIcon(status) {
+  switch (status) {
+    case 'completed': return '✓';
+    case 'processing': return '⟳';
+    case 'failed': return '✗';
+    default: return '○';
+  }
+}
+
 function StatusIndicator({ tasks }) {
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return '#4caf50';
-      case 'processing': return '#2196f3';
-      case 'failed': return '#f44336';
-      default: return '#9e9e9e';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed': return '✓';
-      case 'processing': return '⟳';
-      case 'failed': return '✗';
-      default: return '○';
-    }
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -56,4 +56,4 @@ function StatusIndicator({ tasks }) {
   );
 }
 
-export default StatusIndicator;
+export default React.memo(StatusIndicator);

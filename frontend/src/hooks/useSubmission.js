@@ -11,7 +11,7 @@ export function useSubmission(submissionId) {
 
   const fetchSubmission = useCallback(async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/submission/${submissionId}`);
+      const response = await fetch(`/api/submission/${submissionId}`);
 
       if (!response.ok) {
         throw new Error('Submission not found');
@@ -39,7 +39,7 @@ export function useSubmission(submissionId) {
       if (!submissionId) return;
 
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/submission/${submissionId}/status`);
+        const response = await fetch(`/api/submission/${submissionId}/status`);
         if (response.ok) {
           const data = await response.json();
           setSubmission(prev => prev ? { ...prev, status: { tasks: data.tasks, overall: data.overall_status } } : null);
@@ -62,7 +62,7 @@ export function useSubmission(submissionId) {
       if (pendingSaveRef.current) {
         const { id, topics } = pendingSaveRef.current;
         const blob = new Blob([JSON.stringify({ read_topics: topics })], { type: 'application/json' });
-        navigator.sendBeacon(`http://127.0.0.1:8000/api/submission/${id}/read-topics`, blob);
+        navigator.sendBeacon(`/api/submission/${id}/read-topics`, blob);
       }
     };
   }, []);
@@ -76,7 +76,7 @@ export function useSubmission(submissionId) {
     pendingSaveRef.current = { id: submissionId, topics: topicsArr };
 
     const timer = setTimeout(() => {
-      fetch(`http://127.0.0.1:8000/api/submission/${submissionId}/read-topics`, {
+      fetch(`/api/submission/${submissionId}/read-topics`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ read_topics: topicsArr }),

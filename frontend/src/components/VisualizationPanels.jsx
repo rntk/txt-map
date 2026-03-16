@@ -136,4 +136,4 @@ function VisualizationPanels({
   );
 }
 
-export default VisualizationPanels;
+export default React.memo(VisualizationPanels);

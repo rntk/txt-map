@@ -1,15 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import RefreshButton from './shared/RefreshButton';
 import '../styles/App.css';
+import { formatDate } from '../utils/chartConstants';
 
 const STATUS_OPTIONS = ['pending', 'processing', 'completed', 'failed'];
-
-function formatDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString();
-}
 
 function statusClass(status) {
   return `task-status task-status-${status || 'pending'}`;
@@ -40,7 +34,7 @@ function TextListPage() {
     setError(null);
     try {
       const query = buildQuery();
-      const response = await fetch(`http://127.0.0.1:8000/api/submissions?${query}`);
+      const response = await fetch(`/api/submissions?${query}`);
       if (!response.ok) {
         throw new Error(await response.text());
       }

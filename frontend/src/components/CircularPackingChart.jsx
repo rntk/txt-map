@@ -2,10 +2,12 @@ import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
 import TopicSentencesModal from './shared/TopicSentencesModal';
+import Breadcrumbs from './shared/Breadcrumbs';
+import { useTopicLevel } from '../hooks/useTopicLevel';
+import { useScopeNavigation } from '../hooks/useScopeNavigation';
 import {
   getTopicParts,
   isWithinScope,
-  getScopedMaxLevel,
   getScopeLabel,
   getLevelLabel,
   hasDeeperChildren
@@ -130,48 +132,14 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   });
 }
 
-function Breadcrumbs({ scopePath, onNavigate }) {
-  return (
-    <div className="article-structure-breadcrumbs" style={{ marginBottom: '10px' }}>
-      <button
-        type="button"
-        className={`article-structure-breadcrumb-link${scopePath.length === 0 ? ' current' : ''}`}
-        onClick={() => onNavigate([])}
-        disabled={scopePath.length === 0}
-      >
-        All Topics
-      </button>
-      {scopePath.map((segment, index) => {
-        const isCurrent = index === scopePath.length - 1;
-        return (
-          <React.Fragment key={`${segment}-${index}`}>
-            <span className="article-structure-breadcrumb-separator">&gt;</span>
-            <button
-              type="button"
-              className={`article-structure-breadcrumb-link${isCurrent ? ' current' : ''}`}
-              onClick={() => onNavigate(scopePath.slice(0, index + 1))}
-              disabled={isCurrent}
-            >
-              {segment}
-            </button>
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
-
 export default function CircularPackingChart({ topics, sentences = [] }) {
-  const [selectedLevel, setSelectedLevel] = useState(0);
-  const [scopePath, setScopePath] = useState([]);
+  const { scopePath, navigateTo, drillInto } = useScopeNavigation();
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
   const [modalTopic, setModalTopic] = useState(null);
 
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const zoomRef = useRef(null);
-
-  const maxLevel = useMemo(() => getScopedMaxLevel(topics, scopePath), [topics, scopePath]);
 
   const hierarchyData = useMemo(
     () => buildScopedHierarchy(topics, scopePath, selectedLevel),
@@ -186,12 +154,6 @@ export default function CircularPackingChart({ topics, sentences = [] }) {
       .transition().duration(350)
       .call(zoomRef.current.transform, d3.zoomIdentity);
   };
-
-  useEffect(() => {
-    if (selectedLevel > maxLevel) {
-      setSelectedLevel(maxLevel);
-    }
-  }, [selectedLevel, maxLevel]);
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || !hasHierarchyData) return undefined;
@@ -317,7 +279,7 @@ export default function CircularPackingChart({ topics, sentences = [] }) {
         event.stopPropagation();
         const isDrillable = hasDeeperChildren(topics, node.data.fullPath);
         if (isDrillable) {
-          setScopePath(getTopicParts(node.data.fullPath));
+          drillInto(node.data.fullPath);
           setSelectedLevel(0);
         } else {
           const topicData = node.data.topic;
@@ -391,7 +353,7 @@ export default function CircularPackingChart({ topics, sentences = [] }) {
   return (
     <div ref={containerRef} className="circular-packing-chart">
       <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
-        setScopePath(path);
+        navigateTo(path);
         setSelectedLevel(0);
       }} />
 

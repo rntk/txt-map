@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+const EMPTY_READ_TOPICS = new Set();
+const NOOP = () => {};
 import TopicList from './TopicList';
 import GlobalTopicsClassicView from './GlobalTopicsClassicView';
 import GlobalTopicsTimelineView from './GlobalTopicsTimelineView';
@@ -68,9 +71,9 @@ function GlobalTopicsPage() {
             selectedTopics={selectedTopics}
             onToggleTopic={handleToggleTopic}
             onNavigateTopic={handleNavigateTopic}
-            readTopics={new Set()}
-            onToggleRead={() => {}}
-            onToggleReadAll={() => {}}
+            readTopics={EMPTY_READ_TOPICS}
+            onToggleRead={NOOP}
+            onToggleReadAll={NOOP}
           />
         )}
       </div>

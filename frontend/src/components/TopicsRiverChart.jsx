@@ -4,24 +4,16 @@ import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale 
 import RiverLegend from './shared/RiverLegend';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
-import { getScopedMaxLevel, buildScopedChartData } from '../utils/topicHierarchy';
+import { buildScopedChartData } from '../utils/topicHierarchy';
+import { useTopicLevel } from '../hooks/useTopicLevel';
 import './TopicsBarChart.css';
 
 const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [activeTopic, setActiveTopic] = useState(null);
-    const [selectedLevel, setSelectedLevel] = useState(0);
+    const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
     const [selectedTopicForModal, setSelectedTopicForModal] = useState(null);
-
-    const maxLevel = useMemo(() => getScopedMaxLevel(topics, []), [topics]);
-
-    // Ensure selected level is valid
-    useEffect(() => {
-        if (selectedLevel > maxLevel) {
-            setSelectedLevel(maxLevel);
-        }
-    }, [selectedLevel, maxLevel]);
 
     const scopedData = useMemo(() => {
         const data = buildScopedChartData(topics, sentences, [], selectedLevel);
@@ -265,6 +257,9 @@ const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
             .style("fill", "#333")
             .text("Topic Distribution Across Article");
 
+        return () => {
+            d3.select('body').selectAll('.river-tooltip').remove();
+        };
     }, [effectiveLength, scopedData, keys, colorScale]);
 
     return (

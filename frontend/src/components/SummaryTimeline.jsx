@@ -92,4 +92,4 @@ function SummaryTimeline({
   );
 }
 
-export default SummaryTimeline;
+export default React.memo(SummaryTimeline);
