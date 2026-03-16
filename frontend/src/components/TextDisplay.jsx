@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
 
@@ -12,75 +13,89 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const safeSentences = Array.isArray(sentences) ? sentences : [];
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
-  const readTopicsSet = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+  const readTopicsSet = useMemo(() => 
+    readTopics instanceof Set ? readTopics : new Set(readTopics || [])
+  , [readTopics]);
   const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
 
   // Build character ranges from topic.ranges (in raw HTML string coordinates)
-  const highlightRanges = [];
-  const fadeRanges = [];
+  const { highlightRanges, fadeRanges } = useMemo(() => {
+    const highlights = [];
+    const fades = [];
+    
+    safeArticleTopics.forEach(topic => {
+      const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
+      if (ranges.length === 0) return;
 
-  safeArticleTopics.forEach(topic => {
-    const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
-    if (ranges.length === 0) return;
+      const isHighlighted = safeSelectedTopics.some(t => t.name === topic.name) ||
+        (hoveredTopic && hoveredTopic.name === topic.name);
+      const isFaded = readTopicsSet.has(topic.name);
 
-    const isHighlighted = safeSelectedTopics.some(t => t.name === topic.name) ||
-      (hoveredTopic && hoveredTopic.name === topic.name);
-    const isFaded = readTopicsSet.has(topic.name);
+      ranges.forEach(range => {
+        const rangeStart = Number(range.start);
+        const rangeEnd = Number(range.end);
+        if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
 
-    ranges.forEach(range => {
-      const rangeStart = Number(range.start);
-      const rangeEnd = Number(range.end);
-      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) return;
-
-      if (isHighlighted) {
-        highlightRanges.push({ start: rangeStart, end: rangeEnd });
-      } else if (isFaded) {
-        fadeRanges.push({ start: rangeStart, end: rangeEnd });
-      }
+        if (isHighlighted) {
+          highlights.push({ start: rangeStart, end: rangeEnd });
+        } else if (isFaded) {
+          fades.push({ start: rangeStart, end: rangeEnd });
+        }
+      });
     });
-  });
+    return { highlightRanges: highlights, fadeRanges: fades };
+  }, [safeArticleTopics, safeSelectedTopics, hoveredTopic, readTopicsSet]);
 
   // Sentence-index-based sets for non-rawHtml fallback paths
-  const fadedIndices = new Set();
-  readTopicsSet.forEach(topicName => {
-    const relatedTopic = safeArticleTopics.find(t => t.name === topicName);
-    if (relatedTopic) {
-      relatedTopic.sentences.forEach(num => fadedIndices.add(num - 1));
-    }
-  });
+  const fadedIndices = useMemo(() => {
+    const set = new Set();
+    readTopicsSet.forEach(topicName => {
+      const relatedTopic = safeArticleTopics.find(t => t.name === topicName);
+      if (relatedTopic) {
+        relatedTopic.sentences.forEach(num => set.add(num - 1));
+      }
+    });
+    return set;
+  }, [readTopicsSet, safeArticleTopics]);
 
-  const highlightedIndices = new Set();
-  safeSelectedTopics.forEach(topic => {
-    const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
-    if (relatedTopic && relatedTopic.sentences) {
-      relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
+  const highlightedIndices = useMemo(() => {
+    const set = new Set();
+    safeSelectedTopics.forEach(topic => {
+      const relatedTopic = safeArticleTopics.find(t => t.name === topic.name);
+      if (relatedTopic && relatedTopic.sentences) {
+        relatedTopic.sentences.forEach(num => set.add(num - 1));
+      }
+    });
+    if (hoveredTopic) {
+      const relatedTopic = safeArticleTopics.find(t => t.name === hoveredTopic.name);
+      if (relatedTopic && relatedTopic.sentences) {
+        relatedTopic.sentences.forEach(num => set.add(num - 1));
+      }
     }
-  });
-  if (hoveredTopic) {
-    const relatedTopic = safeArticleTopics.find(t => t.name === hoveredTopic.name);
-    if (relatedTopic && relatedTopic.sentences) {
-      relatedTopic.sentences.forEach(num => highlightedIndices.add(num - 1));
-    }
-  }
+    return set;
+  }, [safeSelectedTopics, hoveredTopic, safeArticleTopics]);
 
-  const highlightedRawHtml = buildHighlightedRawHtml(
+  const highlightedRawHtml = useMemo(() => buildHighlightedRawHtml(
     rawHtml,
     safeArticleTopics,
     articleIndex,
     highlightRanges,
     fadeRanges
-  );
+  ), [rawHtml, safeArticleTopics, articleIndex, highlightRanges, fadeRanges]);
 
-  const sentenceToTopicsEnding = new Map();
-  safeArticleTopics.forEach(topic => {
-    if (topic.sentences && topic.sentences.length > 0) {
-      const lastSentenceIndex = Math.max(...topic.sentences) - 1;
-      if (!sentenceToTopicsEnding.has(lastSentenceIndex)) {
-        sentenceToTopicsEnding.set(lastSentenceIndex, []);
+  const sentenceToTopicsEnding = useMemo(() => {
+    const map = new Map();
+    safeArticleTopics.forEach(topic => {
+      if (topic.sentences && topic.sentences.length > 0) {
+        const lastSentenceIndex = Math.max(...topic.sentences) - 1;
+        if (!map.has(lastSentenceIndex)) {
+          map.set(lastSentenceIndex, []);
+        }
+        map.get(lastSentenceIndex).push(topic);
       }
-      sentenceToTopicsEnding.get(lastSentenceIndex).push(topic);
-    }
-  });
+    });
+    return map;
+  }, [safeArticleTopics]);
 
   // --- Reverse mapping: char position -> topic(s) ---
   const charToTopics = useMemo(() => {
@@ -211,8 +226,8 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     scheduleHide();
   }, [scheduleHide]);
 
-  // Tooltip JSX
-  const tooltipEl = tooltip && onToggleRead ? (
+  // Tooltip JSX - Use createPortal to move it to document.body
+  const tooltipEl = tooltip && onToggleRead ? createPortal(
     <div
       className="text-topic-tooltip"
       style={{ left: tooltip.x, top: tooltip.y }}
@@ -270,8 +285,25 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           </div>
         );
       })}
-    </div>
+    </div>,
+    document.body
   ) : null;
+
+  const paragraphs = useMemo(() => {
+    if (!safeParagraphMap || Object.keys(safeParagraphMap).length === 0) return null;
+    const groups = new Map();
+
+    safeSentences.forEach((sentence, idx) => {
+      const sentenceParagraphIdx = safeParagraphMap[idx] !== undefined ? safeParagraphMap[idx] : 0;
+      if (!groups.has(sentenceParagraphIdx)) {
+        groups.set(sentenceParagraphIdx, []);
+      }
+      groups.get(sentenceParagraphIdx).push({ text: sentence, index: idx });
+    });
+
+    const sortedParagraphIndices = Array.from(groups.keys()).sort((a, b) => a - b);
+    return sortedParagraphIndices.map(paraIdx => groups.get(paraIdx));
+  }, [safeParagraphMap, safeSentences]);
 
   if (highlightedRawHtml) {
     return (
@@ -287,22 +319,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     );
   }
 
-  if (safeParagraphMap && Object.keys(safeParagraphMap).length > 0) {
-    const paragraphGroups = new Map();
-
-    safeSentences.forEach((sentence, idx) => {
-      const sentenceParagraphIdx = safeParagraphMap[idx] !== undefined ? safeParagraphMap[idx] : 0;
-
-      if (!paragraphGroups.has(sentenceParagraphIdx)) {
-        paragraphGroups.set(sentenceParagraphIdx, []);
-      }
-
-      paragraphGroups.get(sentenceParagraphIdx).push({ text: sentence, index: idx });
-    });
-
-    const sortedParagraphIndices = Array.from(paragraphGroups.keys()).sort((a, b) => a - b);
-    const paragraphs = sortedParagraphIndices.map(paraIdx => paragraphGroups.get(paraIdx));
-
+  if (paragraphs) {
     return (
       <div className="text-display">
         <div
