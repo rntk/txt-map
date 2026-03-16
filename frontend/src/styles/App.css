@@ -3333,6 +3333,7 @@ html {
 
 .diff-page {
   padding: 8px 10px 28px;
+  overflow-y: auto;
 }
 
 .diff-page-header {
