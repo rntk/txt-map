@@ -133,7 +133,7 @@ class TestLlamaCPPInit:
 
         llm = LLamaCPP("http://localhost:8989")
 
-        assert llm._LLamaCPP__max_context_tokens == 11000
+        assert llm.max_context_tokens == 11000
 
     def test_stores_max_context_tokens_custom(self, mock_urlparse, reset_environment):
         """Stores custom max_context_tokens."""
@@ -144,7 +144,7 @@ class TestLlamaCPPInit:
 
         llm = LLamaCPP("http://localhost:8989", max_context_tokens=5000)
 
-        assert llm._LLamaCPP__max_context_tokens == 5000
+        assert llm.max_context_tokens == 5000
 
     def test_uses_provided_token(self, mock_urlparse, reset_environment):
         """Uses provided token."""
@@ -362,8 +362,8 @@ class TestCall:
             up_patch.stop()
             http_patch.stop()
 
-    def test_request_model_openai_gpt_oss_20b(self):
-        """Request uses model 'openai/gpt-oss-20b'."""
+    def test_request_model_moonshotai_kimi_k2_5(self):
+        """Request uses model 'moonshotai/Kimi-K2.5'."""
         llm, mock_conn, up_patch, http_patch = self._create_llm_with_mocks()
         try:
             mock_response = MagicMock()
@@ -377,7 +377,7 @@ class TestCall:
 
             call_args = mock_conn.request.call_args
             body = json.loads(call_args[0][2])
-            assert body["model"] == "openai/gpt-oss-20b"
+            assert body["model"] == "moonshotai/Kimi-K2.5"
         finally:
             up_patch.stop()
             http_patch.stop()

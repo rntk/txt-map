@@ -86,147 +86,92 @@ def mock_cache_collection():
 class TestGenerateSubtopicsForTopicBasic:
     """Test basic functionality of generate_subtopics_for_topic."""
 
-    def test_returns_empty_list_for_empty_sentences(self, mock_llm, mock_cache_collection):
+    def test_returns_empty_list_for_empty_sentences(self, mock_llm):
         """Function returns [] when sentences list is empty."""
         result = generate_subtopics_for_topic(
-            "Test Topic", [], [], mock_llm, mock_cache_collection
+            "Test Topic", [], [], mock_llm
         )
         assert result == []
 
-    def test_returns_empty_list_for_no_topic(self, mock_llm, mock_cache_collection):
+    def test_returns_empty_list_for_no_topic(self, mock_llm):
         """Function returns [] when topic_name is 'no_topic'."""
         sentences = ["Sentence one.", "Sentence two."]
         indices = [1, 2]
         result = generate_subtopics_for_topic(
-            "no_topic", sentences, indices, mock_llm, mock_cache_collection
+            "no_topic", sentences, indices, mock_llm
         )
         assert result == []
 
-    def test_constructs_prompt_with_numbered_sentences(self, mock_llm, mock_cache_collection):
+    def test_constructs_prompt_with_numbered_sentences(self, mock_llm):
         """Function constructs prompt with numbered sentences."""
         sentences = ["First sentence.", "Second sentence."]
         indices = [1, 2]
 
         generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         # Verify LLM was called
         mock_llm.call.assert_called_once()
-        prompt = mock_llm.call.call_args[0][0][0]
+        prompt = mock_llm.call.call_args[0][0]
 
         # Check prompt contains numbered sentences
         assert "1. First sentence." in prompt
         assert "2. Second sentence." in prompt
         assert 'Topic: Test Topic' in prompt
 
-    def test_generates_md5_hash_of_prompt(self, mock_llm, mock_cache_collection):
-        """Function generates MD5 hash of prompt for caching."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        # Verify cache lookup with hash
-        mock_cache_collection.find_one.assert_called_once()
-        call_args = mock_cache_collection.find_one.call_args
-        assert "prompt_hash" in call_args[0][0]
-
-    def test_checks_cache_before_llm_call(self, mock_llm, mock_cache_collection):
-        """Function checks cache before making LLM call."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        # Setup cache hit
-        cached_response = {"response": "Cached: 1"}
-        mock_cache_collection.find_one.return_value = cached_response
-
-        result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        # Verify cache was checked
-        mock_cache_collection.find_one.assert_called_once()
-        # Verify LLM was NOT called
-        mock_llm.call.assert_not_called()
-
-    def test_calls_llm_when_not_cached(self, mock_llm, mock_cache_collection):
+    def test_calls_llm_when_not_cached(self, mock_llm):
         """Function calls LLM when response not in cache."""
         sentences = ["Test sentence."]
         indices = [1]
 
-        # Setup cache miss
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Subtopic: 1"
 
         generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         # Verify LLM was called
         mock_llm.call.assert_called_once()
 
-    def test_caches_response_after_llm_call(self, mock_llm, mock_cache_collection):
-        """Function caches response after LLM call."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        # Setup cache miss
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Subtopic: 1"
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        # Verify cache was updated
-        mock_cache_collection.update_one.assert_called_once()
-        update_call = mock_cache_collection.update_one.call_args
-        assert update_call[0][0] == {"prompt_hash": update_call[0][1]["$set"]["prompt_hash"]}
-
-    def test_parses_response_line_by_line(self, mock_llm, mock_cache_collection):
+    def test_parses_response_line_by_line(self, mock_llm):
         """Function parses LLM response line by line."""
         sentences = ["Sentence one.", "Sentence two.", "Sentence three."]
         indices = [1, 2, 3]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Subtopic A: 1\nSubtopic B: 2, 3"
 
         result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         assert len(result) == 2
         assert result[0]["name"] == "Subtopic A"
         assert result[1]["name"] == "Subtopic B"
 
-    def test_skips_lines_without_colon(self, mock_llm, mock_cache_collection):
+    def test_skips_lines_without_colon(self, mock_llm):
         """Function skips lines without ':' separator."""
         sentences = ["Sentence one.", "Sentence two.", "Sentence three."]
         indices = [1, 2, 3]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Invalid line without colon\nValid Subtopic: 1"
 
         result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         assert len(result) == 1
         assert result[0]["name"] == "Valid Subtopic"
 
-    def test_cleans_subtopic_name_removing_non_alphanumeric(self, mock_llm, mock_cache_collection):
+    def test_cleans_subtopic_name_removing_non_alphanumeric(self, mock_llm):
         """Function cleans subtopic name by removing non-alphanumeric characters."""
         sentences = ["Sentence one."]
         indices = [1]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Subtopic@#$ with special chars!: 1"
 
         result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         assert len(result) == 1
@@ -235,31 +180,29 @@ class TestGenerateSubtopicsForTopicBasic:
         assert "@" not in result[0]["name"]
         assert "#" not in result[0]["name"]
 
-    def test_parses_sentence_indices_as_integers(self, mock_llm, mock_cache_collection):
+    def test_parses_sentence_indices_as_integers(self, mock_llm):
         """Function parses sentence indices as integers."""
         sentences = ["Sentence one.", "Sentence two.", "Sentence three."]
         indices = [1, 2, 3]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Subtopic: 1, 2, 3"
 
         result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         assert result[0]["sentences"] == [1, 2, 3]
         assert all(isinstance(i, int) for i in result[0]["sentences"])
 
-    def test_returns_subtopic_dicts_with_correct_structure(self, mock_llm, mock_cache_collection):
+    def test_returns_subtopic_dicts_with_correct_structure(self, mock_llm):
         """Function returns list of subtopic dicts with correct structure."""
         sentences = ["Sentence one.", "Sentence two."]
         indices = [1, 2]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "First Subtopic: 1\nSecond Subtopic: 2"
 
         result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
+            "Test Topic", sentences, indices, mock_llm
         )
 
         assert len(result) == 2
@@ -270,110 +213,6 @@ class TestGenerateSubtopicsForTopicBasic:
             assert "sentences" in subtopic
             assert "parent_topic" in subtopic
             assert subtopic["parent_topic"] == "Test Topic"
-
-
-# =============================================================================
-# Test: generate_subtopics_for_topic - LLM Caching
-# =============================================================================
-
-class TestGenerateSubtopicsForTopicCaching:
-    """Test LLM caching functionality."""
-
-    def test_uses_cached_response_when_available(self, mock_llm, mock_cache_collection):
-        """Function uses cached response when available."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        cached_response = {"response": "Cached Subtopic: 1"}
-        mock_cache_collection.find_one.return_value = cached_response
-
-        result = generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        assert len(result) == 1
-        assert result[0]["name"] == "Cached Subtopic"
-        mock_llm.call.assert_not_called()
-
-    def test_stores_prompt_hash_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores prompt hash in cache."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Subtopic: 1"
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "prompt_hash" in set_doc
-
-    def test_stores_prompt_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores original prompt in cache."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Subtopic: 1"
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "prompt" in set_doc
-
-    def test_stores_response_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores LLM response in cache."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        mock_cache_collection.find_one.return_value = None
-        llm_response = "Subtopic: 1"
-        mock_llm.call.return_value = llm_response
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert set_doc["response"] == llm_response
-
-    def test_stores_created_at_timestamp_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores created_at timestamp in cache."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Subtopic: 1"
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "created_at" in set_doc
-
-    def test_uses_upsert_for_cache_update(self, mock_llm, mock_cache_collection):
-        """Function uses upsert=True for cache update."""
-        sentences = ["Test sentence."]
-        indices = [1]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Subtopic: 1"
-
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        assert update_call[1]["upsert"] is True
 
 
 # =============================================================================
@@ -559,71 +398,8 @@ class TestProcessSubtopicsGenerationBasic:
 
 
 # =============================================================================
-# Test: process_subtopics_generation - LLM Cache Collection
+# Test: process_subtopics_generation - Completion Message
 # =============================================================================
-
-class TestProcessSubtopicsGenerationCacheCollection:
-    """Test LLM cache collection management."""
-
-    def test_creates_llm_cache_collection_if_not_exists(self, mock_llm):
-        """Function creates llm_cache collection if it doesn't exist."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
-        }
-
-        with patch('lib.tasks.subtopics_generation.SubmissionsStorage'):
-            with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic'):
-                process_subtopics_generation(submission, db, mock_llm)
-
-        db.create_collection.assert_called_once_with("llm_cache")
-
-    def test_creates_unique_index_on_prompt_hash(self, mock_llm):
-        """Function creates unique index on prompt_hash."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
-        }
-
-        with patch('lib.tasks.subtopics_generation.SubmissionsStorage'):
-            with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic'):
-                process_subtopics_generation(submission, db, mock_llm)
-
-        db.llm_cache.create_index.assert_called_once_with("prompt_hash", unique=True)
-
-    def test_handles_index_creation_failure_gracefully(self, mock_llm):
-        """Function handles index creation failure gracefully."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-        db.llm_cache.create_index.side_effect = Exception("Index already exists")
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
-        }
-
-        with patch('lib.tasks.subtopics_generation.SubmissionsStorage'):
-            with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic'):
-                # Should not raise
-                process_subtopics_generation(submission, db, mock_llm)
 
 
 # =============================================================================

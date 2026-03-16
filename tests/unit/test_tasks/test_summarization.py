@@ -35,7 +35,7 @@ def mock_llm():
     """Create a mock LLamaCPP client."""
     llm = MagicMock()
     llm.estimate_tokens = MagicMock(return_value=100)
-    llm._LLamaCPP__max_context_tokens = 11000
+    llm.max_context_tokens = 11000
     llm.call = MagicMock(return_value="Brief summary")
     return llm
 
@@ -85,156 +85,68 @@ def mock_cache_collection():
 class TestSummarizeBySentenceGroupsBasic:
     """Test basic functionality of summarize_by_sentence_groups."""
 
-    def test_returns_empty_for_empty_sent_list(self, mock_llm, mock_cache_collection):
+    def test_returns_empty_for_empty_sent_list(self, mock_llm):
         """Function returns empty summaries for empty sentence list."""
         summaries, mappings = summarize_by_sentence_groups(
-            [], mock_llm, mock_cache_collection
+            [], mock_llm, mock_llm
         )
         assert summaries == []
         assert mappings == []
 
-    def test_estimates_template_tokens(self, mock_llm, mock_cache_collection):
+    def test_estimates_template_tokens(self, mock_llm):
         """Function estimates template tokens from LLM."""
         sentences = ["Test sentence."]
 
         summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         mock_llm.estimate_tokens.assert_called_once()
 
-    def test_calculates_max_text_tokens_from_context_limit(self, mock_llm, mock_cache_collection):
+    def test_calculates_max_text_tokens_from_context_limit(self, mock_llm):
         """Function calculates max_text_tokens from context limit."""
         sentences = ["Test sentence."]
         
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Summary"
 
         summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         # Verify the budget calculation: max_text_tokens = context_size - template_tokens - buffer
         # mock_llm.estimate_tokens returns 100 (template tokens)
-        # mock_llm._LLamaCPP__max_context_tokens is 11000
+        # mock_llm.max_context_tokens is 11000
         # Default buffer is 400
         # So max_text_tokens should be 11000 - 100 - 400 = 10500
         expected_template_tokens = 100
-        expected_max_text_tokens = 11000 - expected_template_tokens - 400
         
         # Verify estimate_tokens was called with the template (without sentence content)
         mock_llm.estimate_tokens.assert_called_once()
         call_arg = mock_llm.estimate_tokens.call_args[0][0]
         # The template should contain the prompt structure but not the sentence placeholder value
-        assert "{sentence}" not in call_arg or call_arg == "Summarize the text within the <text> tags into a super brief summary (just a few words).\n- Keep it objective and extremely concise.\n\nText:\n<text></text>\n\nSummary:"
+        assert "{sentence}" not in call_arg
 
-    def test_enforces_token_budget_on_input_sentences(self, mock_llm, mock_cache_collection):
-        """Function respects token budget when processing sentences."""
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-        
-        # Create sentences that would exceed the token budget if not enforced
-        # With template_tokens=100, context=11000, buffer=400, max_text_tokens=10500
-        # Each sentence's tokens should be checked against this limit
-        sentences = ["This is a test sentence."]
-        
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-        
-        # Verify the LLM was called - the function completed successfully
-        mock_llm.call.assert_called_once()
-        
-        # The prompt passed to LLM should contain the sentence
-        call_args = mock_llm.call.call_args[0][0]
-        assert len(call_args) == 1
-        assert "This is a test sentence." in call_args[0]
-
-    def test_summarizes_each_sentence_group_individually(self, mock_llm, mock_cache_collection):
+    def test_summarizes_each_sentence_group_individually(self, mock_llm):
         """Function summarizes each sentence group individually."""
         sentences = ["First sentence.", "Second sentence.", "Third sentence."]
 
         mock_llm.call.return_value = "Summary"
-        mock_cache_collection.find_one.return_value = None
 
         summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         assert len(summaries) == 3
         assert len(mappings) == 3
 
-    def test_generates_prompt_hash_for_each_summary(self, mock_llm, mock_cache_collection):
-        """Function generates MD5 hash of prompt for each summary."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        mock_cache_collection.find_one.assert_called_once()
-        call_args = mock_cache_collection.find_one.call_args
-        assert "prompt_hash" in call_args[0][0]
-
-    def test_checks_cache_before_llm_call(self, mock_llm, mock_cache_collection):
-        """Function checks cache before making LLM call."""
-        sentences = ["Test sentence."]
-
-        # Setup cache hit
-        cached_response = {"response": "Cached summary"}
-        mock_cache_collection.find_one.return_value = cached_response
-
-        summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        # Verify cache was checked
-        mock_cache_collection.find_one.assert_called_once()
-        # Verify LLM was NOT called
-        mock_llm.call.assert_not_called()
-
-    def test_calls_llm_when_not_cached(self, mock_llm, mock_cache_collection):
-        """Function calls LLM when response not in cache."""
-        sentences = ["Test sentence."]
-
-        # Setup cache miss
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        # Verify LLM was called
-        mock_llm.call.assert_called_once()
-
-    def test_caches_response_after_llm_call(self, mock_llm, mock_cache_collection):
-        """Function caches response after LLM call."""
-        sentences = ["Test sentence."]
-
-        # Setup cache miss
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        # Verify cache was updated
-        mock_cache_collection.update_one.assert_called_once()
-
-    def test_creates_summary_mapping_for_each_summary(self, mock_llm, mock_cache_collection):
+    def test_creates_summary_mapping_for_each_summary(self, mock_llm):
         """Function creates summary mapping for each summary."""
         sentences = ["First sentence.", "Second sentence."]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Summary"
 
         summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         assert len(mappings) == 2
@@ -244,15 +156,14 @@ class TestSummarizeBySentenceGroupsBasic:
             assert "summary_sentence" in mapping
             assert "source_sentences" in mapping
 
-    def test_source_sentences_are_one_indexed(self, mock_llm, mock_cache_collection):
+    def test_source_sentences_are_one_indexed(self, mock_llm):
         """Function uses 1-indexed source sentences in mappings."""
         sentences = ["First sentence.", "Second sentence.", "Third sentence."]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Summary"
 
         summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         # Check that source_sentences are 1-indexed
@@ -260,118 +171,20 @@ class TestSummarizeBySentenceGroupsBasic:
         assert mappings[1]["source_sentences"] == [2]
         assert mappings[2]["source_sentences"] == [3]
 
-    def test_summary_mapping_structure(self, mock_llm, mock_cache_collection):
+    def test_summary_mapping_structure(self, mock_llm):
         """Function creates mappings with correct structure."""
         sentences = ["Test sentence."]
 
-        mock_cache_collection.find_one.return_value = None
         mock_llm.call.return_value = "Test summary"
 
         summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
+            sentences, mock_llm, mock_llm
         )
 
         mapping = mappings[0]
         assert mapping["summary_index"] == 0
         assert mapping["summary_sentence"] == "Test summary"
         assert mapping["source_sentences"] == [1]
-
-
-# =============================================================================
-# Test: summarize_by_sentence_groups - LLM Caching
-# =============================================================================
-
-class TestSummarizeBySentenceGroupsCaching:
-    """Test LLM caching functionality."""
-
-    def test_uses_cached_response_when_available(self, mock_llm, mock_cache_collection):
-        """Function uses cached response when available."""
-        sentences = ["Test sentence."]
-
-        cached_response = {"response": "Cached summary"}
-        mock_cache_collection.find_one.return_value = cached_response
-
-        summaries, mappings = summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        assert summaries[0] == "Cached summary"
-        mock_llm.call.assert_not_called()
-
-    def test_stores_prompt_hash_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores prompt hash in cache."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "prompt_hash" in set_doc
-
-    def test_stores_prompt_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores original prompt in cache."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "prompt" in set_doc
-
-    def test_stores_response_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores LLM response in cache."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        llm_response = "Summary"
-        mock_llm.call.return_value = llm_response
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert set_doc["response"] == llm_response
-
-    def test_stores_created_at_timestamp_in_cache(self, mock_llm, mock_cache_collection):
-        """Function stores created_at timestamp in cache."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        set_doc = update_call[0][1]["$set"]
-        assert "created_at" in set_doc
-
-    def test_uses_upsert_for_cache_update(self, mock_llm, mock_cache_collection):
-        """Function uses upsert=True for cache update."""
-        sentences = ["Test sentence."]
-
-        mock_cache_collection.find_one.return_value = None
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_cache_collection
-        )
-
-        update_call = mock_cache_collection.update_one.call_args
-        assert update_call[1]["upsert"] is True
 
 
 # =============================================================================
@@ -591,71 +404,8 @@ class TestProcessSummarizationBasic:
 
 
 # =============================================================================
-# Test: process_summarization - LLM Cache Collection
+# Test: process_summarization - Completion Message
 # =============================================================================
-
-class TestProcessSummarizationCacheCollection:
-    """Test LLM cache collection management."""
-
-    def test_creates_llm_cache_collection_if_not_exists(self, mock_llm):
-        """Function creates llm_cache collection if it doesn't exist."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": []
-            }
-        }
-
-        with patch('lib.tasks.summarization.SubmissionsStorage'):
-            with patch('lib.tasks.summarization.summarize_by_sentence_groups', return_value=(["Summary"], [])):
-                process_summarization(submission, db, mock_llm)
-
-        db.create_collection.assert_called_once_with("llm_cache")
-
-    def test_creates_unique_index_on_prompt_hash(self, mock_llm):
-        """Function creates unique index on prompt_hash."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": []
-            }
-        }
-
-        with patch('lib.tasks.summarization.SubmissionsStorage'):
-            with patch('lib.tasks.summarization.summarize_by_sentence_groups', return_value=(["Summary"], [])):
-                process_summarization(submission, db, mock_llm)
-
-        db.llm_cache.create_index.assert_called_once_with("prompt_hash", unique=True)
-
-    def test_handles_index_creation_failure_gracefully(self, mock_llm):
-        """Function handles index creation failure gracefully."""
-        db = MagicMock()
-        db.list_collection_names.return_value = []
-        db.llm_cache = MagicMock()
-        db.llm_cache.create_index.side_effect = Exception("Index already exists")
-
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1"],
-                "topics": []
-            }
-        }
-
-        with patch('lib.tasks.summarization.SubmissionsStorage'):
-            with patch('lib.tasks.summarization.summarize_by_sentence_groups', return_value=(["Summary"], [])):
-                # Should not raise
-                process_summarization(submission, db, mock_llm)
 
 
 # =============================================================================

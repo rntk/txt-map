@@ -1093,7 +1093,8 @@ class TestSplitArticleWithMarkers:
             llm=mock_llm,
             tracer=mock_tracer,
             anchor_every_words=10,
-            max_chunk_chars=15000
+            max_chunk_chars=15000,
+            cache_store=None
         )
 
     @patch('lib.article_splitter.split_article')
@@ -1124,7 +1125,8 @@ class TestSplitArticleWithMarkers:
             llm=None,
             tracer=None,
             anchor_every_words=5,
-            max_chunk_chars=12000
+            max_chunk_chars=12000,
+            cache_store=None
         )
 
 
