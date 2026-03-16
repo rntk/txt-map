@@ -20,11 +20,15 @@ class OpenAIClient(LLMClient):
             prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]
             logging.info(f"LLM request (preview): {prompt_preview}")
 
+            # gpt-5-mini and gpt-5-nano don't support temperature parameter
+            kwargs = {"service_tier": "flex"}
+            if self._model not in ("gpt-5-mini", "gpt-5-nano"):
+                kwargs["temperature"] = temperature
+
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=[{"role": "user", "content": user_msgs[0]}],
-                temperature=temperature,
-                service_tier="flex",
+                **kwargs,
             )
             content = response.choices[0].message.content
             if content is None:
