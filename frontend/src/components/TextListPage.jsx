@@ -14,6 +14,55 @@ function statusClass(status) {
   return `task-status task-status-${status || 'pending'}`;
 }
 
+function RefreshButton({ submissionId, onRefresh, compact = false }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/submission/${submissionId}/refresh`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tasks: ['all'] })
+        }
+      );
+
+      if (response.ok) {
+        if (onRefresh) onRefresh();
+      } else {
+        console.error('Refresh failed:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleRefresh}
+      disabled={loading}
+      className="text-list-link"
+      title="Refresh all data for this submission"
+      style={{
+        background: loading ? '#ccc' : '#2196f3',
+        color: 'white',
+        border: 'none',
+        padding: compact ? '2px 6px' : '4px 8px',
+        fontSize: compact ? '11px' : '12px',
+        cursor: loading ? 'not-allowed' : 'pointer',
+        borderRadius: '3px',
+        marginLeft: '8px'
+      }}
+    >
+      {loading ? '...' : '🔄 Refresh'}
+    </button>
+  );
+}
+
 function TextListPage() {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -153,6 +202,11 @@ function TextListPage() {
                   <td>{(submission.topic_count || 0).toLocaleString()}</td>
                   <td>
                     <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>
+                    <RefreshButton
+                      submissionId={submission.submission_id}
+                      onRefresh={fetchSubmissions}
+                      compact={true}
+                    />
                   </td>
                 </tr>
               ))}
