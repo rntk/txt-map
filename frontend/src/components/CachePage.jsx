@@ -35,7 +35,7 @@ function CachePage() {
       setEntries(data.entries || []);
       setTotal(data.total || 0);
     } catch (err) {
-      setError(err.message || 'Failed to load cache entries');
+      setError(`Failed to load: ${err.message || 'Unknown error'}. Try refreshing.`);
     } finally {
       setLoading(false);
     }
@@ -176,7 +176,7 @@ function CachePage() {
       )}
 
       {loading ? (
-        <div className="task-state">Loading cache entries...</div>
+        <div className="task-state loading-text">Loading cache entries...</div>
       ) : error ? (
         <div className="task-state task-error">{error}</div>
       ) : (
@@ -201,7 +201,7 @@ function CachePage() {
               ) : (
                 entries.map(entry => (
                   <tr key={entry.id}>
-                    <td className="task-mono" title={entry.key}>{truncateKey(entry.key || entry.prompt_hash)}</td>
+                    <td className="task-mono" title={entry.key || entry.prompt_hash}>{truncateKey(entry.key || entry.prompt_hash)}</td>
                     <td><span className="task-status task-status-completed">{entry.namespace || '-'}</span></td>
                     <td>{entry.model_id || '-'}</td>
                     <td>{entry.temperature != null ? entry.temperature.toFixed(2) : '-'}</td>

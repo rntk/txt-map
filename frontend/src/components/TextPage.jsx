@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import FullScreenGraph from './FullScreenGraph';
@@ -7,6 +7,7 @@ import TopicSentencesModal from './shared/TopicSentencesModal';
 import DropdownMenu from './shared/DropdownMenu';
 import StatusIndicator from './shared/StatusIndicator';
 import RawTextDisplay from './shared/RawTextDisplay';
+import RefreshButton from './shared/RefreshButton';
 import TextPageActionsPortal from './TextPageActionsPortal';
 import VisualizationPanels from './VisualizationPanels';
 import SummaryTimeline from './SummaryTimeline';
@@ -31,50 +32,6 @@ const FULLSCREEN_TABS = [
   { key: 'article_structure', label: 'Article Structure' },
 ];
 
-function RefreshButton({ submissionId, onRefresh, compact = false }) {
-  const [loading, setLoading] = useState(false);
-
-  const handleRefresh = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/submission/${submissionId}/refresh`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tasks: ['all'] })
-        }
-      );
-
-      if (response.ok) {
-        if (onRefresh) onRefresh();
-      } else {
-        console.error('Refresh failed:', await response.text());
-      }
-    } catch (error) {
-      console.error('Error refreshing:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleRefresh}
-      disabled={loading}
-      className="action-btn"
-      style={{
-        background: loading ? '#ccc' : '#2196f3',
-        color: 'white',
-        border: 'none',
-        padding: compact ? '4px 8px' : '8px 16px',
-        fontSize: compact ? '12px' : '13px'
-      }}
-    >
-      {loading ? '...' : '🔄 Refresh'}
-    </button>
-  );
-}
 
 function TextPage() {
   const [selectedTopics, setSelectedTopics] = useState([]);
@@ -122,7 +79,7 @@ function TextPage() {
   const _results = submission?.results || {};
   const _safeTopics = Array.isArray(_results.topics) ? _results.topics : [];
   const _rawText = submission?.text_content || '';
-  const _topicSummaryParaMap = (() => {
+  const _topicSummaryParaMap = useMemo(() => {
     const mappings = _results.summary_mappings;
     if (!Array.isArray(mappings) || mappings.length === 0) return {};
     const map = {};
@@ -141,7 +98,7 @@ function TextPage() {
       }
     }
     return map;
-  })();
+  }, [_results, _safeTopics]);
 
   const { navigateTopicSentence } = useTopicNavigation({
     activeTab,
@@ -152,6 +109,28 @@ function TextPage() {
     topicSummaryParaMap: _topicSummaryParaMap,
     setHighlightedGroupedTopic,
   });
+
+  const allTopics = useMemo(() => _safeTopics.map(topic => ({
+    ...topic,
+    totalSentences: topic.sentences ? topic.sentences.length : 0,
+    summary: _results.topic_summaries ? _results.topic_summaries[topic.name] : ''
+  })), [_safeTopics, _results.topic_summaries]);
+
+  const { highlightRanges: rawTextHighlightRanges, fadeRanges: rawTextFadeRanges } = useMemo(
+    () => buildTopicStateRanges(_safeTopics, selectedTopics, hoveredTopic, readTopics, _rawText.length),
+    [_safeTopics, selectedTopics, hoveredTopic, readTopics, _rawText.length]
+  );
+
+  const highlightedSummaryParas = useMemo(() => {
+    const set = new Set();
+    for (const topic of selectedTopics) {
+      const indices = _topicSummaryParaMap[topic.name];
+      if (Array.isArray(indices)) {
+        for (const idx of indices) set.add(idx);
+      }
+    }
+    return set;
+  }, [selectedTopics, _topicSummaryParaMap]);
 
   const toggleTopic = (topic) => {
     setSelectedTopics(prev => {
@@ -306,33 +285,8 @@ function TextPage() {
     marker_word_indices: Array.isArray(results.marker_word_indices) ? results.marker_word_indices : []
   }] : [];
 
-  const allTopics = safeTopics.map(topic => ({
-    ...topic,
-    totalSentences: topic.sentences ? topic.sentences.length : 0,
-    summary: results.topic_summaries ? results.topic_summaries[topic.name] : ''
-  }));
-
   const rawText = submission.text_content || '';
-  const { highlightRanges: rawTextHighlightRanges, fadeRanges: rawTextFadeRanges } = buildTopicStateRanges(
-    safeTopics,
-    selectedTopics,
-    hoveredTopic,
-    readTopics,
-    rawText.length
-  );
-
   const topicSummaryParaMap = _topicSummaryParaMap;
-
-  const highlightedSummaryParas = (() => {
-    const set = new Set();
-    for (const topic of selectedTopics) {
-      const indices = topicSummaryParaMap[topic.name];
-      if (Array.isArray(indices)) {
-        for (const idx of indices) set.add(idx);
-      }
-    }
-    return set;
-  })();
 
   const summaryTimelineItems = buildSummaryTimelineItems(
     results.summary,
@@ -426,13 +380,19 @@ function TextPage() {
               />
             </div>
             <div className="right-column">
-              {showPanel && panelTopic && (
-                <TopicSentencePanel
-                  panelTopic={panelTopic}
-                  articles={articles}
-                  onClose={() => toggleShowPanel(panelTopic)}
-                />
-              )}
+              <div style={{
+                transition: 'opacity 0.25s ease',
+                opacity: showPanel && panelTopic ? 1 : 0,
+                pointerEvents: showPanel && panelTopic ? 'auto' : 'none',
+              }}>
+                {panelTopic && (
+                  <TopicSentencePanel
+                    panelTopic={panelTopic}
+                    articles={articles}
+                    onClose={() => toggleShowPanel(panelTopic)}
+                  />
+                )}
+              </div>
           <div className="article-section">
             <div className="article-header-sticky">
               <div className="global-menu-links">

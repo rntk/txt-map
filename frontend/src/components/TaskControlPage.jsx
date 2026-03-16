@@ -123,6 +123,12 @@ function TaskControlPage() {
     }
   };
 
+  const formatDate = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString();
+  };
+
   const handleFilterSubmit = (event) => {
     event.preventDefault();
     fetchTasks();
@@ -218,7 +224,7 @@ function TaskControlPage() {
       )}
 
       {loading ? (
-        <div className="task-state">Loading queue...</div>
+        <div className="task-state loading-text">Loading queue...</div>
       ) : error ? (
         <div className="task-state task-error">{error}</div>
       ) : (
@@ -243,14 +249,18 @@ function TaskControlPage() {
               ) : (
                 tasks.map(task => (
                   <tr key={task.id}>
-                    <td className="task-mono">{task.id}</td>
+                    <td className="task-mono">
+                      <span title={task.id} style={{fontFamily: 'monospace'}}>
+                        {task.id?.slice(0, 8) ?? task.id}…
+                      </span>
+                    </td>
                     <td className="task-mono">{task.submission_id}</td>
                     <td>{task.task_type}</td>
                     <td>
                       <span className={`task-status task-status-${task.status}`}>{task.status}</span>
                     </td>
                     <td>{task.priority}</td>
-                    <td>{task.created_at ? new Date(task.created_at).toLocaleString() : '-'}</td>
+                    <td>{formatDate(task.created_at)}</td>
                     <td>
                       <div className="task-actions">
                         <button

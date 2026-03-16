@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
+import { useTooltip } from '../hooks/useTooltip';
 
-// Tooltip configuration constants
+// Tooltip positioning constants
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
-const TOOLTIP_HIDE_DELAY_MS = 200;
 
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
@@ -130,49 +130,15 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }, [safeArticleTopics]);
 
   // --- Tooltip state ---
-  const [tooltip, setTooltip] = useState(null); // {x, y, topics: [{topic, rangeCount}]}
-  const hideTimeoutRef = useRef(null);
-  const lastTargetRef = useRef(null);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const showTooltip = useCallback((topics, x, y) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    setTooltip({ x, y, topics });
-  }, []);
-
-  const scheduleHide = useCallback(() => {
-    hideTimeoutRef.current = setTimeout(() => {
-      setTooltip(null);
-      lastTargetRef.current = null;
-    }, TOOLTIP_HIDE_DELAY_MS);
-  }, []);
-
-  const cancelHide = useCallback(() => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-  }, []);
+  const { tooltip, lastTargetRef, showTooltip, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
 
   // Handler for toggling read status from tooltip
   const handleToggleRead = useCallback((topic) => {
     if (onToggleRead) {
       onToggleRead(topic);
     }
-    setTooltip(null);
-    lastTargetRef.current = null;
-  }, [onToggleRead]);
+    hideTooltip();
+  }, [onToggleRead, hideTooltip]);
 
   // Find topics for a char range
   const findTopicsForChar = useCallback((charStart, charEnd) => {
@@ -208,9 +174,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
     // Only update if we've moved to a different token
     if (token === lastTargetRef.current) {
-      if (hideTimeoutRef.current) {
-        cancelHide();
-      }
+      cancelHide();
       return;
     }
 

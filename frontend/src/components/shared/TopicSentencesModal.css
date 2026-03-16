@@ -22,6 +22,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: modalScaleIn 0.2s ease-out;
 }
 
 .topic-sentences-modal__header {
@@ -46,6 +47,12 @@
     cursor: pointer;
     color: #666;
     line-height: 1;
+    padding: 8px;
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .topic-sentences-modal__close:hover {
@@ -128,5 +135,16 @@
     }
     to {
         opacity: 1;
+    }
+}
+
+@keyframes modalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
     }
 }

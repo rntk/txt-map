@@ -1,0 +1,28 @@
+.refresh-btn {
+  background: #2196f3;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+
+.refresh-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.refresh-btn--normal {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.refresh-btn--compact {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.refresh-btn--extra-compact {
+  padding: 2px 6px;
+  font-size: 11px;
+}

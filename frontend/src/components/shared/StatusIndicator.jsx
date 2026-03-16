@@ -34,7 +34,7 @@ function StatusIndicator({ tasks }) {
           background: 'white',
           borderRadius: '4px',
           border: '1px solid #eee',
-          fontSize: '11px',
+          fontSize: '12px',
           whiteSpace: 'nowrap'
         }} title={`${taskName.replace(/_/g, ' ')}: ${taskInfo.status}`}>
           <span style={{
@@ -46,6 +46,9 @@ function StatusIndicator({ tasks }) {
           </span>
           <span style={{ color: '#444', textTransform: 'capitalize' }}>
             {taskName.replace(/_/g, ' ')}
+          </span>
+          <span style={{ color: '#888', fontSize: '10px', marginLeft: '3px', textTransform: 'capitalize' }}>
+            {taskInfo.status}
           </span>
         </div>
       ))}
