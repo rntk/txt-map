@@ -83,6 +83,7 @@ function TextPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('article');
   const [groupedByTopics, setGroupedByTopics] = useState(false);
+  const [tooltipEnabled, setTooltipEnabled] = useState(true);
   const [highlightedGroupedTopic, setHighlightedGroupedTopic] = useState(null);
   useEffect(() => {
     if (highlightedGroupedTopic && !selectedTopics.some(t => t.name === highlightedGroupedTopic)) {
@@ -456,6 +457,14 @@ function TextPage() {
                 />
                 Grouped by topics
               </label>
+              <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={tooltipEnabled}
+                  onChange={() => setTooltipEnabled(prev => !prev)}
+                />
+                Show tooltips
+              </label>
               {submission.source_url && (
                 <div style={{ fontSize: '11px', color: '#666' }}>
                   Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
@@ -501,6 +510,7 @@ function TextPage() {
                     onToggleRead={toggleRead}
                     onToggleTopic={toggleTopic}
                     onNavigateTopic={navigateTopicSentence}
+                    tooltipEnabled={tooltipEnabled}
                   />
                 ))
               )}

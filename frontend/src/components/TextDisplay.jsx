@@ -9,7 +9,7 @@ const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 const TOOLTIP_HIDE_DELAY_MS = 200;
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
   const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
   const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
@@ -132,6 +132,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   // --- Tooltip state ---
   const [tooltip, setTooltip] = useState(null); // {x, y, topics: [{topic, rangeCount}]}
   const hideTimeoutRef = useRef(null);
+  const lastTargetRef = useRef(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -153,6 +154,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const scheduleHide = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setTooltip(null);
+      lastTargetRef.current = null;
     }, TOOLTIP_HIDE_DELAY_MS);
   }, []);
 
@@ -169,6 +171,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       onToggleRead(topic);
     }
     setTooltip(null);
+    lastTargetRef.current = null;
   }, [onToggleRead]);
 
   // Find topics for a char range
@@ -194,9 +197,22 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   // Event delegation handler
   const handleMouseOver = useCallback((e) => {
-    if (!onToggleRead) return;
+    if (!onToggleRead || !tooltipEnabled) return;
     const token = e.target.closest('.word-token, .sentence-token');
-    if (!token) return;
+    if (!token) {
+      if (lastTargetRef.current) {
+        scheduleHide();
+      }
+      return;
+    }
+
+    // Only update if we've moved to a different token
+    if (token === lastTargetRef.current) {
+      if (hideTimeoutRef.current) {
+        cancelHide();
+      }
+      return;
+    }
 
     let matchedTopics = [];
     if (token.dataset.charStart !== undefined && token.dataset.charEnd !== undefined) {
@@ -205,20 +221,29 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       matchedTopics = findTopicsForSentence(token.dataset.sentenceIndex);
     }
 
-    if (matchedTopics.length === 0) return;
+    if (matchedTopics.length === 0) {
+      lastTargetRef.current = null;
+      scheduleHide();
+      return;
+    }
 
-    // Clamp tooltip to viewport
-    let x = e.clientX + 12;
-    let y = e.clientY + 12;
-    if (x + TOOLTIP_WIDTH > window.innerWidth - TOOLTIP_VIEWPORT_MARGIN) {
-      x = e.clientX - TOOLTIP_WIDTH - 12;
-    }
-    if (y + TOOLTIP_HEIGHT_ESTIMATE > window.innerHeight - TOOLTIP_VIEWPORT_MARGIN) {
-      y = e.clientY - TOOLTIP_HEIGHT_ESTIMATE - 12;
-    }
+    lastTargetRef.current = token;
+
+    // Position tooltip right at the cursor
+    // Using -2 to put the cursor slightly inside the tooltip boundary 
+    // to ensure the transition from token hover to tooltip hover is seamless.
+    let x = e.clientX - 2;
+    let y = e.clientY - 2;
+
+    // Clamp to viewport instead of flipping to the other side
+    const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
+    const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
+    
+    x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
+    y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
 
     showTooltip(matchedTopics, x, y);
-  }, [onToggleRead, findTopicsForChar, findTopicsForSentence, showTooltip]);
+  }, [onToggleRead, findTopicsForChar, findTopicsForSentence, showTooltip, scheduleHide, cancelHide, tooltipEnabled]);
 
   const handleMouseOut = useCallback((e) => {
     const token = e.target.closest('.word-token, .sentence-token');
@@ -247,7 +272,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
             )}
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
               {onToggleTopic && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', color: '#ddd' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', color: '#ddd' }}>
                   <input
                     type="checkbox"
                     checked={isSelected}
