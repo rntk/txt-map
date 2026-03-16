@@ -185,3 +185,9 @@ class SemanticDiffsStorage:
                 }
             },
         )
+
+    def delete_by_pair_key(self, pair_key: str) -> tuple[int, int]:
+        """Delete all diffs and jobs for a pair key. Returns (deleted_diff_count, deleted_job_count)."""
+        deleted_diff_count = self._db.semantic_diffs.delete_many({"pair_key": pair_key}).deleted_count
+        deleted_job_count = self._db.semantic_diff_jobs.delete_many({"pair_key": pair_key}).deleted_count
+        return deleted_diff_count, deleted_job_count

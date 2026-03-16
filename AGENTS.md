@@ -22,6 +22,11 @@ These instructions are intended for AI agents working on this project.
     - To run without Docker (if dependencies are installed locally):
       - `pytest`
       - `pytest tests/unit/test_submission_handler.py -v`
+    - To run tests using the local MongoDB binary:
+      - `./test_mongodb/start_mongo.sh`                     # Starts MongoDB on port 27017
+      - `export MONGODB_URL=mongodb://localhost:27017/`     # Set environment variable
+      - `pytest`                                             # Run tests
+      - `./test_mongodb/stop_mongo.sh`                      # Stops MongoDB
     - See `TESTING.md` for full details on test structure and writing new tests.
 
 5.  **How to Test Frontend Changes**:

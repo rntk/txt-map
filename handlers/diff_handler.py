@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from lib.diff.semantic_diff import (
@@ -13,17 +13,10 @@ from lib.diff.semantic_diff import (
 )
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
+from handlers.dependencies import get_submissions_storage, get_semantic_diffs_storage
 
 
 router = APIRouter()
-
-
-def get_submissions_storage(request: Request) -> SubmissionsStorage:
-    return request.app.state.submissions_storage
-
-
-def get_semantic_diffs_storage(request: Request) -> SemanticDiffsStorage:
-    return request.app.state.semantic_diffs_storage
 
 
 class DiffCalculateRequest(BaseModel):
@@ -216,4 +209,26 @@ def post_diff_calculate(
         "submission_a_id": submission_a_id,
         "submission_b_id": submission_b_id,
         "force_recalculate": bool(job.get("force_recalculate")),
+    }
+
+
+@router.delete("/diff")
+def delete_diff_data(
+    left_submission_id: str,
+    right_submission_id: str,
+    semantic_diffs_storage: SemanticDiffsStorage = Depends(get_semantic_diffs_storage),
+):
+    if left_submission_id == right_submission_id:
+        raise HTTPException(status_code=400, detail="Please select two different submissions")
+
+    pair_key, submission_a_id, submission_b_id = canonical_pair(left_submission_id, right_submission_id)
+    deleted_diff_count, deleted_job_count = semantic_diffs_storage.delete_by_pair_key(pair_key)
+
+    return {
+        "deleted": True,
+        "pair_key": pair_key,
+        "submission_a_id": submission_a_id,
+        "submission_b_id": submission_b_id,
+        "deleted_diff_count": deleted_diff_count,
+        "deleted_job_count": deleted_job_count,
     }

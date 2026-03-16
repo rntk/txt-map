@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional, List
+
+from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
+from lib.storage.task_queue import TaskQueueStorage, make_task_document
 from lib.nlp import compute_word_frequencies
-from datetime import datetime, UTC
-import io
+from handlers.dependencies import get_submissions_storage, get_task_queue_storage, require_submission
 
 
 class SubmitRequest(BaseModel):
@@ -23,19 +25,21 @@ class ReadTopicsRequest(BaseModel):
 router = APIRouter()
 
 
-def get_submissions_storage(request: Request) -> SubmissionsStorage:
-    return request.app.state.submissions_storage
+def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str):
+    """Insert task queue entries for a new submission."""
+    for task_type, priority in TASK_PRIORITIES.items():
+        task_queue_storage.create(make_task_document(submission_id, task_type, priority))
 
 
 @router.post("/submit")
 def post_submit(
     request: SubmitRequest,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+    task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ):
     """
     Accept HTML content, save to DB, queue tasks, and return submission ID
     """
-    # Create submission in database
     submission = submissions_storage.create(
         html_content=request.html,
         # Keep raw HTML in text_content as well to avoid any pre-cleaning.
@@ -43,8 +47,7 @@ def post_submit(
         source_url=request.source_url
     )
 
-    db = submissions_storage._db
-    _queue_all_tasks(db, submission["submission_id"])
+    _queue_all_tasks(task_queue_storage, submission["submission_id"])
 
     return {
         "submission_id": submission["submission_id"],
@@ -102,33 +105,11 @@ def _extract_content_from_upload(filename: str, data: bytes) -> tuple[str, str]:
     )
 
 
-def _queue_all_tasks(db, submission_id: str):
-    """Insert task queue entries for a new submission (same as /submit)."""
-    now = datetime.now(UTC)
-    base = {
-        "submission_id": submission_id,
-        "status": "pending",
-        "created_at": now,
-        "started_at": None,
-        "completed_at": None,
-        "worker_id": None,
-        "retry_count": 0,
-        "error": None,
-    }
-    for task_type, priority in [
-        ("split_topic_generation", 1),
-        ("subtopics_generation", 2),
-        ("summarization", 3),
-        ("mindmap", 3),
-        ("prefix_tree", 3),
-    ]:
-        db.task_queue.insert_one({**base, "task_type": task_type, "priority": priority})
-
-
 @router.post("/upload")
 async def post_upload(
     file: UploadFile = File(...),
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+    task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ):
     """
     Accept an uploaded file (html, htm, txt, md, pdf), extract its text/html
@@ -151,8 +132,7 @@ async def post_upload(
         source_url=filename,
     )
 
-    db = submissions_storage._db
-    _queue_all_tasks(db, submission["submission_id"])
+    _queue_all_tasks(task_queue_storage, submission["submission_id"])
 
     return {
         "submission_id": submission["submission_id"],
@@ -162,20 +142,16 @@ async def post_upload(
 
 @router.get("/submission/{submission_id}/status")
 def get_submission_status(
-    submission_id: str,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     Return current task statuses for polling
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
     overall_status = submissions_storage.get_overall_status(submission)
 
     return {
-        "submission_id": submission_id,
+        "submission_id": submission["submission_id"],
         "tasks": submission["tasks"],
         "overall_status": overall_status
     }
@@ -183,20 +159,16 @@ def get_submission_status(
 
 @router.get("/submission/{submission_id}")
 def get_submission(
-    submission_id: str,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     Return all available results from DB
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
     overall_status = submissions_storage.get_overall_status(submission)
 
     return {
-        "submission_id": submission_id,
+        "submission_id": submission["submission_id"],
         "source_url": submission.get("source_url", ""),
         "text_content": submission.get("text_content", ""),
         "html_content": submission.get("html_content", ""),
@@ -212,17 +184,14 @@ def get_submission(
 
 @router.put("/submission/{submission_id}/read-topics")
 def put_read_topics(
-    submission_id: str,
     body: ReadTopicsRequest,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     Persist the list of read topic names for a submission
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
+    submission_id = submission["submission_id"]
     submissions_storage.update_read_topics(submission_id, body.read_topics)
 
     return {
@@ -233,21 +202,18 @@ def put_read_topics(
 
 @router.delete("/submission/{submission_id}")
 def delete_submission(
-    submission_id: str,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+    task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ):
     """
     Delete a submission and any queued tasks
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    submission_id = submission["submission_id"]
+    task_queue_storage.delete_by_submission(submission_id)
+    deleted = submissions_storage.delete_by_id(submission_id)
 
-    db = submissions_storage._db
-    db.task_queue.delete_many({"submission_id": submission_id})
-    delete_result = db.submissions.delete_one({"submission_id": submission_id})
-
-    if delete_result.deleted_count == 0:
+    if not deleted:
         raise HTTPException(status_code=500, detail="Failed to delete submission")
 
     return {
@@ -258,16 +224,15 @@ def delete_submission(
 
 @router.post("/submission/{submission_id}/refresh")
 def post_refresh(
-    submission_id: str,
     refresh_request: RefreshRequest,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+    task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ):
     """
     Clear results and re-queue tasks for recalculation
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    submission_id = submission["submission_id"]
 
     # Determine which tasks to refresh and validate user input
     requested_tasks = refresh_request.tasks or ["all"]
@@ -283,37 +248,13 @@ def post_refresh(
     submissions_storage.clear_results(submission_id, task_names)
 
     # Delete existing task queue entries for this submission
-    db = submissions_storage._db
-    db.task_queue.delete_many({
-        "submission_id": submission_id,
-        "task_type": {"$in": task_names}
-    })
+    task_queue_storage.delete_by_submission(submission_id, task_types=task_names)
 
     # Re-queue tasks
-    now = datetime.now(UTC)
     tasks_queued = []
-
-    task_priorities = {
-        "split_topic_generation": 1,
-        "subtopics_generation": 2,
-        "summarization": 3,
-        "mindmap": 3,
-        "prefix_tree": 3
-    }
-
     for task_name in task_names:
-        db.task_queue.insert_one({
-            "submission_id": submission_id,
-            "task_type": task_name,
-            "priority": task_priorities.get(task_name, 3),
-            "status": "pending",
-            "created_at": now,
-            "started_at": None,
-            "completed_at": None,
-            "worker_id": None,
-            "retry_count": 0,
-            "error": None
-        })
+        priority = TASK_PRIORITIES.get(task_name, 3)
+        task_queue_storage.create(make_task_document(submission_id, task_name, priority))
         tasks_queued.append(task_name)
 
     return {
@@ -324,10 +265,9 @@ def post_refresh(
 
 @router.get("/submission/{submission_id}/word-cloud")
 def get_word_cloud(
-    submission_id: str,
     path: List[str] = Query(default=[]),
     top_n: int = Query(default=60, ge=1, le=200),
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submission: dict = Depends(require_submission),
 ):
     """
     Return a word-frequency cloud for the sentences that belong to topics
@@ -335,10 +275,6 @@ def get_word_cloud(
     An empty *path* covers all topics.
     Uses NLTK tokenisation, POS tagging, and lemmatisation on the backend.
     """
-    submission = submissions_storage.get_by_id(submission_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
     results = submission.get("results") or {}
     topics = results.get("topics") or []
     sentences = results.get("sentences") or []
@@ -373,41 +309,19 @@ def get_word_cloud(
 
 @router.get("/global-topics")
 def get_global_topics(
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     Return aggregated topic tree across all completed submissions.
     """
-    db = submissions_storage._db
-    pipeline = [
-        {"$match": {"tasks.split_topic_generation.status": "completed"}},
-        {"$unwind": "$results.topics"},
-        {"$group": {
-            "_id": "$results.topics.name",
-            "total_sentences": {"$sum": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}},
-            "sources": {"$push": {
-                "submission_id": "$submission_id",
-                "source_url": "$source_url",
-                "sentence_count": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}
-            }}
-        }},
-        {"$project": {
-            "_id": 0,
-            "name": "$_id",
-            "total_sentences": 1,
-            "source_count": {"$size": "$sources"},
-            "sources": 1
-        }},
-        {"$sort": {"name": 1}}
-    ]
-    topics = list(db.submissions.aggregate(pipeline))
+    topics = submissions_storage.aggregate_global_topics()
     return {"topics": topics}
 
 
 @router.get("/global-topics/sentences")
 def get_global_topics_sentences(
     topic_name: List[str] = Query(default=[]),
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     Return sentence texts for selected topics across all submissions.
@@ -415,11 +329,10 @@ def get_global_topics_sentences(
     if not topic_name:
         return {"groups": []}
 
-    db = submissions_storage._db
-    submissions = list(db.submissions.find(
+    submissions = submissions_storage.list_with_projection(
         {"tasks.split_topic_generation.status": "completed"},
-        {"submission_id": 1, "source_url": 1, "results.topics": 1, "results.sentences": 1}
-    ))
+        {"submission_id": 1, "source_url": 1, "results.topics": 1, "results.sentences": 1},
+    )
 
     groups = []
     for submission in submissions:
@@ -450,7 +363,7 @@ def list_submissions(
     submission_id: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 100,
-    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage)
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
     List submissions with optional filters.
@@ -462,9 +375,8 @@ def list_submissions(
     if submission_id:
         query["submission_id"] = submission_id
 
-    db = submissions_storage._db
     fetch_limit = limit if not status else min(max(limit * 5, limit), 1000)
-    submissions = list(db.submissions.find(query).sort("created_at", -1).limit(fetch_limit))
+    submissions = submissions_storage.list(query, fetch_limit)
 
     items = []
     for submission in submissions:

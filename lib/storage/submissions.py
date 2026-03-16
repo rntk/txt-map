@@ -222,6 +222,44 @@ class SubmissionsStorage:
 
         return [name for name in self.task_names if name in expanded]
 
+    def delete_by_id(self, submission_id: str) -> bool:
+        """Delete a submission by submission_id. Returns True if deleted."""
+        result = self._db.submissions.delete_one({"submission_id": submission_id})
+        return result.deleted_count > 0
+
+    def list(self, filters: Optional[dict] = None, limit: int = 100) -> List[dict]:
+        """List submissions with optional filters, sorted by created_at desc."""
+        return list(self._db.submissions.find(filters or {}).sort("created_at", -1).limit(limit))
+
+    def list_with_projection(self, filters: dict, projection: dict) -> List[dict]:
+        """List submissions applying a specific projection (no default sort)."""
+        return list(self._db.submissions.find(filters, projection))
+
+    def aggregate_global_topics(self) -> List[dict]:
+        """Return aggregated topic tree across all completed submissions."""
+        pipeline = [
+            {"$match": {"tasks.split_topic_generation.status": "completed"}},
+            {"$unwind": "$results.topics"},
+            {"$group": {
+                "_id": "$results.topics.name",
+                "total_sentences": {"$sum": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}},
+                "sources": {"$push": {
+                    "submission_id": "$submission_id",
+                    "source_url": "$source_url",
+                    "sentence_count": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}
+                }}
+            }},
+            {"$project": {
+                "_id": 0,
+                "name": "$_id",
+                "total_sentences": 1,
+                "source_count": {"$size": "$sources"},
+                "sources": 1
+            }},
+            {"$sort": {"name": 1}}
+        ]
+        return list(self._db.submissions.aggregate(pipeline))
+
     def get_overall_status(self, submission: dict) -> str:
         """Determine overall status from task statuses"""
         tasks = submission.get("tasks", {})

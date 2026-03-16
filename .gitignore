@@ -7,3 +7,5 @@ frontend/build
 .idea
 .vscode
 .env
+test_mongodb/data/
+test_mongodb/mongodb.log
