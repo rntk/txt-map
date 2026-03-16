@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import uuid
 from datetime import datetime, UTC
 
-# Mock dependencies before importing app
+# Mock dependencies before importing app - must be at module level to catch import-time operations
 @pytest.fixture(autouse=True)
 def mock_env(monkeypatch):
     monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
@@ -12,11 +12,14 @@ def mock_env(monkeypatch):
     with patch("lifespan.MongoClient"):
         yield
 
-from main import app
-from handlers.dependencies import get_submissions_storage, get_task_queue_storage
+@pytest.fixture
+def app():
+    """Lazy import app to ensure mocks are applied first."""
+    from main import app
+    return app
 
 @pytest.fixture
-def client():
+def client(app):
     return TestClient(app)
 
 @pytest.fixture
@@ -30,7 +33,8 @@ def mock_task_queue():
     return MagicMock()
 
 @pytest.fixture(autouse=True)
-def setup_overrides(mock_storage, mock_task_queue):
+def setup_overrides(app, mock_storage, mock_task_queue):
+    from handlers.dependencies import get_submissions_storage, get_task_queue_storage
     app.dependency_overrides[get_submissions_storage] = lambda: mock_storage
     app.dependency_overrides[get_task_queue_storage] = lambda: mock_task_queue
     yield
