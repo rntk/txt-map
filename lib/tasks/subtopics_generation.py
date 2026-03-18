@@ -13,8 +13,17 @@ class _LLMAdapter:
     def __init__(self, client):
         self._client = client
 
+    @property
+    def model_id(self):
+        return getattr(self._client, "model_id", None)
+
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         return self._client.call([prompt], temperature=temperature)
+
+
+def _cache_namespace(base_namespace, llm_client):
+    model_id = getattr(llm_client, "model_id", "unknown")
+    return f"{base_namespace}:{model_id}"
 
 
 def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, cached_llm):
@@ -103,7 +112,11 @@ def process_subtopics_generation(submission: dict, db, llm, cache_store=None):
 
     llm_adapter = _LLMAdapter(llm)
     if cache_store is not None:
-        cached_llm = CachingLLMCallable(llm_adapter, cache_store, namespace="subtopics")
+        cached_llm = CachingLLMCallable(
+            llm_adapter,
+            cache_store,
+            namespace=_cache_namespace("subtopics", llm),
+        )
     else:
         cached_llm = llm_adapter
 

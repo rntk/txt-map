@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import TextPage from './components/TextPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
@@ -18,14 +18,119 @@ const globalMenuItems = [
 ];
 
 function App() {
-  const [llmProvider, setLlmProvider] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [draftProvider, setDraftProvider] = useState('');
+  const [draftModel, setDraftModel] = useState('');
+  const [saveState, setSaveState] = useState('idle');
 
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => r.json())
-      .then((data) => setLlmProvider(data.llm_provider))
+      .then((data) => {
+        setSettings(data);
+        setDraftProvider(data.llm_provider || '');
+        setDraftModel(data.llm_model || '');
+      })
       .catch(() => {});
   }, []);
+
+  const providerOptions = settings?.llm_available_providers || [];
+  const selectedProvider = providerOptions.find((provider) => provider.name === draftProvider) || null;
+  const modelOptions = selectedProvider?.models || [];
+
+  const hasPendingChanges = Boolean(
+    settings &&
+    (draftProvider !== settings.llm_provider || draftModel !== settings.llm_model)
+  );
+
+  const handleProviderChange = (event) => {
+    const nextProviderName = event.target.value;
+    const provider = providerOptions.find((item) => item.name === nextProviderName);
+    setDraftProvider(nextProviderName);
+    setDraftModel(provider?.default_model || '');
+    setSaveState('idle');
+  };
+
+  const handleModelChange = (event) => {
+    setDraftModel(event.target.value);
+    setSaveState('idle');
+  };
+
+  const handleApply = async () => {
+    if (!draftProvider || !draftModel) {
+      return;
+    }
+
+    setSaveState('saving');
+    try {
+      const response = await fetch('/api/settings/llm', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: draftProvider, model: draftModel }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update LLM settings');
+      }
+      const data = await response.json();
+      setSettings(data);
+      setDraftProvider(data.llm_provider || '');
+      setDraftModel(data.llm_model || '');
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  };
+
+  const renderLLMSelector = () => {
+    if (!settings || providerOptions.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="llm-provider-badge">
+        <span className="llm-provider-badge__label">LLM</span>
+        <select
+          aria-label="LLM provider"
+          className="llm-provider-badge__select"
+          value={draftProvider}
+          onChange={handleProviderChange}
+        >
+          {providerOptions.map((provider) => (
+            <option key={provider.key} value={provider.name}>
+              {provider.name}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="LLM model"
+          className="llm-provider-badge__select llm-provider-badge__select--model"
+          value={draftModel}
+          onChange={handleModelChange}
+        >
+          {modelOptions.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="llm-provider-badge__button"
+          onClick={handleApply}
+          disabled={!hasPendingChanges || saveState === 'saving' || !draftProvider || !draftModel}
+        >
+          {saveState === 'saving' ? 'Saving...' : 'Apply'}
+        </button>
+        <span className="llm-provider-badge__hint">
+          {saveState === 'error'
+            ? 'Save failed'
+            : settings.llm_applies_on_next_task
+              ? 'Applies on next task'
+              : ''}
+        </span>
+      </div>
+    );
+  };
 
   const renderWithGlobalMenu = (content) => {
     const currentPath = window.location.pathname;
@@ -48,56 +153,45 @@ function App() {
             })}
           </div>
           <div id="global-menu-portal-target" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}></div>
-          {llmProvider && (
-            <span className="llm-provider-badge" style={{ marginLeft: '10px' }}>LLM: {llmProvider}</span>
-          )}
+          {renderLLMSelector()}
         </nav>
         <main className="global-page-content">{content}</main>
       </div>
     );
   };
 
-  // Determine which page to render based on URL
   const pathname = window.location.pathname;
   const pathParts = pathname.split('/');
   const pageType = pathParts[2];
 
-  // Home page
   if (!pageType || pageType === 'menu') {
     return <MainPage />;
   }
 
-  // Task control page
   if (pageType === 'tasks') {
     return renderWithGlobalMenu(<TaskControlPage />);
   }
 
-  // Texts list page
   if (pageType === 'texts') {
     return renderWithGlobalMenu(<TextListPage />);
   }
 
-  // Diff page
   if (pageType === 'diff') {
     return renderWithGlobalMenu(<DiffPage />);
   }
 
-  // LLM Cache page
   if (pageType === 'cache') {
     return renderWithGlobalMenu(<CachePage />);
   }
 
-  // Global Topics page
   if (pageType === 'topics') {
     return renderWithGlobalMenu(<GlobalTopicsPage />);
   }
 
-  // Text submission page
   if (pageType === 'text') {
     return renderWithGlobalMenu(<TextPage />);
   }
 
-  // Default fallback
   return renderWithGlobalMenu(<div>Page not found</div>);
 }
 

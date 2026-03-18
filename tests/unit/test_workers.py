@@ -655,7 +655,8 @@ class TestWorkerProcessTask:
             yield worker
 
     @patch('workers.TASK_HANDLERS')
-    def test_finds_handler_from_task_handlers_mapping(self, mock_handlers, worker, caplog):
+    @patch('workers.create_llm_client')
+    def test_finds_handler_from_task_handlers_mapping(self, mock_create_llm, mock_handlers, worker, caplog):
         """Finds handler from TASK_HANDLERS mapping."""
         task = {
             "_id": "task-1",
@@ -669,13 +670,15 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
             mock_handler.assert_called_once()
 
     @patch('workers.TASK_HANDLERS')
-    def test_updates_submission_task_status_to_processing(self, mock_handlers, worker):
+    @patch('workers.create_llm_client')
+    def test_updates_submission_task_status_to_processing(self, mock_create_llm, mock_handlers, worker):
         """Updates submission task status to 'processing'."""
         task = {
             "_id": "task-1",
@@ -689,6 +692,7 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
@@ -698,7 +702,8 @@ class TestWorkerProcessTask:
         )
 
     @patch('workers.TASK_HANDLERS')
-    def test_fetches_submission_document(self, mock_handlers, worker):
+    @patch('workers.create_llm_client')
+    def test_fetches_submission_document(self, mock_create_llm, mock_handlers, worker):
         """Fetches submission document."""
         task = {
             "_id": "task-1",
@@ -712,6 +717,7 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
@@ -719,7 +725,8 @@ class TestWorkerProcessTask:
         worker.submissions_storage.get_by_id.assert_called_once_with("sub-123")
 
     @patch('workers.TASK_HANDLERS')
-    def test_calls_handler_with_submission_db_llm(self, mock_handlers, worker):
+    @patch('workers.create_llm_client')
+    def test_calls_handler_with_submission_db_llm(self, mock_create_llm, mock_handlers, worker):
         """Non-cache tasks (e.g. mindmap) called with (submission, db, llm) only."""
         task = {
             "_id": "task-1",
@@ -733,14 +740,39 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        active_llm = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = active_llm
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
 
-            mock_handler.assert_called_once_with(submission, worker.db, worker.llm)
+            mock_handler.assert_called_once_with(submission, worker.db, active_llm)
 
     @patch('workers.TASK_HANDLERS')
-    def test_marks_task_completed_on_success(self, mock_handlers, worker):
+    @patch('workers.create_llm_client')
+    def test_calls_cache_task_handler_with_runtime_llm(self, mock_create_llm, mock_handlers, worker):
+        """Cache tasks receive the per-task LLM client and cache store."""
+        task = {
+            "_id": "task-1",
+            "task_type": "summarization",
+            "submission_id": "sub-123"
+        }
+
+        mock_handler = MagicMock()
+        mock_handlers.get.return_value = mock_handler
+        submission = {"_id": "sub-123"}
+        worker.submissions_storage.get_by_id.return_value = submission
+        active_llm = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = active_llm
+
+        with patch.object(worker, '_mark_task_completed'):
+            worker.process_task(task)
+
+        mock_handler.assert_called_once_with(submission, worker.db, active_llm, cache_store=worker.cache_store)
+
+    @patch('workers.TASK_HANDLERS')
+    @patch('workers.create_llm_client')
+    def test_marks_task_completed_on_success(self, mock_create_llm, mock_handlers, worker):
         """Marks task completed on success."""
         task = {
             "_id": "task-1",
@@ -754,13 +786,15 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_completed') as mock_mark_completed:
             worker.process_task(task)
 
             mock_mark_completed.assert_called_once_with(task)
 
-    def test_marks_task_failed_on_exception(self, worker):
+    @patch('workers.create_llm_client')
+    def test_marks_task_failed_on_exception(self, mock_create_llm, worker):
         """Marks task failed on exception."""
         task = {
             "_id": "task-1",
@@ -770,6 +804,7 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_failed') as mock_mark_failed:
             with patch.object(worker, '_mark_task_completed'):
@@ -796,7 +831,8 @@ class TestWorkerProcessTask:
             call_args = mock_mark_failed.call_args
             assert "No handler for task type" in call_args[0][1]
 
-    def test_submission_not_found_marks_failed(self, worker):
+    @patch('workers.create_llm_client')
+    def test_submission_not_found_marks_failed(self, mock_create_llm, worker):
         """Submission not found -> mark failed."""
         task = {
             "_id": "task-1",
@@ -805,6 +841,7 @@ class TestWorkerProcessTask:
         }
 
         worker.submissions_storage.get_by_id.return_value = None
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_failed') as mock_mark_failed:
             worker.process_task(task)
@@ -812,7 +849,8 @@ class TestWorkerProcessTask:
             mock_mark_failed.assert_called_once()
 
     @patch('workers.TASK_HANDLERS')
-    def test_logs_errors_with_exc_info(self, mock_handlers, worker, caplog):
+    @patch('workers.create_llm_client')
+    def test_logs_errors_with_exc_info(self, mock_create_llm, mock_handlers, worker, caplog):
         """Logs errors with exc_info."""
         task = {
             "_id": "task-1",
@@ -826,6 +864,7 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
 
         with patch.object(worker, '_mark_task_failed'):
             with patch.object(worker, '_mark_task_completed'):
@@ -1557,5 +1596,4 @@ class TestWorkerRun:
         # When running is False from start, the while loop condition is False
         # so claim_task should never be called
         worker.claim_task.assert_not_called()
-
 

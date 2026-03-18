@@ -15,6 +15,14 @@ class OpenAIClient(LLMClient):
     def provider_name(self) -> str:
         return "OpenAI"
 
+    @property
+    def provider_key(self) -> str:
+        return "openai"
+
+    @property
+    def model_name(self) -> str:
+        return self._model
+
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         try:
             prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]

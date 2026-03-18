@@ -1,0 +1,137 @@
+import React from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import App from './App';
+
+vi.mock('./components/TextPage', () => ({ default: () => <div>Text Page</div> }));
+vi.mock('./components/TaskControlPage', () => ({ default: () => <div>Task Control</div> }));
+vi.mock('./components/TextListPage', () => ({ default: () => <div>Texts List</div> }));
+vi.mock('./components/MainPage', () => ({ default: () => <div>Main Page</div> }));
+vi.mock('./components/DiffPage', () => ({ default: () => <div>Diff Page</div> }));
+vi.mock('./components/CachePage', () => ({ default: () => <div>Cache Page</div> }));
+vi.mock('./components/GlobalTopicsPage', () => ({ default: () => <div>Global Topics</div> }));
+
+describe('App LLM selector', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    window.history.pushState({}, '', '/page/tasks');
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('renders provider and model selectors from settings payload', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        llm_provider: 'OpenAI',
+        llm_model: 'gpt-4o',
+        llm_applies_on_next_task: true,
+        llm_available_providers: [
+          {
+            key: 'openai',
+            name: 'OpenAI',
+            models: ['gpt-4o', 'gpt-5-mini'],
+            default_model: 'gpt-4o',
+          },
+        ],
+      }),
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByLabelText('LLM provider')).toHaveValue('OpenAI');
+    expect(screen.getByLabelText('LLM model')).toHaveValue('gpt-4o');
+    expect(screen.getByText('Applies on next task')).toBeInTheDocument();
+  });
+
+  it('switches model to provider default when provider changes', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        llm_provider: 'OpenAI',
+        llm_model: 'gpt-5-mini',
+        llm_applies_on_next_task: true,
+        llm_available_providers: [
+          {
+            key: 'openai',
+            name: 'OpenAI',
+            models: ['gpt-4o', 'gpt-5-mini'],
+            default_model: 'gpt-4o',
+          },
+          {
+            key: 'anthropic',
+            name: 'Anthropic',
+            models: ['claude-sonnet-4-20250514'],
+            default_model: 'claude-sonnet-4-20250514',
+          },
+        ],
+      }),
+    }));
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText('LLM provider'), {
+      target: { value: 'Anthropic' },
+    });
+
+    expect(screen.getByLabelText('LLM model')).toHaveValue('claude-sonnet-4-20250514');
+  });
+
+  it('saves the selected provider and model', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          llm_provider: 'OpenAI',
+          llm_model: 'gpt-4o',
+          llm_applies_on_next_task: true,
+          llm_available_providers: [
+            {
+              key: 'openai',
+              name: 'OpenAI',
+              models: ['gpt-4o', 'gpt-5-mini'],
+              default_model: 'gpt-4o',
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          llm_provider: 'OpenAI',
+          llm_model: 'gpt-5-mini',
+          llm_applies_on_next_task: true,
+          llm_available_providers: [
+            {
+              key: 'openai',
+              name: 'OpenAI',
+              models: ['gpt-4o', 'gpt-5-mini'],
+              default_model: 'gpt-4o',
+            },
+          ],
+        }),
+      });
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText('LLM model'), {
+      target: { value: 'gpt-5-mini' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenNthCalledWith(
+        2,
+        '/api/settings/llm',
+        expect.objectContaining({
+          method: 'PUT',
+        }),
+      );
+    });
+  });
+});

@@ -5,7 +5,7 @@ from lib.llm.base import LLMClient
 
 
 class AnthropicClient(LLMClient):
-    def __init__(self, api_key: str, model: str = "claude-haiku-4-5", max_context_tokens: int = 200000, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514", max_context_tokens: int = 200000, max_retries: int = 3, retry_delay: float = 1.0):
         super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         import anthropic
         self._client = anthropic.Anthropic(api_key=api_key)
@@ -14,6 +14,14 @@ class AnthropicClient(LLMClient):
     @property
     def provider_name(self) -> str:
         return "Anthropic"
+
+    @property
+    def provider_key(self) -> str:
+        return "anthropic"
+
+    @property
+    def model_name(self) -> str:
+        return self._model
 
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         try:

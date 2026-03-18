@@ -34,6 +34,10 @@ class _LLMCallableAdapter:
     def __init__(self, llm_client):
         self._llm_client = llm_client
 
+    @property
+    def model_id(self):
+        return getattr(self._llm_client, "model_id", None)
+
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         prompt_preview = prompt[:300] + "..." if len(prompt) > 300 else prompt
         logger.info(f"LLMCallableAdapter sending chunk ({len(prompt)} chars): {prompt_preview}")
@@ -41,6 +45,11 @@ class _LLMCallableAdapter:
         result_preview = result[:300] + "..." if len(result) > 300 else result
         logger.info(f"LLMCallableAdapter received response ({len(result)} chars): {result_preview}")
         return result
+
+
+def _cache_namespace(base_namespace: str, llm_client) -> str:
+    model_id = getattr(llm_client, "model_id", "unknown")
+    return f"{base_namespace}:{model_id}"
 
 
 def _groups_to_topics(groups, sentence_objects) -> List[Dict]:
@@ -139,7 +148,11 @@ def split_article(
 
     llm_adapter = _LLMCallableAdapter(llm)
     cached_adapter = (
-        CachingLLMCallable(llm_adapter, cache_store, namespace="article-split")
+        CachingLLMCallable(
+            llm_adapter,
+            cache_store,
+            namespace=_cache_namespace("article-split", llm),
+        )
         if cache_store is not None
         else llm_adapter
     )

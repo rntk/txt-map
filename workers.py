@@ -62,7 +62,7 @@ TASK_HANDLERS = {
 
 
 class Worker:
-    def __init__(self, db, llm, cache_store=None):
+    def __init__(self, db, llm=None, cache_store=None):
         self.db = db
         self.llm = llm
         self.cache_store = cache_store
@@ -165,6 +165,8 @@ class Worker:
 
         try:
             logger.info(f"Processing {task_type} for submission {submission_id}")
+            llm = create_llm_client(db=self.db)
+            logger.info(f"Using LLM provider: {llm.provider_name}, model: {llm.model_name}")
 
             # Update submission task status to processing
             self.submissions_storage.update_task_status(
@@ -179,9 +181,9 @@ class Worker:
             # Execute the handler (pass cache_store to LLM-using tasks)
             cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization"}
             if task_type in cache_tasks:
-                handler(submission, self.db, self.llm, cache_store=self.cache_store)
+                handler(submission, self.db, llm, cache_store=self.cache_store)
             else:
-                handler(submission, self.db, self.llm)
+                handler(submission, self.db, llm)
 
             # Mark task as completed
             self._mark_task_completed(task)
@@ -349,8 +351,8 @@ def main():
     # Initialize connections
     client = MongoClient(mongodb_url)
     db = client["rss"]
-    llm = create_llm_client()
-    logger.info(f"Using LLM provider: {llm.provider_name}")
+    llm = create_llm_client(db=db)
+    logger.info(f"Initial LLM provider: {llm.provider_name}, model: {llm.model_name}")
 
     # Create and run worker
     SubmissionsStorage(db).prepare()

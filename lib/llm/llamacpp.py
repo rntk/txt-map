@@ -9,17 +9,26 @@ from lib.llm.base import LLMClient
 
 
 class LLamaCPP(LLMClient):
-    def __init__(self, host: str, max_context_tokens: int = 11000, token: Optional[str] = None, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(self, host: str, model: str = "moonshotai/Kimi-K2.5", max_context_tokens: int = 11000, token: Optional[str] = None, max_retries: int = 3, retry_delay: float = 1.0):
         super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
+        self.__model = model
         # Token can be passed in explicitly or read from the environment variable TOKEN
         self.__token = token or os.getenv("TOKEN")
 
     @property
     def provider_name(self) -> str:
         return "LlamaCPP"
+
+    @property
+    def provider_key(self) -> str:
+        return "llamacpp"
+
+    @property
+    def model_name(self) -> str:
+        return self.__model
 
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         """Single attempt to call the LLM without retry logic."""
@@ -31,7 +40,7 @@ class LLamaCPP(LLMClient):
 
             body = json.dumps(
                 {
-                    "model": "moonshotai/Kimi-K2.5",
+                    "model": self.__model,
                     "messages": [{"role": "user", "content": user_msgs[0]}],
                     "temperature": temperature,
                     "cache_prompt": True

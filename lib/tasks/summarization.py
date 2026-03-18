@@ -11,8 +11,17 @@ class _LLMAdapter:
     def __init__(self, client):
         self._client = client
 
+    @property
+    def model_id(self):
+        return getattr(self._client, "model_id", None)
+
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         return self._client.call([prompt], temperature=temperature)
+
+
+def _cache_namespace(base_namespace, llm_client):
+    model_id = getattr(llm_client, "model_id", "unknown")
+    return f"{base_namespace}:{model_id}"
 
 
 def summarize_by_sentence_groups(sent_list, cached_llm, llm_client, max_groups_tokens_buffer=400):
@@ -74,7 +83,11 @@ def process_summarization(submission: dict, db, llm, cache_store=None):
 
     llm_adapter = _LLMAdapter(llm)
     if cache_store is not None:
-        cached_llm = CachingLLMCallable(llm_adapter, cache_store, namespace="summarization")
+        cached_llm = CachingLLMCallable(
+            llm_adapter,
+            cache_store,
+            namespace=_cache_namespace("summarization", llm),
+        )
     else:
         cached_llm = llm_adapter
 

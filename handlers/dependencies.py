@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, Request
 
+from lib.storage.app_settings import AppSettingsStorage
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.task_queue import TaskQueueStorage
@@ -15,6 +16,10 @@ def get_task_queue_storage(request: Request) -> TaskQueueStorage:
 
 def get_semantic_diffs_storage(request: Request) -> SemanticDiffsStorage:
     return request.app.state.semantic_diffs_storage
+
+
+def get_app_settings_storage(request: Request) -> AppSettingsStorage:
+    return request.app.state.app_settings_storage
 
 
 def require_submission(
