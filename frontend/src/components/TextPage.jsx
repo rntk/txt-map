@@ -19,7 +19,7 @@ import { useTextPageData } from '../hooks/useTextPageData';
 import '../styles/App.css';
 
 const FULLSCREEN_TABS = [
-  { key: 'summary', label: 'Topic Summaries' },
+  { key: 'topic_summary_timeline', label: 'Topic Summaries' },
   { key: 'topics', label: 'Topics' },
   { key: 'topics_river', label: 'Topics River' },
   { key: 'marimekko', label: 'Marimekko' },
@@ -78,6 +78,8 @@ function TextPage() {
   const {
     safeTopics: _safeTopics,
     rawText: _rawText,
+    articleSummaryText,
+    articleSummaryBullets,
     topicSummaryParaMap: _topicSummaryParaMap,
     allTopics,
     rawTextHighlightRanges,
@@ -340,28 +342,38 @@ function TextPage() {
                   Article
                 </button>
                 <button
+                  className={`global-menu-link${activeTab === 'article_summary' ? ' active' : ''}`}
+                  onClick={() => handleTabClick('article_summary')}
+                >
+                  Summary
+                </button>
+                <button
                   className={`global-menu-link${activeTab === 'raw_text' ? ' active' : ''}`}
                   onClick={() => handleTabClick('raw_text')}
                 >
                   Raw Text
                 </button>
               </div>
-              <label className="grouped-topics-toggle">
-                <input
-                  type="checkbox"
-                  checked={groupedByTopics}
-                  onChange={() => setGroupedByTopics(prev => !prev)}
-                />
-                Grouped by topics
-              </label>
-              <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
-                <input
-                  type="checkbox"
-                  checked={tooltipEnabled}
-                  onChange={() => setTooltipEnabled(prev => !prev)}
-                />
-                Show tooltips
-              </label>
+              {(activeTab === 'article' || activeTab === 'raw_text') && (
+                <>
+                  <label className="grouped-topics-toggle">
+                    <input
+                      type="checkbox"
+                      checked={groupedByTopics}
+                      onChange={() => setGroupedByTopics(prev => !prev)}
+                    />
+                    Grouped by topics
+                  </label>
+                  <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={tooltipEnabled}
+                      onChange={() => setTooltipEnabled(prev => !prev)}
+                    />
+                    Show tooltips
+                  </label>
+                </>
+              )}
               {submission.source_url && (
                 <div style={{ fontSize: '11px', color: '#666' }}>
                   Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
@@ -370,7 +382,30 @@ function TextPage() {
             </div>
 
             <div className="article-body">
-              {groupedByTopics ? (
+              {activeTab === 'article_summary' ? (
+                <div className="summary-content">
+                  {articleSummaryText || articleSummaryBullets.length > 0 ? (
+                    <>
+                      {articleSummaryText && (
+                        <div className="summary-text">
+                          <p>{articleSummaryText}</p>
+                        </div>
+                      )}
+                      {articleSummaryBullets.length > 0 && (
+                        <div className="summary-text">
+                          <ul>
+                            {articleSummaryBullets.map((bullet, index) => (
+                              <li key={`${index}-${bullet}`}>{bullet}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p>No summary available. Processing may still be in progress...</p>
+                  )}
+                </div>
+              ) : groupedByTopics ? (
                 <GroupedByTopicsView
                   topics={safeTopics}
                   rawHtml={articles[0]?.raw_html || ''}
@@ -416,7 +451,7 @@ function TextPage() {
             </div>
           </div>
 
-          {fullscreenGraph === 'summary' && (
+          {fullscreenGraph === 'topic_summary_timeline' && (
             <SummaryTimeline
               summaryTimelineItems={summaryTimelineItems}
               highlightedSummaryParas={highlightedSummaryParas}

@@ -89,6 +89,10 @@ def sample_submission_a():
                 {"name": "Topic A2", "sentences": [3]}
             ],
             "topic_summaries": {},
+            "article_summary": {
+                "text": "",
+                "bullets": []
+            },
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],
@@ -148,6 +152,10 @@ def sample_submission_b():
                 {"name": "Topic B2", "sentences": [3]}
             ],
             "topic_summaries": {},
+            "article_summary": {
+                "text": "",
+                "bullets": []
+            },
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],
@@ -180,6 +188,10 @@ def sample_submission_not_ready():
             "sentences": [],
             "topics": [],
             "topic_summaries": {},
+            "article_summary": {
+                "text": "",
+                "bullets": []
+            },
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],

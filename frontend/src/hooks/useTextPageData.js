@@ -6,6 +6,13 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
     const results = submission?.results || {};
     const safeTopics = Array.isArray(results.topics) ? results.topics : [];
     const rawText = submission?.text_content || '';
+    const articleSummary = results.article_summary && typeof results.article_summary === 'object'
+        ? results.article_summary
+        : {};
+    const articleSummaryText = typeof articleSummary.text === 'string' ? articleSummary.text : '';
+    const articleSummaryBullets = Array.isArray(articleSummary.bullets)
+        ? articleSummary.bullets.filter((bullet) => typeof bullet === 'string' && bullet.trim())
+        : [];
 
     const topicSummaryParaMap = useMemo(() => {
         const mappings = results.summary_mappings;
@@ -71,6 +78,8 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
     return {
         safeTopics,
         rawText,
+        articleSummaryText,
+        articleSummaryBullets,
         topicSummaryParaMap,
         allTopics,
         rawTextHighlightRanges,

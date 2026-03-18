@@ -38,6 +38,10 @@ describe('TextPage raw text navigation', () => {
         },
       ],
       topic_summaries: {},
+      article_summary: {
+        text: 'Brief article summary',
+        bullets: ['Important detail one', 'Important detail two'],
+      },
       paragraph_map: null,
       summary: [],
       summary_mappings: [],
@@ -120,5 +124,19 @@ describe('TextPage raw text navigation', () => {
     expect(betaToken).toHaveClass('raw-text-token');
     expect(betaToken).toHaveClass('faded');
     expect(betaToken).not.toHaveClass('highlighted');
+  });
+
+  it('renders the article summary tab with summary text and bullets', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    expect(screen.getByText('Brief article summary')).toBeInTheDocument();
+    expect(screen.getByText('Important detail one')).toBeInTheDocument();
+    expect(screen.getByText('Important detail two')).toBeInTheDocument();
+    expect(screen.queryByText('Grouped by topics')).not.toBeInTheDocument();
+    expect(screen.queryByText('Show tooltips')).not.toBeInTheDocument();
   });
 });

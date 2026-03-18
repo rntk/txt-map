@@ -246,6 +246,10 @@ class TestCreate:
             "sentences": [],
             "topics": [],
             "topic_summaries": {},
+            "article_summary": {
+                "text": "",
+                "bullets": []
+            },
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],
@@ -722,6 +726,7 @@ class TestClearResults:
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         assert update_doc["$set"]["results.topic_summaries"] == {}
+        assert update_doc["$set"]["results.article_summary"] == {"text": "", "bullets": []}
         assert update_doc["$set"]["results.summary"] == []
         assert update_doc["$set"]["results.summary_mappings"] == []
 

@@ -84,6 +84,10 @@ class SubmissionsStorage:
                 "sentences": [],
                 "topics": [],
                 "topic_summaries": {},
+                "article_summary": {
+                    "text": "",
+                    "bullets": []
+                },
                 "topic_mindmaps": {},
                 "mindmap_results": [],
                 "subtopics": [],
@@ -181,6 +185,7 @@ class SubmissionsStorage:
 
         if "summarization" in task_names:
             update_fields["results.topic_summaries"] = {}
+            update_fields["results.article_summary"] = {"text": "", "bullets": []}
             update_fields["results.summary"] = []
             update_fields["results.summary_mappings"] = []
 

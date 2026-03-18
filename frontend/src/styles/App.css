@@ -842,6 +842,19 @@ html {
   margin-bottom: 0;
 }
 
+.summary-text ul {
+  margin: 12px 0 0 20px;
+  padding-left: 0;
+}
+
+.summary-text li {
+  margin-bottom: 8px;
+}
+
+.summary-text li:last-child {
+  margin-bottom: 0;
+}
+
 .summary-sentence-wrapper {
   display: inline;
 }

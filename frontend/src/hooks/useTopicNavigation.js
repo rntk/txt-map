@@ -132,7 +132,7 @@ export function useTopicNavigation({
       return;
     }
 
-    if (activeTab === 'summary') {
+    if (activeTab === 'topic_summary_timeline') {
       const paraIndices = topicSummaryParaMap[topic.name];
       if (!paraIndices || paraIndices.length === 0) return;
 

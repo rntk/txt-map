@@ -90,6 +90,10 @@ def sample_submission():
                 {"name": "Topic B", "sentences": [3]}
             ],
             "topic_summaries": {},
+            "article_summary": {
+                "text": "",
+                "bullets": []
+            },
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],

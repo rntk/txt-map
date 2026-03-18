@@ -10,6 +10,11 @@ from datetime import datetime, UTC
 
 # Import module under test
 from lib.tasks.summarization import (
+    ArticleSummaryGenerationError,
+    ARTICLE_SUMMARY_MAX_ATTEMPTS,
+    build_article_summary_chunks,
+    generate_article_summary,
+    parse_article_summary_response,
     summarize_by_sentence_groups,
     process_summarization,
 )
@@ -36,7 +41,7 @@ def mock_llm():
     llm = MagicMock()
     llm.estimate_tokens = MagicMock(return_value=100)
     llm.max_context_tokens = 11000
-    llm.call = MagicMock(return_value="Brief summary")
+    llm.call = MagicMock(return_value='{"text":"Brief summary","bullets":["Detail A","Detail B"]}')
     return llm
 
 
@@ -64,7 +69,8 @@ def sample_submission():
             ],
             "summary": [],
             "summary_mappings": [],
-            "topic_summaries": {}
+            "topic_summaries": {},
+            "article_summary": {"text": "", "bullets": []}
         }
     }
 
@@ -185,6 +191,113 @@ class TestSummarizeBySentenceGroupsBasic:
         assert mapping["summary_index"] == 0
         assert mapping["summary_sentence"] == "Test summary"
         assert mapping["source_sentences"] == [1]
+
+
+class TestArticleSummaryHelpers:
+    """Test article-level summary helpers."""
+
+    def test_parse_article_summary_response_handles_json(self):
+        parsed = parse_article_summary_response(
+            '{"text":"Short summary","bullets":["Detail A","Detail B"]}'
+        )
+
+        assert parsed == {
+            "text": "Short summary",
+            "bullets": ["Detail A", "Detail B"]
+        }
+
+    def test_parse_article_summary_response_strips_code_fences(self):
+        parsed = parse_article_summary_response(
+            '```json\n{"text":"Short summary","bullets":["Detail A"]}\n```'
+        )
+
+        assert parsed == {
+            "text": "Short summary",
+            "bullets": ["Detail A"]
+        }
+
+    def test_build_article_summary_chunks_supports_overlap(self):
+        llm = MagicMock()
+        llm.max_context_tokens = 40
+        llm.estimate_tokens = MagicMock(side_effect=lambda text: 10 if "Summarize the article text within" in text else 8)
+
+        chunks = build_article_summary_chunks(
+            ["S1", "S2", "S3", "S4"],
+            llm,
+            overlap_sentences=1,
+            max_output_tokens_buffer=12,
+        )
+
+        assert [chunk["sentences"] for chunk in chunks] == [
+            ["S1", "S2"],
+            ["S2", "S3"],
+            ["S3", "S4"],
+        ]
+
+    def test_generate_article_summary_merges_chunk_summaries(self, mock_llm):
+        cached_llm = MagicMock()
+        cached_llm.call.side_effect = [
+            '{"text":"Chunk 1","bullets":["A","B"]}',
+            '{"text":"Chunk 2","bullets":["B","C"]}',
+            '{"text":"Merged","bullets":["A","C"]}',
+        ]
+
+        with patch('lib.tasks.summarization.build_article_summary_chunks') as mock_chunks:
+            mock_chunks.return_value = [
+                {"sentences": ["S1", "S2"], "start_sentence": 1, "end_sentence": 2},
+                {"sentences": ["S2", "S3"], "start_sentence": 2, "end_sentence": 3},
+            ]
+
+            summary = generate_article_summary(["S1", "S2", "S3"], cached_llm, mock_llm)
+
+        assert summary == {"text": "Merged", "bullets": ["A", "C"]}
+        assert cached_llm.call.call_count == 3
+
+    def test_generate_article_summary_retries_after_invalid_response(self, mock_llm):
+        cached_llm = MagicMock()
+        cached_llm.call.return_value = 'not valid json'
+        mock_llm.call = MagicMock(return_value='{"text":"Recovered","bullets":["Detail A"]}')
+
+        with patch('lib.tasks.summarization.build_article_summary_chunks') as mock_chunks:
+            mock_chunks.return_value = [
+                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+            ]
+
+            summary = generate_article_summary(["S1"], cached_llm, mock_llm, max_attempts=3)
+
+        assert summary == {"text": "Recovered", "bullets": ["Detail A"]}
+        cached_llm.call.assert_called_once()
+        mock_llm.call.assert_called_once()
+
+    def test_generate_article_summary_raises_after_retries_exhausted(self, mock_llm):
+        cached_llm = MagicMock()
+        cached_llm.call.return_value = 'not valid json'
+        mock_llm.call = MagicMock(return_value='still not valid json')
+
+        with patch('lib.tasks.summarization.build_article_summary_chunks') as mock_chunks:
+            mock_chunks.return_value = [
+                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+            ]
+
+            with pytest.raises(ArticleSummaryGenerationError, match="empty or invalid JSON"):
+                generate_article_summary(["S1"], cached_llm, mock_llm, max_attempts=3)
+
+    def test_generate_article_summary_defaults_to_ten_attempts(self, mock_llm):
+        cached_llm = MagicMock()
+        cached_llm.call.return_value = 'not valid json'
+        mock_llm.call = MagicMock(return_value='still not valid json')
+
+        with patch('lib.tasks.summarization.build_article_summary_chunks') as mock_chunks:
+            mock_chunks.return_value = [
+                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+            ]
+
+            with pytest.raises(ArticleSummaryGenerationError, match="empty or invalid JSON"):
+                generate_article_summary(["S1"], cached_llm, mock_llm)
+
+        assert ARTICLE_SUMMARY_MAX_ATTEMPTS == 10
+        cached_llm.call.assert_called_once()
+        assert mock_llm.call.call_count == ARTICLE_SUMMARY_MAX_ATTEMPTS - 1
 
 
 # =============================================================================
@@ -373,11 +486,15 @@ class TestProcessSummarizationBasic:
         with patch('lib.tasks.summarization.summarize_by_sentence_groups') as mock_sum:
             mock_sum.return_value = (["Summary"], [{"summary_index": 0, "summary_sentence": "Summary", "source_sentences": [1]}])
 
-            process_summarization(submission, mock_db, mock_llm)
+            with patch('lib.tasks.summarization.generate_article_summary') as mock_article_summary:
+                mock_article_summary.return_value = {"text": "Brief", "bullets": ["Point"]}
+
+                process_summarization(submission, mock_db, mock_llm)
 
             update_call = mock_storage_instance.update_results.call_args
             assert "summary" in update_call[0][1]
             assert "summary_mappings" in update_call[0][1]
+            assert update_call[0][1]["article_summary"] == {"text": "Brief", "bullets": ["Point"]}
 
     def test_updates_results_with_topic_summaries(
         self, mock_db, mock_llm, mock_submissions_storage
@@ -519,7 +636,7 @@ class TestProcessSummarizationEdgeCases:
     def test_handles_empty_summary_response(
         self, mock_db, mock_llm, mock_submissions_storage
     ):
-        """Function handles empty summary response from LLM."""
+        """Function raises when article summary response is empty after retries."""
         submission = {
             "submission_id": "test-123",
             "results": {
@@ -532,11 +649,12 @@ class TestProcessSummarizationEdgeCases:
         mock_submissions_storage.return_value = mock_storage_instance
 
         with patch('lib.tasks.summarization.summarize_by_sentence_groups') as mock_sum:
-            # Empty summaries returned
             mock_sum.return_value = ([], [])
+            with patch('lib.tasks.summarization.generate_article_summary') as mock_article_summary:
+                mock_article_summary.return_value = {"text": "", "bullets": []}
 
-            # Should not raise
-            process_summarization(submission, mock_db, mock_llm)
+                with pytest.raises(ArticleSummaryGenerationError, match="empty content"):
+                    process_summarization(submission, mock_db, mock_llm)
 
 
 # =============================================================================
