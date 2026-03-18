@@ -29,8 +29,9 @@ export function sanitizeHTML(html) {
     'margin', 'margin-left', 'margin-right', 'margin-top', 'margin-bottom',
     'padding', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom',
     'border', 'border-left', 'border-right', 'border-top', 'border-bottom', 'border-color',
-    'border-width', 'border-style', 'border-radius', 'display', 'width', 'height', 'max-width',
-    'min-width', 'max-height', 'min-height', 'white-space'
+    'border-width', 'border-style', 'border-radius', 'border-collapse', 'display', 'width', 'height', 'max-width',
+    'min-width', 'max-height', 'min-height', 'white-space',
+    'list-style-type', 'list-style', 'vertical-align', 'text-indent', 'text-decoration-line'
   ]);
 
   const sanitizeStyle = (styleValue) => {

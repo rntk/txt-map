@@ -185,6 +185,88 @@
     });
   }
 
+  // --- Style extraction ---
+
+  const STYLE_PROPS = [
+    'font-size', 'font-family', 'font-weight', 'font-style',
+    'color', 'background-color',
+    'text-align', 'text-decoration', 'text-decoration-line', 'text-transform', 'text-indent',
+    'line-height', 'letter-spacing', 'word-spacing',
+    'display', 'white-space',
+    'list-style-type',
+    'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+    'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+    'border-top', 'border-bottom', 'border-left', 'border-right',
+    'border-collapse', 'border-radius',
+    'vertical-align', 'width', 'max-width',
+  ];
+
+  function extractStyledHtml(elements) {
+    // Create a hidden iframe with no stylesheets to get browser default styles
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+    // Cache default styles per tag name
+    const defaultStyleCache = new Map();
+
+    function getDefaultStyle(tagName) {
+      if (defaultStyleCache.has(tagName)) return defaultStyleCache.get(tagName);
+      const el = iframeDoc.createElement(tagName);
+      iframeDoc.body.appendChild(el);
+      const computed = iframe.contentWindow.getComputedStyle(el);
+      const defaults = {};
+      for (const prop of STYLE_PROPS) {
+        defaults[prop] = computed.getPropertyValue(prop);
+      }
+      iframeDoc.body.removeChild(el);
+      defaultStyleCache.set(tagName, defaults);
+      return defaults;
+    }
+
+    function inlineStyles(original, clone) {
+      if (original.nodeType !== Node.ELEMENT_NODE) return;
+
+      const computed = window.getComputedStyle(original);
+      const defaults = getDefaultStyle(original.tagName.toLowerCase());
+      const parts = [];
+
+      for (const prop of STYLE_PROPS) {
+        const val = computed.getPropertyValue(prop);
+        // Skip transparent background (non-visual default)
+        if (prop === 'background-color' && val === 'rgba(0, 0, 0, 0)') continue;
+        if (val !== defaults[prop]) {
+          parts.push(`${prop}: ${val}`);
+        }
+      }
+
+      if (parts.length > 0) {
+        clone.style.cssText = parts.join('; ');
+      }
+
+      // Strip extension classes
+      clone.classList.remove('rsstag-selected', 'rsstag-element-highlight');
+
+      // Recurse into children
+      const origChildren = original.children;
+      const cloneChildren = clone.children;
+      for (let i = 0; i < origChildren.length; i++) {
+        inlineStyles(origChildren[i], cloneChildren[i]);
+      }
+    }
+
+    const htmlParts = [];
+    for (const el of elements) {
+      const clone = el.cloneNode(true);
+      inlineStyles(el, clone);
+      htmlParts.push(clone.outerHTML);
+    }
+
+    document.body.removeChild(iframe);
+    return htmlParts.join('\n');
+  }
+
   // --- Submit / state ---
 
   function updateSubmitState() {
@@ -206,7 +288,7 @@
     }
 
     const sourceUrl = window.location.href;
-    const html = selectedElements.map(({ el }) => el.innerHTML).join('\n');
+    const html = extractStyledHtml(selectedElements.map(({ el }) => el));
 
     browser.runtime.sendMessage({
       action: "submitSelection",
