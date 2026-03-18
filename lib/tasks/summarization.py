@@ -4,9 +4,10 @@ Summarization task - generates summaries for sentences and topics
 import json
 import logging
 import re
+import time
 
 from lib.storage.submissions import SubmissionsStorage
-from txt_splitt.cache import CachingLLMCallable
+from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,58 @@ class _LLMAdapter:
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         return self._client.call([prompt], temperature=temperature)
+
+
+class _ValidatedCachingLLMCallable(CachingLLMCallable):
+    """Cache wrapper that only stores and serves responses accepted by a validator."""
+
+    def __init__(self, *args, validator, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._validator = validator
+
+    def call(self, prompt: str, temperature: float) -> str:
+        if not self._should_cache(temperature):
+            self._annotate_cache_event(
+                hit=False,
+                cache_key=None,
+                bypass_reason="nonzero_temperature",
+            )
+            return self._inner.call(prompt, temperature)
+
+        cache_key = _build_cache_key(
+            namespace=self._namespace,
+            model_id=self._model_id,
+            prompt_version=self._prompt_version,
+            prompt=prompt,
+            temperature=temperature,
+        )
+        entry = self._store.get(cache_key)
+        if entry is not None and self._validator(entry.response):
+            self._annotate_cache_event(hit=True, cache_key=cache_key)
+            return entry.response
+
+        response = self._inner.call(prompt, temperature)
+        if self._validator(response):
+            self._store.set(
+                CacheEntry(
+                    key=cache_key,
+                    response=response,
+                    created_at=time.time(),
+                    namespace=self._namespace,
+                    model_id=self._model_id,
+                    prompt_version=self._prompt_version,
+                    temperature=temperature,
+                )
+            )
+            self._annotate_cache_event(hit=False, cache_key=cache_key)
+            return response
+
+        self._annotate_cache_event(
+            hit=False,
+            cache_key=cache_key,
+            bypass_reason="validation_failed",
+        )
+        return response
 
 
 def _cache_namespace(base_namespace, llm_client):
@@ -154,6 +207,12 @@ def _normalize_article_summary(summary_data):
 
 def _article_summary_has_required_content(summary_data):
     return bool(summary_data.get("text")) and bool(summary_data.get("bullets"))
+
+
+def _is_valid_article_summary_response(response_text: str) -> bool:
+    return _article_summary_has_required_content(
+        parse_article_summary_response(response_text)
+    )
 
 
 def parse_article_summary_response(response_text: str):
@@ -368,8 +427,15 @@ def process_summarization(submission: dict, db, llm, cache_store=None):
             cache_store,
             namespace=_cache_namespace("summarization", llm),
         )
+        article_summary_cached_llm = _ValidatedCachingLLMCallable(
+            llm_adapter,
+            cache_store,
+            namespace=_cache_namespace("summarization", llm),
+            validator=_is_valid_article_summary_response,
+        )
     else:
         cached_llm = llm_adapter
+        article_summary_cached_llm = llm_adapter
 
     # Generate overall summary for all sentences
     print(f"Generating overall summary for {len(sentences)} sentences")
@@ -378,7 +444,7 @@ def process_summarization(submission: dict, db, llm, cache_store=None):
     )
     article_summary = generate_article_summary(
         sentences,
-        cached_llm,
+        article_summary_cached_llm,
         llm,
     )
     if not _article_summary_has_required_content(article_summary):

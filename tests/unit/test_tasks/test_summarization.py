@@ -12,8 +12,10 @@ from datetime import datetime, UTC
 from lib.tasks.summarization import (
     ArticleSummaryGenerationError,
     ARTICLE_SUMMARY_MAX_ATTEMPTS,
+    _ValidatedCachingLLMCallable,
     build_article_summary_chunks,
     generate_article_summary,
+    _is_valid_article_summary_response,
     parse_article_summary_response,
     summarize_by_sentence_groups,
     process_summarization,
@@ -215,6 +217,46 @@ class TestArticleSummaryHelpers:
             "text": "Short summary",
             "bullets": ["Detail A"]
         }
+
+    def test_is_valid_article_summary_response_rejects_invalid_json(self):
+        assert _is_valid_article_summary_response('not valid json') is False
+
+    def test_validated_cache_skips_invalid_article_summary_response(self):
+        inner = MagicMock()
+        inner.call.return_value = 'not valid json'
+        store = MagicMock()
+        store.get.return_value = None
+
+        cached_llm = _ValidatedCachingLLMCallable(
+            inner,
+            store,
+            namespace="summarization:test",
+            validator=_is_valid_article_summary_response,
+        )
+
+        response = cached_llm.call("prompt", 0.0)
+
+        assert response == 'not valid json'
+        store.set.assert_not_called()
+
+    def test_validated_cache_ignores_invalid_cached_article_summary_response(self):
+        inner = MagicMock()
+        inner.call.return_value = '{"text":"Recovered","bullets":["Detail A"]}'
+        store = MagicMock()
+        store.get.return_value = MagicMock(response='not valid json')
+
+        cached_llm = _ValidatedCachingLLMCallable(
+            inner,
+            store,
+            namespace="summarization:test",
+            validator=_is_valid_article_summary_response,
+        )
+
+        response = cached_llm.call("prompt", 0.0)
+
+        assert response == '{"text":"Recovered","bullets":["Detail A"]}'
+        inner.call.assert_called_once_with("prompt", 0.0)
+        store.set.assert_called_once()
 
     def test_build_article_summary_chunks_supports_overlap(self):
         llm = MagicMock()
