@@ -7,8 +7,14 @@ function DiffPage() {
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [submissionsError, setSubmissionsError] = useState('');
 
-  const [leftId, setLeftId] = useState('');
-  const [rightId, setRightId] = useState('');
+  const [leftId, setLeftId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('left') || '';
+  });
+  const [rightId, setRightId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('right') || '';
+  });
   const [diffState, setDiffState] = useState(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [diffError, setDiffError] = useState('');

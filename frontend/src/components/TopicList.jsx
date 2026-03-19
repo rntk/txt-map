@@ -15,6 +15,7 @@ function TopicList({
   onToggleShowPanel = () => { },
   onNavigateTopic,
   onToggleReadAll = () => { },
+  onOpenVisualization,
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -243,6 +244,7 @@ function TopicList({
     onToggleShowPanel,
     onNavigateTopic,
     isPanelSelection,
+    onOpenVisualization,
   };
 
   const buttonStyle = {

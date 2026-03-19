@@ -8,7 +8,7 @@ import { buildScopedChartData } from '../utils/topicHierarchy';
 import { useTopicLevel } from '../hooks/useTopicLevel';
 import './TopicsBarChart.css';
 
-const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
+const TopicsRiverChart = ({ topics, sentences = [], articleLength, onShowInArticle }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [activeTopic, setActiveTopic] = useState(null);
@@ -295,6 +295,7 @@ const TopicsRiverChart = ({ topics, sentences = [], articleLength }) => {
                     topic={selectedTopicForModal}
                     sentences={sentences}
                     onClose={() => setSelectedTopicForModal(null)}
+                    onShowInArticle={onShowInArticle}
                 />
             )}
         </div>

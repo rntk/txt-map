@@ -20,13 +20,14 @@ function VisualizationPanels({
   results,
   submissionId,
   allTopics,
+  onShowInArticle,
 }) {
   return (
     <>
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
           <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
-            <TopicsBarChart topics={allTopics} sentences={safeSentences} />
+            <TopicsBarChart topics={allTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
           </div>
         </FullScreenGraph>
       )}
@@ -37,7 +38,7 @@ function VisualizationPanels({
             <div style={{ marginBottom: '60px' }}>
               <h2>Topics River</h2>
               <p>Visualization of topic density across the article.</p>
-              <TopicsRiverChart topics={safeTopics} sentences={safeSentences} articleLength={safeSentences.length} />
+              <TopicsRiverChart topics={safeTopics} sentences={safeSentences} articleLength={safeSentences.length} onShowInArticle={onShowInArticle} />
             </div>
             <div className="subtopics-river-section">
               <h2>Subtopics River</h2>
@@ -48,6 +49,7 @@ function VisualizationPanels({
                   subtopics={results.subtopics}
                   sentences={safeSentences}
                   articleLength={safeSentences.length}
+                  onShowInArticle={onShowInArticle}
                 />
               ) : (
                 <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
@@ -102,7 +104,7 @@ function VisualizationPanels({
               Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
             </p>
             <div style={{ flex: 1 }}>
-              <CircularPackingChart topics={safeTopics} sentences={safeSentences} />
+              <CircularPackingChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
             </div>
           </div>
         </FullScreenGraph>
@@ -128,7 +130,7 @@ function VisualizationPanels({
       {fullscreenGraph === 'article_structure' && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <ArticleStructureChart topics={safeTopics} sentences={safeSentences} />
+            <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
           </div>
         </FullScreenGraph>
       )}

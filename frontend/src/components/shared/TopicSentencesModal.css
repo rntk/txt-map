@@ -14,9 +14,9 @@
 
 .topic-sentences-modal {
     background: #fff;
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
+    width: 80vw;
+    max-width: 1100px;
+    height: 75vh;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     display: flex;
@@ -119,6 +119,22 @@
 .topic-sentences-modal__extend-btn:hover {
     background: #e0e8ff;
     border-color: #88a;
+}
+
+.topic-sentences-modal__show-in-article {
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid #a0b8d0;
+    border-radius: 4px;
+    background: #eaf2fb;
+    color: #2a5a8a;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.topic-sentences-modal__show-in-article:hover {
+    background: #d0e6f7;
+    border-color: #7aaac8;
 }
 
 .topic-sentences-modal__header-extra {

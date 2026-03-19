@@ -61,9 +61,18 @@ function GlobalTopicsTimelineView({ groups, groupRefs }) {
             >
               <div
                 className="timeline-subtopic"
-                style={{ color: agg.colors.subtopicText }}
+                style={{ color: agg.colors.subtopicText, display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 {agg.subtopicLabel !== agg.topLevelLabel ? agg.subtopicLabel : ''}
+                {agg.items.length >= 2 && (
+                  <a
+                    href={`/page/diff?left=${agg.items[0].submission_id}&right=${agg.items[1].submission_id}`}
+                    style={{ fontSize: '11px', color: '#5a7a9a', textDecoration: 'none', border: '1px solid #a0b8d0', borderRadius: '3px', padding: '1px 5px', whiteSpace: 'nowrap' }}
+                    title={`Compare first two sources sharing this topic`}
+                  >
+                    Compare
+                  </a>
+                )}
               </div>
               <div
                 className="timeline-dot"

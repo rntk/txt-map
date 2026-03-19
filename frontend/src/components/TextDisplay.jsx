@@ -194,7 +194,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     lastTargetRef.current = token;
 
     // Position tooltip right at the cursor
-    // Using -2 to put the cursor slightly inside the tooltip boundary 
+    // Using -2 to put the cursor slightly inside the tooltip boundary
     // to ensure the transition from token hover to tooltip hover is seamless.
     let x = e.clientX - 2;
     let y = e.clientY - 2;
@@ -202,11 +202,17 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     // Clamp to viewport instead of flipping to the other side
     const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
     const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
-    
+
     x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
     y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
 
-    showTooltip(matchedTopics, x, y);
+    let meta = null;
+    if (token.dataset.sentenceIndex !== undefined) {
+      const idx = Number(token.dataset.sentenceIndex);
+      meta = { sentenceIdx: idx, totalSentences: safeSentences.length };
+    }
+
+    showTooltip(matchedTopics, x, y, meta);
   }, [onToggleRead, findTopicsForChar, findTopicsForSentence, showTooltip, scheduleHide, cancelHide, tooltipEnabled]);
 
   const handleMouseOut = useCallback((e) => {
@@ -223,6 +229,11 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       onMouseEnter={cancelHide}
       onMouseLeave={scheduleHide}
     >
+      {tooltip.meta && (
+        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '6px', borderBottom: '1px solid #444', paddingBottom: '4px' }}>
+          Sentence {tooltip.meta.sentenceIdx + 1} / {tooltip.meta.totalSentences}
+        </div>
+      )}
       {tooltip.topics.map(({ topic, rangeCount }, i) => {
         const isRead = readTopicsSet.has(topic.name);
         const isSelected = safeSelectedTopics.some(t => t.name === topic.name);

@@ -894,6 +894,26 @@ html {
   filter: brightness(0.92);
 }
 
+.summary-topic-badge {
+  display: inline;
+  padding: 1px 5px;
+  margin: 0 2px;
+  background-color: #e8f4e8;
+  color: #2d6a2d;
+  border: 1px solid #a8d8a8;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 500;
+  vertical-align: baseline;
+  transition: background-color 0.15s;
+}
+
+.summary-topic-badge:hover {
+  background-color: #c8e8c8;
+  border-color: #80c080;
+}
+
 /* Vertical timeline layout for Summary tab */
 .summary-timeline {
   position: relative;

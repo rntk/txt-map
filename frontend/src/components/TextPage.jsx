@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import FullScreenGraph from './FullScreenGraph';
@@ -152,6 +152,44 @@ function TextPage() {
   const closeSummaryModal = useCallback(() => {
     setSummaryModalTopic(null);
   }, []);
+
+  const pendingShowTopicRef = useRef(null);
+
+  const handleShowInArticle = useCallback((modalTopic) => {
+    const topicName = modalTopic.fullPath || modalTopic.displayName;
+    const matchedTopic = _safeTopics.find(t => t.name === topicName);
+    if (!matchedTopic) return;
+    pendingShowTopicRef.current = matchedTopic;
+    closeFullscreenGraph();
+    setSelectedTopics(prev =>
+      prev.some(t => t.name === matchedTopic.name) ? prev : [...prev, matchedTopic]
+    );
+  }, [_safeTopics, closeFullscreenGraph]);
+
+  useEffect(() => {
+    if (!fullscreenGraph && pendingShowTopicRef.current) {
+      const topic = pendingShowTopicRef.current;
+      pendingShowTopicRef.current = null;
+      const timer = setTimeout(() => {
+        navigateTopicSentence(topic, 'focus');
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [fullscreenGraph, navigateTopicSentence]);
+
+  const highlightedBulletIndices = useMemo(() => {
+    if (!selectedTopics.length || !articleBulletMatches.length) return new Set();
+    const selectedNames = new Set(selectedTopics.map(t => t.name));
+    const result = new Set();
+    articleBulletMatches.forEach((matches, idx) => {
+      if (matches.some(m => selectedNames.has(m.topic.name))) result.add(idx);
+    });
+    return result;
+  }, [selectedTopics, articleBulletMatches]);
+
+  const handleOpenVisualization = useCallback(() => {
+    handleTabClick('topics');
+  }, [handleTabClick]);
 
   const [bulletSourceMenu, setBulletSourceMenu] = useState(null);
 
@@ -341,6 +379,7 @@ function TextPage() {
                 onToggleShowPanel={toggleShowPanel}
                 onNavigateTopic={navigateTopicSentence}
                 onToggleReadAll={toggleReadAll}
+                onOpenVisualization={handleOpenVisualization}
               />
             </div>
             <div className="right-column">
@@ -432,22 +471,39 @@ function TextPage() {
                       {articleSummaryBullets.length > 0 && (
                         <div className="summary-text">
                           <ul>
-                            {articleSummaryBullets.map((bullet, index) => (
-                              <li key={`${index}-${bullet}`}>
-                                {bullet}
-                                {articleBulletMatches[index]?.length > 0 && (
-                                  <>
-                                    {' '}
+                            {articleSummaryBullets.map((bullet, index) => {
+                              const isHighlighted = highlightedBulletIndices.has(index);
+                              const topicBadges = articleBulletMatches[index] || [];
+                              return (
+                                <li
+                                  key={`${index}-${bullet}`}
+                                  style={isHighlighted ? { background: '#fffde7', borderRadius: '3px', padding: '2px 4px', marginLeft: '-4px' } : undefined}
+                                >
+                                  {bullet}
+                                  {topicBadges.slice(0, 3).map(({ topic }) => (
                                     <button
-                                      className="summary-source-link"
-                                      onClick={(e) => handleBulletSourceClick(e, index)}
+                                      key={topic.name}
+                                      className="summary-topic-badge"
+                                      onClick={() => toggleTopic(topic)}
+                                      title={`Select topic: ${topic.name}`}
                                     >
-                                      [source]
+                                      {topic.name.split('/').pop()}
                                     </button>
-                                  </>
-                                )}
-                              </li>
-                            ))}
+                                  ))}
+                                  {articleBulletMatches[index]?.length > 0 && (
+                                    <>
+                                      {' '}
+                                      <button
+                                        className="summary-source-link"
+                                        onClick={(e) => handleBulletSourceClick(e, index)}
+                                      >
+                                        [source]
+                                      </button>
+                                    </>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       )}
@@ -522,6 +578,7 @@ function TextPage() {
             results={results}
             submissionId={submissionId}
             allTopics={allTopics}
+            onShowInArticle={handleShowInArticle}
           />
         </>) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

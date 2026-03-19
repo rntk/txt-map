@@ -24,7 +24,7 @@ describe('useTooltip', () => {
       result.current.showTooltip(topics, 100, 200);
     });
 
-    expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics });
+    expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics, meta: null });
   });
 
   it('showTooltip does nothing when disabled', () => {
@@ -95,7 +95,7 @@ describe('useTooltip', () => {
     });
 
     // Tooltip should show the new target, not be hidden
-    expect(result.current.tooltip).toEqual({ x: 3, y: 4, topics: [{ topic: 'B' }] });
+    expect(result.current.tooltip).toEqual({ x: 3, y: 4, topics: [{ topic: 'B' }], meta: null });
   });
 
   it('hideTooltip immediately sets tooltip to null', () => {

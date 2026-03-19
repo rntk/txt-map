@@ -108,6 +108,7 @@ function TopicTreeNode({
   onToggleShowPanel,
   onNavigateTopic,
   isPanelSelection,
+  onOpenVisualization,
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
@@ -136,6 +137,7 @@ function TopicTreeNode({
     onToggleShowPanel,
     onNavigateTopic,
     isPanelSelection,
+    onOpenVisualization,
   };
 
   return (
@@ -249,6 +251,15 @@ function TopicTreeNode({
                 >
                   Next
                 </button>
+                {onOpenVisualization && (
+                  <button
+                    onClick={() => onOpenVisualization(topic)}
+                    style={styles.button}
+                    title="Open Topics chart"
+                  >
+                    Chart
+                  </button>
+                )}
               </>
             ) : (
               <>

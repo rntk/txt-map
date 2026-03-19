@@ -19,7 +19,7 @@ function groupConsecutive(sortedIndices) {
     return groups;
 }
 
-function TopicSentencesModal({ topic, sentences, onClose, headerExtra }) {
+function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInArticle }) {
     const [extendedIndices, setExtendedIndices] = useState(new Set());
 
     useEffect(() => {
@@ -71,14 +71,26 @@ function TopicSentencesModal({ topic, sentences, onClose, headerExtra }) {
             >
                 <div className="topic-sentences-modal__header">
                     <h3>{topic.displayName}</h3>
-                    <button
-                        type="button"
-                        className="topic-sentences-modal__close"
-                        onClick={onClose}
-                        aria-label="Close"
-                    >
-                        &times;
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {onShowInArticle && (
+                            <button
+                                type="button"
+                                className="topic-sentences-modal__show-in-article"
+                                onClick={() => { onShowInArticle(topic); onClose(); }}
+                                title="Close this panel and jump to the topic in the article"
+                            >
+                                Show in article
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className="topic-sentences-modal__close"
+                            onClick={onClose}
+                            aria-label="Close"
+                        >
+                            &times;
+                        </button>
+                    </div>
                 </div>
                 {headerExtra && (
                     <div className="topic-sentences-modal__header-extra">

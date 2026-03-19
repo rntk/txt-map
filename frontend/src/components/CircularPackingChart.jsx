@@ -132,7 +132,7 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   });
 }
 
-export default function CircularPackingChart({ topics, sentences = [] }) {
+export default function CircularPackingChart({ topics, sentences = [], onShowInArticle }) {
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
   const [modalTopic, setModalTopic] = useState(null);
@@ -398,6 +398,7 @@ export default function CircularPackingChart({ topics, sentences = [] }) {
           topic={modalTopic}
           sentences={sentences}
           onClose={() => setModalTopic(null)}
+          onShowInArticle={onShowInArticle}
         />
       )}
     </div>

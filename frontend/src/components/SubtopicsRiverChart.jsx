@@ -4,7 +4,7 @@ import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale 
 import RiverLegend from './shared/RiverLegend';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 
-const SubtopicsRiverChart = ({ topics, subtopics, sentences = [], articleLength }) => {
+const SubtopicsRiverChart = ({ topics, subtopics, sentences = [], articleLength, onShowInArticle }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [activeSubtopic, setActiveSubtopic] = useState(null);
@@ -322,6 +322,7 @@ const SubtopicsRiverChart = ({ topics, subtopics, sentences = [], articleLength 
                     topic={selectedSubtopicForModal}
                     sentences={sentences}
                     onClose={() => setSelectedSubtopicForModal(null)}
+                    onShowInArticle={onShowInArticle}
                 />
             )}
         </div>

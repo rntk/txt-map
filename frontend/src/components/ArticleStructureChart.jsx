@@ -32,7 +32,7 @@ function rollingAverage(data, windowSize) {
     });
 }
 
-function ArticleStructureChart({ topics, sentences = [] }) {
+function ArticleStructureChart({ topics, sentences = [], onShowInArticle }) {
     const { scopePath, navigateTo, drillInto } = useScopeNavigation();
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const [hoveredTopic, setHoveredTopic] = useState(null);
@@ -383,6 +383,7 @@ function ArticleStructureChart({ topics, sentences = [] }) {
                     topic={modalTopic}
                     sentences={sentences}
                     onClose={() => setModalTopic(null)}
+                    onShowInArticle={onShowInArticle}
                 />
             )}
         </div>

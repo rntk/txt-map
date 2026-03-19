@@ -29,13 +29,13 @@ export function useTooltip(enabled = true) {
     };
   }, []);
 
-  const showTooltip = useCallback((topics, x, y) => {
+  const showTooltip = useCallback((topics, x, y, meta = null) => {
     if (!enabled) return;
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
-    setTooltip({ x, y, topics });
+    setTooltip({ x, y, topics, meta });
   }, [enabled]);
 
   const scheduleHide = useCallback(() => {
