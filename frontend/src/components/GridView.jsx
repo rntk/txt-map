@@ -15,22 +15,25 @@ import SentenceList from './grid/SentenceList';
 
 function Breadcrumb({ path, onNavigate }) {
   return (
-    <div className="grid-view-breadcrumb">
-      <span
+    <div className="grid-view-breadcrumb" aria-label="Grid navigation">
+      <button
+        type="button"
         className="grid-view-breadcrumb-item grid-view-breadcrumb-link"
         onClick={() => onNavigate([])}
       >
         Home
-      </span>
+      </button>
       {path.map((segment, i) => (
         <React.Fragment key={i}>
           <span className="grid-view-breadcrumb-separator">&gt;</span>
-          <span
+          <button
+            type="button"
             className={`grid-view-breadcrumb-item ${i < path.length - 1 ? 'grid-view-breadcrumb-link' : 'grid-view-breadcrumb-current'}`}
-            onClick={() => i < path.length - 1 ? onNavigate(path.slice(0, i + 1)) : null}
+            onClick={() => i < path.length - 1 ? onNavigate(path.slice(0, i + 1)) : undefined}
+            disabled={i === path.length - 1}
           >
             {segment}
-          </span>
+          </button>
         </React.Fragment>
       ))}
     </div>
@@ -94,11 +97,11 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
               <SentenceList sentenceIndices={allHighlightedIndices} sentences={sentences} />
             </div>
             <div className="grid-view-leaf-minimap-panel">
-              <div className="grid-view-leaf-minimap-title">
-                Article Minimap
-              </div>
-              <div className="grid-view-leaf-minimap-subtitle">
-                {allHighlightedIndices.length} highlighted sentences in full article
+              <div className="grid-view-leaf-minimap-header">
+                <div className="grid-view-leaf-minimap-title">Article Minimap</div>
+                <div className="grid-view-leaf-minimap-subtitle">
+                  {allHighlightedIndices.length} highlighted sentences in full article
+                </div>
               </div>
               <ArticleMinimap sentences={sentences} highlightedIndices={allHighlightedIndices} />
             </div>

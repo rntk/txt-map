@@ -148,12 +148,14 @@ function TextListPage() {
                   <td>{(submission.sentence_count || 0).toLocaleString()}</td>
                   <td>{(submission.topic_count || 0).toLocaleString()}</td>
                   <td>
-                    <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>
+                    <div className="text-list-actions">
+                      <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>
                     <RefreshButton
                       submissionId={submission.submission_id}
                       onRefresh={fetchSubmissions}
                       compact={true}
                     />
+                    </div>
                   </td>
                 </tr>
               ))}

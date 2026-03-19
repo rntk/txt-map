@@ -1,14 +1,13 @@
 .refresh-btn {
-  background: #2196f3;
-  color: white;
-  border: none;
-  cursor: pointer;
-  border-radius: 3px;
-  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-left: 0;
 }
 
 .refresh-btn:disabled {
-  background: #ccc;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -18,8 +17,13 @@
 }
 
 .refresh-btn--compact {
-  padding: 4px 8px;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.8rem;
   font-size: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--shell-muted-strong);
+  border: 1px solid rgba(29, 30, 27, 0.1);
 }
 
 .refresh-btn--extra-compact {
