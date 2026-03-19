@@ -321,6 +321,7 @@ def get_global_topics(
 @router.get("/global-topics/sentences")
 def get_global_topics_sentences(
     topic_name: List[str] = Query(default=[]),
+    include_context: bool = Query(default=False),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
 ):
     """
@@ -349,12 +350,17 @@ def get_global_topics_sentences(
                 if 1 <= idx <= len(all_sentences)
             ]
             if texts:
-                groups.append({
+                group_data = {
                     "submission_id": submission["submission_id"],
                     "source_url": submission.get("source_url", ""),
                     "topic_name": topic["name"],
                     "sentences": texts
-                })
+                }
+                if include_context:
+                    group_data["all_sentences"] = all_sentences
+                    group_data["topics"] = topics
+                    group_data["indices"] = indices
+                groups.append(group_data)
     return {"groups": groups}
 
 

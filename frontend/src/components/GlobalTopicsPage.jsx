@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TopicList from './TopicList';
 import GlobalTopicsClassicView from './GlobalTopicsClassicView';
 import GlobalTopicsTimelineView from './GlobalTopicsTimelineView';
+import GlobalTopicsCompareView from './GlobalTopicsCompareView';
 import GlobalVisualizationPanels from './GlobalVisualizationPanels';
 import { useGlobalChartData } from '../hooks/useGlobalChartData';
 
@@ -80,12 +81,13 @@ function GlobalTopicsPage() {
     }
     setSentencesLoading(true);
     const params = selectedTopics.map((t) => `topic_name=${encodeURIComponent(t.name)}`).join('&');
-    fetch(`/api/global-topics/sentences?${params}`)
+    const includeContext = activeView === 'compare' ? '&include_context=true' : '';
+    fetch(`/api/global-topics/sentences?${params}${includeContext}`)
       .then((r) => r.json())
       .then((data) => setGroups(data.groups || []))
       .catch(() => setGroups([]))
       .finally(() => setSentencesLoading(false));
-  }, [selectedTopics]);
+  }, [selectedTopics, activeView]);
 
   const handleToggleTopic = (topic) => {
     setSelectedTopics((prev) => {
@@ -134,6 +136,12 @@ function GlobalTopicsPage() {
             >
               Timeline
             </button>
+            <button
+              className={`global-menu-link${activeView === 'compare' ? ' active' : ''}`}
+              onClick={() => setActiveView('compare')}
+            >
+              Compare
+            </button>
           </div>
           {topics.length > 0 && (
             <div className="tab-bar">
@@ -167,6 +175,9 @@ function GlobalTopicsPage() {
         )}
         {!sentencesLoading && activeView === 'timeline' && (
           <GlobalTopicsTimelineView groups={groups} groupRefs={groupRefs} />
+        )}
+        {!sentencesLoading && activeView === 'compare' && (
+          <GlobalTopicsCompareView groups={groups} groupRefs={groupRefs} />
         )}
       </div>
       {fullscreenGraph && (
