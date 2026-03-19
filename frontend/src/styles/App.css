@@ -2851,7 +2851,7 @@ html {
 .global-page-content {
   padding-top: 5px;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -4844,6 +4844,7 @@ textarea {
   flex: 1;
   min-height: 0;
   padding: 0 2rem 2rem;
+  overflow: visible;
 }
 
 .page-surface {
@@ -4855,6 +4856,7 @@ textarea {
     linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(245, 245, 241, 0.94)),
     var(--shell-surface);
   box-shadow: var(--shell-shadow-soft);
+  overflow: visible;
 }
 
 .page-surface--home {
@@ -4975,6 +4977,7 @@ textarea {
   transform: translateY(-1px);
 }
 
+.page-stack,
 .app,
 .text-list-page,
 .task-page,
@@ -5098,7 +5101,8 @@ textarea {
 .text-list-table-wrapper,
 .task-table-wrapper,
 .diff-content {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .text-list-table,

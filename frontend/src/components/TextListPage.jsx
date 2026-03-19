@@ -59,7 +59,7 @@ function TextListPage() {
   };
 
   return (
-    <div className="app text-list-page">
+    <div className="page-stack text-list-page">
       <div className="text-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1>Text Submissions</h1>

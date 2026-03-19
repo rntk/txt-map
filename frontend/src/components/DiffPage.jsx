@@ -225,7 +225,7 @@ function DiffPage() {
   }, [filteredRows, rows]);
 
   return (
-    <div className="app diff-page">
+    <div className="page-stack diff-page">
       <div className="diff-page-header">
         <div>
           <h1>Semantic Diff</h1>

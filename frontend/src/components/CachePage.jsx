@@ -101,7 +101,7 @@ function CachePage() {
   const truncateKey = (key) => key ? `${key.slice(0, 12)}…` : '-';
 
   return (
-    <div className="app task-page">
+    <div className="page-stack task-page">
       <div className="task-page-header">
         <div>
           <h1>LLM Cache</h1>
