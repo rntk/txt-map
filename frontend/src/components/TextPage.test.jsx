@@ -203,4 +203,20 @@ describe('TextPage raw text navigation', () => {
     expect(screen.queryByText('Select topic:')).not.toBeInTheDocument();
     expect(document.querySelector('.topic-sentences-modal__header h3')).toHaveTextContent('Topic1');
   });
+
+  it('renders the read progress gauge', async () => {
+    render(<TextPage />);
+    await screen.findByText('Source:');
+    
+    // Initial progress should be 0%
+    expect(screen.getByText('0%')).toBeInTheDocument();
+
+    // Mark Topic1 as read
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Read' }));
+    
+    // Topic1 has [1] sentence, total 1 sentence. So 100%.
+    await waitFor(() => {
+      expect(screen.getByText('100%')).toBeInTheDocument();
+    });
+  });
 });

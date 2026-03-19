@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import '../styles/MainPage.css';
+import GlobalReadProgress from './GlobalReadProgress';
 
 const menuItems = [
   {
@@ -135,12 +136,15 @@ function UploadCard() {
 function MainPage() {
   return (
     <div className="main-page">
-      <div className="main-page-intro">
-        <span className="main-page-intro__eyebrow">Workspace</span>
-        <h2 className="main-page-intro__title">Choose a workflow</h2>
-        <p className="main-page-intro__description">
-          The home page keeps the original straightforward layout: quick entry points plus upload.
-        </p>
+      <div className="main-page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span className="main-page-intro__eyebrow">Workspace</span>
+          <h2 className="main-page-intro__title">Choose a workflow</h2>
+          <p className="main-page-intro__description">
+            The home page keeps the original straightforward layout: quick entry points plus upload.
+          </p>
+        </div>
+        <GlobalReadProgress size={160} />
       </div>
 
       <div className="main-page-grid">

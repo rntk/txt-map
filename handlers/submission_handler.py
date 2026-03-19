@@ -364,6 +364,61 @@ def get_global_topics_sentences(
     return {"groups": groups}
 
 
+@router.get("/submissions/read-progress")
+def get_global_read_progress(
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+):
+    submissions = submissions_storage.list_with_projection(
+        {},
+        {"results.sentences": 1, "results.topics.name": 1, "results.topics.sentences": 1, "read_topics": 1}
+    )
+    total_sentences = 0
+    total_read = 0
+    
+    for submission in submissions:
+        results = submission.get("results") or {}
+        sentences = results.get("sentences") or []
+        topics = results.get("topics") or []
+        read_topics = set(submission.get("read_topics") or [])
+        
+        t_count = len(sentences)
+        if t_count == 0:
+            continue
+            
+        r_indices = set()
+        for topic in topics:
+            if topic.get("name") in read_topics:
+                for idx in topic.get("sentences", []):
+                    r_indices.add(idx)
+                    
+        total_sentences += t_count
+        total_read += len(r_indices)
+        
+    return {"read_count": total_read, "total_count": total_sentences}
+
+
+@router.get("/submission/{submission_id}/read-progress")
+def get_submission_read_progress(
+    submission: dict = Depends(require_submission),
+):
+    results = submission.get("results") or {}
+    sentences = results.get("sentences") or []
+    topics = results.get("topics") or []
+    read_topics = set(submission.get("read_topics") or [])
+    
+    total_sentences = len(sentences)
+    if total_sentences == 0:
+        return {"read_count": 0, "total_count": 0}
+        
+    read_indices = set()
+    for topic in topics:
+        if topic.get("name") in read_topics:
+            for idx in topic.get("sentences", []):
+                read_indices.add(idx)
+                
+    return {"read_count": len(read_indices), "total_count": total_sentences}
+
+
 @router.get("/submissions")
 def list_submissions(
     submission_id: Optional[str] = None,

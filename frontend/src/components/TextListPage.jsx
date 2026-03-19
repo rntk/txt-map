@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import RefreshButton from './shared/RefreshButton';
+import GlobalReadProgress from './GlobalReadProgress';
+import ArticleReadProgress from './ArticleReadProgress';
 import '../styles/App.css';
 import { formatDate } from '../utils/chartConstants';
 
@@ -58,12 +60,15 @@ function TextListPage() {
 
   return (
     <div className="app text-list-page">
-      <div className="text-list-header">
+      <div className="text-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1>Text Submissions</h1>
           <p className="text-list-subtitle">Browse text submissions stored in the database.</p>
         </div>
-        <button className="text-list-refresh" onClick={fetchSubmissions}>Refresh</button>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+          <GlobalReadProgress size={120} />
+          <button className="text-list-refresh" onClick={fetchSubmissions}>Refresh</button>
+        </div>
       </div>
 
       <form className="text-list-filters" onSubmit={handleFilterSubmit}>
@@ -121,6 +126,7 @@ function TextListPage() {
                 <th>Chars</th>
                 <th>Sentences</th>
                 <th>Topics</th>
+                <th>Progress</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -147,6 +153,9 @@ function TextListPage() {
                   <td>{(submission.text_characters || 0).toLocaleString()}</td>
                   <td>{(submission.sentence_count || 0).toLocaleString()}</td>
                   <td>{(submission.topic_count || 0).toLocaleString()}</td>
+                  <td>
+                    <ArticleReadProgress submissionId={submission.submission_id} />
+                  </td>
                   <td>
                     <div className="text-list-actions">
                       <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>

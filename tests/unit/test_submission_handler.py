@@ -162,3 +162,26 @@ def test_get_global_topics_sentences(client, mock_storage, sample_submission):
     assert response.status_code == 200
     assert len(response.json()["groups"]) == 1
     assert response.json()["groups"][0]["topic_name"] == "Topic A"
+
+def test_get_global_read_progress(client, mock_storage, sample_submission):
+    sample_submission["read_topics"] = ["Topic A"]
+    mock_storage.list_with_projection.return_value = [sample_submission]
+    
+    response = client.get("/api/submissions/read-progress")
+    
+    assert response.status_code == 200
+    # Topic A has [1, 2], total sentences 3
+    assert response.json()["read_count"] == 2
+    assert response.json()["total_count"] == 3
+
+def test_get_submission_read_progress(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["read_topics"] = ["Topic B"]
+    mock_storage.get_by_id.return_value = sample_submission
+    
+    response = client.get(f"/api/submission/{submission_id}/read-progress")
+    
+    assert response.status_code == 200
+    # Topic B has [3], total sentences 3
+    assert response.json()["read_count"] == 1
+    assert response.json()["total_count"] == 3

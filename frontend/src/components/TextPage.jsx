@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
+import ReadProgress from './ReadProgress';
 import FullScreenGraph from './FullScreenGraph';
 import GroupedByTopicsView from './GroupedByTopicsView';
 import TopicSentencesModal from './shared/TopicSentencesModal';
@@ -91,6 +92,22 @@ function TextPage() {
     articleBulletMatches,
     articleTextMatches,
   } = useTextPageData(submission, selectedTopics, hoveredTopic, readTopics);
+
+  const readProgressInfo = useMemo(() => {
+    let total_count = 0;
+    const read_indices = new Set();
+    articles.forEach((article, aIdx) => {
+      total_count += (article.sentences || []).length;
+      (article.topics || []).forEach(topic => {
+        if (readTopics.has(topic.name)) {
+          (topic.sentences || []).forEach(idx => read_indices.add(`${aIdx}-${idx}`));
+        }
+      });
+    });
+    return { read_count: read_indices.size, total_count };
+  }, [articles, readTopics]);
+
+  const readPercentage = readProgressInfo.total_count > 0 ? (readProgressInfo.read_count / readProgressInfo.total_count) * 100 : 0;
 
   const { navigateTopicSentence } = useTopicNavigation({
     activeTab,
@@ -365,7 +382,10 @@ function TextPage() {
           <>
           <div className="container" style={{ padding: '0 5px 5px' }}>
             <div className="left-column">
-              <h1>Topics ({safeTopics.length})</h1>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h1>Topics ({safeTopics.length})</h1>
+                <ReadProgress percentage={readPercentage} size={60} />
+              </div>
               <TopicList
                 topics={allTopics}
                 selectedTopics={selectedTopics}
