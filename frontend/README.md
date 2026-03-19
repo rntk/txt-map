@@ -13,8 +13,8 @@ Key pages:
 - `/page/tasks`: task queue management view
 - `/page/texts`: submission list view
 - `/page/diff`: semantic diff view for comparing two submissions
-- `/page/topics`: topics cloud view
-- `/page/themed-topic` and `/page/themed-topic/{topic}`: themed topic pages
+- `/page/topics`: global topics view
+- `/page/cache`: LLM cache management view
 
 ## Development Commands
 
@@ -40,9 +40,11 @@ npm test -- --watchAll=false
 npm run test:coverage
 ```
 
-Current tests include:
+Current tests include (22 test files):
 
-- safe HTML sanitization (`src/utils/sanitize.test.js`)
+- **Components**: `ArticleStructureChart`, `CircularPackingChart`, `RadarChart`, `TextDisplay`, `TextPage`, `TopicList`, `TopicsBarChart`, `TopicsRiverChart`, `App`, and shared components (`RefreshButton`, `TopicLevelSwitcher`)
+- **Hooks**: `useGlobalChartData`, `useTooltip`
+- **Utils**: `chartConstants`, `diffRowBuilder`, `diffUtils`, `gridUtils`, `sanitize`, `summaryMatcher`, `summaryTimeline`, `textHighlight`, `topicTree`
 
 ## Dockerized Frontend Tests
 

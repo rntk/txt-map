@@ -42,8 +42,12 @@ docker compose up --scale worker=3
 - `MONGODB_URL=mongodb://mongodb:27017/`
 - `LLAMACPP_URL=${LLAMACPP_URL:-http://llamacpp:8080}`
 - `TOKEN=${TOKEN:-}`
+- `OPENAI_API_KEY=${OPENAI_API_KEY:-}`
+- `ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}`
+- `OPENAI_MODEL=${OPENAI_MODEL:-}`
+- `ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}`
 
-If you use an external LLamaCPP server, set `LLAMACPP_URL` in `.env`.
+If you use an external LLamaCPP server, set `LLAMACPP_URL` in `.env`. Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in `.env` to enable those providers.
 
 ## Useful URLs
 

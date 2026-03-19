@@ -33,6 +33,7 @@ React Frontend
 - Task implementations: `lib/tasks/`
 - MongoDB storage helpers: `lib/storage/`
 - Semantic diff logic: `lib/diff/semantic_diff.py`
+- LLM provider abstraction: `lib/llm/` (LlamaCPP, OpenAI, Anthropic)
 
 ## Processing Pipeline
 
@@ -42,6 +43,7 @@ Tasks are queued on submission and executed with dependencies:
 2. `subtopics_generation` (depends on `split_topic_generation`)
 3. `summarization` (depends on `split_topic_generation`)
 4. `mindmap` (depends on `subtopics_generation`)
+5. `prefix_tree` (depends on `split_topic_generation`)
 
 ## Local (Non-Docker) Run
 
@@ -71,6 +73,10 @@ API is available at `http://127.0.0.1:8000`.
 - `MONGODB_URL`: MongoDB connection string
 - `LLAMACPP_URL`: LLamaCPP server base URL
 - `TOKEN`: optional auth token used by LLamaCPP client
+- `OPENAI_API_KEY`: OpenAI API key (required when using OpenAI provider)
+- `ANTHROPIC_API_KEY`: Anthropic API key (required when using Anthropic provider)
+- `OPENAI_MODEL`: default OpenAI model name
+- `ANTHROPIC_MODEL`: default Anthropic model name
 
 ## Main API Endpoints
 
@@ -84,10 +90,20 @@ API is available at `http://127.0.0.1:8000`.
 - `POST /api/task-queue/add`: queue task(s) for a submission
 - `POST /api/task-queue/{task_id}/repeat`: requeue a task entry
 - `DELETE /api/task-queue/{task_id}`: delete a queue entry
-- `GET /api/topics`: aggregated topics from stored posts
-- `GET /api/themed-topic` and `GET /api/themed-topic/{topic}`: topic-filtered post view data
+- `POST /api/upload`: file upload (submit HTML file directly)
+- `PUT /api/submission/{submission_id}/read-topics`: mark topics as read
+- `GET /api/submission/{submission_id}/word-cloud`: word cloud data for a submission
+- `GET /api/global-topics`: aggregated topics from all submissions
+- `GET /api/global-topics/sentences`: sentences for global topics
 - `GET /api/diff?left_submission_id=...&right_submission_id=...`: fetch oriented diff payload and diff/job state
 - `POST /api/diff/calculate`: enqueue semantic diff calculation for a submission pair
+- `DELETE /api/diff`: delete a diff
+- `GET /api/llm-cache/stats`: LLM cache statistics
+- `GET /api/llm-cache`: list LLM cache entries
+- `DELETE /api/llm-cache/entry/{entry_id}`: delete a single LLM cache entry
+- `DELETE /api/llm-cache`: clear all LLM cache entries
+- `GET /api/settings`: get current app settings
+- `PUT /api/settings/llm`: update LLM provider/model settings
 
 ## Semantic Diff Model
 
@@ -103,5 +119,4 @@ Interactive docs:
 
 ## Notes
 
-- This repository currently includes frontend routes for pages like `clustered-post` and `themed-post`, but only the API handlers listed above are implemented in `handlers/`.
 - For Docker usage and service lifecycle commands, use `Docker-README.md`.
