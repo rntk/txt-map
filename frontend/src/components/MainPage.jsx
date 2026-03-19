@@ -5,32 +5,32 @@ const menuItems = [
     {
         title: 'Texts List',
         description: 'Browse all submitted texts, view their status, processing results, and details.',
-        icon: '📚',
-        link: '/page/texts'
-    },
-    {
-        title: 'Task Control',
-        description: 'Monitor and manage background processing tasks. Check status and retry failed jobs.',
-        icon: '⚙️',
-        link: '/page/tasks'
+        link: '/page/texts',
+        sizeClass: 'cloud-size-1'
     },
     {
         title: 'Diff',
         description: 'Compare two documents with topic-aware semantic matching and sentence-level links.',
-        icon: '⇄',
-        link: '/page/diff'
-    },
-    {
-        title: 'LLM Cache',
-        description: 'Browse, filter, and delete cached LLM responses to save compute and speed up reprocessing.',
-        icon: '🗄️',
-        link: '/page/cache'
+        link: '/page/diff',
+        sizeClass: 'cloud-size-2'
     },
     {
         title: 'Global Topics',
         description: 'Explore topics aggregated across all submissions. See sentences from multiple sources grouped by topic.',
-        icon: '🌐',
-        link: '/page/topics'
+        link: '/page/topics',
+        sizeClass: 'cloud-size-2'
+    },
+    {
+        title: 'Task Control',
+        description: 'Monitor and manage background processing tasks. Check status and retry failed jobs.',
+        link: '/page/tasks',
+        sizeClass: 'cloud-size-3'
+    },
+    {
+        title: 'LLM Cache',
+        description: 'Browse, filter, and delete cached LLM responses to save compute and speed up reprocessing.',
+        link: '/page/cache',
+        sizeClass: 'cloud-size-3'
     }
 ];
 
@@ -97,7 +97,7 @@ function UploadCard() {
 
     return (
         <div
-            className={`menu-card upload-card${dragging ? ' upload-card--dragging' : ''}${status === 'uploading' ? ' upload-card--uploading' : ''}`}
+            className={`cloud-item cloud-upload${dragging ? ' cloud-upload--dragging' : ''}${status === 'uploading' ? ' cloud-upload--uploading' : ''}`}
             onClick={onClick}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
@@ -114,17 +114,13 @@ function UploadCard() {
                 style={{ display: 'none' }}
                 onChange={onFileChange}
             />
-            <div className="card-icon upload-card__icon">
-                {status === 'uploading' ? '⏳' : dragging ? '📂' : '📤'}
+            <div className="cloud-title cloud-size-2 cloud-upload__icon">
+                {status === 'uploading' ? '⏳ ' : dragging ? '📂 ' : '📤 '}Upload File
             </div>
-            <div className="card-title">Upload File</div>
-            <div className="card-description">
+            <div className="cloud-description">
                 {status === 'uploading' && 'Uploading…'}
-                {status === 'error' && <span className="upload-card__error">{errorMsg}</span>}
-                {status === 'idle' && (
-                    <>Drop a file here or click to browse.<br />
-                    Supported: HTML, PDF, TXT, MD</>
-                )}
+                {status === 'error' && <span className="cloud-upload__error">{errorMsg}</span>}
+                {status === 'idle' && <>Drop a file here or click to browse.<br />Supported: HTML, PDF, TXT, MD</>}
             </div>
         </div>
     );
@@ -133,20 +129,14 @@ function UploadCard() {
 function MainPage() {
     return (
         <div className="main-page">
-            <header className="main-header">
-                <h1 className="main-header-title">Dashboard</h1>
-            </header>
-            <div className="main-container">
-                <div className="menu-grid">
-                    {menuItems.map((item, index) => (
-                        <a key={index} href={item.link} className="menu-card">
-                            <div className="card-icon">{item.icon}</div>
-                            <div className="card-title">{item.title}</div>
-                            <div className="card-description">{item.description}</div>
-                        </a>
-                    ))}
-                    <UploadCard />
-                </div>
+            <div className="tag-cloud">
+                {menuItems.map((item, index) => (
+                    <a key={index} href={item.link} className="cloud-item">
+                        <div className={`cloud-title ${item.sizeClass}`}>{item.title}</div>
+                        <div className="cloud-description">{item.description}</div>
+                    </a>
+                ))}
+                <UploadCard />
             </div>
         </div>
     );

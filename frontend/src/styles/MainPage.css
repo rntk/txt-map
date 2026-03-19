@@ -1,172 +1,117 @@
-/* MD3 Design Tokens */
-:root {
-  --md-primary: #1976D2;
-  --md-on-primary: #FFFFFF;
-  --md-primary-container: #D3E4FF;
-  --md-surface: #F8FAFC;
-  --md-surface-container: #FFFFFF;
-  --md-on-surface: #1A1C1E;
-  --md-on-surface-variant: #44474E;
-  --md-outline: #74777F;
-  --md-outline-variant: #C4C7CF;
-  --md-error: #B3261E;
-
-  --md-elevation-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
-  --md-elevation-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
-}
-
 .main-page {
   min-height: 100vh;
-  background: var(--md-surface);
-  display: flex;
-  flex-direction: column;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: var(--md-on-surface);
-}
-
-.main-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--md-surface-container);
-  box-shadow: var(--md-elevation-1);
-  padding: 0 24px;
-  height: 64px;
+  background: #1565C0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-.main-header-title {
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--md-on-surface);
-  margin: 0;
-  letter-spacing: 0;
-}
-
-.main-container {
-  max-width: 1000px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 24px;
-  flex: 1;
-}
-
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  width: 100%;
-}
-
-/* MD3 Elevated Card */
-.menu-card {
+.tag-cloud {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 28px;
+  max-width: 900px;
+  padding: 48px 32px;
+}
+
+.cloud-item {
+  display: inline-flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: 20px;
-  background: var(--md-surface-container);
-  border-radius: 12px;
   text-decoration: none;
-  color: var(--md-on-surface);
-  box-shadow: var(--md-elevation-1);
-  position: relative;
-  overflow: hidden;
-  transition: box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* MD3 State Layer */
-.menu-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--md-primary);
-  opacity: 0;
-  transition: opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
-  pointer-events: none;
-}
-
-.menu-card:hover {
-  box-shadow: var(--md-elevation-2);
-}
-
-.menu-card:hover::before {
-  opacity: 0.08;
-}
-
-.menu-card:active::before {
-  opacity: 0.12;
-}
-
-/* Card icon (emoji) */
-.card-icon {
-  font-size: 2rem;
-  margin-bottom: 16px;
-  line-height: 1;
-  user-select: none;
-}
-
-.card-title {
-  font-size: 18px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: var(--md-on-surface);
-  line-height: 1.4;
-}
-
-.card-description {
-  font-size: 14px;
-  color: var(--md-on-surface-variant);
-  line-height: 1.5;
-}
-
-/* MD3 Outlined Card variant for upload */
-.upload-card {
+  color: #ffffff;
   cursor: pointer;
-  background: var(--md-surface-container);
-  box-shadow: none;
-  border: 1px dashed var(--md-outline);
+  padding: 6px 4px;
+}
+
+.cloud-title {
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  transition: opacity 0.2s ease;
+}
+
+.cloud-item:hover .cloud-title {
+  opacity: 0.85;
+}
+
+.cloud-size-1 { font-size: 3rem; }
+.cloud-size-2 { font-size: 2.2rem; }
+.cloud-size-3 { font-size: 1.5rem; }
+.cloud-size-4 { font-size: 1.1rem; }
+.cloud-size-5 { font-size: 0.85rem; }
+
+.cloud-description {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+  max-width: 260px;
+  margin-top: 4px;
+  transition: color 0.2s ease;
+}
+
+.cloud-item:hover .cloud-description {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Slight rotation variety for organic feel */
+.cloud-item:nth-child(2) { transform: rotate(-1deg); }
+.cloud-item:nth-child(3) { transform: rotate(1.5deg); }
+.cloud-item:nth-child(5) { transform: rotate(-0.8deg); }
+
+/* Upload card */
+.cloud-upload {
+  cursor: pointer;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: border-color 0.2s ease;
   user-select: none;
 }
 
-.upload-card:hover {
-  box-shadow: none;
-  border-color: var(--md-primary);
+.cloud-upload:hover {
+  border-color: rgba(255, 255, 255, 0.8);
 }
 
-.upload-card--dragging {
-  background: var(--md-primary-container);
-  border: 1px solid var(--md-primary);
+.cloud-upload--dragging {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.upload-card--dragging::before {
-  opacity: 0;
-}
-
-.upload-card--uploading {
+.cloud-upload--uploading {
   cursor: default;
   opacity: 0.7;
 }
 
-.upload-card__icon {
-  transition: transform 0.2s ease;
+.cloud-upload__icon {
+  display: block;
 }
 
-.upload-card:hover .upload-card__icon {
-  transform: translateY(-2px);
+.cloud-upload--uploading .cloud-upload__icon {
+  animation: cloud-spin 1.2s linear infinite;
+  transform-origin: center;
+  display: inline-block;
 }
 
-.upload-card__error {
-  color: var(--md-error);
-  font-size: 13px;
+.cloud-upload__error {
+  color: #ffcdd2;
 }
 
-/* Spinning loader for upload state */
-@keyframes md-spin {
+@keyframes cloud-spin {
   to { transform: rotate(360deg); }
 }
 
-.upload-card--uploading .upload-card__icon {
-  animation: md-spin 1.2s linear infinite;
-  transform-origin: center;
+/* Mobile */
+@media (max-width: 600px) {
+  .cloud-size-1 { font-size: 2.2rem; }
+  .cloud-size-2 { font-size: 1.6rem; }
+  .cloud-size-3 { font-size: 1.2rem; }
+
+  .tag-cloud {
+    padding: 32px 20px;
+    gap: 10px 18px;
+  }
 }
