@@ -11,6 +11,7 @@ import RefreshButton from './shared/RefreshButton';
 import TextPageActionsPortal from './TextPageActionsPortal';
 import VisualizationPanels from './VisualizationPanels';
 import SummaryTimeline from './SummaryTimeline';
+import SummarySourceMenu from './SummarySourceMenu';
 import TopicSentencePanel from './TopicSentencePanel';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
@@ -87,6 +88,8 @@ function TextPage() {
     highlightedSummaryParas,
     articles,
     summaryTimelineItems,
+    articleBulletMatches,
+    articleTextMatches,
   } = useTextPageData(submission, selectedTopics, hoveredTopic, readTopics);
 
   const { navigateTopicSentence } = useTopicNavigation({
@@ -148,6 +151,28 @@ function TextPage() {
 
   const closeSummaryModal = useCallback(() => {
     setSummaryModalTopic(null);
+  }, []);
+
+  const [bulletSourceMenu, setBulletSourceMenu] = useState(null);
+
+  const handleBulletSourceClick = useCallback((e, index) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setBulletSourceMenu({ bulletIndex: index, x: rect.left, y: rect.bottom + 4 });
+  }, []);
+
+  const handleTextSourceClick = useCallback((e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setBulletSourceMenu({ bulletIndex: -1, x: rect.left, y: rect.bottom + 4 });
+  }, []);
+
+  const handleBulletTopicSelect = useCallback((topic, sentenceIndices) => {
+    setBulletSourceMenu(null);
+    setSummaryModalTopic({
+      displayName: topic.name,
+      sentenceIndices,
+    });
   }, []);
 
   const runRefresh = async (tasks, successMessage) => {
@@ -388,14 +413,40 @@ function TextPage() {
                     <>
                       {articleSummaryText && (
                         <div className="summary-text">
-                          <p>{articleSummaryText}</p>
+                          <p>
+                            {articleSummaryText}
+                            {articleTextMatches.length > 0 && (
+                              <>
+                                {' '}
+                                <button
+                                  className="summary-source-link"
+                                  onClick={handleTextSourceClick}
+                                >
+                                  [source]
+                                </button>
+                              </>
+                            )}
+                          </p>
                         </div>
                       )}
                       {articleSummaryBullets.length > 0 && (
                         <div className="summary-text">
                           <ul>
                             {articleSummaryBullets.map((bullet, index) => (
-                              <li key={`${index}-${bullet}`}>{bullet}</li>
+                              <li key={`${index}-${bullet}`}>
+                                {bullet}
+                                {articleBulletMatches[index]?.length > 0 && (
+                                  <>
+                                    {' '}
+                                    <button
+                                      className="summary-source-link"
+                                      onClick={(e) => handleBulletSourceClick(e, index)}
+                                    >
+                                      [source]
+                                    </button>
+                                  </>
+                                )}
+                              </li>
                             ))}
                           </ul>
                         </div>
@@ -477,6 +528,28 @@ function TextPage() {
             <p>No results yet. Processing is in progress...</p>
           </div>
         )}
+
+      {bulletSourceMenu && (
+        <SummarySourceMenu
+          matches={
+            bulletSourceMenu.bulletIndex === -1
+              ? articleTextMatches
+              : (articleBulletMatches[bulletSourceMenu.bulletIndex] || [])
+          }
+          onSelect={handleBulletTopicSelect}
+          onClose={() => setBulletSourceMenu(null)}
+          x={bulletSourceMenu.x}
+          y={bulletSourceMenu.y}
+        />
+      )}
+
+      {!fullscreenGraph && summaryModalTopic && (
+        <TopicSentencesModal
+          topic={summaryModalTopic}
+          sentences={summaryModalTopic._sentences || safeSentences}
+          onClose={closeSummaryModal}
+        />
+      )}
     </div>
   );
 }

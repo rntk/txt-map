@@ -2,6 +2,7 @@ import React from 'react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TextPage from './TextPage';
+import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
 vi.mock('./TopicsRiverChart', () => ({ default: () => <div data-testid="topics-river-chart" /> }));
 vi.mock('./SubtopicsRiverChart', () => ({ default: () => <div data-testid="subtopics-river-chart" /> }));
@@ -17,6 +18,10 @@ vi.mock('./RadarChart', () => ({ default: () => <div data-testid="radar-chart" /
 vi.mock('./ArticleStructureChart', () => ({ default: () => <div data-testid="article-structure-chart" /> }));
 vi.mock('../utils/summaryTimeline', () => ({
   buildSummaryTimelineItems: () => [],
+}));
+
+vi.mock('../utils/summaryMatcher', () => ({
+  matchSummaryToTopics: vi.fn(() => []),
 }));
 
 describe('TextPage raw text navigation', () => {
@@ -134,9 +139,68 @@ describe('TextPage raw text navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
 
     expect(screen.getByText('Brief article summary')).toBeInTheDocument();
-    expect(screen.getByText('Important detail one')).toBeInTheDocument();
-    expect(screen.getByText('Important detail two')).toBeInTheDocument();
+    expect(screen.getByText(/Important detail one/)).toBeInTheDocument();
+    expect(screen.getByText(/Important detail two/)).toBeInTheDocument();
     expect(screen.queryByText('Grouped by topics')).not.toBeInTheDocument();
     expect(screen.queryByText('Show tooltips')).not.toBeInTheDocument();
+  });
+
+  it('shows no [source] links when matchSummaryToTopics returns no matches', async () => {
+    vi.mocked(matchSummaryToTopics).mockReturnValue([]);
+
+    render(<TextPage />);
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    expect(screen.queryAllByText('[source]')).toHaveLength(0);
+  });
+
+  it('shows [source] links on bullets when matches exist', async () => {
+    vi.mocked(matchSummaryToTopics).mockReturnValue([
+      { topic: { name: 'Topic1', sentences: [1] }, score: 0.8, sentenceIndices: [1] },
+    ]);
+
+    render(<TextPage />);
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    const sourceLinks = screen.getAllByText('[source]');
+    // Two bullets + summary text all get [source] links
+    expect(sourceLinks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('opens topic menu when [source] is clicked on a bullet', async () => {
+    vi.mocked(matchSummaryToTopics).mockReturnValue([
+      { topic: { name: 'Topic1', sentences: [1] }, score: 0.8, sentenceIndices: [1] },
+    ]);
+
+    render(<TextPage />);
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    const sourceLinks = screen.getAllByText('[source]');
+    fireEvent.click(sourceLinks[0]);
+
+    expect(screen.getByText('Select topic:')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Topic1/ })).toBeInTheDocument();
+  });
+
+  it('opens TopicSentencesModal when a topic is selected from the menu', async () => {
+    vi.mocked(matchSummaryToTopics).mockReturnValue([
+      { topic: { name: 'Topic1', sentences: [1] }, score: 0.8, sentenceIndices: [1] },
+    ]);
+
+    render(<TextPage />);
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    const sourceLinks = screen.getAllByText('[source]');
+    fireEvent.click(sourceLinks[0]);
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /Topic1/ }));
+
+    // Menu should close and modal should open
+    expect(screen.queryByText('Select topic:')).not.toBeInTheDocument();
+    expect(document.querySelector('.topic-sentences-modal__header h3')).toHaveTextContent('Topic1');
   });
 });

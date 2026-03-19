@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { buildTopicStateRanges } from '../utils/textHighlight';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
+import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
 export function useTextPageData(submission, selectedTopics, hoveredTopic, readTopics) {
     const results = submission?.results || {};
@@ -75,6 +76,22 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
         return buildSummaryTimelineItems(results.summary, results.summary_mappings, safeTopics);
     }, [results, safeTopics]);
 
+    const articleBulletMatches = useMemo(() => {
+        if (!articleSummaryBullets.length || !safeTopics.length) return [];
+        const sentences = Array.isArray(results.sentences) ? results.sentences : [];
+        return articleSummaryBullets.map(bullet =>
+            matchSummaryToTopics(bullet, safeTopics, sentences)
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [articleSummaryBullets, safeTopics, results.sentences]);
+
+    const articleTextMatches = useMemo(() => {
+        if (!articleSummaryText || !safeTopics.length) return [];
+        const sentences = Array.isArray(results.sentences) ? results.sentences : [];
+        return matchSummaryToTopics(articleSummaryText, safeTopics, sentences);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [articleSummaryText, safeTopics, results.sentences]);
+
     return {
         safeTopics,
         rawText,
@@ -87,5 +104,7 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
         highlightedSummaryParas,
         articles,
         summaryTimelineItems,
+        articleBulletMatches,
+        articleTextMatches,
     };
 }
