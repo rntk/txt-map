@@ -3359,7 +3359,7 @@ html {
   min-height: 0;
   box-sizing: border-box;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .fullscreen-graph-content .mindmap-results-container {

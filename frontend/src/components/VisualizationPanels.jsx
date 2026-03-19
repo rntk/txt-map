@@ -62,7 +62,7 @@ function VisualizationPanels({
       {fullscreenGraph === 'marimekko' && (
         <FullScreenGraph title="Marimekko" onClose={onClose}>
           <div className="marimekko-container" style={{ padding: '20px' }}>
-            <MarimekkoChartTab topics={safeTopics} subtopics={results.subtopics} />
+            <MarimekkoChartTab topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
           </div>
         </FullScreenGraph>
       )}
