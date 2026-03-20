@@ -209,7 +209,6 @@ function App() {
                     href={item.link}
                     className={`app-shell__nav-link${isActive ? ' active' : ''}`}
                   >
-                    <span className="app-shell__nav-icon" aria-hidden="true">{item.badge}</span>
                     <span className="app-shell__nav-title">{item.title}</span>
                   </a>
                 );
