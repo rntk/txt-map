@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import TextPage from './components/TextPage';
+import CachePage from './components/CachePage';
+import DiffPage from './components/DiffPage';
+import GlobalTopicsPage from './components/GlobalTopicsPage';
+import MainPage from './components/MainPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
-import MainPage from './components/MainPage';
-import DiffPage from './components/DiffPage';
-import CachePage from './components/CachePage';
-import GlobalTopicsPage from './components/GlobalTopicsPage';
+import TextPage from './components/TextPage';
 import './styles/App.css';
 
 const navigationItems = [
@@ -60,6 +60,28 @@ const routeMeta = {
   }
 };
 
+const PAGE_COMPONENTS = {
+  cache: CachePage,
+  diff: DiffPage,
+  menu: MainPage,
+  tasks: TaskControlPage,
+  text: TextPage,
+  texts: TextListPage,
+  topics: GlobalTopicsPage,
+};
+
+function getSaveHintText(saveState, settings) {
+  if (saveState === 'error') {
+    return 'Save failed';
+  }
+
+  if (settings.llm_applies_on_next_task) {
+    return 'Applies on next task';
+  }
+
+  return '';
+}
+
 function App() {
   const [settings, setSettings] = useState(null);
   const [draftProvider, setDraftProvider] = useState('');
@@ -85,6 +107,7 @@ function App() {
     settings &&
     (draftProvider !== settings.llm_provider || draftModel !== settings.llm_model)
   );
+  const saveHintText = settings ? getSaveHintText(saveState, settings) : '';
 
   const handleProviderChange = (event) => {
     const nextProviderName = event.target.value;
@@ -164,13 +187,7 @@ function App() {
         >
           {saveState === 'saving' ? 'Saving...' : 'Apply'}
         </button>
-        <span className="llm-provider-badge__hint">
-          {saveState === 'error'
-            ? 'Save failed'
-            : settings.llm_applies_on_next_task
-              ? 'Applies on next task'
-              : ''}
-        </span>
+        <span className="llm-provider-badge__hint">{saveHintText}</span>
       </div>
     );
   };
@@ -180,23 +197,23 @@ function App() {
     const meta = routeMeta[pageKey] || routeMeta.notFound;
 
     return (
-        <div className={`app-shell${pageKey === 'menu' ? ' app-shell--home' : ''}`}>
+      <div className={`app-shell${pageKey === 'menu' ? ' app-shell--home' : ''}`}>
         <div className="app-shell__main">
           <nav className="app-shell__topbar" aria-label="Global navigation">
             <div className="app-shell__topnav">
-            {navigationItems.map((item) => {
-              const isActive = currentPath === item.link || currentPath.startsWith(`${item.link}/`);
-              return (
-                <a
-                  key={item.link}
-                  href={item.link}
-                  className={`app-shell__nav-link${isActive ? ' active' : ''}`}
-                >
-                  <span className="app-shell__nav-icon" aria-hidden="true">{item.badge}</span>
-                  <span className="app-shell__nav-title">{item.title}</span>
-                </a>
-              );
-            })}
+              {navigationItems.map((item) => {
+                const isActive = currentPath === item.link || currentPath.startsWith(`${item.link}/`);
+                return (
+                  <a
+                    key={item.link}
+                    href={item.link}
+                    className={`app-shell__nav-link${isActive ? ' active' : ''}`}
+                  >
+                    <span className="app-shell__nav-icon" aria-hidden="true">{item.badge}</span>
+                    <span className="app-shell__nav-title">{item.title}</span>
+                  </a>
+                );
+              })}
             </div>
           </nav>
           <header className="app-shell__header">
@@ -222,39 +239,15 @@ function App() {
     );
   };
 
-  const pathname = window.location.pathname;
-  const pathParts = pathname.split('/');
-  const pageType = pathParts[2];
+  const requestedPageKey = window.location.pathname.split('/')[2] || 'menu';
+  const pageKey = PAGE_COMPONENTS[requestedPageKey] ? requestedPageKey : 'notFound';
 
-  if (!pageType || pageType === 'menu') {
-    return renderWithGlobalMenu(<MainPage />, 'menu');
+  if (pageKey === 'notFound') {
+    return renderWithGlobalMenu(<div>Page not found</div>, pageKey);
   }
 
-  if (pageType === 'tasks') {
-    return renderWithGlobalMenu(<TaskControlPage />, 'tasks');
-  }
-
-  if (pageType === 'texts') {
-    return renderWithGlobalMenu(<TextListPage />, 'texts');
-  }
-
-  if (pageType === 'diff') {
-    return renderWithGlobalMenu(<DiffPage />, 'diff');
-  }
-
-  if (pageType === 'cache') {
-    return renderWithGlobalMenu(<CachePage />, 'cache');
-  }
-
-  if (pageType === 'topics') {
-    return renderWithGlobalMenu(<GlobalTopicsPage />, 'topics');
-  }
-
-  if (pageType === 'text') {
-    return renderWithGlobalMenu(<TextPage />, 'text');
-  }
-
-  return renderWithGlobalMenu(<div>Page not found</div>, 'notFound');
+  const PageComponent = PAGE_COMPONENTS[pageKey];
+  return renderWithGlobalMenu(<PageComponent />, pageKey);
 }
 
 export default App;

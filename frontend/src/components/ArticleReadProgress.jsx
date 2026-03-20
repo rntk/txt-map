@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReadProgress from './ReadProgress';
+import { calculateReadPercentage } from '../utils/readProgress';
+
+const PLACEHOLDER_SIZE = 80;
+
+function supportsIntersectionObserver() {
+  return typeof IntersectionObserver !== 'undefined';
+}
 
 export default function ArticleReadProgress({ submissionId }) {
   const [progress, setProgress] = useState(null);
@@ -7,40 +14,64 @@ export default function ArticleReadProgress({ submissionId }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => {
+    if (!supportsIntersectionObserver()) {
+      setIsVisible(true);
+      return undefined;
+    }
+
+    const element = ref.current;
+    if (!element) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(function handleIntersection([entry]) {
       if (entry.isIntersecting) {
         setIsVisible(true);
-        observer.unobserve(el);
+        observer.unobserve(element);
       }
     });
-    observer.observe(el);
-    return () => observer.disconnect();
+
+    observer.observe(element);
+
+    return function cleanup() {
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
-    if (!isVisible) return;
-    
-    let isMounted = true;
-    fetch(`/api/submission/${submissionId}/read-progress`)
-      .then(res => res.json())
-      .then(data => {
-        if (isMounted) setProgress(data);
-      })
-      .catch(e => console.error(e));
-      
-    return () => { isMounted = false; };
+    if (!isVisible) {
+      return undefined;
+    }
+
+    let isActive = true;
+
+    async function loadProgress() {
+      try {
+        const response = await fetch(`/api/submission/${submissionId}/read-progress`);
+        const data = await response.json();
+
+        if (isActive) {
+          setProgress(data);
+        }
+      } catch {}
+    }
+
+    loadProgress();
+
+    return function cleanup() {
+      isActive = false;
+    };
   }, [isVisible, submissionId]);
 
   if (!progress) {
-    return <div ref={ref} style={{ width: 80, height: 40 }} />; // placeholder
+    return <div ref={ref} style={{ width: PLACEHOLDER_SIZE, height: 40 }} />;
   }
 
-  const percent = progress.total_count > 0 ? (progress.read_count / progress.total_count) * 100 : 0;
+  const percentage = calculateReadPercentage(progress);
+
   return (
     <div ref={ref}>
-      <ReadProgress percentage={percent} size={80} />
+      <ReadProgress percentage={percentage} size={PLACEHOLDER_SIZE} />
     </div>
   );
 }

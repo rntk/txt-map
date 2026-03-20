@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import RefreshButton from './shared/RefreshButton';
-import GlobalReadProgress from './GlobalReadProgress';
 import ArticleReadProgress from './ArticleReadProgress';
-import '../styles/App.css';
+import GlobalReadProgress from './GlobalReadProgress';
+import RefreshButton from './shared/RefreshButton';
 import { formatDate } from '../utils/chartConstants';
+import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
+import '../styles/App.css';
 
 const STATUS_OPTIONS = ['pending', 'processing', 'completed', 'failed'];
 
@@ -22,13 +23,18 @@ function TextListPage() {
     limit: '100'
   });
 
+  const updateFilters = useCallback(function updateFilters(field, value) {
+    setFilters(function applyFilterUpdate(previousFilters) {
+      return { ...previousFilters, [field]: value };
+    });
+  }, []);
+
   const buildQuery = useCallback(() => {
-    const params = new URLSearchParams();
-    if (filters.submissionId) params.append('submission_id', filters.submissionId.trim());
-    if (filters.status) params.append('status', filters.status);
-    const limit = Number.parseInt(filters.limit, 10);
-    if (Number.isFinite(limit) && limit > 0) params.append('limit', String(limit));
-    return params.toString();
+    return buildQueryString(function configureParams(params) {
+      appendStringParam(params, 'submission_id', filters.submissionId, { trim: true });
+      appendStringParam(params, 'status', filters.status);
+      appendPositiveIntegerParam(params, 'limit', filters.limit);
+    });
   }, [filters.submissionId, filters.status, filters.limit]);
 
   const fetchSubmissions = useCallback(async () => {
@@ -38,7 +44,7 @@ function TextListPage() {
       const query = buildQuery();
       const response = await fetch(`/api/submissions?${query}`);
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response, 'Failed to load submissions'));
       }
       const data = await response.json();
       setSubmissions(data.submissions || []);
@@ -60,12 +66,12 @@ function TextListPage() {
 
   return (
     <div className="page-stack text-list-page">
-      <div className="text-list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="text-list-header">
         <div>
           <h1>Text Submissions</h1>
           <p className="text-list-subtitle">Browse text submissions stored in the database.</p>
         </div>
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+        <div className="page-header-actions page-header-actions--center">
           <GlobalReadProgress size={120} />
           <button className="text-list-refresh" onClick={fetchSubmissions}>Refresh</button>
         </div>
@@ -77,7 +83,7 @@ function TextListPage() {
           <input
             type="text"
             value={filters.submissionId}
-            onChange={(e) => setFilters(prev => ({ ...prev, submissionId: e.target.value }))}
+            onChange={(event) => updateFilters('submissionId', event.target.value)}
             placeholder="Paste submission ID"
           />
         </label>
@@ -85,10 +91,10 @@ function TextListPage() {
           Status
           <select
             value={filters.status}
-            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+            onChange={(event) => updateFilters('status', event.target.value)}
           >
             <option value="">Any</option>
-            {STATUS_OPTIONS.map(option => (
+            {STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
@@ -100,7 +106,7 @@ function TextListPage() {
             min="1"
             max="500"
             value={filters.limit}
-            onChange={(e) => setFilters(prev => ({ ...prev, limit: e.target.value }))}
+            onChange={(event) => updateFilters('limit', event.target.value)}
           />
         </label>
         <button type="submit" className="text-list-primary">Apply Filters</button>
@@ -159,11 +165,11 @@ function TextListPage() {
                   <td>
                     <div className="text-list-actions">
                       <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>
-                    <RefreshButton
-                      submissionId={submission.submission_id}
-                      onRefresh={fetchSubmissions}
-                      compact={true}
-                    />
+                      <RefreshButton
+                        submissionId={submission.submission_id}
+                        onRefresh={fetchSubmissions}
+                        compact={true}
+                      />
                     </div>
                   </td>
                 </tr>

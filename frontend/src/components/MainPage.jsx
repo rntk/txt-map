@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import '../styles/MainPage.css';
 import GlobalReadProgress from './GlobalReadProgress';
+import '../styles/MainPage.css';
 
 const menuItems = [
   {
@@ -36,11 +36,32 @@ const ACCEPTED_MIME = [
   'text/html', 'text/plain', 'text/markdown', 'application/pdf',
 ].join(',');
 
+function getUploadDescription(status, errorMessage) {
+  if (status === 'uploading') {
+    return 'Uploading...';
+  }
+
+  if (status === 'error') {
+    return errorMessage;
+  }
+
+  return 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD.';
+}
+
 function UploadCard() {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const uploadDescription = getUploadDescription(status, errorMsg);
+  const uploadCardClassName = [
+    'main-page-card',
+    'main-page-card--upload',
+    dragging ? 'main-page-card--dragging' : '',
+    status === 'uploading' ? 'main-page-card--uploading' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const isValidFile = (file) => {
     const name = file.name || '';
@@ -107,7 +128,7 @@ function UploadCard() {
   return (
     <button
       type="button"
-      className={`main-page-card main-page-card--upload${dragging ? ' main-page-card--dragging' : ''}${status === 'uploading' ? ' main-page-card--uploading' : ''}`}
+      className={uploadCardClassName}
       onClick={onClick}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -122,13 +143,7 @@ function UploadCard() {
       />
       <span className="main-page-card__eyebrow">Upload</span>
       <span className="main-page-card__title">Upload File</span>
-      <span className="main-page-card__description">
-        {status === 'uploading'
-          ? 'Uploading...'
-          : status === 'error'
-            ? errorMsg
-            : 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD.'}
-      </span>
+      <span className="main-page-card__description">{uploadDescription}</span>
     </button>
   );
 }
@@ -136,8 +151,8 @@ function UploadCard() {
 function MainPage() {
   return (
     <div className="main-page">
-      <div className="main-page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+      <div className="main-page-intro main-page-intro--split">
+        <div className="main-page-intro__content">
           <span className="main-page-intro__eyebrow">Workspace</span>
           <h2 className="main-page-intro__title">Choose a workflow</h2>
           <p className="main-page-intro__description">

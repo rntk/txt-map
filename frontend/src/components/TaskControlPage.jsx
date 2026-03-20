@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import '../styles/App.css';
 import { formatDate } from '../utils/chartConstants';
+import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
+import '../styles/App.css';
 
 const TASK_TYPES = [
   'split_topic_generation',
@@ -26,13 +27,24 @@ function TaskControlPage() {
   });
   const [actionMessage, setActionMessage] = useState('');
 
+  const updateFilters = useCallback(function updateFilters(field, value) {
+    setFilters(function applyFilterUpdate(previousFilters) {
+      return { ...previousFilters, [field]: value };
+    });
+  }, []);
+
+  const updateNewTask = useCallback(function updateNewTask(field, value) {
+    setNewTask(function applyTaskUpdate(previousTask) {
+      return { ...previousTask, [field]: value };
+    });
+  }, []);
+
   const buildQuery = useCallback(() => {
-    const params = new URLSearchParams();
-    if (filters.submissionId) params.append('submission_id', filters.submissionId);
-    if (filters.status) params.append('status', filters.status);
-    const limit = Number.parseInt(filters.limit, 10);
-    if (Number.isFinite(limit) && limit > 0) params.append('limit', String(limit));
-    return params.toString();
+    return buildQueryString(function configureParams(params) {
+      appendStringParam(params, 'submission_id', filters.submissionId);
+      appendStringParam(params, 'status', filters.status);
+      appendPositiveIntegerParam(params, 'limit', filters.limit);
+    });
   }, [filters.submissionId, filters.status, filters.limit]);
 
   const fetchTasks = useCallback(async () => {
@@ -42,7 +54,7 @@ function TaskControlPage() {
       const query = buildQuery();
       const response = await fetch(`/api/task-queue?${query}`);
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response, 'Failed to load tasks'));
       }
       const data = await response.json();
       setTasks(data.tasks || []);
@@ -64,7 +76,7 @@ function TaskControlPage() {
         method: 'DELETE'
       });
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response, 'Delete failed'));
       }
       setActionMessage('Task deleted.');
       fetchTasks();
@@ -80,7 +92,7 @@ function TaskControlPage() {
         method: 'POST'
       });
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response, 'Repeat failed'));
       }
       setActionMessage('Task re-queued.');
       fetchTasks();
@@ -114,10 +126,10 @@ function TaskControlPage() {
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response, 'Add failed'));
       }
       setActionMessage('Task added to queue.');
-      setNewTask(prev => ({ ...prev, priority: '' }));
+      updateNewTask('priority', '');
       fetchTasks();
     } catch (err) {
       setActionMessage(`Add failed: ${err.message}`);
@@ -147,7 +159,7 @@ function TaskControlPage() {
             <input
               type="text"
               value={filters.submissionId}
-              onChange={(e) => setFilters(prev => ({ ...prev, submissionId: e.target.value }))}
+              onChange={(event) => updateFilters('submissionId', event.target.value)}
               placeholder="e.g. 8e0a..."
             />
           </label>
@@ -155,7 +167,7 @@ function TaskControlPage() {
             Status
             <select
               value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(event) => updateFilters('status', event.target.value)}
             >
               <option value="">Any</option>
               <option value="pending">pending</option>
@@ -171,7 +183,7 @@ function TaskControlPage() {
               min="1"
               max="500"
               value={filters.limit}
-              onChange={(e) => setFilters(prev => ({ ...prev, limit: e.target.value }))}
+              onChange={(event) => updateFilters('limit', event.target.value)}
             />
           </label>
           <button type="submit" className="task-primary">Apply Filters</button>
@@ -184,7 +196,7 @@ function TaskControlPage() {
             <input
               type="text"
               value={newTask.submissionId}
-              onChange={(e) => setNewTask(prev => ({ ...prev, submissionId: e.target.value }))}
+              onChange={(event) => updateNewTask('submissionId', event.target.value)}
               placeholder="Paste submission ID"
             />
           </label>
@@ -192,9 +204,9 @@ function TaskControlPage() {
             Task Type
             <select
               value={newTask.taskType}
-              onChange={(e) => setNewTask(prev => ({ ...prev, taskType: e.target.value }))}
+              onChange={(event) => updateNewTask('taskType', event.target.value)}
             >
-              {TASK_TYPES.map(type => (
+              {TASK_TYPES.map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
@@ -206,7 +218,7 @@ function TaskControlPage() {
               min="1"
               max="10"
               value={newTask.priority}
-              onChange={(e) => setNewTask(prev => ({ ...prev, priority: e.target.value }))}
+              onChange={(event) => updateNewTask('priority', event.target.value)}
               placeholder="Default priority"
             />
           </label>
@@ -242,10 +254,10 @@ function TaskControlPage() {
                   <td colSpan="7" className="task-empty">No tasks match the filters.</td>
                 </tr>
               ) : (
-                tasks.map(task => (
+                tasks.map((task) => (
                   <tr key={task.id}>
                     <td className="task-mono">
-                      <span title={task.id} style={{fontFamily: 'monospace'}}>
+                      <span className="task-mono__value" title={task.id}>
                         {task.id?.slice(0, 8) ?? task.id}…
                       </span>
                     </td>

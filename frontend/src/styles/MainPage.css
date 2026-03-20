@@ -13,6 +13,17 @@
   box-shadow: var(--shell-shadow-soft);
 }
 
+.main-page-intro--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.main-page-intro__content {
+  min-width: 0;
+}
+
 .main-page-intro__eyebrow {
   display: inline-flex;
   align-items: center;
@@ -131,6 +142,11 @@
   .main-page-card {
     padding: 1rem;
     border-radius: 1rem;
+  }
+
+  .main-page-intro--split {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .main-page-card {

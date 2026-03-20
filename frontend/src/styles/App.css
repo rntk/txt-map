@@ -5167,6 +5167,16 @@ textarea {
   flex-wrap: wrap;
 }
 
+.page-header-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-header-actions--center {
+  align-items: center;
+}
+
 .task-status {
   display: inline-flex;
   align-items: center;
@@ -5203,6 +5213,24 @@ textarea {
 .task-mono {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.82rem;
+}
+
+.task-mono__value {
+  font-family: inherit;
+}
+
+.task-panel-note {
+  margin: 0 0 1rem;
+  color: var(--shell-muted);
+  font-size: 0.85rem;
+}
+
+.task-danger--block {
+  width: 100%;
+}
+
+.task-danger--spaced {
+  margin-bottom: 0.5rem;
 }
 
 .container {
