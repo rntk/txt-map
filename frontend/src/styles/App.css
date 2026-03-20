@@ -20,8 +20,7 @@ body {
   --z-fullscreen: 10000;
 }
 
-html {
-}
+
 
 .app {
   font-family: Arial, sans-serif;
@@ -86,7 +85,7 @@ html {
 }
 
 .tabs button {
-  padding: 8px 16px;
+  padding: 4px 12px;
   background-color: #f8f9fa;
   border: none;
   cursor: pointer;
@@ -230,7 +229,7 @@ html {
 }
 
 .action-btn {
-  padding: 8px 12px;
+  padding: 5px 10px;
   border: 1px solid #cfd8dc;
   border-radius: 6px;
   background: #ffffff;
@@ -4670,9 +4669,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.95rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.5rem;
   background: var(--shell-accent);
   color: var(--shell-accent-contrast);
   font-size: 0.82rem;
@@ -4698,8 +4697,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 1rem;
-  padding: 0.72rem 2rem;
+  gap: 0.75rem;
+  padding: 0.4rem 1.5rem;
   background: rgba(247, 247, 244, 0.88);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(29, 30, 27, 0.05);
@@ -4710,15 +4709,15 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.55rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
 }
 
 .app-shell__nav-link {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.75rem 0.9rem;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--shell-muted);
@@ -4743,9 +4742,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.3rem;
-  height: 2.3rem;
-  border-radius: 0.85rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.5rem;
   background: rgba(34, 35, 34, 0.08);
   color: var(--shell-muted-strong);
   font-size: 0.7rem;
@@ -4773,12 +4772,12 @@ textarea {
 
 .app-shell__header {
   position: sticky;
-  top: 5.5rem;
+  top: 3.2rem;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 0.95rem 2rem 0.8rem;
+  gap: 1rem;
+  padding: 0.35rem 1.25rem 0.3rem;
   background: rgba(247, 247, 244, 0.82);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(29, 30, 27, 0.05);
@@ -4798,9 +4797,9 @@ textarea {
 
 .app-shell__eyebrow {
   display: inline-block;
-  margin-bottom: 0.18rem;
+  margin-bottom: 0.1rem;
   color: var(--shell-muted-strong);
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -4808,17 +4807,17 @@ textarea {
 
 .app-shell__title {
   margin: 0;
-  font-size: clamp(1.8rem, 3vw, 2.65rem);
+  font-size: clamp(0.95rem, 1.8vw, 1.35rem);
   letter-spacing: -0.04em;
-  line-height: 0.98;
+  line-height: 1.05;
 }
 
 .app-shell__subtitle {
   max-width: 54rem;
-  margin: 0.3rem 0 0;
+  margin: 0.1rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.98rem;
-  line-height: 1.55;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .app-shell__header-actions {
@@ -4843,15 +4842,15 @@ textarea {
 .global-page-content {
   flex: 1;
   min-height: 0;
-  padding: 0 2rem 2rem;
+  padding: 0 1.5rem 1.25rem;
   overflow: visible;
 }
 
 .page-surface {
-  min-height: calc(100vh - 9.25rem);
-  padding: 1.25rem;
+  min-height: calc(100vh - 7.5rem);
+  padding: 1rem;
   border: 1px solid rgba(29, 30, 27, 0.05);
-  border-radius: 1.6rem;
+  border-radius: 1rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(245, 245, 241, 0.94)),
     var(--shell-surface);
@@ -4893,13 +4892,14 @@ textarea {
 .task-panel select,
 .diff-selectors select,
 .diff-toolbar input {
-  min-height: 2.7rem;
-  padding: 0.7rem 0.85rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.65rem;
   border: 1px solid rgba(29, 30, 27, 0.12);
-  border-radius: 0.9rem;
+  border-radius: 0.6rem;
   background: rgba(248, 248, 245, 0.95);
   color: var(--shell-ink);
   box-sizing: border-box;
+  font-size: 0.9rem;
 }
 
 .llm-provider-badge__select {
@@ -4932,12 +4932,13 @@ textarea {
 .text-list-primary,
 .task-primary,
 .action-btn {
-  min-height: 2.7rem;
-  padding: 0.7rem 1rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.9rem;
   background: var(--shell-accent);
   color: var(--shell-accent-contrast);
   cursor: pointer;
   font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .llm-provider-badge__button:disabled {
@@ -4961,13 +4962,14 @@ textarea {
 }
 
 .task-danger {
-  min-height: 2.7rem;
-  padding: 0.7rem 1rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.9rem;
   border-color: rgba(138, 37, 37, 0.14);
   background: rgba(158, 43, 43, 0.08);
   color: #8a2525;
   cursor: pointer;
   font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .task-danger:hover,
@@ -4997,7 +4999,7 @@ textarea {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: 1.1rem 1.2rem;
+  padding: 0.65rem 1rem;
   border: 1px solid var(--shell-border);
   border-radius: 1.2rem;
   background: rgba(255, 255, 255, 0.72);
@@ -5144,8 +5146,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.2rem;
-  padding: 0.45rem 0.9rem;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.75rem;
   border: 1px solid rgba(29, 30, 27, 0.1);
   border-radius: 999px;
   background: rgba(31, 32, 29, 0.92);
@@ -5323,15 +5325,15 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.4rem;
-  padding: 0.5rem 0.9rem;
+  min-height: 1.95rem;
+  padding: 0.2rem 0.75rem;
   border: 1px solid rgba(29, 30, 27, 0.1);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--shell-muted);
   cursor: pointer;
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -5356,11 +5358,11 @@ textarea {
 }
 
 .tabs button {
-  min-height: 2.3rem;
-  padding: 0.45rem 0.85rem;
+  min-height: 1.8rem;
+  padding: 0.2rem 0.7rem;
   background: rgba(255, 255, 255, 0.82);
   color: var(--shell-muted);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .tabs button.active {
