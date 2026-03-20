@@ -48,7 +48,17 @@ function SummaryTimeline({
                     className={`timeline-subtopic${item.subtopicLabel ? '' : ' timeline-subtopic--empty'}`}
                     aria-hidden={item.subtopicLabel ? undefined : 'true'}
                   >
-                    {item.subtopicLabel}
+                    {item.subtopicLabel && item.topicName ? (
+                      <button
+                        className="timeline-subtopic-link"
+                        onClick={() => onShowInArticle({ fullPath: item.topicName, displayName: item.topicName })}
+                        title="Show in article"
+                      >
+                        {item.subtopicLabel}
+                      </button>
+                    ) : (
+                      item.subtopicLabel
+                    )}
                   </div>
                   <div className="timeline-dot" />
                   <div className="timeline-card">
