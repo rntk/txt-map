@@ -26,7 +26,7 @@ Also tests:
 - MongoDB mocking
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 
 from lib.storage.posts import PostsStorage

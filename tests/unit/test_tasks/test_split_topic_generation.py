@@ -4,8 +4,7 @@ Unit tests for the split_topic_generation task handler.
 Tests process_split_topic_generation function and its dependencies.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-import sys
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.split_topic_generation import process_split_topic_generation

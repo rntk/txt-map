@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 
 from lib.constants import ALLOWED_TASKS, TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
-from handlers.dependencies import get_submissions_storage, get_task_queue_storage, require_submission
+from handlers.dependencies import get_submissions_storage, get_task_queue_storage
 
 
 router = APIRouter()

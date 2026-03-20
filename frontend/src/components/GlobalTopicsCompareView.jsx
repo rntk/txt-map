@@ -128,7 +128,6 @@ function CompareColumn({
   middleContent,
   bottomContext,
   groupRef,
-  groupKey,
 }) {
   const topRef = useRef(null);
 

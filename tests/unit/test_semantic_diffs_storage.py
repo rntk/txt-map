@@ -21,7 +21,7 @@ Also tests:
 - Edge cases: concurrent job claims, race conditions, large payloads
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC, timedelta
 import uuid
 
@@ -839,7 +839,7 @@ class TestClaimJob:
         storage = SemanticDiffsStorage(mock_db)
         mock_db.semantic_diff_jobs.find_one_and_update.return_value = sample_job
 
-        result = storage.claim_job("worker-001")
+        storage.claim_job("worker-001")
 
         call_args = mock_db.semantic_diff_jobs.find_one_and_update.call_args
         update_doc = call_args[0][1]

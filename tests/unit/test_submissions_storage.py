@@ -17,10 +17,8 @@ Also tests constants:
 - task_names
 - task_dependencies
 """
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
-import uuid
 
 from lib.storage.submissions import SubmissionsStorage
 

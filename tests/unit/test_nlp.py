@@ -12,9 +12,7 @@ Tests all constants:
 - WN_ADJ, WN_VERB, WN_ADV, WN_NOUN
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
-import collections
-import importlib
+from unittest.mock import MagicMock, patch
 
 
 # =============================================================================
@@ -1260,7 +1258,6 @@ class TestNlpIntegration:
         """Full pipeline test with actual NLTK (if available)."""
         # This test will use real NLTK if available, or skip if not
         try:
-            import nltk
             # Try to ensure data is available
             ensure_nltk_data()
 

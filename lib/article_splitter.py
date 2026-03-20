@@ -8,7 +8,6 @@ from txt_splitt import (
     HTMLParserTagStripCleaner,
     LLMRepairingGapHandler,
     MappingOffsetRestorer,
-    NormalizingSplitter,
     Pipeline,
     OverlapChunker,
     TopicRangeLLM,

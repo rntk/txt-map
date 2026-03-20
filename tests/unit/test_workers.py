@@ -4,17 +4,14 @@ Unit tests for the workers module.
 Tests Worker class, main function, and constants.
 """
 import pytest
-import os
 import signal
-from datetime import datetime, timedelta, UTC
-from unittest.mock import MagicMock, Mock, patch, call
-import uuid
+from datetime import datetime, UTC
+from unittest.mock import MagicMock, patch
 
 
 # Import module under test
 from workers import (
     Worker,
-    main,
     TASK_DEPENDENCIES,
     TASK_PRIORITIES,
     TASK_HANDLERS,

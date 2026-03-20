@@ -5,8 +5,7 @@ from lib.storage.submissions import SubmissionsStorage
 import hashlib
 from datetime import datetime, UTC
 import re
-import logging
-from typing import List, Tuple, Dict, Set, Optional
+from typing import List, Tuple
 
 
 def normalize_topic(topic_name):
@@ -306,7 +305,7 @@ Output:"""
         db.create_collection("llm_cache")
         try:
             db.llm_cache.create_index("prompt_hash", unique=True)
-        except:
+        except Exception:
             pass
 
     # Token/Chunking Estimation

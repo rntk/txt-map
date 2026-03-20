@@ -2,7 +2,6 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 import uuid
-from datetime import datetime, UTC
 
 # Mock dependencies before importing app - must be at module level to catch import-time operations
 @pytest.fixture(autouse=True)

@@ -5,8 +5,7 @@ Tests PDFToSemanticHTML class, convert_pdf_to_html, and extract_text_from_pdf fu
 Tests PyMuPDF (fitz) integration and edge cases.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-import io
+from unittest.mock import MagicMock, Mock, patch
 import pymupdf
 
 # Import module under test
@@ -691,7 +690,6 @@ startxref
 
     def test_returns_plain_text_when_no_flags(self):
         """Returns plain text when no formatting flags."""
-        import pymupdf
 
         result = self.converter._wrap_text_with_style("plain text", 0)
 
@@ -998,7 +996,7 @@ class TestExtractTextFromPdf:
             mock_doc.__iter__ = MagicMock(return_value=iter([]))
             mock_open.return_value = mock_doc
 
-            result = extract_text_from_pdf(valid_pdf_bytes)
+            extract_text_from_pdf(valid_pdf_bytes)
 
             mock_doc.close.assert_called_once()
 

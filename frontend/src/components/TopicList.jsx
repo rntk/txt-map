@@ -7,7 +7,7 @@ function TopicList({
   topics = [],
   selectedTopics = [],
   onToggleTopic = () => { },
-  onHoverTopic = () => { },
+  onHoverTopic: _onHoverTopic = () => { },
   readTopics = new Set(),
   onToggleRead = () => { },
   showPanel = false,
@@ -19,8 +19,14 @@ function TopicList({
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
-  const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+  const safeSelectedTopics = useMemo(
+    () => (Array.isArray(selectedTopics) ? selectedTopics : []),
+    [selectedTopics]
+  );
+  const safeReadTopics = useMemo(
+    () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+    [readTopics]
+  );
 
   const topicTree = useMemo(() => buildTopicTree(topics), [topics]);
 

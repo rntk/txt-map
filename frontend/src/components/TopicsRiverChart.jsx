@@ -154,7 +154,7 @@ const TopicsRiverChart = ({ topics, sentences = [], articleLength, onShowInArtic
                 tooltip.style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 28) + "px");
             })
-            .on("mouseout", function (event, d) {
+            .on("mouseout", function () {
                 setActiveTopic(null);
                 tooltip.style("opacity", 0);
             })

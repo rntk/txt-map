@@ -4,16 +4,22 @@ import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
 export function useTextPageData(submission, selectedTopics, hoveredTopic, readTopics) {
-    const results = submission?.results || {};
-    const safeTopics = Array.isArray(results.topics) ? results.topics : [];
+    const results = useMemo(() => (submission?.results || {}), [submission]);
+    const safeTopics = useMemo(
+        () => (Array.isArray(results.topics) ? results.topics : []),
+        [results.topics]
+    );
     const rawText = submission?.text_content || '';
     const articleSummary = results.article_summary && typeof results.article_summary === 'object'
         ? results.article_summary
         : {};
     const articleSummaryText = typeof articleSummary.text === 'string' ? articleSummary.text : '';
-    const articleSummaryBullets = Array.isArray(articleSummary.bullets)
-        ? articleSummary.bullets.filter((bullet) => typeof bullet === 'string' && bullet.trim())
-        : [];
+    const articleSummaryBullets = useMemo(
+        () => (Array.isArray(articleSummary.bullets)
+            ? articleSummary.bullets.filter((bullet) => typeof bullet === 'string' && bullet.trim())
+            : []),
+        [articleSummary.bullets]
+    );
 
     const topicSummaryParaMap = useMemo(() => {
         const mappings = results.summary_mappings;

@@ -2,7 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 from bson import ObjectId
-import uuid
+from main import app
+from handlers.dependencies import get_submissions_storage, get_task_queue_storage
 
 # Mock dependencies before importing app
 @pytest.fixture(autouse=True)
@@ -11,9 +12,6 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("LLAMACPP_URL", "http://localhost:8080")
     with patch("lifespan.MongoClient"):
         yield
-
-from main import app
-from handlers.dependencies import get_submissions_storage, get_task_queue_storage
 
 @pytest.fixture
 def client():

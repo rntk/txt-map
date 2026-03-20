@@ -8,6 +8,7 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
   const [foldDepth, setFoldDepth] = useState(null);
   const foldDepthRef = useRef(0);
   const [selectedPanels, setSelectedPanels] = useState([]);
+  const safeTreeData = useMemo(() => (treeData || {}), [treeData]);
 
   const handleLegendClick = (depth) => {
     foldDepthRef.current += 1;
@@ -17,18 +18,7 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
     });
   };
 
-  if (!treeData) {
-    return (
-      <div className="mindmap-results-container">
-        <div className="mindmap-placeholder">
-          <h2>No Data Available</h2>
-          <p>Please analyze an article first.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const hierarchyData = useMemo(() => buildPrefixTreeHierarchy(treeData), [treeData]);
+  const hierarchyData = useMemo(() => buildPrefixTreeHierarchy(safeTreeData), [safeTreeData]);
 
   const handleNodeClick = useCallback((name, sentenceIndices, path) => {
     if (!path) return;
@@ -64,12 +54,23 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
     }
   };
 
+  if (!treeData) {
+    return (
+      <div className="mindmap-results-container">
+        <div className="mindmap-placeholder">
+          <h2>No Data Available</h2>
+          <p>Please analyze an article first.</p>
+        </div>
+      </div>
+    );
+  }
+
   const graphContent = (
     <div className="mindmap-results-container">
       <div className="mindmap-body">
         <div className="mindmap-left">
           <div className="hierarchical-tree-wrapper">
-            {Object.keys(treeData).length > 0 ? (
+            {Object.keys(safeTreeData).length > 0 ? (
               <>
                 <HierarchicalTree
                   hierarchyData={hierarchyData}

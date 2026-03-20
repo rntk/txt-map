@@ -8,6 +8,8 @@ function MindmapResults({ mindmapData, fullscreen = false, onCloseFullscreen }) 
   const [foldDepth, setFoldDepth] = useState(null);
   const foldDepthRef = useRef(0);
   const [selectedPanels, setSelectedPanels] = useState([]);
+  const structure = useMemo(() => (mindmapData?.topic_mindmaps || {}), [mindmapData]);
+  const sentences = mindmapData?.sentences || [];
 
   const handleLegendClick = (depth) => {
     foldDepthRef.current += 1;
@@ -16,20 +18,6 @@ function MindmapResults({ mindmapData, fullscreen = false, onCloseFullscreen }) 
       return { depth, key: foldDepthRef.current, collapse: !wasCollapsed };
     });
   };
-
-  if (!mindmapData) {
-    return (
-      <div className="mindmap-results-container">
-        <div className="mindmap-placeholder">
-          <h2>No Data Available</h2>
-          <p>Please analyze an article first.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const structure = mindmapData.topic_mindmaps || {};
-  const sentences = mindmapData.sentences || [];
 
   const hierarchyData = useMemo(() => buildMindmapHierarchy(structure), [structure]);
 
@@ -66,6 +54,17 @@ function MindmapResults({ mindmapData, fullscreen = false, onCloseFullscreen }) 
       onCloseFullscreen();
     }
   };
+
+  if (!mindmapData) {
+    return (
+      <div className="mindmap-results-container">
+        <div className="mindmap-placeholder">
+          <h2>No Data Available</h2>
+          <p>Please analyze an article first.</p>
+        </div>
+      </div>
+    );
+  }
 
   const graphContent = (
     <div className="mindmap-results-container">

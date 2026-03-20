@@ -6,7 +6,7 @@ with proper headings (<h1>, <h2>, <h3>), paragraphs (<p>),
 and inline formatting (<strong>, <em>).
 """
 import pymupdf
-from typing import Tuple, List, Optional
+from typing import List, Optional
 from dataclasses import dataclass
 
 

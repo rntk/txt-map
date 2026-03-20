@@ -4,9 +4,7 @@ Unit tests for the subtopics_generation task handler.
 Tests generate_subtopics_for_topic and process_subtopics_generation functions.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-import hashlib
-from datetime import datetime, UTC
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.subtopics_generation import (

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import ReadProgress from './ReadProgress';
-import FullScreenGraph from './FullScreenGraph';
 import GroupedByTopicsView from './GroupedByTopicsView';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 import DropdownMenu from './shared/DropdownMenu';
@@ -311,8 +310,6 @@ function TextPage() {
   const safeSentences = Array.isArray(results.sentences) ? results.sentences : [];
   const safeTopics = _safeTopics;
   const rawText = _rawText;
-  const topicSummaryParaMap = _topicSummaryParaMap;
-
   return (
     <div className="app">
       <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>

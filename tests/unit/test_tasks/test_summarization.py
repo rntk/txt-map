@@ -4,9 +4,7 @@ Unit tests for the summarization task handler.
 Tests summarize_by_sentence_groups and process_summarization functions.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-import hashlib
-from datetime import datetime, UTC
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.summarization import (
@@ -126,8 +124,6 @@ class TestSummarizeBySentenceGroupsBasic:
         # mock_llm.max_context_tokens is 11000
         # Default buffer is 400
         # So max_text_tokens should be 11000 - 100 - 400 = 10500
-        expected_template_tokens = 100
-        
         # Verify estimate_tokens was called with the template (without sentence content)
         mock_llm.estimate_tokens.assert_called_once()
         call_arg = mock_llm.estimate_tokens.call_args[0][0]

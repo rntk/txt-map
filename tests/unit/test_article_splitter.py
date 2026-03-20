@@ -4,9 +4,7 @@ Unit tests for the article_splitter module.
 Tests ArticleSplitResult dataclass, _groups_to_topics, _LLMCallableAdapter,
 split_article, and split_article_with_markers functions.
 """
-import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.article_splitter import (

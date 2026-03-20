@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 export { buildMindmapHierarchy, buildPrefixTreeHierarchy } from '../../utils/hierarchyBuilders';
 
@@ -18,7 +18,6 @@ function HierarchicalTree({
   const containerRef = useRef(null);
   const gRef = useRef(null);
   const zoomBehaviorRef = useRef(null);
-  const lastToggledNodeRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [expandState, setExpandState] = useState({});
   const [isInitialized, setIsInitialized] = useState(false);
@@ -99,8 +98,6 @@ function HierarchicalTree({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const margin = { top: 100, right: 200, bottom: 100, left: 200 };
-
     const g = svg.append('g').attr('class', 'tree-content');
     gRef.current = g;
 
@@ -113,6 +110,7 @@ function HierarchicalTree({
 
     svg.call(zoom);
 
+    const margin = { top: 100, right: 200, bottom: 100, left: 200 };
     g.append('g').attr('class', 'tree-links').attr('transform', `translate(${margin.left},${margin.top})`);
     g.append('g').attr('class', 'tree-nodes').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -159,7 +157,7 @@ function HierarchicalTree({
       .style('font-size', '10px').text('Reset');
 
     setIsInitialized(true);
-  }, []);
+  }, [isInitialized]);
 
   // Update zoom control position on dimension change
   useEffect(() => {
@@ -177,9 +175,7 @@ function HierarchicalTree({
     const gNodes = g.select('.tree-nodes');
     const gLinks = g.select('.tree-links');
 
-    const margin = { top: 100, right: 200, bottom: 100, left: 200 };
-
-    const treeLayout = d3.tree()
+      const treeLayout = d3.tree()
       .nodeSize([50, nodeSpacing])
       .separation((a, b) => {
         return (a.parent === b.parent ? 1 : 1.2);
@@ -335,7 +331,7 @@ function HierarchicalTree({
 
       // EXIT
       nodeSelection.exit().transition().duration(duration)
-        .attr('transform', function (d) { return d3.select(this).attr('transform'); })
+        .attr('transform', function () { return d3.select(this).attr('transform'); })
         .style('opacity', 0)
         .remove();
 
@@ -487,7 +483,7 @@ function HierarchicalTree({
 
     updateGraph();
 
-  }, [hierarchyData, expandState, selectedPanels, isInitialized, dimensions, onNodeSelect, onClosePanel, sentences, onPanelDrag, nodeSpacing, emptyPanelMessage]);
+  }, [hierarchyData, expandState, selectedPanels, isInitialized, onNodeSelect, onClosePanel, sentences, onPanelDrag, nodeSpacing, emptyPanelMessage]);
 
   // Initial Centering Logic
   useEffect(() => {
@@ -516,7 +512,7 @@ function HierarchicalTree({
       }
     }, 300);
     return () => clearTimeout(timeout);
-  }, [hierarchyData, isInitialized]);
+  }, [dimensions.height, dimensions.width, hierarchyData, isInitialized]);
 
   if (!hierarchyData) {
     return <div className="tree-visualization-empty"><p>No hierarchy data available</p></div>;

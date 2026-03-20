@@ -17,7 +17,7 @@ Also tests:
 - Edge cases: no topic overlap, identical content, unicode handling
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC, timedelta
 import numpy as np
 
@@ -966,7 +966,7 @@ class TestComputeTopicAwareSemanticDiff:
             with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
                 mock_cosine.return_value = np.array([[0.5]])
 
-                result = compute_topic_aware_semantic_diff(submission_a, submission_b)
+                compute_topic_aware_semantic_diff(submission_a, submission_b)
 
                 call_kwargs = mock_vectorizer_class.call_args[1]
                 assert call_kwargs.get("ngram_range") == (3, 6)
@@ -1744,7 +1744,7 @@ class TestDependencyMocks:
             with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
                 mock_cosine.return_value = np.array([[1.0]])
 
-                result = compute_topic_aware_semantic_diff(submission_a, submission_b)
+                compute_topic_aware_semantic_diff(submission_a, submission_b)
 
                 mock_vectorizer_class.assert_called_once()
 
@@ -1765,7 +1765,7 @@ class TestDependencyMocks:
         with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
             mock_cosine.return_value = np.array([[1.0]])
 
-            result = compute_topic_aware_semantic_diff(submission_a, submission_b)
+            compute_topic_aware_semantic_diff(submission_a, submission_b)
 
             mock_cosine.assert_called()
 
@@ -1806,7 +1806,7 @@ class TestDependencyMocks:
             mock_np.argsort.return_value = [1, 0]  # Mock ranking
             mock_np.ndarray = np.ndarray
 
-            result = _compute_directional(
+            _compute_directional(
                 source_units, target_units,
                 similarity_matrix=np.array([[0.5, 0.8]]),
                 threshold=0.25,

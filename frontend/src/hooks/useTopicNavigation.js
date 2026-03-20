@@ -51,7 +51,7 @@ export function useTopicNavigation({
     return withOffsets[withOffsets.length - 1].el;
   };
 
-  const getTopicAnchors = (topic) => {
+  const getTopicAnchors = useCallback((topic) => {
     if (!topic || !topic.name) {
       return [];
     }
@@ -96,7 +96,7 @@ export function useTopicNavigation({
       .map((sentenceStart) => ({
         sentenceStart
       }));
-  };
+  }, [activeTab, rawText, safeTopics]);
 
   const navigateTopicSentence = useCallback((topic, direction = 'next') => {
     if (groupedByTopics) {
@@ -230,7 +230,7 @@ export function useTopicNavigation({
     if (targetEl) {
       targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [activeTab, rawText, safeTopics, groupedByTopics, selectedTopics, topicSummaryParaMap, setHighlightedGroupedTopic]);
+  }, [activeTab, getTopicAnchors, groupedByTopics, selectedTopics, setHighlightedGroupedTopic, topicSummaryParaMap]);
 
   return { navigateTopicSentence };
 }

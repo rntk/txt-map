@@ -8,9 +8,8 @@ Mocks: http.client, urlparse, json, os.getenv, logging
 Tests edge cases: empty texts, long prompts, server unavailable, SSL errors
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock, patch
 import json
-import logging
 
 
 # =============================================================================
@@ -1248,7 +1247,7 @@ class TestEdgeCases:
         })
         self.mock_conn_instance.getresponse.return_value = mock_response
 
-        result = self.llm.call([special_text])
+        self.llm.call([special_text])
 
         call_args = self.mock_conn_instance.request.call_args
         body = json.loads(call_args[0][2])
@@ -1264,7 +1263,7 @@ class TestEdgeCases:
         })
         self.mock_conn_instance.getresponse.return_value = mock_response
 
-        result = self.llm.call([text_with_newlines])
+        self.llm.call([text_with_newlines])
 
         call_args = self.mock_conn_instance.request.call_args
         body = json.loads(call_args[0][2])

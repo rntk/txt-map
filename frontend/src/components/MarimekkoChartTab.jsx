@@ -15,8 +15,8 @@ const MarimekkoChartTab = ({ topics, sentences, onShowInArticle }) => {
     const { containerRef, containerSize } = useContainerSize(900);
     const [modalTopic, setModalTopic] = useState(null);
 
-    const safeTopics = Array.isArray(topics) ? topics : [];
-    const safeSentences = Array.isArray(sentences) ? sentences : [];
+    const safeTopics = useMemo(() => (Array.isArray(topics) ? topics : []), [topics]);
+    const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
 
     const columns = useMemo(() => {
         const colItems = buildScopedChartData(safeTopics, safeSentences, scopePath, selectedLevel);

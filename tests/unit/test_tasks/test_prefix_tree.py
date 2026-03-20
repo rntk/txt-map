@@ -4,8 +4,7 @@ Unit tests for the prefix_tree task handler.
 Tests build_compressed_trie, _compress_node, and process_prefix_tree functions.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
-import re
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.prefix_tree import (
@@ -82,7 +81,7 @@ class TestBuildCompressedTrieBasic:
         """Function raises TypeError when sentences is None."""
         # Note: The source code doesn't handle None sentences
         with pytest.raises(TypeError):
-            tree = build_compressed_trie(None)
+            build_compressed_trie(None)
 
     def test_extracts_words_with_regex(self, sample_sentences):
         """Function extracts words using regex [a-zA-Z']+."""
@@ -135,7 +134,6 @@ class TestBuildCompressedTrieBasic:
         def find_word_sentences(node, word, path=""):
             if not isinstance(node, dict):
                 return None
-            current_path = path + str(list(node.keys())[0]) if node else path
             if "count" in node and node.get("count", 0) > 0 and "sentences" in node:
                 return node["sentences"]
             for key, child in node.items():

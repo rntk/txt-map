@@ -338,7 +338,7 @@ export default function CircularPackingChart({ topics, sentences = [], onShowInA
       tooltip.remove();
       svg.selectAll('*').remove();
     };
-  }, [hierarchyData, hasHierarchyData, topics]);
+  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics]);
 
   const scopeLabel = getScopeLabel(scopePath);
 

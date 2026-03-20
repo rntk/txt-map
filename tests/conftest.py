@@ -2,10 +2,9 @@
 Pytest fixtures and configuration for RSS submission analysis tests.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 import uuid
-import sys
 
 # Note: main.py mocks are set up in test_main_app.py module-level code
 
@@ -146,7 +145,6 @@ def mock_upload_file():
 @pytest.fixture
 def mock_async_upload_file():
     """Create a mock UploadFile with async read method."""
-    import asyncio
 
     class AsyncMockRead:
         def __init__(self, data):

@@ -10,9 +10,15 @@ const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true }) {
-  const safeSentences = Array.isArray(sentences) ? sentences : [];
-  const safeSelectedTopics = Array.isArray(selectedTopics) ? selectedTopics : [];
-  const safeArticleTopics = Array.isArray(articleTopics) ? articleTopics : [];
+  const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
+  const safeSelectedTopics = useMemo(
+    () => (Array.isArray(selectedTopics) ? selectedTopics : []),
+    [selectedTopics]
+  );
+  const safeArticleTopics = useMemo(
+    () => (Array.isArray(articleTopics) ? articleTopics : []),
+    [articleTopics]
+  );
   const readTopicsSet = useMemo(() => 
     readTopics instanceof Set ? readTopics : new Set(readTopics || [])
   , [readTopics]);
@@ -213,7 +219,17 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     }
 
     showTooltip(matchedTopics, x, y, meta);
-  }, [onToggleRead, findTopicsForChar, findTopicsForSentence, showTooltip, scheduleHide, cancelHide, tooltipEnabled]);
+  }, [
+    cancelHide,
+    findTopicsForChar,
+    findTopicsForSentence,
+    lastTargetRef,
+    onToggleRead,
+    safeSentences.length,
+    scheduleHide,
+    showTooltip,
+    tooltipEnabled,
+  ]);
 
   const handleMouseOut = useCallback((e) => {
     const token = e.target.closest('.word-token, .sentence-token');

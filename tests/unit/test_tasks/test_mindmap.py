@@ -4,7 +4,7 @@ Unit tests for the mindmap task handler.
 Tests build_tree_from_topics and process_mindmap functions.
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.mindmap import (
@@ -105,7 +105,7 @@ class TestBuildTreeFromTopicsBasic:
         """Function raises TypeError when topics is None."""
         # Note: The source code doesn't handle None topics, it will raise TypeError
         with pytest.raises(TypeError):
-            tree = build_tree_from_topics(None, [])
+            build_tree_from_topics(None, [])
 
     def test_creates_nested_structure_from_hierarchy(self, sample_topics):
         """Function creates nested structure from '>' hierarchy."""
@@ -436,7 +436,7 @@ class TestBuildTreeFromTopicsEdgeCases:
         """Function raises TypeError when subtopics is None."""
         # Note: The source code doesn't handle None subtopics
         with pytest.raises(TypeError):
-            tree = build_tree_from_topics(sample_topics, None)
+            build_tree_from_topics(sample_topics, None)
 
     def test_handles_whitespace_in_topic_names(self):
         """Function handles whitespace in topic names."""

@@ -251,21 +251,18 @@ function RadarChart({ topics, sentences = [] }) {
                 const textLength = labelText.node().getComputedTextLength();
                 labelBg.attr('x', -(textLength / 2) - 4)
                     .attr('width', textLength + 8);
-            } catch (e) {
+            } catch {
                 // Fallback if getComputedTextLength fails
             }
         });
 
         // Draw the radar area
-        const areaPath = g.append('path')
+        g.append('path')
             .datum(chartData)
             .attr('d', d3.areaRadial()
                 .curve(d3.curveLinearClosed)
                 .innerRadius(0)
-                .outerRadius((d, i) => {
-                    const angle = angleSlice * i - Math.PI / 2;
-                    return rScale(d.totalChars);
-                })
+                .outerRadius((d) => rScale(d.totalChars))
                 .startAngle((d, i) => angleSlice * i)
                 .endAngle((d, i) => angleSlice * (i + 1))
             )

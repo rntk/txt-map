@@ -8,7 +8,7 @@ Tests all functions in handlers/diff_handler.py:
 - _serialize_job
 """
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC, timedelta
 import uuid
 

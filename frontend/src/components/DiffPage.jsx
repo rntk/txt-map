@@ -205,7 +205,7 @@ function DiffPage() {
       setActiveIndex(targetIndex);
     }
     setPendingJumpRowId(null);
-  }, [filteredRows, pendingJumpRowId, query]);
+  }, [debouncedQuery, filteredRows, pendingJumpRowId]);
 
   useEffect(() => {
     if (activeIndex < 0 || activeIndex >= filteredRows.length) return;

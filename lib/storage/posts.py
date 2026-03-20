@@ -1,6 +1,5 @@
 import logging
 from typing import Optional, List, Iterator
-import gzip
 
 from pymongo import MongoClient, DESCENDING, UpdateMany
 
