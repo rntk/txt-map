@@ -35,3 +35,6 @@ These instructions are intended for AI agents working on this project.
       - `cd /app/frontend && npm test -- --watchAll=false`
       - `cd /app/frontend && npm run test:coverage`
     - Frontend tests should cover safe HTML sanitization and topic/read-unread highlighting behavior.
+
+6.  **LLM Changes**:
+    - If you need to add or modify any LLM related features (client creation, prompt engineering, caching, or settings), you **MUST** consult the [LLM Architecture Guide](docs/llm_handler.md) first to ensure consistency with the existing design patterns and dynamic runtime switching.
