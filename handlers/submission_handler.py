@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Tuple, Set
 
 from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
@@ -25,7 +25,7 @@ class ReadTopicsRequest(BaseModel):
 router = APIRouter()
 
 
-def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str):
+def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -> None:
     """Insert task queue entries for a new submission."""
     for task_type, priority in TASK_PRIORITIES.items():
         task_queue_storage.create(make_task_document(submission_id, task_type, priority))
@@ -36,7 +36,7 @@ def post_submit(
     request: SubmitRequest,
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, str]:
     """
     Accept HTML content, save to DB, queue tasks, and return submission ID
     """
@@ -58,20 +58,14 @@ def post_submit(
 ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf"}
 
 
-def _extract_content_from_upload(filename: str, data: bytes) -> tuple[str, str]:
+def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
     """
     Extract (html_content, text_content) from uploaded file bytes.
     Returns (html_content, text_content) — for plain text types both are the same.
     """
-    ext = ""
-    if filename:
-        ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
 
-    if ext in (".html", ".htm"):
-        content = data.decode("utf-8", errors="replace")
-        return content, content
-
-    if ext == ".txt":
+    if ext in (".html", ".htm", ".txt"):
         content = data.decode("utf-8", errors="replace")
         return content, content
 
@@ -110,14 +104,14 @@ async def post_upload(
     file: UploadFile = File(...),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, str]:
     """
     Accept an uploaded file (html, htm, txt, md, pdf), extract its text/html
     content, and process it the same way as a browser-extension submission.
     """
     filename = file.filename or ""
-    if "." not in filename or \
-            ("." + filename.rsplit(".", 1)[-1].lower()) not in ALLOWED_UPLOAD_EXTENSIONS:
+    ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
@@ -144,7 +138,7 @@ async def post_upload(
 def get_submission_status(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """
     Return current task statuses for polling
     """
@@ -161,7 +155,7 @@ def get_submission_status(
 def get_submission(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """
     Return all available results from DB
     """
@@ -187,7 +181,7 @@ def put_read_topics(
     body: ReadTopicsRequest,
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """
     Persist the list of read topic names for a submission
     """
@@ -205,7 +199,7 @@ def delete_submission(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, str]:
     """
     Delete a submission and any queued tasks
     """
@@ -228,38 +222,36 @@ def post_refresh(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, Any]:
     """
     Clear results and re-queue tasks for recalculation
     """
     submission_id = submission["submission_id"]
 
-    # Determine which tasks to refresh and validate user input
     requested_tasks = refresh_request.tasks or ["all"]
-    invalid_tasks = [t for t in requested_tasks if t != "all" and t not in submissions_storage.task_names]
+    valid_task_names = submissions_storage.task_names
+    invalid_tasks = [t for t in requested_tasks if t != "all" and t not in valid_task_names]
+    
     if invalid_tasks:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported task(s): {', '.join(invalid_tasks)}"
         )
+        
     task_names = submissions_storage.expand_recalculation_tasks(requested_tasks)
 
-    # Clear results and reset task statuses
+    # Reset existing data and queue
     submissions_storage.clear_results(submission_id, task_names)
-
-    # Delete existing task queue entries for this submission
     task_queue_storage.delete_by_submission(submission_id, task_types=task_names)
 
-    # Re-queue tasks
-    tasks_queued = []
+    # Re-queue
     for task_name in task_names:
         priority = TASK_PRIORITIES.get(task_name, 3)
         task_queue_storage.create(make_task_document(submission_id, task_name, priority))
-        tasks_queued.append(task_name)
 
     return {
         "message": "Tasks queued for recalculation",
-        "tasks_queued": tasks_queued
+        "tasks_queued": task_names
     }
 
 
@@ -268,12 +260,10 @@ def get_word_cloud(
     path: List[str] = Query(default=[]),
     top_n: int = Query(default=60, ge=1, le=200),
     submission: dict = Depends(require_submission),
-):
+) -> Dict[str, Any]:
     """
     Return a word-frequency cloud for the sentences that belong to topics
     matching *path* (a hierarchical list of topic segments, e.g. ["Sport", "Tennis"]).
-    An empty *path* covers all topics.
-    Uses NLTK tokenisation, POS tagging, and lemmatisation on the backend.
     """
     results = submission.get("results") or {}
     topics = results.get("topics") or []
@@ -282,40 +272,35 @@ def get_word_cloud(
     if not sentences:
         return {"words": [], "sentence_count": 0}
 
-    # Filter topics whose name starts with the requested path segments.
-    def topic_matches(name: str) -> bool:
+    # Collect sentence indices from matching topics
+    sentence_indices: Set[int] = set()
+    for topic in topics:
+        name = topic.get("name", "")
         parts = [p.strip() for p in name.split(">")]
-        if len(parts) < len(path):
-            return False
-        return all(parts[i] == path[i] for i in range(len(path)))
+        
+        # Check if topic matches hierarchical path
+        if len(parts) >= len(path) and all(parts[i] == path[i] for i in range(len(path))):
+            for idx in (topic.get("sentences") or []):
+                sentence_indices.add(int(idx))
 
-    matching_topics = [t for t in topics if topic_matches(t.get("name", ""))]
-
-    # Collect unique 1-based sentence indices.
-    sentence_indices: set = set()
-    for topic in matching_topics:
-        for idx in (topic.get("sentences") or []):
-            sentence_indices.add(int(idx))
-
-    texts = [
+    filtered_texts = [
         sentences[idx - 1]
         for idx in sentence_indices
         if 1 <= idx <= len(sentences)
     ]
 
-    words = compute_word_frequencies(texts, top_n=top_n)
+    words = compute_word_frequencies(filtered_texts, top_n=top_n)
     return {"words": words, "sentence_count": len(sentence_indices)}
 
 
 @router.get("/global-topics")
 def get_global_topics(
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """
     Return aggregated topic tree across all completed submissions.
     """
-    topics = submissions_storage.aggregate_global_topics()
-    return {"topics": topics}
+    return {"topics": submissions_storage.aggregate_global_topics()}
 
 
 @router.get("/global-topics/sentences")
@@ -323,7 +308,7 @@ def get_global_topics_sentences(
     topic_name: List[str] = Query(default=[]),
     include_context: bool = Query(default=False),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     Return sentence texts for selected topics across all submissions.
     """
@@ -336,63 +321,64 @@ def get_global_topics_sentences(
     )
 
     groups = []
-    for submission in submissions:
-        results = submission.get("results") or {}
+    for sub in submissions:
+        results = sub.get("results") or {}
         all_sentences = results.get("sentences") or []
         topics = results.get("topics") or []
+        
         for topic in topics:
             if topic.get("name") not in topic_name:
                 continue
+                
             indices = topic.get("sentences") or []
-            texts = [
-                all_sentences[idx - 1]
-                for idx in indices
-                if 1 <= idx <= len(all_sentences)
-            ]
+            texts = [all_sentences[i-1] for i in indices if 1 <= i <= len(all_sentences)]
+            
             if texts:
-                group_data = {
-                    "submission_id": submission["submission_id"],
-                    "source_url": submission.get("source_url", ""),
+                group = {
+                    "submission_id": sub["submission_id"],
+                    "source_url": sub.get("source_url", ""),
                     "topic_name": topic["name"],
                     "sentences": texts
                 }
                 if include_context:
-                    group_data["all_sentences"] = all_sentences
-                    group_data["topics"] = topics
-                    group_data["indices"] = indices
-                groups.append(group_data)
+                    group.update({"all_sentences": all_sentences, "topics": topics, "indices": indices})
+                groups.append(group)
+                
     return {"groups": groups}
+
+
+def _calculate_read_indices(topics: List[Dict], read_topics: Set[str]) -> Set[int]:
+    """Helper to get unique sentence indices for read topics."""
+    indices = set()
+    for topic in topics:
+        if topic.get("name") in read_topics:
+            indices.update(topic.get("sentences") or [])
+    return indices
 
 
 @router.get("/submissions/read-progress")
 def get_global_read_progress(
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, int]:
     submissions = submissions_storage.list_with_projection(
         {},
         {"results.sentences": 1, "results.topics.name": 1, "results.topics.sentences": 1, "read_topics": 1}
     )
+    
     total_sentences = 0
     total_read = 0
     
-    for submission in submissions:
-        results = submission.get("results") or {}
+    for sub in submissions:
+        results = sub.get("results") or {}
         sentences = results.get("sentences") or []
-        topics = results.get("topics") or []
-        read_topics = set(submission.get("read_topics") or [])
-        
-        t_count = len(sentences)
-        if t_count == 0:
+        if not sentences:
             continue
             
-        r_indices = set()
-        for topic in topics:
-            if topic.get("name") in read_topics:
-                for idx in topic.get("sentences", []):
-                    r_indices.add(idx)
+        read_topics = set(sub.get("read_topics") or [])
+        read_indices = _calculate_read_indices(results.get("topics") or [], read_topics)
                     
-        total_sentences += t_count
-        total_read += len(r_indices)
+        total_sentences += len(sentences)
+        total_read += len(read_indices)
         
     return {"read_count": total_read, "total_count": total_sentences}
 
@@ -400,21 +386,16 @@ def get_global_read_progress(
 @router.get("/submission/{submission_id}/read-progress")
 def get_submission_read_progress(
     submission: dict = Depends(require_submission),
-):
+) -> Dict[str, int]:
     results = submission.get("results") or {}
     sentences = results.get("sentences") or []
-    topics = results.get("topics") or []
-    read_topics = set(submission.get("read_topics") or [])
-    
     total_sentences = len(sentences)
+    
     if total_sentences == 0:
         return {"read_count": 0, "total_count": 0}
         
-    read_indices = set()
-    for topic in topics:
-        if topic.get("name") in read_topics:
-            for idx in topic.get("sentences", []):
-                read_indices.add(idx)
+    read_topics = set(submission.get("read_topics") or [])
+    read_indices = _calculate_read_indices(results.get("topics") or [], read_topics)
                 
     return {"read_count": len(read_indices), "total_count": total_sentences}
 
@@ -425,46 +406,37 @@ def list_submissions(
     status: Optional[str] = None,
     limit: int = 100,
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """
     List submissions with optional filters.
     """
     if limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be positive")
 
-    query = {}
-    if submission_id:
-        query["submission_id"] = submission_id
-
+    query = {"submission_id": submission_id} if submission_id else {}
+    # Fetch more if status filter is active since we filter in-memory
     fetch_limit = limit if not status else min(max(limit * 5, limit), 1000)
     submissions = submissions_storage.list(query, fetch_limit)
 
     items = []
-    for submission in submissions:
-        overall_status = submissions_storage.get_overall_status(submission)
+    for sub in submissions:
+        overall_status = submissions_storage.get_overall_status(sub)
         if status and overall_status != status:
             continue
 
-        text_content = submission.get("text_content") or ""
-        results = submission.get("results") or {}
-        sentences = results.get("sentences") or []
-        topics = results.get("topics") or []
-
+        results = sub.get("results") or {}
         items.append({
-            "submission_id": submission.get("submission_id"),
-            "source_url": submission.get("source_url", ""),
-            "created_at": submission.get("created_at"),
-            "updated_at": submission.get("updated_at"),
+            "submission_id": sub.get("submission_id"),
+            "source_url": sub.get("source_url", ""),
+            "created_at": sub.get("created_at"),
+            "updated_at": sub.get("updated_at"),
             "overall_status": overall_status,
-            "text_characters": len(text_content),
-            "sentence_count": len(sentences),
-            "topic_count": len(topics)
+            "text_characters": len(sub.get("text_content") or ""),
+            "sentence_count": len(results.get("sentences") or []),
+            "topic_count": len(results.get("topics") or [])
         })
 
         if len(items) >= limit:
             break
 
-    return {
-        "submissions": items,
-        "count": len(items)
-    }
+    return {"submissions": items, "count": len(items)}

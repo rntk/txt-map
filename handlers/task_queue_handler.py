@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from lib.constants import ALLOWED_TASKS, TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
@@ -23,7 +23,7 @@ def list_task_queue(
     status: Optional[str] = None,
     limit: int = 100,
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, List[Dict[str, Any]]]:
     """List task queue entries with optional filters."""
     if limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be positive")
@@ -38,9 +38,10 @@ def list_task_queue(
 
     serialized = []
     for task in tasks:
-        task_copy = {**task}
-        task_copy["id"] = str(task_copy.pop("_id"))
-        serialized.append(task_copy)
+        # Convert _id to string for JSON serialization
+        t = dict(task)
+        t["id"] = str(t.pop("_id"))
+        serialized.append(t)
 
     return {"tasks": serialized}
 
@@ -49,7 +50,7 @@ def list_task_queue(
 def delete_task_queue_entry(
     task_id: str,
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-):
+) -> Dict[str, Any]:
     """Delete a task queue entry by its ID."""
     try:
         deleted = task_queue_storage.delete_by_id(task_id)
@@ -67,7 +68,7 @@ def repeat_task_queue_entry(
     task_id: str,
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """Re-queue a task based on an existing queue entry."""
     try:
         task = task_queue_storage.get_by_id(task_id)
@@ -96,10 +97,10 @@ def repeat_task_queue_entry(
         statuses=["pending", "processing"],
     )
 
-    inserted_ids = []
-    for expanded_task in expanded_tasks:
-        doc = make_task_document(submission_id, expanded_task, TASK_PRIORITIES.get(expanded_task, 3))
-        inserted_ids.append(task_queue_storage.create(doc))
+    inserted_ids = [
+        task_queue_storage.create(make_task_document(submission_id, t, TASK_PRIORITIES.get(t, 3)))
+        for t in expanded_tasks
+    ]
 
     return {"requeued": True, "tasks": expanded_tasks, "task_ids": inserted_ids}
 
@@ -109,7 +110,7 @@ def add_task_queue_entry(
     payload: AddTaskRequest,
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-):
+) -> Dict[str, Any]:
     """Add a new task queue entry for a submission."""
     if payload.task_type not in ALLOWED_TASKS:
         raise HTTPException(status_code=400, detail="Unsupported task type")
@@ -122,9 +123,8 @@ def add_task_queue_entry(
     submissions_storage.clear_results(payload.submission_id, expanded_tasks)
 
     inserted_ids = []
-    for expanded_task in expanded_tasks:
-        priority = payload.priority if payload.priority is not None else TASK_PRIORITIES.get(expanded_task, 3)
-        doc = make_task_document(payload.submission_id, expanded_task, priority)
-        inserted_ids.append(task_queue_storage.create(doc))
+    for t in expanded_tasks:
+        priority = payload.priority if payload.priority is not None else TASK_PRIORITIES.get(t, 3)
+        inserted_ids.append(task_queue_storage.create(make_task_document(payload.submission_id, t, priority)))
 
     return {"queued": True, "tasks": expanded_tasks, "task_ids": inserted_ids}

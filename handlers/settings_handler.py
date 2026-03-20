@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Dict, Any
 
 from handlers.dependencies import get_app_settings_storage
 from lib.llm import get_active_llm_settings
@@ -13,7 +14,7 @@ class UpdateLLMSettingsRequest(BaseModel):
     model: str
 
 
-def _serialize_settings(storage: AppSettingsStorage) -> dict:
+def _serialize_settings(storage: AppSettingsStorage) -> Dict[str, Any]:
     active = get_active_llm_settings(db=storage.db)
     return {
         "llm_provider": active["provider"],
@@ -24,7 +25,7 @@ def _serialize_settings(storage: AppSettingsStorage) -> dict:
 
 
 @router.get("/settings")
-def get_settings(storage: AppSettingsStorage = Depends(get_app_settings_storage)):
+def get_settings(storage: AppSettingsStorage = Depends(get_app_settings_storage)) -> Dict[str, Any]:
     return _serialize_settings(storage)
 
 
@@ -32,12 +33,12 @@ def get_settings(storage: AppSettingsStorage = Depends(get_app_settings_storage)
 def update_llm_settings(
     payload: UpdateLLMSettingsRequest,
     storage: AppSettingsStorage = Depends(get_app_settings_storage),
-):
+) -> Dict[str, Any]:
     active = get_active_llm_settings(db=storage.db)
-    available_providers = {
-        provider["name"]: provider for provider in active["available_providers"]
-    }
-    provider = available_providers.get(payload.provider)
+    
+    # Quick lookup for provider info
+    provider = next((p for p in active["available_providers"] if p["name"] == payload.provider), None)
+    
     if provider is None:
         raise HTTPException(status_code=400, detail="Selected LLM provider is not available")
     if payload.model not in provider["models"]:
