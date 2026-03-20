@@ -39,37 +39,19 @@ app.include_router(llm_cache_handler.router, prefix="/api")
 app.include_router(settings_handler.router, prefix="/api")
 
 
+FRONTEND_INDEX = "frontend/build/index.html"
+
+
 @app.get("/")
-def serve_root_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/menu")
-def serve_menu_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/text/{submission_id}")
-def serve_text_page(submission_id: str):
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/tasks")
-def serve_tasks_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/texts")
-def serve_texts_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/diff")
-def serve_diff_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/cache")
-def serve_cache_page():
-    return FileResponse("frontend/build/index.html")
-
 @app.get("/page/topics")
-def serve_topics_page():
-    return FileResponse("frontend/build/index.html")
+def serve_frontend_page():
+    return FileResponse(FRONTEND_INDEX)
 
 if __name__ == "__main__":
     import uvicorn
