@@ -382,7 +382,7 @@ function TextPage() {
             <div className="left-column">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>Topics ({safeTopics.length})</h1>
-                <ReadProgress percentage={readPercentage} size={60} />
+                <ReadProgress percentage={readPercentage} size={60} label="Topics read" />
               </div>
               <TopicList
                 topics={allTopics}

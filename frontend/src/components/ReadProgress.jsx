@@ -24,13 +24,17 @@ function buildGaugeLines(percentage) {
   });
 }
 
-export default function ReadProgress({ percentage = 0, label = '', size = 150 }) {
+export default function ReadProgress({ percentage = 0, label = '', size = 150, hint = '' }) {
   const safePercentage = Math.min(100, Math.max(0, percentage));
   const gaugeLines = buildGaugeLines(safePercentage);
   const labelFontSize = size * 0.09;
+  const tooltip = hint || label;
 
   return (
-    <div style={{ width: size, display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif' }}>
+    <div 
+      title={tooltip}
+      style={{ width: size, display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif', cursor: 'help' }}
+    >
       <svg viewBox={VIEWBOX} style={{ width: '100%', display: 'block' }}>
         {gaugeLines.map(function renderLine(line) {
           return (

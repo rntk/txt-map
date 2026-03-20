@@ -71,7 +71,7 @@ export default function ArticleReadProgress({ submissionId }) {
 
   return (
     <div ref={ref}>
-      <ReadProgress percentage={percentage} size={PLACEHOLDER_SIZE} />
+      <ReadProgress percentage={percentage} size={PLACEHOLDER_SIZE} label="Article progress" />
     </div>
   );
 }

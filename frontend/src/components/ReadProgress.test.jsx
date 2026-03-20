@@ -28,4 +28,16 @@ describe('ReadProgress', () => {
     // We defined linesCount = 40 in the component
     expect(lines.length).toBe(40);
   });
+
+  it('shows tooltip hint when provided', () => {
+    const { container } = render(<ReadProgress percentage={50} label="My Label" hint="My Hint" />);
+    const div = container.querySelector('div');
+    expect(div.getAttribute('title')).toBe('My Hint');
+  });
+
+  it('uses label as tooltip when hint is missing', () => {
+    const { container } = render(<ReadProgress percentage={50} label="My Label" />);
+    const div = container.querySelector('div');
+    expect(div.getAttribute('title')).toBe('My Label');
+  });
 });
