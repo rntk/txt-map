@@ -1,15 +1,15 @@
 import logging
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from datetime import datetime, UTC
 
-from pymongo import MongoClient
+from pymongo.database import Database
 
 
 class SubmissionsStorage:
-    indexes = ["submission_id", "created_at"]
-    task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree"]
-    task_dependencies = {
+    indexes: List[str] = ["submission_id", "created_at"]
+    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree"]
+    task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
@@ -17,8 +17,8 @@ class SubmissionsStorage:
         "prefix_tree": ["split_topic_generation"],
     }
 
-    def __init__(self, db: MongoClient) -> None:
-        self._db: MongoClient = db
+    def __init__(self, db: Database) -> None:
+        self._db: Database = db
         self._log = logging.getLogger("submissions")
 
     def prepare(self) -> None:
@@ -35,7 +35,7 @@ class SubmissionsStorage:
         html_content: str,
         text_content: str = "",
         source_url: str = ""
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create a new submission and return the document"""
         submission_id = str(uuid.uuid4())
         now = datetime.now(UTC)
@@ -100,7 +100,7 @@ class SubmissionsStorage:
         self._db.submissions.insert_one(submission)
         return submission
 
-    def get_by_id(self, submission_id: str) -> Optional[dict]:
+    def get_by_id(self, submission_id: str) -> Optional[dict[str, Any]]:
         """Get submission by submission_id"""
         return self._db.submissions.find_one({"submission_id": submission_id})
 
@@ -113,7 +113,7 @@ class SubmissionsStorage:
     ) -> bool:
         """Update task status (pending, processing, completed, failed)"""
         now = datetime.now(UTC)
-        update_fields = {
+        update_fields: dict[str, Any] = {
             f"tasks.{task_name}.status": status,
             "updated_at": now
         }
@@ -135,7 +135,7 @@ class SubmissionsStorage:
     def update_results(
         self,
         submission_id: str,
-        results: dict
+        results: dict[str, Any]
     ) -> bool:
         """Update results fields"""
         result = self._db.submissions.update_one(
@@ -163,38 +163,38 @@ class SubmissionsStorage:
         task_names: Optional[List[str]] = None
     ) -> bool:
         """Clear results and reset task statuses for refresh"""
-        task_names = self.expand_recalculation_tasks(task_names)
+        names = self.expand_recalculation_tasks(task_names)
 
         now = datetime.now(UTC)
-        update_fields = {"updated_at": now}
+        update_fields: dict[str, Any] = {"updated_at": now}
 
         # Reset task statuses
-        for task_name in task_names:
+        for task_name in names:
             update_fields[f"tasks.{task_name}.status"] = "pending"
             update_fields[f"tasks.{task_name}.started_at"] = None
             update_fields[f"tasks.{task_name}.completed_at"] = None
             update_fields[f"tasks.{task_name}.error"] = None
 
         # Clear related results
-        if "split_topic_generation" in task_names:
+        if "split_topic_generation" in names:
             update_fields["results.sentences"] = []
             update_fields["results.topics"] = []
 
-        if "subtopics_generation" in task_names:
+        if "subtopics_generation" in names:
             update_fields["results.subtopics"] = []
 
-        if "summarization" in task_names:
+        if "summarization" in names:
             update_fields["results.topic_summaries"] = {}
             update_fields["results.article_summary"] = {"text": "", "bullets": []}
             update_fields["results.summary"] = []
             update_fields["results.summary_mappings"] = []
 
-        if "mindmap" in task_names:
+        if "mindmap" in names:
             update_fields["results.topic_mindmaps"] = {}
             update_fields["results.mindmap_results"] = []
             update_fields["results.mindmap_metadata"] = {}
 
-        if "prefix_tree" in task_names:
+        if "prefix_tree" in names:
             update_fields["results.prefix_tree"] = {}
 
         result = self._db.submissions.update_one(
@@ -232,15 +232,15 @@ class SubmissionsStorage:
         result = self._db.submissions.delete_one({"submission_id": submission_id})
         return result.deleted_count > 0
 
-    def list(self, filters: Optional[dict] = None, limit: int = 100) -> List[dict]:
+    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> List[dict[str, Any]]:
         """List submissions with optional filters, sorted by created_at desc."""
         return list(self._db.submissions.find(filters or {}).sort("created_at", -1).limit(limit))
 
-    def list_with_projection(self, filters: dict, projection: dict) -> List[dict]:
+    def list_with_projection(self, filters: dict[str, Any], projection: dict[str, Any]) -> List[dict[str, Any]]:
         """List submissions applying a specific projection (no default sort)."""
         return list(self._db.submissions.find(filters, projection))
 
-    def aggregate_global_topics(self) -> List[dict]:
+    def aggregate_global_topics(self) -> List[dict[str, Any]]:
         """Return aggregated topic tree across all completed submissions."""
         pipeline = [
             {"$match": {"tasks.split_topic_generation.status": "completed"}},
@@ -265,9 +265,9 @@ class SubmissionsStorage:
         ]
         return list(self._db.submissions.aggregate(pipeline))
 
-    def get_overall_status(self, submission: dict) -> str:
+    def get_overall_status(self, submission: dict[str, Any]) -> str:
         """Determine overall status from task statuses"""
-        tasks = submission.get("tasks", {})
+        tasks: dict[str, Any] = submission.get("tasks", {})
         statuses = [task.get("status") for task in tasks.values()]
 
         if any(s == "failed" for s in statuses):

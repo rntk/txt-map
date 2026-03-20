@@ -35,10 +35,10 @@ PROVIDER_DEFINITIONS: tuple[ProviderDefinition, ...] = (
     ),
 )
 
-PROVIDER_DEFINITION_BY_KEY = {
+PROVIDER_DEFINITION_BY_KEY: dict[str, ProviderDefinition] = {
     provider.key: provider for provider in PROVIDER_DEFINITIONS
 }
-PROVIDER_DEFINITION_BY_NAME = {
+PROVIDER_DEFINITION_BY_NAME: dict[str, ProviderDefinition] = {
     provider.display_name: provider for provider in PROVIDER_DEFINITIONS
 }
 

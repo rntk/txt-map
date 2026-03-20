@@ -1,17 +1,20 @@
 """MongoDB-backed LLM cache store implementing txt_splitt's LLMCacheStore protocol."""
 
 from datetime import datetime, UTC
+from typing import Any
 
 from txt_splitt.cache import CacheEntry
+from pymongo.database import Database
+from pymongo.collection import Collection
 
 
 class MongoLLMCacheStore:
     """MongoDB-backed cache store implementing txt_splitt LLMCacheStore protocol."""
 
-    def __init__(self, db):
-        self._collection = db.llm_cache
+    def __init__(self, db: Database) -> None:
+        self._collection: Collection = db.llm_cache
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Create indexes for the cache collection."""
         # Drop stale legacy index if present
         try:
@@ -65,8 +68,8 @@ class MongoLLMCacheStore:
 
     # --- Management API methods ---
 
-    def list_entries(self, namespace: str | None = None, limit: int = 100, skip: int = 0) -> list[dict]:
-        query: dict = {}
+    def list_entries(self, namespace: str | None = None, limit: int = 100, skip: int = 0) -> list[dict[str, Any]]:
+        query: dict[str, Any] = {}
         if namespace:
             query["namespace"] = namespace
         cursor = self._collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
@@ -78,7 +81,7 @@ class MongoLLMCacheStore:
         return result
 
     def count_entries(self, namespace: str | None = None) -> int:
-        query: dict = {}
+        query: dict[str, Any] = {}
         if namespace:
             query["namespace"] = namespace
         return self._collection.count_documents(query)
@@ -103,7 +106,7 @@ class MongoLLMCacheStore:
     def get_namespaces(self) -> list[str]:
         return self._collection.distinct("namespace")
 
-    def get_stats(self) -> list[dict]:
+    def get_stats(self) -> list[dict[str, Any]]:
         pipeline = [
             {"$group": {"_id": "$namespace", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},

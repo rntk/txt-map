@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, UTC
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -18,7 +18,7 @@ def canonical_pair(left_submission_id: str, right_submission_id: str) -> Tuple[s
     return pair_key, submission_a_id, submission_b_id
 
 
-def _parse_sentence_indices_from_topic(topic: dict) -> List[int]:
+def _parse_sentence_indices_from_topic(topic: Dict[str, Any]) -> List[int]:
     """Extract 0-based sentence indices from topic.ranges/topic.sentences."""
     result: set[int] = set()
 
@@ -49,7 +49,7 @@ def _parse_sentence_indices_from_topic(topic: dict) -> List[int]:
     return sorted(result)
 
 
-def build_topic_units(submission: dict) -> Tuple[List[dict], List[str]]:
+def build_topic_units(submission: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Build topic-aware sentence units from a submission.
 
@@ -105,15 +105,15 @@ def build_topic_units(submission: dict) -> Tuple[List[dict], List[str]]:
     return units, missing
 
 
-def check_submission_topic_readiness(submission: dict) -> dict:
+def check_submission_topic_readiness(submission: Dict[str, Any]) -> Dict[str, Any]:
     """Return readiness report for topic-aware diff prerequisites."""
     units, missing = build_topic_units(submission)
     return {"ready": len(missing) == 0, "missing": missing, "unit_count": len(units)}
 
 
 def _compute_directional(
-    source_units: List[dict],
-    target_units: List[dict],
+    source_units: List[Dict[str, Any]],
+    target_units: List[Dict[str, Any]],
     *,
     similarity_matrix: np.ndarray | None = None,
     threshold: float,
@@ -121,7 +121,7 @@ def _compute_directional(
     top_k_nearest: int,
     source_label: str,
     target_label: str,
-) -> dict:
+) -> Dict[str, Any]:
     if not source_units:
         return {
             "matches": [],
@@ -223,13 +223,13 @@ def _compute_directional(
 
 
 def compute_topic_aware_semantic_diff(
-    submission_a: dict,
-    submission_b: dict,
+    submission_a: Dict[str, Any],
+    submission_b: Dict[str, Any],
     *,
     threshold: float = 0.25,
     nearest_min_similarity: float = 0.5,
     top_k_nearest: int = 3,
-) -> dict:
+) -> Dict[str, Any]:
     units_a, missing_a = build_topic_units(submission_a)
     units_b, missing_b = build_topic_units(submission_b)
 
@@ -293,16 +293,16 @@ def compute_topic_aware_semantic_diff(
 
 
 def orient_payload(
-    payload: dict,
+    payload: Dict[str, Any],
     submission_a_id: str,
     submission_b_id: str,
     left_submission_id: str,
     right_submission_id: str,
-) -> dict:
+) -> Dict[str, Any]:
     """
     Orient canonical A/B payload into requested left/right direction.
     """
-    def remap_rows(rows: List[dict], left_prefix: str, right_prefix: str) -> List[dict]:
+    def remap_rows(rows: List[Dict[str, Any]], left_prefix: str, right_prefix: str) -> List[Dict[str, Any]]:
         mapped = []
         for row in rows or []:
             mapped.append(
@@ -343,9 +343,9 @@ def orient_payload(
 
 
 def stale_reasons(
-    diff_doc: dict,
-    submission_a: dict,
-    submission_b: dict,
+    diff_doc: Dict[str, Any],
+    submission_a: Dict[str, Any],
+    submission_b: Dict[str, Any],
     *,
     algorithm_version: str = ALGORITHM_VERSION,
 ) -> List[str]:

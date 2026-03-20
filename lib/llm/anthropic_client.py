@@ -5,7 +5,14 @@ from lib.llm.base import LLMClient
 
 
 class AnthropicClient(LLMClient):
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514", max_context_tokens: int = 200000, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "claude-sonnet-4-20250514",
+        max_context_tokens: int = 200000,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> None:
         super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         import anthropic
         self._client = anthropic.Anthropic(api_key=api_key)

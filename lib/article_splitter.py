@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 
 from txt_splitt import (
@@ -30,11 +30,11 @@ class ArticleSplitResult:
 class _LLMCallableAdapter:
     """Adapter for lib.llm.llamacpp.LLamaCPP to txt_splitt LLMCallable protocol."""
 
-    def __init__(self, llm_client):
+    def __init__(self, llm_client: Any) -> None:
         self._llm_client = llm_client
 
     @property
-    def model_id(self):
+    def model_id(self) -> Optional[str]:
         return getattr(self._llm_client, "model_id", None)
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
@@ -46,13 +46,13 @@ class _LLMCallableAdapter:
         return result
 
 
-def _cache_namespace(base_namespace: str, llm_client) -> str:
+def _cache_namespace(base_namespace: str, llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
     return f"{base_namespace}:{model_id}"
 
 
-def _groups_to_topics(groups, sentence_objects) -> List[Dict]:
-    topics: List[Dict] = []
+def _groups_to_topics(groups: List[Any], sentence_objects: List[Any]) -> List[Dict[str, Any]]:
+    topics: List[Dict[str, Any]] = []
     sentence_by_index = {s.index: s for s in sentence_objects}
 
     for group in groups:
@@ -109,11 +109,11 @@ def _groups_to_topics(groups, sentence_objects) -> List[Dict]:
 
 def split_article(
     article: str,
-    llm=None,
+    llm: Optional[Any] = None,
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
-    cache_store=None,
+    cache_store: Optional[Any] = None,
 ) -> ArticleSplitResult:
     """
     Split an article into sentences and topic ranges using txt_splitt.
@@ -187,11 +187,11 @@ def split_article(
 
 def split_article_with_markers(
     article: str,
-    llm=None,
+    llm: Optional[Any] = None,
     tracer: Optional[Tracer] = None,
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
-    cache_store=None,
+    cache_store: Optional[Any] = None,
 ) -> ArticleSplitResult:
     """Backward-compatible alias for split_article."""
     return split_article(

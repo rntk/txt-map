@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
@@ -16,11 +17,11 @@ logger = logging.getLogger(__name__)
 class _LLMAdapter:
     """Adapter for LLamaCPP to txt_splitt LLMCallable protocol."""
 
-    def __init__(self, client):
-        self._client = client
+    def __init__(self, client: Any) -> None:
+        self._client: Any = client
 
     @property
-    def model_id(self):
+    def model_id(self) -> Optional[str]:
         return getattr(self._client, "model_id", None)
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
@@ -30,7 +31,7 @@ class _LLMAdapter:
 class _ValidatedCachingLLMCallable(CachingLLMCallable):
     """Cache wrapper that only stores and serves responses accepted by a validator."""
 
-    def __init__(self, *args, validator, **kwargs):
+    def __init__(self, *args: Any, validator: Callable[[str], bool], **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._validator = validator
 
@@ -79,7 +80,7 @@ class _ValidatedCachingLLMCallable(CachingLLMCallable):
         return response
 
 
-def _cache_namespace(base_namespace, llm_client):
+def _cache_namespace(base_namespace: str, llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
     return f"{base_namespace}:{model_id}"
 
@@ -133,7 +134,12 @@ ARTICLE_SUMMARY_MERGE_PROMPT_TEMPLATE = (
 )
 
 
-def summarize_by_sentence_groups(sent_list, cached_llm, llm_client, max_groups_tokens_buffer=400):
+def summarize_by_sentence_groups(
+    sent_list: List[str],
+    cached_llm: Any,
+    llm_client: Any,
+    max_groups_tokens_buffer: int = 400
+) -> Tuple[List[str], List[Dict[str, Any]]]:
     """
     Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
     summaries equals the number of sentence groups. Each summary gets a mapping to its single
@@ -152,8 +158,8 @@ def summarize_by_sentence_groups(sent_list, cached_llm, llm_client, max_groups_t
         "Text:\n<text>{sentence}</text>\n\nSummary:"
     )
 
-    all_summary_sentences = []
-    summary_mappings = []
+    all_summary_sentences: List[str] = []
+    summary_mappings: List[Dict[str, Any]] = []
 
     for idx, s in enumerate(sent_list):
         sentences_text = s
@@ -182,7 +188,7 @@ def _strip_markdown_code_fences(text: str) -> str:
     return cleaned.strip()
 
 
-def _normalize_article_summary(summary_data):
+def _normalize_article_summary(summary_data: Any) -> Dict[str, Any]:
     if not isinstance(summary_data, dict):
         return {"text": "", "bullets": []}
 
@@ -211,7 +217,7 @@ def _normalize_article_summary(summary_data):
     }
 
 
-def _article_summary_has_required_content(summary_data):
+def _article_summary_has_required_content(summary_data: Dict[str, Any]) -> bool:
     return bool(summary_data.get("text")) and bool(summary_data.get("bullets"))
 
 
@@ -221,7 +227,7 @@ def _is_valid_article_summary_response(response_text: str) -> bool:
     )
 
 
-def parse_article_summary_response(response_text: str):
+def parse_article_summary_response(response_text: str) -> Dict[str, Any]:
     cleaned = _strip_markdown_code_fences(response_text)
     if not cleaned:
         return {"text": "", "bullets": []}
@@ -252,7 +258,7 @@ _RETRY_SUFFIX = (
 )
 
 
-def _summary_overlaps_source(summary_text: str, source_sentences: list, min_overlap: float = 0.2) -> bool:
+def _summary_overlaps_source(summary_text: str, source_sentences: List[str], min_overlap: float = 0.2) -> bool:
     """Check that the summary shares enough vocabulary with the source to catch obvious hallucinations."""
     source_words = {
         w.lower() for s in source_sentences for w in s.split() if len(w) > 3
@@ -267,12 +273,12 @@ def _summary_overlaps_source(summary_text: str, source_sentences: list, min_over
 
 
 def build_article_summary_chunks(
-    sentences,
-    llm_client,
-    prompt_template=ARTICLE_SUMMARY_PROMPT_TEMPLATE,
-    max_output_tokens_buffer=1200,
-    overlap_sentences=2,
-):
+    sentences: List[str],
+    llm_client: Any,
+    prompt_template: str = ARTICLE_SUMMARY_PROMPT_TEMPLATE,
+    max_output_tokens_buffer: int = 1200,
+    overlap_sentences: int = 2,
+) -> List[Dict[str, Any]]:
     if not sentences:
         return []
 
@@ -325,7 +331,7 @@ def build_article_summary_chunks(
     return chunks
 
 
-def _format_chunk_summaries_for_merge(chunk_summaries):
+def _format_chunk_summaries_for_merge(chunk_summaries: List[Dict[str, Any]]) -> str:
     formatted_chunks = []
     for idx, chunk in enumerate(chunk_summaries, start=1):
         bullets = chunk["summary"].get("bullets", [])
@@ -343,12 +349,12 @@ def _format_chunk_summaries_for_merge(chunk_summaries):
 
 
 def generate_article_summary(
-    sentences,
-    cached_llm,
-    llm_client,
-    overlap_sentences=2,
-    max_attempts=ARTICLE_SUMMARY_MAX_ATTEMPTS,
-):
+    sentences: List[str],
+    cached_llm: Any,
+    llm_client: Any,
+    overlap_sentences: int = 2,
+    max_attempts: int = ARTICLE_SUMMARY_MAX_ATTEMPTS,
+) -> Dict[str, Any]:
     chunks = build_article_summary_chunks(
         sentences,
         llm_client,
@@ -437,7 +443,12 @@ def generate_article_summary(
     )
 
 
-def process_summarization(submission: dict, db, llm, cache_store=None):
+def process_summarization(
+    submission: Dict[str, Any],
+    db: Any,
+    llm: Any,
+    cache_store: Any = None
+) -> None:
     """
     Process summarization task for a submission.
     Generates both overall summaries and topic-specific summaries.
@@ -490,7 +501,7 @@ def process_summarization(submission: dict, db, llm, cache_store=None):
         )
 
     # Generate summaries for each topic
-    topic_summaries = {}
+    topic_summaries: Dict[str, str] = {}
     if topics:
         print(f"Generating summaries for {len(topics)} topics")
         for topic in topics:

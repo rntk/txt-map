@@ -1,14 +1,12 @@
 """
 Text splitting task - extracts sentences and words from submitted HTML
 """
+from typing import Any, Dict
 from lib.article_splitter import split_article_with_markers
 from lib.storage.submissions import SubmissionsStorage
 
 
-
-
-
-def process_text_splitting(submission: dict, db, llm):
+def process_text_splitting(submission: Dict[str, Any], db: Any, llm: Any) -> None:
     """
     Process text splitting task for a submission.
 

@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime, UTC
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from bson import ObjectId
+from pymongo.database import Database
 
 
-def make_task_document(submission_id: str, task_type: str, priority: int = 3) -> dict:
+def make_task_document(submission_id: str, task_type: str, priority: int = 3) -> dict[str, Any]:
     now = datetime.now(UTC)
     return {
         "submission_id": submission_id,
@@ -22,15 +23,15 @@ def make_task_document(submission_id: str, task_type: str, priority: int = 3) ->
 
 
 class TaskQueueStorage:
-    def __init__(self, db) -> None:
-        self._db = db
+    def __init__(self, db: Database) -> None:
+        self._db: Database = db
         self._log = logging.getLogger("task_queue")
 
-    def list(self, filters: Optional[dict] = None, limit: int = 100) -> List[dict]:
+    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> List[dict[str, Any]]:
         """List task queue entries with optional filters, sorted by created_at desc."""
         return list(self._db.task_queue.find(filters or {}).sort("created_at", -1).limit(limit))
 
-    def get_by_id(self, task_id: str) -> Optional[dict]:
+    def get_by_id(self, task_id: str) -> Optional[dict[str, Any]]:
         """Get a task queue entry by its ObjectId string. Raises ValueError on invalid ID."""
         try:
             obj_id = ObjectId(task_id)
@@ -38,7 +39,7 @@ class TaskQueueStorage:
             raise ValueError(f"Invalid task ID: {task_id}")
         return self._db.task_queue.find_one({"_id": obj_id})
 
-    def create(self, doc: dict) -> str:
+    def create(self, doc: dict[str, Any]) -> str:
         """Insert a task document and return the inserted ObjectId as a string."""
         result = self._db.task_queue.insert_one(doc)
         return str(result.inserted_id)
@@ -59,7 +60,7 @@ class TaskQueueStorage:
         statuses: Optional[List[str]] = None,
     ) -> int:
         """Delete task queue entries for a submission. Returns deleted count."""
-        query: dict = {"submission_id": submission_id}
+        query: dict[str, Any] = {"submission_id": submission_id}
         if task_types:
             query["task_type"] = {"$in": task_types}
         if statuses:

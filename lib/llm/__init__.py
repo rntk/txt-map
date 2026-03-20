@@ -1,4 +1,5 @@
 import os
+from typing import Any, Optional
 
 from lib.llm.base import (
     LLMClient,
@@ -34,7 +35,7 @@ def _get_env_model(provider: ProviderDefinition) -> str:
     return provider.default_model
 
 
-def get_active_llm_settings(db=None) -> dict:
+def get_active_llm_settings(db: Any = None) -> dict[str, Any]:
     available = get_available_provider_definitions()
     if not available:
         return {
@@ -80,11 +81,11 @@ def get_active_llm_settings(db=None) -> dict:
     }
 
 
-def get_active_provider_name(db=None) -> str:
+def get_active_provider_name(db: Any = None) -> str:
     return get_active_llm_settings(db=db)["provider"]
 
 
-def create_llm_client(db=None) -> LLMClient:
+def create_llm_client(db: Any = None) -> LLMClient:
     """Factory function that resolves the active provider/model and returns the client."""
     active_settings = get_active_llm_settings(db=db)
     provider_name = active_settings["provider"]

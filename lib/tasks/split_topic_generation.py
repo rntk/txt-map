@@ -3,6 +3,8 @@ Combined text splitting and topic generation task.
 """
 import time
 import logging
+from typing import Any
+
 from lib.article_splitter import split_article_with_markers
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt import Tracer
@@ -10,7 +12,13 @@ from txt_splitt import Tracer
 logger = logging.getLogger(__name__)
 
 
-def process_split_topic_generation(submission: dict, db, llm, max_retries: int = 3, cache_store=None):
+def process_split_topic_generation(
+    submission: dict[str, Any],
+    db: Any,
+    llm: Any,
+    max_retries: int = 3,
+    cache_store: Any | None = None,
+) -> None:
     """
     Process combined split + topic generation for a submission.
 
@@ -20,7 +28,7 @@ def process_split_topic_generation(submission: dict, db, llm, max_retries: int =
         llm: LLamaCPP client instance.
         max_retries: Number of retries for LLM failures.
     """
-    submission_id = submission["submission_id"]
+    submission_id: str = submission["submission_id"]
 
     # Prefer html_content for preserving formatting; fall back to text_content.
     html_content = submission.get("html_content", "")

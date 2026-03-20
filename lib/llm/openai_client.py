@@ -5,7 +5,14 @@ from lib.llm.base import LLMClient
 
 
 class OpenAIClient(LLMClient):
-    def __init__(self, api_key: str, model: str = "gpt-4o", max_context_tokens: int = 128000, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4o",
+        max_context_tokens: int = 128000,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> None:
         super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         import openai
         self._client = openai.OpenAI(api_key=api_key)

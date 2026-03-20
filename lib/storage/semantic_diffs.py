@@ -1,12 +1,14 @@
 import logging
 from datetime import UTC, datetime
+from typing import Any, Optional
 
 from pymongo.errors import DuplicateKeyError
+from pymongo.database import Database
 
 
 class SemanticDiffsStorage:
-    def __init__(self, db) -> None:
-        self._db = db
+    def __init__(self, db: Database) -> None:
+        self._db: Database = db
         self._log = logging.getLogger("semantic_diffs")
 
     def prepare(self) -> None:
@@ -37,13 +39,13 @@ class SemanticDiffsStorage:
         except Exception as exc:
             self._log.warning("Can't create semantic_diff_jobs status/force/created_at index: %s", exc)
 
-    def get_diff_by_pair_key(self, pair_key: str):
+    def get_diff_by_pair_key(self, pair_key: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diffs.find_one({"pair_key": pair_key})
 
-    def get_latest_job(self, pair_key: str):
+    def get_latest_job(self, pair_key: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diff_jobs.find_one({"pair_key": pair_key}, sort=[("created_at", -1)])
 
-    def get_active_job(self, pair_key: str):
+    def get_active_job(self, pair_key: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diff_jobs.find_one(
             {"pair_key": pair_key, "status": {"$in": ["pending", "processing"]}},
             sort=[("created_at", -1)],
@@ -59,7 +61,7 @@ class SemanticDiffsStorage:
         requested_left_id: str,
         requested_right_id: str,
         force_recalculate: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         now = datetime.now(UTC)
         job = {
             "job_id": job_id,
@@ -89,7 +91,7 @@ class SemanticDiffsStorage:
         requested_left_id: str,
         requested_right_id: str,
         force_recalculate: bool = False,
-    ) -> tuple[dict, bool]:
+    ) -> tuple[dict[str, Any], bool]:
         now = datetime.now(UTC)
         job = {
             "job_id": job_id,
@@ -122,9 +124,9 @@ class SemanticDiffsStorage:
         submission_a_id: str,
         submission_b_id: str,
         algorithm_version: str,
-        submission_a_updated_at,
-        submission_b_updated_at,
-        payload: dict,
+        submission_a_updated_at: Any,
+        submission_b_updated_at: Any,
+        payload: dict[str, Any],
     ) -> None:
         now = datetime.now(UTC)
         self._db.semantic_diffs.update_one(
@@ -148,7 +150,7 @@ class SemanticDiffsStorage:
             upsert=True,
         )
 
-    def claim_job(self, worker_id: str):
+    def claim_job(self, worker_id: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diff_jobs.find_one_and_update(
             {"status": "pending"},
             {
@@ -162,19 +164,19 @@ class SemanticDiffsStorage:
             sort=[("force_recalculate", -1), ("created_at", 1)],
         )
 
-    def set_job_force_recalculate(self, job_id, force_recalculate: bool) -> None:
+    def set_job_force_recalculate(self, job_id: Any, force_recalculate: bool) -> None:
         self._db.semantic_diff_jobs.update_one(
             {"_id": job_id},
             {"$set": {"force_recalculate": force_recalculate}},
         )
 
-    def mark_job_completed(self, job_id) -> None:
+    def mark_job_completed(self, job_id: Any) -> None:
         self._db.semantic_diff_jobs.update_one(
             {"_id": job_id},
             {"$set": {"status": "completed", "completed_at": datetime.now(UTC)}},
         )
 
-    def mark_job_failed(self, job_id, error_msg: str) -> None:
+    def mark_job_failed(self, job_id: Any, error_msg: str) -> None:
         self._db.semantic_diff_jobs.update_one(
             {"_id": job_id},
             {

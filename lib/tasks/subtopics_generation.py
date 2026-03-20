@@ -2,6 +2,7 @@
 Subtopics generation task - generates subtopics for existing topics.
 """
 import re
+from typing import Any
 
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt.cache import CachingLLMCallable
@@ -10,36 +11,47 @@ from txt_splitt.cache import CachingLLMCallable
 class _LLMAdapter:
     """Adapter for LLamaCPP to txt_splitt LLMCallable protocol."""
 
-    def __init__(self, client):
-        self._client = client
+    def __init__(self, client: Any) -> None:
+        self._client: Any = client
 
     @property
-    def model_id(self):
+    def model_id(self) -> str | None:
         return getattr(self._client, "model_id", None)
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         return self._client.call([prompt], temperature=temperature)
 
 
-def _cache_namespace(base_namespace, llm_client):
-    model_id = getattr(llm_client, "model_id", "unknown")
+def _cache_namespace(base_namespace: str, llm_client: Any) -> str:
+    model_id: str = getattr(llm_client, "model_id", "unknown")
     return f"{base_namespace}:{model_id}"
 
 
-def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, cached_llm):
+def generate_subtopics_for_topic(
+    topic_name: str,
+    sentences: list[str],
+    sentence_indices: list[int],
+    cached_llm: Any,
+) -> list[dict[str, Any]]:
     """
     Generate subtopics for a specific topic.
 
     Args:
+        topic_name: Name of the topic.
+        sentences: List of sentence texts.
+        sentence_indices: List of sentence indices.
         cached_llm: An LLMCallable (possibly wrapped with CachingLLMCallable).
+
+    Returns:
+        List of subtopic dictionaries.
     """
     if not sentences or topic_name == "no_topic":
         return []
 
-    numbered_sentences = [
+    numbered_sentences: list[str] = [
         f"{sentence_indices[i]}. {sentences[i]}" for i in range(len(sentences))
     ]
-    sentences_text = "\n".join(numbered_sentences)
+    sentences_text: str = "\n".join(numbered_sentences)
 
     prompt_template = """Group the following sentences into detailed sub-chapters for the topic "{topic_name}".
 - For each sub-chapter, specify which sentences belong to it.
@@ -85,7 +97,12 @@ Sentences:
     return subtopics
 
 
-def process_subtopics_generation(submission: dict, db, llm, cache_store=None):
+def process_subtopics_generation(
+    submission: dict[str, Any],
+    db: Any,
+    llm: Any,
+    cache_store: Any | None = None,
+) -> None:
     """
     Process subtopics generation for a submission.
 
@@ -95,7 +112,7 @@ def process_subtopics_generation(submission: dict, db, llm, cache_store=None):
         llm: LLamaCPP client instance.
         cache_store: Optional MongoLLMCacheStore instance.
     """
-    submission_id = submission["submission_id"]
+    submission_id: str = submission["submission_id"]
     results = submission.get("results", {})
 
     sentences = results.get("sentences", [])

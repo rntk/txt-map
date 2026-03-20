@@ -3,10 +3,13 @@ Prefix tree (compressed radix trie) task - builds a trie of all words in the tex
 """
 import re
 from collections import defaultdict
+from typing import Any
 
 
-def process_prefix_tree(submission, db, llm):
-    sentences = submission["results"].get("sentences", [])
+def process_prefix_tree(
+    submission: dict[str, Any], db: Any, llm: Any
+) -> None:
+    sentences: list[str] = submission["results"].get("sentences", [])
     tree = build_compressed_trie(sentences)
     db.submissions.update_one(
         {"submission_id": submission["submission_id"]},
@@ -14,9 +17,11 @@ def process_prefix_tree(submission, db, llm):
     )
 
 
-def build_compressed_trie(sentences):
+def build_compressed_trie(sentences: list[str]) -> dict[str, Any]:
     # 1. Count words and their sentence positions (1-indexed)
-    word_data = defaultdict(lambda: {"count": 0, "sentences": set()})
+    word_data: defaultdict[str, dict[str, Any]] = defaultdict(
+        lambda: {"count": 0, "sentences": set()}
+    )
     for i, sentence in enumerate(sentences, 1):
         words = re.findall(r"[a-zA-Z']+", sentence.lower())
         for word in words:
@@ -41,7 +46,7 @@ def build_compressed_trie(sentences):
     return root["children"]
 
 
-def _compress_node(node):
+def _compress_node(node: dict[str, Any]) -> None:
     """Compress single-child intermediate nodes by merging their labels (in-place)."""
     # Recursively compress all children first
     for child in node["children"].values():

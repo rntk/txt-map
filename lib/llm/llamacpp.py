@@ -9,7 +9,15 @@ from lib.llm.base import LLMClient
 
 
 class LLamaCPP(LLMClient):
-    def __init__(self, host: str, model: str = "moonshotai/Kimi-K2.5", max_context_tokens: int = 11000, token: Optional[str] = None, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(
+        self,
+        host: str,
+        model: str = "moonshotai/Kimi-K2.5",
+        max_context_tokens: int = 11000,
+        token: Optional[str] = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> None:
         super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
         u = urlparse(host)
         self.__host = u.netloc
@@ -119,7 +127,7 @@ class LLamaCPP(LLMClient):
         finally:
             conn.close()
 
-    def rerank(self, query: str, documents: List[str], top_n: int = None) -> Optional[List[Dict[str, Any]]]:
+    def rerank(self, query: str, documents: List[str], top_n: Optional[int] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Reranks documents according to their relevance to the query.
 

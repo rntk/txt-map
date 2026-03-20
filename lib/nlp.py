@@ -5,7 +5,7 @@ and stop-word removal.
 
 import re
 import collections
-from typing import List
+from typing import List, Dict, Any
 
 import nltk
 from nltk.tokenize import word_tokenize
@@ -74,7 +74,7 @@ def _wordnet_pos(treebank_tag: str) -> str:
     return WN_NOUN  # default (covers NN, NNS, NNP, …)
 
 
-def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[dict]:
+def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[Dict[str, Any]]:
     """
     Tokenise, POS-tag, lemmatise, and count words across all *texts*.
 

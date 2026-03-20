@@ -21,7 +21,7 @@ class FontThresholds:
 class PDFToSemanticHTML:
     """Convert PDF to semantic HTML with proper heading and text tags."""
 
-    def __init__(self, pdf_bytes: bytes):
+    def __init__(self, pdf_bytes: bytes) -> None:
         self.doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         self.font_thresholds = self._analyze_font_sizes()
 
@@ -188,7 +188,7 @@ class PDFToSemanticHTML:
 
         return full_html
 
-    def close(self):
+    def close(self) -> None:
         """Close the document and release resources."""
         self.doc.close()
 

@@ -5,17 +5,23 @@ from lib.storage.submissions import SubmissionsStorage
 import hashlib
 from datetime import datetime, UTC
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Any, Dict
 
 
-def normalize_topic(topic_name):
+def normalize_topic(topic_name: str) -> str:
     """
     Normalize topic name to avoid duplicates due to case, spaces vs underscores, etc.
     """
     return re.sub(r'[^a-z0-9]+', '_', topic_name.lower()).strip('_')
 
 
-def generate_subtopics_for_topic(topic_name, sentences, sentence_indices, llm, cache_collection):
+def generate_subtopics_for_topic(
+    topic_name: str,
+    sentences: List[str],
+    sentence_indices: List[int],
+    llm: Any,
+    cache_collection: Any
+) -> List[Dict[str, Any]]:
     """
     Generate subtopics for a specific chapter/topic.
     
@@ -141,7 +147,10 @@ def parse_llm_ranges(response: str) -> List[Tuple[str, int, int]]:
     return ranges
 
 
-def normalize_topic_ranges(topic_ranges: List[Tuple[str, int, int]], max_index: int) -> List[Tuple[str, int, int]]:
+def normalize_topic_ranges(
+    topic_ranges: List[Tuple[str, int, int]],
+    max_index: int
+) -> List[Tuple[str, int, int]]:
     """
     Clamp, order, and fill gaps to ensure continuous coverage.
     Uses 0-based sentence indices.
@@ -178,7 +187,7 @@ def normalize_topic_ranges(topic_ranges: List[Tuple[str, int, int]], max_index: 
     return normalized
 
 
-def process_topic_extraction(submission: dict, db, llm):
+def process_topic_extraction(submission: Dict[str, Any], db: Any, llm: Any) -> None:
     """
     Process topic extraction task using sentence tagging approach.
 

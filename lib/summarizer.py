@@ -1,7 +1,13 @@
 import hashlib
 from datetime import datetime, UTC
+from typing import List, Tuple, Dict, Any
 
-def summarize_by_sentence_groups(sent_list, llm_client, cache_collection, max_groups_tokens_buffer=400):
+def summarize_by_sentence_groups(
+    sent_list: List[str],
+    llm_client: Any,
+    cache_collection: Any,
+    max_groups_tokens_buffer: int = 400
+) -> Tuple[List[str], List[Dict[str, Any]]]:
     """
     Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
     summaries equals the number of sentence groups. Each summary gets a mapping to its single

@@ -1,14 +1,15 @@
 import logging
-from typing import Optional, List, Iterator
+from typing import Optional, List, Iterator, Any, Set
 
-from pymongo import MongoClient, DESCENDING, UpdateMany
+from pymongo import DESCENDING, UpdateMany
+from pymongo.database import Database
 
 
 class PostsStorage:
-    indexes = ["owner", "category_id", "feed_id", "read", "tags", "pid"]
+    indexes: List[str] = ["owner", "category_id", "feed_id", "read", "tags", "pid"]
 
-    def __init__(self, db: MongoClient) -> None:
-        self._db: MongoClient = db
+    def __init__(self, db: Database) -> None:
+        self._db: Database = db
         self._log = logging.getLogger("posts")
 
     def prepare(self) -> None:
@@ -25,9 +26,9 @@ class PostsStorage:
         owner: str,
         only_unread: Optional[bool] = None,
         category: str = "",
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
-        query = {"owner": owner}
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner}
         if category:
             query["category_id"] = category
 
@@ -43,9 +44,9 @@ class PostsStorage:
         self,
         owner: str,
         only_unread: Optional[bool] = None,
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
-        query = {"owner": owner}
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner}
         if only_unread is not None:
             query["read"] = not only_unread
 
@@ -53,8 +54,8 @@ class PostsStorage:
 
     def get_grouped_stat(
         self, owner: str, only_unread: Optional[bool] = None
-    ) -> Iterator[dict]:
-        query = {"owner": owner}
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner}
         if only_unread is not None:
             query["read"] = not only_unread
 
@@ -76,12 +77,12 @@ class PostsStorage:
         owner: str,
         tags: list,
         only_unread: Optional[bool] = None,
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
         """
         TODO: may be need change condition from 'tags': {'$all': tags} to 'tags': {'$elemMAtch': {'$in': tags}}
         """
-        query = {"owner": owner, "tags": {"$all": tags}}
+        query: dict[str, Any] = {"owner": owner, "tags": {"$all": tags}}
         if only_unread is not None:
             query["read"] = not only_unread
         sort_data = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
@@ -93,9 +94,9 @@ class PostsStorage:
         owner: str,
         tags: list,
         only_unread: Optional[bool] = None,
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
-        query = {"owner": owner, "bi_grams": {"$all": tags}}
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner, "bi_grams": {"$all": tags}}
         if only_unread is not None:
             query["read"] = not only_unread
         sort_data = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
@@ -107,9 +108,9 @@ class PostsStorage:
         owner: str,
         feed_id: str,
         only_unread: Optional[bool] = None,
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
-        query = {"owner": owner, "feed_id": feed_id}
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner, "feed_id": feed_id}
         if only_unread is not None:
             query["read"] = not only_unread
             sort = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
@@ -119,23 +120,23 @@ class PostsStorage:
         return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort)
 
     def get_by_pid(
-        self, owner: str, pid: int, projection: Optional[dict] = None
-    ) -> Optional[dict]:
+        self, owner: str, pid: int, projection: Optional[dict[str, Any]] = None
+    ) -> Optional[dict[str, Any]]:
         query = {"owner": owner, "pid": pid}
 
         return self._db.posts.find_one(query, projection=projection)
 
     def get_by_id(
-            self, owner: str, pid: int, projection: Optional[dict] = None
-    ) -> Optional[dict]:
+            self, owner: str, pid: int, projection: Optional[dict[str, Any]] = None
+    ) -> Optional[dict[str, Any]]:
         query = {"owner": owner, "id": pid}
 
         return self._db.posts.find_one(query, projection=projection)
 
     def get_by_pids(
-        self, owner: str, pids: List[int], projection: Optional[dict] = None
-    ) -> Iterator[dict]:
-        query = {"owner": owner, "pid": {"$in": pids}}
+        self, owner: str, pids: List[int], projection: Optional[dict[str, Any]] = None
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {"owner": owner, "pid": {"$in": pids}}
 
         return self._db.posts.find(query, projection=projection)
 
@@ -145,7 +146,7 @@ class PostsStorage:
 
         return True
 
-    def get_stat(self, owner: str) -> dict:
+    def get_stat(self, owner: str) -> dict[str, Any]:
         result = {"unread": 0, "read": 0, "tags": 0}
         cursor = self._db.posts.aggregate(
             [
@@ -162,7 +163,7 @@ class PostsStorage:
 
         return result
 
-    def set_clusters(self, owner: str, similars: dict) -> bool:
+    def set_clusters(self, owner: str, similars: dict[str, Any]) -> bool:
         updates = [
             UpdateMany(
                 {"owner": owner, "pid": {"$in": list(ids)}},
@@ -181,9 +182,9 @@ class PostsStorage:
         owner: str,
         clusters: list,
         only_unread: Optional[bool] = None,
-        projection: Optional[dict] = None,
-    ) -> Iterator[dict]:
-        query = {
+        projection: Optional[dict[str, Any]] = None,
+    ) -> Iterator[dict[str, Any]]:
+        query: dict[str, Any] = {
             "owner": owner,
             "clusters": {"$exists": True, "$elemMatch": {"$in": clusters}},
         }
@@ -193,8 +194,8 @@ class PostsStorage:
 
         return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort_data)
 
-    def get_clusters(self, posts: List[dict]) -> set:
-        result = set()
+    def get_clusters(self, posts: List[dict[str, Any]]) -> Set[Any]:
+        result: Set[Any] = set()
         field = "clusters"
         for post in posts:
             if (field in post) and post[field]:
