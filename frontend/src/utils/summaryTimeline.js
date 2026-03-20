@@ -135,7 +135,8 @@ export function buildSummaryTimelineItems(summaryEntries, summaryMappings, topic
       topLevelLabel,
       subtopicLabel,
       showSectionLabel,
-      topicColor: topLevelLabel ? getTopicColorTokens(topLevelLabel) : null
+      topicColor: topLevelLabel ? getTopicColorTokens(topLevelLabel) : null,
+      topicName: chosenTopic ? chosenTopic.topic.name : null
     };
   });
 }

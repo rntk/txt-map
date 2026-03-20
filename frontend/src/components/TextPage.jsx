@@ -154,10 +154,11 @@ function TextPage() {
     }
   }, [showPanel, panelTopic]);
 
-  const handleSummaryClick = useCallback((mapping, article) => {
+  const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
       setSummaryModalTopic({
-        displayName: 'Source Sentences',
+        displayName: topicName || 'Source Sentences',
+        fullPath: topicName || null,
         sentenceIndices: mapping.source_sentences,
         _summarySentence: mapping.summary_sentence,
         _sentences: article.sentences,
@@ -584,6 +585,7 @@ function TextPage() {
               handleSummaryClick={handleSummaryClick}
               articles={articles}
               onClose={closeFullscreenGraph}
+              onShowInArticle={handleShowInArticle}
             />
           )}
 

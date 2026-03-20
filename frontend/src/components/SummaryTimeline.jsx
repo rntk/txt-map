@@ -10,6 +10,7 @@ function SummaryTimeline({
   handleSummaryClick,
   articles,
   onClose,
+  onShowInArticle,
 }) {
   return (
     <FullScreenGraph title="Topic Summaries" onClose={onClose}>
@@ -59,7 +60,7 @@ function SummaryTimeline({
                           {' '}
                           <button
                             className="summary-source-link"
-                            onClick={() => handleSummaryClick(item.mapping, articles[0])}
+                            onClick={() => handleSummaryClick(item.mapping, articles[0], item.topicName)}
                             title="View source sentences"
                           >
                             [source]
@@ -80,6 +81,7 @@ function SummaryTimeline({
             topic={summaryModalTopic}
             sentences={summaryModalTopic._sentences}
             onClose={closeSummaryModal}
+            onShowInArticle={onShowInArticle}
             headerExtra={
               <div>
                 <strong>Summary:</strong> {summaryModalTopic._summarySentence}
