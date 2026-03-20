@@ -117,6 +117,41 @@ Interactive docs:
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
 
+## Testing and Linting
+
+### Backend Tests
+
+```bash
+./test.sh                    # Run all backend tests once
+./test.sh tests/unit/...     # Run a specific test file
+./test.sh --coverage         # With terminal coverage output
+./test.sh --rebuild          # Rebuild backend test image first when using Docker Compose
+```
+
+`./test.sh` runs directly inside containers when local test dependencies are available, and otherwise uses the Docker Compose test stack.
+
+### Frontend Tests
+
+```bash
+./frontend-test.sh                    # Run all frontend tests once
+./frontend-test.sh src/App.test.jsx   # Run a specific test target
+./frontend-test.sh --coverage         # With coverage report
+./frontend-test.sh --rebuild          # Rebuild image and refresh cached deps when using Docker
+```
+
+`./frontend-test.sh` runs directly inside containers when local Node tooling is available, and otherwise uses Docker.
+
+### Linting and Formatting
+
+```bash
+./lint.sh                # Run all lint checks
+./lint.sh check backend  # Backend lint checks only
+./lint.sh fix frontend   # Auto-fix frontend lint issues
+./lint.sh format         # Format backend and frontend code
+```
+
+`./lint.sh` runs local tools directly inside containers when available, and only falls back to Docker for backend linting if `ruff` is not installed on the host.
+
 ## Notes
 
 - For Docker usage and service lifecycle commands, use `Docker-README.md`.

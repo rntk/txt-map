@@ -9,3 +9,6 @@ pytest-cov>=4.1.0
 pytest-xdist>=3.5.0
 mongomock>=4.1.0
 httpx>=0.26.0
+
+# Linting and formatting
+ruff>=0.4.0

@@ -4,24 +4,20 @@
 
 ### Using the helper script (recommended)
 ```bash
-# Run all tests
+# Run all backend tests once
 ./test.sh
 
 # Run specific test file
 ./test.sh tests/unit/test_submission_handler.py
 
-# Run with verbose output
-./test.sh -v
-
 # Run with coverage report
-./test.sh --cov=. --cov-report=html
+./test.sh --coverage
 
-# Run specific test class
-./test.sh tests/unit/test_submission_handler.py::TestPostSubmit -v
-
-# Run tests matching a keyword
-./test.sh -k "submission" -v
+# Rebuild the backend test image first
+./test.sh --rebuild
 ```
+
+The helper runs `pytest` directly when executed inside a container with local dependencies available. On host environments it falls back to the Docker Compose test stack.
 
 ## Test Dependencies
 
@@ -56,10 +52,10 @@ docker run --rm -v $(pwd):/app rss-tests pytest --cov=. --cov-report=html
 docker-compose -f docker-compose.test.yml run --rm tests
 
 # Run specific tests
-docker-compose -f docker-compose.test.yml run --rm tests pytest tests/unit/test_workers.py -v
+docker-compose -f docker-compose.test.yml run --rm tests pytest --tb=short tests/unit/test_workers.py
 
 # Run with coverage
-docker-compose -f docker-compose.test.yml run --rm tests pytest --cov=. --cov-report=html
+docker-compose -f docker-compose.test.yml run --rm tests pytest --tb=short --cov=. --cov-report=term-missing
 ```
 
 ## Test Structure
@@ -115,50 +111,31 @@ tests/
 | Workers | 80%+ |
 | Overall | 85%+ |
 
-## Generate Coverage Report
+## Coverage
 
 ```bash
-# HTML report
-./test.sh --cov=. --cov-report=html
-# Open htmlcov/index.html in browser
-
-# Terminal report
-./test.sh --cov=. --cov-report=term
-
-# XML report (for CI/CD)
-./test.sh --cov=. --cov-report=xml
+./test.sh --coverage
 ```
 
-## Parallel Test Execution
+## Advanced Pytest Usage
 
 ```bash
-# Run tests in parallel using 4 CPUs
-./test.sh -n 4
+# Run a specific test class directly
+pytest tests/unit/test_submission_handler.py::TestPostSubmit -v
 
-# Auto-detect CPU count
-./test.sh -n auto
+# Run tests matching a keyword directly
+pytest -k "submission" -v
+
+# Run parallel tests directly
+pytest -n auto
 ```
-
-## Common Pytest Options
-
-| Option | Description |
-|--------|-------------|
-| `-v` | Verbose output |
-| `-x` | Stop on first failure |
-| `--tb=short` | Shorter traceback |
-| `-k "pattern"` | Run tests matching pattern |
-| `--cov=.` | Coverage for current directory |
-| `--cov-report=html` | HTML coverage report |
-| `-n auto` | Parallel execution |
-| `--maxfail=5` | Stop after 5 failures |
-| `-q` | Quiet mode |
 
 ## Troubleshooting
 
 ### Tests fail with MongoDB connection error
-Use Docker Compose which includes MongoDB:
+Use the helper script or Docker Compose, both of which include MongoDB:
 ```bash
-docker-compose -f docker-compose.test.yml run --rm tests
+./test.sh
 ```
 
 ### Tests fail due to missing NLTK data

@@ -1,38 +1,93 @@
 #!/bin/bash
-# Helper script to run tests in Docker
+# Helper script to run backend tests directly in-container when possible,
+# otherwise in the compose-backed test environment.
 # Usage:
-#   ./test.sh                    # Run all tests
-#   ./test.sh -v                 # Run all tests with verbose output
-#   ./test.sh tests/unit/test_submission_handler.py  # Run specific test file
-#   ./test.sh --cov=.            # Run with coverage
-#   ./test.sh --cov-report=html  # Generate HTML coverage report
-#   ./test.sh --rebuild          # Force rebuild the test image, then run tests
+#   ./test.sh                                     # Run all backend tests once
+#   ./test.sh tests/unit/test_submission_handler.py
+#   ./test.sh --coverage
+#   ./test.sh --rebuild tests/unit/test_workers.py
 
-set -e
+set -euo pipefail
 
-IMAGE_NAME="rss-tests"
-PROJECT_DIR="$(pwd)"
+usage() {
+    cat <<'EOF'
+Usage: ./test.sh [--coverage] [--rebuild] [test-target...]
 
-# Check for --rebuild flag
+Options:
+  --coverage  Run with terminal coverage output.
+  --rebuild   Rebuild the backend test image before running.
+
+Examples:
+  ./test.sh
+  ./test.sh tests/unit/test_submission_handler.py
+  ./test.sh --coverage
+  ./test.sh --rebuild tests/unit/test_workers.py
+EOF
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.test.yml"
+
 REBUILD=false
-ARGS=()
+COVERAGE=false
+TARGETS=()
+
 for arg in "$@"; do
-    if [ "$arg" = "--rebuild" ]; then
-        REBUILD=true
-    else
-        ARGS+=("$arg")
-    fi
+    case "$arg" in
+        --rebuild)
+            REBUILD=true
+            ;;
+        --coverage)
+            COVERAGE=true
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            TARGETS+=("$arg")
+            ;;
+    esac
 done
 
-# Build the test image if it doesn't exist or --rebuild was requested
-if $REBUILD || ! docker images "$IMAGE_NAME" --format '{{.Repository}}' | grep -q "$IMAGE_NAME"; then
-    echo "Building test image..."
-    docker build -f Dockerfile.tests -t "$IMAGE_NAME" .
+PYTEST_ARGS=(--tb=short)
+if $COVERAGE; then
+    PYTEST_ARGS+=(--cov=. --cov-report=term-missing)
+fi
+if [ ${#TARGETS[@]} -gt 0 ]; then
+    PYTEST_ARGS+=("${TARGETS[@]}")
 fi
 
-# Run tests with mounted volume
-docker run --rm \
-    -v "$PROJECT_DIR:/app" \
-    -w /app \
-    "$IMAGE_NAME" \
-    pytest "${ARGS[@]}"
+run_direct=false
+if command -v pytest >/dev/null 2>&1; then
+    if [ -f "/.dockerenv" ]; then
+        run_direct=true
+    elif ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+        run_direct=true
+    fi
+fi
+
+if $run_direct; then
+    if $REBUILD; then
+        echo "--rebuild is ignored in direct mode." >&2
+    fi
+    (cd "$PROJECT_DIR" && PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" pytest "${PYTEST_ARGS[@]}")
+    exit 0
+fi
+
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+else
+    echo "Neither direct pytest nor Docker Compose is available to run backend tests." >&2
+    exit 1
+fi
+
+if $REBUILD; then
+    echo "Rebuilding backend test image..."
+    "${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" build tests
+fi
+
+"${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" run --rm tests pytest "${PYTEST_ARGS[@]}"

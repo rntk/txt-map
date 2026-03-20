@@ -40,11 +40,45 @@ npm test -- --watchAll=false
 npm run test:coverage
 ```
 
+Using the helper script (recommended):
+
+```bash
+# From /app directory
+./frontend-test.sh                    # Run all tests once
+./frontend-test.sh src/App.test.jsx   # Run a specific test target
+./frontend-test.sh --coverage         # Run with coverage report
+./frontend-test.sh --rebuild          # Rebuild image and refresh cached deps when using Docker
+```
+
+The helper runs tests directly inside agent/container environments when local Node tooling is available, and otherwise uses Docker.
+
 Current tests include (22 test files):
 
 - **Components**: `ArticleStructureChart`, `CircularPackingChart`, `RadarChart`, `TextDisplay`, `TextPage`, `TopicList`, `TopicsBarChart`, `TopicsRiverChart`, `App`, and shared components (`RefreshButton`, `TopicLevelSwitcher`)
 - **Hooks**: `useGlobalChartData`, `useTooltip`
 - **Utils**: `chartConstants`, `diffRowBuilder`, `diffUtils`, `gridUtils`, `sanitize`, `summaryMatcher`, `summaryTimeline`, `textHighlight`, `topicTree`
+
+## Linting and Formatting
+
+From `/app/frontend`:
+
+```bash
+npm run lint          # Run ESLint
+npm run lint:fix      # Auto-fix ESLint issues
+npm run format        # Run Prettier formatting
+```
+
+Using the helper script (recommended):
+
+```bash
+# From /app directory
+./lint.sh                # Run all lint checks
+./lint.sh check frontend # Frontend lint checks only
+./lint.sh fix frontend   # Auto-fix frontend lint issues
+./lint.sh format         # Format backend and frontend code
+```
+
+The helper runs local tools directly inside agent/container environments when available.
 
 ## Dockerized Frontend Tests
 
@@ -54,12 +88,11 @@ Build and run from `/app`:
 
 ```bash
 docker build -f frontend/Dockerfile.test -t frontend-tests .
-docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests
+./frontend-test.sh --rebuild
 ```
 
-To run non-coverage test mode in the same image:
+For uncommon Vitest flags, run directly from `/app/frontend`:
 
 ```bash
-docker run --rm -v "$(pwd)/frontend:/app/frontend" frontend-tests \
-  sh -lc "npm install && npm test -- --watchAll=false"
+npm test -- --watchAll=false
 ```
