@@ -45,6 +45,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/")
 @app.get("/page/menu")
 @app.get("/page/text/{submission_id}")
+@app.get("/page/word/{submission_id}/{word}")
 @app.get("/page/tasks")
 @app.get("/page/texts")
 @app.get("/page/diff")

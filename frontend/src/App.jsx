@@ -6,6 +6,7 @@ import MainPage from './components/MainPage';
 import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
 import TextPage from './components/TextPage';
+import WordPage from './components/WordPage';
 import './styles/App.css';
 
 const navigationItems = [
@@ -53,6 +54,11 @@ const routeMeta = {
     title: 'Text Analysis',
     subtitle: 'Read the article, inspect summaries, and navigate topics in one focused layout.'
   },
+  word: {
+    eyebrow: 'Submission detail',
+    title: 'Word Analysis',
+    subtitle: 'Analyze topics, summaries, and contexts containing exactly this word.'
+  },
   notFound: {
     eyebrow: 'Navigation',
     title: 'Page not found',
@@ -68,6 +74,7 @@ const PAGE_COMPONENTS = {
   text: TextPage,
   texts: TextListPage,
   topics: GlobalTopicsPage,
+  word: WordPage,
 };
 
 function getSaveHintText(saveState, settings) {

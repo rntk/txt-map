@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple, Set
+import re
 
 from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
@@ -258,12 +259,14 @@ def post_refresh(
 @router.get("/submission/{submission_id}/word-cloud")
 def get_word_cloud(
     path: List[str] = Query(default=[]),
+    word: Optional[str] = Query(default=None),
     top_n: int = Query(default=60, ge=1, le=200),
     submission: dict = Depends(require_submission),
 ) -> Dict[str, Any]:
     """
-    Return a word-frequency cloud for the sentences that belong to topics
-    matching *path* (a hierarchical list of topic segments, e.g. ["Sport", "Tennis"]).
+    Return a word-frequency cloud for the sentences. If *word* is provided,
+    it filters for sentences containing that word. Otherwise, it filters by *path*
+    (a hierarchical list of topic segments, e.g. ["Sport", "Tennis"]).
     """
     results = submission.get("results") or {}
     topics = results.get("topics") or []
@@ -272,16 +275,24 @@ def get_word_cloud(
     if not sentences:
         return {"words": [], "sentence_count": 0}
 
-    # Collect sentence indices from matching topics
+    # Collect sentence indices
     sentence_indices: Set[int] = set()
-    for topic in topics:
-        name = topic.get("name", "")
-        parts = [p.strip() for p in name.split(">")]
-        
-        # Check if topic matches hierarchical path
-        if len(parts) >= len(path) and all(parts[i] == path[i] for i in range(len(path))):
-            for idx in (topic.get("sentences") or []):
-                sentence_indices.add(int(idx))
+    
+    if word:
+        # Regex to match exact word with boundaries, case-insensitive
+        pattern = re.compile(rf'\b{re.escape(word)}\b', re.IGNORECASE)
+        for idx, sentence in enumerate(sentences):
+            if pattern.search(sentence):
+                sentence_indices.add(idx + 1)
+    else:
+        for topic in topics:
+            name = topic.get("name", "")
+            parts = [p.strip() for p in name.split(">")]
+            
+            # Check if topic matches hierarchical path
+            if len(parts) >= len(path) and all(parts[i] == path[i] for i in range(len(path))):
+                for idx in (topic.get("sentences") or []):
+                    sentence_indices.add(int(idx))
 
     filtered_texts = [
         sentences[idx - 1]

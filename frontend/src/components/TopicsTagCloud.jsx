@@ -226,7 +226,7 @@ function getSentenceIndicesForPath(topics, navPath) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-function TopicsTagCloud({ submissionId, topics, sentences }) {
+function TopicsTagCloud({ submissionId, topics, sentences, forcedPathQuery }) {
   const [navPath, setNavPath] = useState([]);
   const [selectedKeyword, setSelectedKeyword] = useState(null);
 
@@ -264,10 +264,16 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
   const fetchWordCloud = useCallback(async (path) => {
     setLoadingCloud(true);
     try {
-      const params = new URLSearchParams();
-      path.forEach(seg => params.append('path', seg));
+      let queryStr = '';
+      if (forcedPathQuery) {
+        queryStr = forcedPathQuery;
+      } else {
+        const params = new URLSearchParams();
+        path.forEach(seg => params.append('path', seg));
+        queryStr = params.toString();
+      }
       const res = await fetch(
-        `/api/submission/${submissionId}/word-cloud?${params}`
+        `/api/submission/${submissionId}/word-cloud?${queryStr}`
       );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -280,7 +286,7 @@ function TopicsTagCloud({ submissionId, topics, sentences }) {
     } finally {
       setLoadingCloud(false);
     }
-  }, [submissionId]);
+  }, [submissionId, forcedPathQuery]);
 
   useEffect(() => {
     fetchWordCloud(navPath);

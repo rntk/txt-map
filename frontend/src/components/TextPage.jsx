@@ -15,6 +15,7 @@ import SummarySourceMenu from './SummarySourceMenu';
 import TopicSentencePanel from './TopicSentencePanel';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
+import { useTextSelection } from '../hooks/useTextSelection';
 import { getTopicSelectionKey } from '../utils/chartConstants';
 import { useTextPageData } from '../hooks/useTextPageData';
 import '../styles/App.css';
@@ -75,6 +76,8 @@ function TextPage() {
     toggleRead,
     toggleReadAll: toggleReadAllBase,
   } = useSubmission(submissionId);
+
+  const { selectionData, clearSelection } = useTextSelection();
 
   const {
     safeTopics: _safeTopics,
@@ -625,6 +628,30 @@ function TextPage() {
           sentences={summaryModalTopic._sentences || safeSentences}
           onClose={closeSummaryModal}
         />
+      )}
+
+      {selectionData && (
+        <div style={{
+          position: 'fixed',
+          left: selectionData.position.x,
+          top: selectionData.position.y,
+          transform: 'translate(-50%, -100%)',
+          zIndex: 1000,
+          background: '#1976d2',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+        }}>
+          <button 
+            style={{ color: '#fff', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.location.href = `/page/word/${submissionId}/${encodeURIComponent(selectionData.word)}`;
+            }}
+          >
+            Explore Word: "{selectionData.word}"
+          </button>
+        </div>
       )}
     </div>
   );
