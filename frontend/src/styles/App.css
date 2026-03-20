@@ -4959,6 +4959,8 @@ textarea {
 .action-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(22, 22, 20, 0.14);
+  background: var(--shell-accent);
+  color: var(--shell-accent-contrast);
 }
 
 .task-danger {
@@ -5160,6 +5162,8 @@ textarea {
 .text-list-link:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(22, 22, 20, 0.12);
+  background: var(--shell-accent);
+  color: var(--shell-accent-contrast);
 }
 
 .text-list-actions {
