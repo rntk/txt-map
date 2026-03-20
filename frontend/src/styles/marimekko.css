@@ -56,38 +56,3 @@
 .marimekko-breadcrumb-separator {
   color: #999;
 }
-
-.marimekko-nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  flex-wrap: wrap;
-}
-
-.marimekko-nav-btn {
-  padding: 6px 16px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: #555;
-  background-color: #e9ecef;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.marimekko-nav-btn:hover:not(:disabled) {
-  background-color: #dee2e6;
-}
-
-.marimekko-nav-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.marimekko-nav-info {
-  font-size: 13px;
-  color: #666;
-}
