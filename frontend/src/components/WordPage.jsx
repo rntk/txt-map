@@ -5,8 +5,6 @@ import CircularPackingChart from './CircularPackingChart';
 import TopicsTagCloud from './TopicsTagCloud';
 import SummaryTimeline from './SummaryTimeline';
 import TopicSentencesModal from './shared/TopicSentencesModal';
-import StatusIndicator from './shared/StatusIndicator';
-import RefreshButton from './shared/RefreshButton';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 
 const VIS_TABS = [
@@ -32,7 +30,6 @@ export default function WordPage() {
     submission,
     loading,
     error,
-    fetchSubmission,
     readTopics,
     toggleRead,
   } = useSubmission(submissionId);
@@ -148,20 +145,13 @@ export default function WordPage() {
 
   return (
     <div className="app word-page">
-      <div style={{ flex: '0 0 auto', padding: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
+      <div style={{ flex: '0 0 auto', padding: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', flexWrap: 'wrap' }}>
           <button onClick={() => navigate(`/page/text/${submissionId}`)} className="action-btn">
             ← Back to Article
           </button>
-          <h2>Word Analysis: <span style={{ color: '#1976d2' }}>"{word}"</span></h2>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-            <StatusIndicator tasks={submission.status?.tasks} />
-            <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={true} />
-          </div>
-        </div>
-
-        <div className="tab-bar" style={{ marginBottom: '15px' }}>
-          <div className="tab-group">
+          <h2>Sentences matching: <span style={{ color: '#1976d2' }}>"{word}"</span></h2>
+          <div className="tab-bar" style={{ marginBottom: 0, marginLeft: 'auto' }}>
             <div className="tabs">
               {VIS_TABS.map(tab => (
                 <button
@@ -177,18 +167,17 @@ export default function WordPage() {
         </div>
       </div>
 
-      <div className="container" style={{ padding: '0 15px 15px', display: 'block', height: 'auto', flex: 1 }}>
-        <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', height: '100%', overflowY: 'auto' }}>
+      <div className="container" style={{ padding: '0 5px 5px', display: 'block', height: 'auto', flex: 1 }}>
+        <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', height: '100%', overflowY: 'auto' }}>
           
           {activeTab === 'sentences' && (
             <div>
-              <h3>Sentences matching "{word}" ({sentencesInfo.length})</h3>
               {sentencesInfo.length === 0 ? (
                 <p style={{ color: '#666' }}>No occurrences of this word were found in the article.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '15px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
                   {sentencesInfo.map(({ index, text }) => (
-                    <div key={index} style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', borderLeft: '4px solid #1976d2' }}>
+                    <div key={index} style={{ padding: '6px', background: '#f8f9fa', borderRadius: '6px', borderLeft: '4px solid #1976d2' }}>
                       <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Sentence #{index + 1}</span>
                       </div>
