@@ -831,7 +831,7 @@ body {
 .task-page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   margin-bottom: 5px;
 }
@@ -3310,7 +3310,7 @@ textarea {
   position: sticky;
   top: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--shell-space-sm);
   padding: var(--shell-space-xs) var(--shell-space-lg);
@@ -3331,7 +3331,7 @@ textarea {
 
 .app-shell__topbar-actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.7rem;
   margin-left: auto;
