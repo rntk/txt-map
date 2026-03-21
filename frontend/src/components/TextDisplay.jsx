@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
@@ -9,7 +9,7 @@ const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -137,6 +137,14 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   // --- Tooltip state ---
   const { tooltip, lastTargetRef, showTooltip, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
+  const isDraggingRef = useRef(false);
+
+  const handleTextMouseDown = useCallback(() => {
+    isDraggingRef.current = true;
+    hideTooltip();
+    // Reset drag state when mouse is released anywhere (including outside this element)
+    document.addEventListener('mouseup', () => { isDraggingRef.current = false; }, { once: true });
+  }, [hideTooltip]);
 
   // Handler for toggling read status from tooltip
   const handleToggleRead = useCallback((topic) => {
@@ -169,6 +177,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   // Event delegation handler
   const handleMouseOver = useCallback((e) => {
+    if (isDraggingRef.current) return;
     if (!onToggleRead || !tooltipEnabled) return;
     const token = e.target.closest('.word-token, .sentence-token');
     if (!token) {
@@ -213,9 +222,13 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
 
     let meta = null;
+    const rawWord = token.textContent ? token.textContent.trim().replace(/[^a-zA-ZÀ-ÿ0-9\-']/g, '') : '';
+    const hoverWord = rawWord.length > 1 ? rawWord : null;
     if (token.dataset.sentenceIndex !== undefined) {
       const idx = Number(token.dataset.sentenceIndex);
-      meta = { sentenceIdx: idx, totalSentences: safeSentences.length };
+      meta = { sentenceIdx: idx, totalSentences: safeSentences.length, word: hoverWord };
+    } else {
+      meta = { word: hoverWord };
     }
 
     showTooltip(matchedTopics, x, y, meta);
@@ -298,6 +311,17 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                 </>
               )}
             </div>
+            {submissionId && tooltip.meta?.word && (
+              <div style={{ marginTop: '6px' }}>
+                <a
+                  className="text-topic-tooltip-btn"
+                  href={`/page/word/${submissionId}/${encodeURIComponent(tooltip.meta.word)}`}
+                  style={{ textDecoration: 'none', display: 'inline-block' }}
+                >
+                  Explore "{tooltip.meta.word}"
+                </a>
+              </div>
+            )}
           </div>
         );
       })}
@@ -327,6 +351,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         <div
           className="text-content"
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
+          onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
         />
@@ -340,6 +365,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       <div className="text-display">
         <div
           className="text-content"
+          onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
         >
@@ -380,6 +406,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     <div className="text-display">
       <div
         className="text-content"
+        onMouseDown={handleTextMouseDown}
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
       >

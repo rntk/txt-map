@@ -377,7 +377,6 @@ body {
 .sentence-token:hover {
   outline: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 2px;
-  cursor: pointer;
 }
 
 .sentence-token {

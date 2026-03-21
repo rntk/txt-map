@@ -572,6 +572,7 @@ function TextPage() {
                     onToggleTopic={toggleTopic}
                     onNavigateTopic={navigateTopicSentence}
                     tooltipEnabled={tooltipEnabled}
+                    submissionId={submissionId}
                   />
                 ))
               )}

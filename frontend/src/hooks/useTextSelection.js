@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook to detect and handle single-word text selection in the browser.
@@ -6,10 +6,23 @@ import { useState, useEffect, useCallback } from 'react';
  */
 export function useTextSelection() {
   const [selectionData, setSelectionData] = useState(null);
+  const timeoutRef = useRef(null);
 
-  const handleMouseUp = useCallback((e) => {
-    // We defer slightly to allow the browser to complete the selection
-    setTimeout(() => {
+  const handleMouseDown = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setSelectionData(null);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    // Delay to avoid accidental triggers and let the selection settle
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
       const selection = window.getSelection();
       const text = selection.toString();
 
@@ -20,12 +33,12 @@ export function useTextSelection() {
 
       if (match && match[1].length > 1) {
         const word = match[1];
-        
+
         // Get coordinates of the selection
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
-          
+
           // Position the tooltip slighty above the selection
           setSelectionData({
             word,
@@ -42,7 +55,7 @@ export function useTextSelection() {
       if (!text.trim() || !match) {
         setSelectionData(null);
       }
-    }, 10);
+    }, 300);
   }, []);
 
   const handleSelectionChange = useCallback(() => {
@@ -54,13 +67,16 @@ export function useTextSelection() {
   }, []);
 
   useEffect(() => {
+    document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('selectionchange', handleSelectionChange);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [handleMouseUp, handleSelectionChange]);
+  }, [handleMouseDown, handleMouseUp, handleSelectionChange]);
 
   const clearSelection = useCallback(() => {
     setSelectionData(null);
