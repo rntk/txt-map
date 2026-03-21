@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import OverviewPage from './OverviewPage';
 
 const mockSubmission = {
@@ -245,6 +245,134 @@ describe('OverviewPage', () => {
       render(<OverviewPage />);
       await screen.findByText('Valid narrative.');
       // unknown type renders nothing — no crash
+    });
+  });
+
+  describe('annotation layout extraction highlighting', () => {
+    const annotationSubmission = {
+      ...mockSubmission,
+      results: {
+        ...mockSubmission.results,
+        topics: [{ name: 'Topic A', sentences: [1, 2] }],
+        sentences: [
+          'Opening context sentence.',
+          'Revenue grew by 48% in Europe.',
+        ],
+        annotations: {
+          sentence_annotations: {
+            1: { importance: 'high', flags: ['definition'] },
+            2: { importance: 'normal', flags: ['data_point'] },
+          },
+          topic_annotations: {
+            'Topic A': {
+              reading_priority: 'optional',
+              recommended_sentences: [1],
+            },
+          },
+          data_extractions: [
+            {
+              label: 'Revenue growth',
+              source_sentences: [2],
+              values: [{ key: 'Europe', value: '48%' }],
+              display_suggestion: 'table',
+            },
+          ],
+          structural_suggestions: {
+            reading_order: ['Topic A'],
+            recommended_charts: [],
+          },
+        },
+      },
+    };
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+      global.fetch = vi.fn(async () => ({ ok: true, json: async () => annotationSubmission }));
+    });
+
+    it('shows a hidden-sentence hint on hover without revealing the sentence', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('Topic A');
+
+      const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
+      fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
+      const topicExtractionButton = within(topicCard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*48%/ });
+
+      expect(screen.queryByText('Revenue grew by 48% in Europe.')).not.toBeInTheDocument();
+      expect(topicExtractionButton).toHaveAttribute('title', '1 hidden source sentence. Click to reveal.');
+    });
+
+    it('reveals and locks the source sentence on click, then clears it on second click', async () => {
+      const { container } = render(<OverviewPage />);
+      await screen.findByText('Topic A');
+
+      const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
+      fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
+      const topicExtractionButton = within(topicCard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*48%/ });
+
+      fireEvent.mouseEnter(topicExtractionButton);
+      fireEvent.click(topicExtractionButton);
+      fireEvent.mouseLeave(topicExtractionButton);
+
+      expect(container.querySelector('.rg-sentence--active')).toHaveTextContent('Revenue grew by 48% in Europe.');
+      expect(container.querySelector('.rg-sentence__text-highlight')?.textContent).toBe('48%');
+
+      fireEvent.click(topicExtractionButton);
+
+      expect(screen.queryByText('Revenue grew by 48% in Europe.')).not.toBeInTheDocument();
+    });
+
+    it('shows a hint on hover from the global dashboard and reveals on click', async () => {
+      const { container } = render(<OverviewPage />);
+      await screen.findByText('Data Points');
+
+      const dashboard = screen.getByText('Data Points').closest('.rg-data-dashboard');
+      const dashboardExtractionButton = within(dashboard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*48%/ });
+
+      expect(screen.queryByText('Revenue grew by 48% in Europe.')).not.toBeInTheDocument();
+      expect(dashboardExtractionButton).toHaveAttribute('title', '1 hidden source sentence. Click to reveal.');
+      expect(screen.queryByText('Revenue grew by 48% in Europe.')).not.toBeInTheDocument();
+
+      fireEvent.click(dashboardExtractionButton);
+
+      expect(container.querySelector('.rg-sentence--active')).toHaveTextContent('Revenue grew by 48% in Europe.');
+    });
+
+    it('falls back to sentence-level highlighting when no exact substring match exists', async () => {
+      global.fetch = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          ...annotationSubmission,
+          results: {
+            ...annotationSubmission.results,
+            annotations: {
+              ...annotationSubmission.results.annotations,
+              data_extractions: [
+                {
+                  label: 'Revenue growth',
+                  source_sentences: [2],
+                  values: [{ key: 'Europe', value: '49%' }],
+                  display_suggestion: 'table',
+                },
+              ],
+            },
+          },
+        }),
+      }));
+
+      const { container } = render(<OverviewPage />);
+      await screen.findByText('Data Points');
+
+      const dashboard = screen.getByText('Data Points').closest('.rg-data-dashboard');
+      const dashboardExtractionButton = within(dashboard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*49%/ });
+
+      fireEvent.click(dashboardExtractionButton);
+      fireEvent.mouseEnter(dashboardExtractionButton);
+
+      const activeSentence = container.querySelector('.rg-sentence--active');
+      expect(activeSentence).not.toBeNull();
+      expect(activeSentence.textContent).toContain('Revenue grew by 48% in Europe.');
+      expect(container.querySelector('.rg-sentence__text-highlight')).toBeNull();
     });
   });
 

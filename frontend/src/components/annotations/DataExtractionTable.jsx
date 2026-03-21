@@ -1,14 +1,82 @@
 import React from 'react';
+import { buildExtractionKey } from '../../utils/extractionHighlight';
+
+/**
+ * @typedef {import('../../utils/extractionHighlight').DataExtraction} DataExtraction
+ */
+
+/**
+ * @typedef {Object} DataExtractionTableProps
+ * @property {DataExtraction[]} [extractions]
+ * @property {string[]} [sentences]
+ * @property {number[]} [topicSentences]
+ * @property {string|null} [activeExtractionKey]
+ * @property {Record<string, string>} [extractionHints]
+ * @property {(extractionKey: string) => void} [onExtractionHoverStart]
+ * @property {(extractionKey: string) => void} [onExtractionHoverEnd]
+ * @property {(extractionKey: string) => void} [onExtractionToggle]
+ */
+
+function handleExtractionKeyDown(event, extractionKey, onExtractionToggle) {
+  if (!onExtractionToggle) return;
+
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    onExtractionToggle(extractionKey);
+  }
+}
+
+function ExtractionActivator({
+  as = 'div',
+  className,
+  extractionKey,
+  isActive,
+  title,
+  onExtractionHoverStart,
+  onExtractionHoverEnd,
+  onExtractionToggle,
+  children,
+}) {
+  const Component = as;
+
+  return (
+    <Component
+      className={`${className}${isActive ? ' rg-extraction__activator--active' : ''}`}
+      onMouseEnter={() => onExtractionHoverStart?.(extractionKey)}
+      onMouseLeave={() => onExtractionHoverEnd?.(extractionKey)}
+      onFocus={() => onExtractionHoverStart?.(extractionKey)}
+      onBlur={() => onExtractionHoverEnd?.(extractionKey)}
+      onClick={() => onExtractionToggle?.(extractionKey)}
+      onKeyDown={(event) => handleExtractionKeyDown(event, extractionKey, onExtractionToggle)}
+      role="button"
+      tabIndex={0}
+      title={title}
+    >
+      {children}
+    </Component>
+  );
+}
 
 /**
  * Renders a single data extraction.
  * values[] are LLM-generated but grounding-checked server-side (each value
  * is verified to appear verbatim in its source sentences before storage).
  */
-function ExtractionItem({ extraction, sentences }) {
+function ExtractionItem({
+  extraction,
+  sentences,
+  activeExtractionKey,
+  extractionHints,
+  onExtractionHoverStart,
+  onExtractionHoverEnd,
+  onExtractionToggle,
+}) {
   const { label, values, source_sentences, display_suggestion } = extraction;
   const displayMode = display_suggestion || 'inline';
   const hasValues = Array.isArray(values) && values.length > 0;
+  const extractionKey = buildExtractionKey(extraction);
+  const isActive = extractionKey === activeExtractionKey;
+  const hintText = extractionHints?.[extractionKey] || '';
 
   // Fallback: if no grounded values survived, show the raw source sentences
   if (!hasValues) {
@@ -17,35 +85,62 @@ function ExtractionItem({ extraction, sentences }) {
       .filter((s) => s.text);
     if (sourceSentences.length === 0) return null;
     return (
-      <div className="rg-extraction rg-extraction--inline">
+      <ExtractionActivator
+        className="rg-extraction rg-extraction--inline"
+        extractionKey={extractionKey}
+        isActive={isActive}
+        title={hintText || undefined}
+        onExtractionHoverStart={onExtractionHoverStart}
+        onExtractionHoverEnd={onExtractionHoverEnd}
+        onExtractionToggle={onExtractionToggle}
+      >
         {label && <span className="rg-extraction__label">{label}: </span>}
         {sourceSentences.map(({ idx, text }) => (
           <span key={idx} className="rg-extraction__value">{text}</span>
         ))}
-      </div>
+      </ExtractionActivator>
     );
   }
 
   if ((displayMode === 'table' || displayMode === 'chart_bar') && values.length > 1) {
     return (
-      <div className="rg-extraction rg-extraction--table">
+      <ExtractionActivator
+        className="rg-extraction rg-extraction--table"
+        extractionKey={extractionKey}
+        isActive={isActive}
+        title={hintText || undefined}
+        onExtractionHoverStart={onExtractionHoverStart}
+        onExtractionHoverEnd={onExtractionHoverEnd}
+        onExtractionToggle={onExtractionToggle}
+      >
         {label && <div className="rg-extraction__label">{label}</div>}
         <table className="rg-extraction__table">
           <tbody>
             {values.map((v, i) => (
-              <tr key={i}>
+              <tr
+                key={i}
+                className={`rg-extraction__table-row${isActive ? ' rg-extraction__table-row--active' : ''}`}
+              >
                 {v.key && <td className="rg-extraction__table-key">{v.key}</td>}
                 <td className="rg-extraction__table-val">{v.value}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </ExtractionActivator>
     );
   }
 
   return (
-    <div className="rg-extraction rg-extraction--inline">
+    <ExtractionActivator
+      className="rg-extraction rg-extraction--inline"
+      extractionKey={extractionKey}
+      isActive={isActive}
+      title={hintText || undefined}
+      onExtractionHoverStart={onExtractionHoverStart}
+      onExtractionHoverEnd={onExtractionHoverEnd}
+      onExtractionToggle={onExtractionToggle}
+    >
       {label && <span className="rg-extraction__label">{label}: </span>}
       {values.map((v, i) => (
         <span key={i} className="rg-extraction__value">
@@ -53,7 +148,7 @@ function ExtractionItem({ extraction, sentences }) {
           {i < values.length - 1 ? ' · ' : ''}
         </span>
       ))}
-    </div>
+    </ExtractionActivator>
   );
 }
 
@@ -61,7 +156,19 @@ function ExtractionItem({ extraction, sentences }) {
  * Renders all data extractions for a topic (inline) or the full data dashboard.
  * Pass topicSentences to filter to only extractions relevant to that topic.
  */
-export default function DataExtractionTable({ extractions, sentences, topicSentences }) {
+/**
+ * @param {DataExtractionTableProps} props
+ */
+export default function DataExtractionTable({
+  extractions,
+  sentences,
+  topicSentences,
+  activeExtractionKey = null,
+  extractionHints = {},
+  onExtractionHoverStart,
+  onExtractionHoverEnd,
+  onExtractionToggle,
+}) {
   if (!extractions || extractions.length === 0) return null;
 
   const filtered = topicSentences
@@ -76,7 +183,16 @@ export default function DataExtractionTable({ extractions, sentences, topicSente
   return (
     <div className="rg-extractions">
       {filtered.map((ex, i) => (
-        <ExtractionItem key={i} extraction={ex} sentences={sentences} />
+        <ExtractionItem
+          key={buildExtractionKey(ex) || i}
+          extraction={ex}
+          sentences={sentences}
+          activeExtractionKey={activeExtractionKey}
+          extractionHints={extractionHints}
+          onExtractionHoverStart={onExtractionHoverStart}
+          onExtractionHoverEnd={onExtractionHoverEnd}
+          onExtractionToggle={onExtractionToggle}
+        />
       ))}
     </div>
   );

@@ -1,8 +1,9 @@
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo, useCallback, useState } from 'react';
 import ReadingOrderBar from './ReadingOrderBar';
 import TopicCard from './TopicCard';
 import DataExtractionTable from './DataExtractionTable';
 import { COMPONENT_REGISTRY, assembleChartProps } from '../storytelling/componentRegistry';
+import { buildExtractionKey } from '../../utils/extractionHighlight';
 
 /**
  * ReadingGuideLayout — overview page driven by content annotations.
@@ -23,6 +24,8 @@ export default function ReadingGuideLayout({
 }) {
   const cardRefs = useRef({});
   const results = submission?.results || {};
+  const [hoveredExtractionKey, setHoveredExtractionKey] = useState(null);
+  const [lockedExtractionKey, setLockedExtractionKey] = useState(null);
 
   const {
     sentence_annotations: sentenceAnnotations = {},
@@ -32,7 +35,59 @@ export default function ReadingGuideLayout({
   } = annotations;
 
   const recommendedCharts = structuralSuggestions.recommended_charts || [];
-  const readingOrder = structuralSuggestions.reading_order || [];
+  const readingOrder = useMemo(
+    () => (Array.isArray(structuralSuggestions.reading_order) ? structuralSuggestions.reading_order : []),
+    [structuralSuggestions.reading_order]
+  );
+  const extractionByKey = useMemo(() => {
+    const entries = new Map();
+    dataExtractions.forEach((extraction) => {
+      const key = buildExtractionKey(extraction);
+      if (key) {
+        entries.set(key, extraction);
+      }
+    });
+    return entries;
+  }, [dataExtractions]);
+  const activeExtractionKey = lockedExtractionKey || hoveredExtractionKey;
+  const activeExtraction = activeExtractionKey ? extractionByKey.get(activeExtractionKey) || null : null;
+  const lockedExtraction = lockedExtractionKey ? extractionByKey.get(lockedExtractionKey) || null : null;
+  const extractionHints = useMemo(() => {
+    const hints = {};
+
+    dataExtractions.forEach((extraction) => {
+      const extractionKey = buildExtractionKey(extraction);
+      if (!extractionKey) return;
+
+      const sourceSentences = Array.isArray(extraction.source_sentences) ? extraction.source_sentences : [];
+      let hiddenCount = 0;
+
+      safeTopics.forEach((topic) => {
+        const topicName = topic?.name;
+        const topicSentenceIndices = Array.isArray(topic?.sentences) ? topic.sentences : [];
+        const matchingSourceIndices = sourceSentences.filter((idx) => topicSentenceIndices.includes(idx));
+        if (matchingSourceIndices.length === 0) return;
+
+        const topicAnnotation = topicAnnotations[topicName] || {};
+        const recommendedSentences = Array.isArray(topicAnnotation.recommended_sentences)
+          ? topicAnnotation.recommended_sentences
+          : [];
+        const defaultVisibleSentences = recommendedSentences.length > 0
+          ? recommendedSentences.slice(0, 5)
+          : topicSentenceIndices
+              .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
+              .slice(0, 5);
+
+        hiddenCount += matchingSourceIndices.filter((idx) => !defaultVisibleSentences.includes(idx)).length;
+      });
+
+      if (hiddenCount > 0) {
+        hints[extractionKey] = `${hiddenCount} hidden source sentence${hiddenCount === 1 ? '' : 's'}. Click to reveal.`;
+      }
+    });
+
+    return hints;
+  }, [dataExtractions, safeTopics, topicAnnotations, sentenceAnnotations]);
 
   // All topics ordered: reading_order first, then all remaining (nothing omitted)
   const orderedTopics = useMemo(() => {
@@ -68,6 +123,15 @@ export default function ReadingGuideLayout({
   const scrollToTopic = useCallback((name) => {
     const el = cardRefs.current[name];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+  const handleExtractionHoverStart = useCallback((extractionKey) => {
+    setHoveredExtractionKey(extractionKey);
+  }, []);
+  const handleExtractionHoverEnd = useCallback((extractionKey) => {
+    setHoveredExtractionKey((currentKey) => (currentKey === extractionKey ? null : currentKey));
+  }, []);
+  const handleExtractionToggle = useCallback((extractionKey) => {
+    setLockedExtractionKey((currentKey) => (currentKey === extractionKey ? null : extractionKey));
   }, []);
 
   const handleRegenerate = async () => {
@@ -178,6 +242,14 @@ export default function ReadingGuideLayout({
             isRead={readTopics ? readTopics.has(topic.name) : false}
             onToggleRead={toggleRead}
             cardRef={(el) => { cardRefs.current[topic.name] = el; }}
+            activeExtraction={activeExtraction}
+            lockedExtraction={lockedExtraction}
+            activeExtractionKey={activeExtractionKey}
+            hoveredExtractionKey={hoveredExtractionKey}
+            extractionHints={extractionHints}
+            onExtractionHoverStart={handleExtractionHoverStart}
+            onExtractionHoverEnd={handleExtractionHoverEnd}
+            onExtractionToggle={handleExtractionToggle}
           />
         ))}
       </div>
@@ -186,7 +258,16 @@ export default function ReadingGuideLayout({
       {dataExtractions.length > 0 && (
         <div className="rg-data-dashboard">
           <h3 className="rg-data-dashboard__title">Data Points</h3>
-          <DataExtractionTable extractions={dataExtractions} sentences={safeSentences} />
+          <DataExtractionTable
+            extractions={dataExtractions}
+            sentences={safeSentences}
+            activeExtractionKey={activeExtractionKey}
+            hoveredExtractionKey={hoveredExtractionKey}
+            extractionHints={extractionHints}
+            onExtractionHoverStart={handleExtractionHoverStart}
+            onExtractionHoverEnd={handleExtractionHoverEnd}
+            onExtractionToggle={handleExtractionToggle}
+          />
         </div>
       )}
     </div>

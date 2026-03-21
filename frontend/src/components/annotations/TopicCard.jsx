@@ -1,5 +1,32 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import DataExtractionTable from './DataExtractionTable';
+import {
+  buildExtractionTextSegments,
+  extractionIncludesSentence,
+} from '../../utils/extractionHighlight';
+
+/**
+ * @typedef {import('../../utils/extractionHighlight').DataExtraction} DataExtraction
+ */
+
+/**
+ * @typedef {Object} TopicCardProps
+ * @property {{ name?: string, sentences?: number[] }} topic
+ * @property {Object} [topicAnnotation]
+ * @property {Object} [sentenceAnnotations]
+ * @property {string[]} [sentences]
+ * @property {DataExtraction[]} [dataExtractions]
+ * @property {boolean} [isRead]
+ * @property {(topic: Object) => void} [onToggleRead]
+ * @property {(element: HTMLDivElement|null) => void} [cardRef]
+ * @property {DataExtraction|null} [activeExtraction]
+ * @property {DataExtraction|null} [lockedExtraction]
+ * @property {string|null} [activeExtractionKey]
+ * @property {Record<string, string>} [extractionHints]
+ * @property {(extractionKey: string) => void} [onExtractionHoverStart]
+ * @property {(extractionKey: string) => void} [onExtractionHoverEnd]
+ * @property {(extractionKey: string) => void} [onExtractionToggle]
+ */
 
 const PRIORITY_LABELS = {
   must_read: 'Must Read',
@@ -35,12 +62,28 @@ function SentenceBadges({ flags }) {
   );
 }
 
-function KeySentence({ text, annotation }) {
+function KeySentence({ text, annotation, isActive, isSourceReveal, activeExtraction }) {
   const importance = annotation?.importance || 'normal';
   const flags = annotation?.flags || [];
+  const segments = useMemo(
+    () => (isActive ? buildExtractionTextSegments(text, activeExtraction) : [{ text, highlighted: false }]),
+    [text, isActive, activeExtraction]
+  );
+
   return (
-    <div className={`rg-sentence rg-sentence--${importance}`}>
-      <span className="rg-sentence__text">{text}</span>
+    <div
+      className={`rg-sentence rg-sentence--${importance}${isActive ? ' rg-sentence--active' : ''}${isSourceReveal ? ' rg-sentence--source-reveal' : ''}`}
+    >
+      <span className="rg-sentence__text">
+        {segments.map((segment, index) => (
+          <span
+            key={`${segment.text}-${index}`}
+            className={segment.highlighted ? 'rg-sentence__text-highlight' : undefined}
+          >
+            {segment.text}
+          </span>
+        ))}
+      </span>
       <SentenceBadges flags={flags} />
     </div>
   );
@@ -53,6 +96,9 @@ function KeySentence({ text, annotation }) {
  * Topics are always rendered (never hidden) — optional/skip start folded
  * so users can always expand and read any content.
  */
+/**
+ * @param {TopicCardProps} props
+ */
 export default function TopicCard({
   topic,
   topicAnnotation,
@@ -62,9 +108,19 @@ export default function TopicCard({
   isRead,
   onToggleRead,
   cardRef,
+  activeExtraction = null,
+  lockedExtraction = null,
+  activeExtractionKey = null,
+  extractionHints = {},
+  onExtractionHoverStart,
+  onExtractionHoverEnd,
+  onExtractionToggle,
 }) {
   const name = topic?.name || '';
-  const topicSentences = topic?.sentences || [];
+  const topicSentences = useMemo(
+    () => (Array.isArray(topic?.sentences) ? topic.sentences : []),
+    [topic?.sentences]
+  );
   const ann = topicAnnotation || {};
   const priority = ann.reading_priority || 'recommended';
   const skipReason = ann.skip_reason;
@@ -76,6 +132,14 @@ export default function TopicCard({
 
   const displayName = name.includes('>') ? name.split('>').pop() : name;
   const fullPath = name.includes('>') ? name.split('>').slice(0, -1).join(' › ') : null;
+  const lockedSourceSentenceIndices = useMemo(() => {
+    if (!lockedExtraction || !Array.isArray(lockedExtraction.source_sentences)) {
+      return [];
+    }
+
+    return lockedExtraction.source_sentences.filter((idx) => topicSentences.includes(idx));
+  }, [lockedExtraction, topicSentences]);
+  const isOpen = !folded || lockedSourceSentenceIndices.length > 0;
 
   // Key sentences: LLM-recommended (high importance), capped at 5
   const keySentenceIndices = recommendedSentences.length > 0
@@ -83,6 +147,10 @@ export default function TopicCard({
     : topicSentences
         .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
         .slice(0, 5);
+  const visibleSentenceIndices = useMemo(() => {
+    const merged = new Set([...keySentenceIndices, ...lockedSourceSentenceIndices]);
+    return [...merged].sort((a, b) => a - b);
+  }, [keySentenceIndices, lockedSourceSentenceIndices]);
 
   const handleReadToggle = (e) => {
     e.stopPropagation();
@@ -120,7 +188,7 @@ export default function TopicCard({
             </button>
           )}
           <button className="rg-topic-card__fold-btn" aria-label={folded ? 'Expand' : 'Collapse'}>
-            {folded ? '▸' : '▾'}
+            {isOpen ? '▾' : '▸'}
           </button>
         </div>
       </div>
@@ -131,15 +199,26 @@ export default function TopicCard({
         </div>
       )}
 
-      {!folded && (
+      {isOpen && (
         <div className="rg-topic-card__body">
-          {keySentenceIndices.length > 0 && (
+          {visibleSentenceIndices.length > 0 && (
             <div className="rg-topic-card__sentences">
-              {keySentenceIndices.map((idx) => {
+              {visibleSentenceIndices.map((idx) => {
                 const text = sentences && sentences[idx - 1];
                 if (!text) return null;
                 const annotation = sentenceAnnotations?.[String(idx)];
-                return <KeySentence key={idx} text={text} annotation={annotation} />;
+                const isActiveSourceSentence = extractionIncludesSentence(activeExtraction, idx);
+                const isSourceReveal = isActiveSourceSentence && !keySentenceIndices.includes(idx);
+                return (
+                  <KeySentence
+                    key={idx}
+                    text={text}
+                    annotation={annotation}
+                    isActive={isActiveSourceSentence}
+                    isSourceReveal={isSourceReveal}
+                    activeExtraction={activeExtraction}
+                  />
+                );
               })}
             </div>
           )}
@@ -148,6 +227,11 @@ export default function TopicCard({
             extractions={dataExtractions}
             sentences={sentences}
             topicSentences={topicSentences}
+            activeExtractionKey={activeExtractionKey}
+            extractionHints={extractionHints}
+            onExtractionHoverStart={onExtractionHoverStart}
+            onExtractionHoverEnd={onExtractionHoverEnd}
+            onExtractionToggle={onExtractionToggle}
           />
         </div>
       )}
