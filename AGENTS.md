@@ -6,6 +6,7 @@ These instructions are intended for AI agents working on this project.
     - Always add type definitions on both the backend and frontend codebase.
     - Backend (Python): Use type hints for all function parameters, return types, and variable annotations.
     - Frontend (TypeScript/JavaScript): Use explicit types for props, state, function parameters, and return values.
+    - Frontend (TypeScript/JavaScript): Always use CSS classes instead of inline styles for styling components.
 
 2.  **Docker Environment**:
     - The project is designed to run within a Docker Compose environment.
