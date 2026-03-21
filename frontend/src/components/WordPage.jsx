@@ -37,17 +37,17 @@ export default function WordPage() {
   // Derive subsets
   const matchingData = useMemo(() => {
     if (!submission?.results) return { sentences: [], topics: [], summaries: [] };
-    
+
     const allSentences = submission.results.sentences || [];
     const allTopics = submission.results.topics || [];
 
     // 1. Find matched sentences
     const wordPattern = new RegExp(`\\b${word}\\b`, 'i');
-    
+
     // We will keep them as original 1-indexed for reference
     const matchedSentencesInfo = [];
     const matchedSentence1BasedIndices = new Set();
-    
+
     allSentences.forEach((text, i) => {
       if (wordPattern.test(text)) {
         matchedSentencesInfo.push({ index: i, text });
@@ -84,7 +84,7 @@ export default function WordPage() {
       submission.results.summary_mappings || [],
       allTopics
     );
-    const filteredTimelineItems = allTimelineItems.filter(item => 
+    const filteredTimelineItems = allTimelineItems.filter(item =>
       item.mapping?.source_sentences?.some(s => matchedSentence1BasedIndices.has(s))
     );
 
@@ -137,21 +137,19 @@ export default function WordPage() {
     topic_summaries: submission?.results?.topic_summaries || {},
   }], [allSentences, allTopics, submission]);
 
-  if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}>Loading word data...</div>;
-  if (error) return <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>Error: {error}</div>;
-  if (!submission) return <div style={{ padding: '20px', textAlign: 'center' }}>No submission found.</div>;
-
-
+  if (loading) return <div className="word-page-loading">Loading word data...</div>;
+  if (error) return <div className="word-page-error">Error: {error}</div>;
+  if (!submission) return <div className="word-page-no-submission">No submission found.</div>;
 
   return (
     <div className="app word-page">
-      <div style={{ flex: '0 0 auto', padding: '5px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px', flexWrap: 'wrap' }}>
+      <div className="word-page-header">
+        <div className="word-page-header-row">
           <button onClick={() => navigate(`/page/text/${submissionId}`)} className="action-btn">
             ← Back to Article
           </button>
-          <h2>Sentences matching: <span style={{ color: '#1976d2' }}>"{word}"</span></h2>
-          <div className="tab-bar" style={{ marginBottom: 0, marginLeft: 'auto' }}>
+          <h2 className="word-page-title">Sentences matching: <span className="word-page-word-highlight">"{word}"</span></h2>
+          <div className="tab-bar word-page-tab-bar">
             <div className="tabs">
               {VIS_TABS.map(tab => (
                 <button
@@ -167,28 +165,28 @@ export default function WordPage() {
         </div>
       </div>
 
-      <div className="container" style={{ padding: '0 5px 5px', display: 'block', height: 'auto', flex: 1 }}>
-        <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', height: '100%', overflowY: 'auto' }}>
-          
+      <div className="container word-page-container">
+        <div className="word-page-content">
+
           {activeTab === 'sentences' && (
             <div>
               {sentencesInfo.length === 0 ? (
-                <p style={{ color: '#666' }}>No occurrences of this word were found in the article.</p>
+                <p className="word-page-no-occurrences">No occurrences of this word were found in the article.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
+                <div className="word-page-sentences-list">
                   {sentencesInfo.map(({ index, text }) => (
-                    <div key={index} style={{ padding: '6px', background: '#f8f9fa', borderRadius: '6px', borderLeft: '4px solid #1976d2' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                    <div key={index} className="word-page-sentence-card">
+                      <div className="word-page-sentence-header">
                         <span>Sentence #{index + 1}</span>
                       </div>
-                      <TextDisplay 
-                        sentences={[text]} 
-                        selectedTopics={selectedTopics} 
-                        hoveredTopic={hoveredTopic} 
-                        readTopics={readTopics} 
-                        articleTopics={topics.filter(t => t.sentences.includes(index + 1))} 
-                        articleIndex={0} 
-                        onToggleRead={toggleRead} 
+                      <TextDisplay
+                        sentences={[text]}
+                        selectedTopics={selectedTopics}
+                        hoveredTopic={hoveredTopic}
+                        readTopics={readTopics}
+                        articleTopics={topics.filter(t => t.sentences.includes(index + 1))}
+                        articleIndex={0}
+                        onToggleRead={toggleRead}
                         onToggleTopic={toggleTopic}
                       />
                     </div>
@@ -199,28 +197,27 @@ export default function WordPage() {
           )}
 
           {activeTab === 'circles' && (
-            <div style={{ height: '70vh' }}>
-              <CircularPackingChart 
-                topics={topics} 
-                sentences={allSentences} 
-                onShowInArticle={() => {}} 
+            <div className="word-page-chart-container">
+              <CircularPackingChart
+                topics={topics}
+                sentences={allSentences}
+                onShowInArticle={() => {}}
               />
             </div>
           )}
 
           {activeTab === 'summaries' && (
-            <div style={{ height: '70vh', position: 'relative' }}>
-              <SummaryTimeline 
+            <div className="word-page-timeline-container">
+              <SummaryTimeline
                 summaryTimelineItems={timelineItems}
                 highlightedSummaryParas={new Set()}
-                summaryModalTopic={null} // Handled locally below for better control in WordPage
+                summaryModalTopic={null}
                 closeSummaryModal={() => setSummaryModalTopic(null)}
                 handleSummaryClick={handleSummaryClick}
                 articles={articles}
                 onClose={() => setActiveTab('sentences')}
                 onShowInArticle={(topic) => {
                   navigate(`/page/text/${submissionId}`);
-                  // Note: In a real app we might want to pass state to scroll to the topic
                 }}
               />
             </div>
@@ -229,9 +226,9 @@ export default function WordPage() {
           {activeTab === 'tags' && (
             <div>
               <h3>Tags Cloud for sentences containing "{word}"</h3>
-              <TopicsTagCloud 
-                submissionId={submissionId} 
-                topics={[]} 
+              <TopicsTagCloud
+                submissionId={submissionId}
+                topics={[]}
                 sentences={allSentences}
                 forcedPathQuery={`word=${encodeURIComponent(word)}`}
               />
