@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import TreemapChart from './TreemapChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import MindmapResults from './MindmapResults';
 import TopicsTagCloud from './TopicsTagCloud';
+import SectionRenderer from './storytelling/SectionRenderer';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTextPageData } from '../hooks/useTextPageData';
 import { formatDate } from '../utils/chartConstants';
 import '../styles/App.css';
 
+// Static fallback slides (used when storytelling data is absent)
 const SLIDES = [
   { key: 'overview', title: 'Article Overview' },
   { key: 'landscape', title: 'Topic Landscape' },
@@ -16,23 +18,8 @@ const SLIDES = [
   { key: 'tags', title: 'Tags Cloud' },
 ];
 
-function OverviewPage() {
-  const submissionId = window.location.pathname.split('/')[3];
+function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, articleSummaryText }) {
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  const { submission, loading, error } = useSubmission(submissionId);
-  const { safeTopics, articleSummaryText } = useTextPageData(
-    submission,
-    [],
-    null,
-    new Set()
-  );
-
-  const results = useMemo(() => submission?.results || {}, [submission]);
-  const safeSentences = useMemo(
-    () => (Array.isArray(results.sentences) ? results.sentences : []),
-    [results.sentences]
-  );
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -43,34 +30,11 @@ function OverviewPage() {
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2>Loading...</h2>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2 style={{ color: 'red' }}>Error: {error}</h2>
-      </div>
-    );
-  }
-
-  if (!submission) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2>No submission data</h2>
-      </div>
-    );
-  }
-
   const noop = () => {};
+  const results = submission?.results || {};
 
   return (
-    <div className="overview-page">
+    <>
       <div className="overview-header">
         <nav className="overview-toc">
           {SLIDES.map((slide, i) => (
@@ -83,10 +47,7 @@ function OverviewPage() {
             </button>
           ))}
         </nav>
-        <a
-          className="overview-exit-link"
-          href={`/page/text/${submissionId}`}
-        >
+        <a className="overview-exit-link" href={`/page/text/${submissionId}`}>
           Open Full View
         </a>
       </div>
@@ -122,33 +83,22 @@ function OverviewPage() {
             </div>
           </div>
         )}
-
         {currentSlide === 1 && (
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Topic Landscape</h2>
             <div className="overview-chart-container">
-              <TreemapChart
-                topics={safeTopics}
-                sentences={safeSentences}
-                onShowInArticle={noop}
-              />
+              <TreemapChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} />
             </div>
           </div>
         )}
-
         {currentSlide === 2 && (
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Article Structure</h2>
             <div className="overview-chart-container">
-              <ArticleStructureChart
-                topics={safeTopics}
-                sentences={safeSentences}
-                onShowInArticle={noop}
-              />
+              <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} />
             </div>
           </div>
         )}
-
         {currentSlide === 3 && (
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Mindmap</h2>
@@ -162,16 +112,11 @@ function OverviewPage() {
             </div>
           </div>
         )}
-
         {currentSlide === 4 && (
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Tags Cloud</h2>
             <div className="overview-chart-container">
-              <TopicsTagCloud
-                submissionId={submissionId}
-                topics={safeTopics}
-                sentences={safeSentences}
-              />
+              <TopicsTagCloud submissionId={submissionId} topics={safeTopics} sentences={safeSentences} />
             </div>
           </div>
         )}
@@ -196,6 +141,181 @@ function OverviewPage() {
           Next
         </button>
       </div>
+    </>
+  );
+}
+
+function StorytellingLayout({ submission, storytelling, safeTopics, safeSentences, submissionId }) {
+  const sectionRefs = useRef([]);
+  const results = submission?.results || {};
+
+  const sections = useMemo(
+    () => (Array.isArray(storytelling.sections) ? storytelling.sections : []),
+    [storytelling.sections]
+  );
+
+  // TOC entries: chart sections with titles, plus named narrative sections
+  const tocEntries = useMemo(() => {
+    return sections
+      .map((s, i) => {
+        if (s.type === 'chart' && s.title) return { index: i, label: s.title };
+        if (s.type === 'narrative' && s.style === 'intro') return { index: i, label: 'Introduction' };
+        if (s.type === 'narrative' && s.style === 'conclusion') return { index: i, label: 'Conclusion' };
+        if (s.type === 'key_findings') return { index: i, label: 'Key Findings' };
+        return null;
+      })
+      .filter(Boolean);
+  }, [sections]);
+
+  const scrollToSection = (index) => {
+    const el = sectionRefs.current[index];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleRegenerate = async () => {
+    try {
+      await fetch(`/api/submission/${submissionId}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks: ['storytelling_generation'] }),
+      });
+      window.location.reload();
+    } catch (e) {
+      console.error('Regenerate failed', e);
+    }
+  };
+
+  const dataCtx = {
+    submissionId,
+    topics: safeTopics,
+    sentences: safeSentences,
+    topicMindmaps: results.topic_mindmaps || {},
+  };
+
+  return (
+    <div className="storytelling-layout">
+      <div className="storytelling-header">
+        <div className="storytelling-header__left">
+          {storytelling.title && (
+            <h1 className="storytelling-title">{storytelling.title}</h1>
+          )}
+        </div>
+        <div className="storytelling-header__actions">
+          <button className="storytelling-regen-btn" onClick={handleRegenerate} title="Regenerate story with AI">
+            Regenerate Story
+          </button>
+          <a className="overview-exit-link" href={`/page/text/${submissionId}`}>
+            Open Full View
+          </a>
+        </div>
+      </div>
+
+      <div className="storytelling-body">
+        {tocEntries.length > 0 && (
+          <nav className="storytelling-toc">
+            {tocEntries.map((entry) => (
+              <button
+                key={entry.index}
+                className="storytelling-toc__item"
+                onClick={() => scrollToSection(entry.index)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        <div className="storytelling-sections">
+          {sections.map((section, i) => (
+            <div
+              key={i}
+              className="storytelling-section"
+              ref={(el) => { sectionRefs.current[i] = el; }}
+            >
+              <SectionRenderer section={section} dataCtx={dataCtx} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OverviewPage() {
+  const submissionId = window.location.pathname.split('/')[3];
+
+  const { submission, loading, error } = useSubmission(submissionId);
+  const { safeTopics, articleSummaryText } = useTextPageData(
+    submission,
+    [],
+    null,
+    new Set()
+  );
+
+  const results = useMemo(() => submission?.results || {}, [submission]);
+  const safeSentences = useMemo(
+    () => (Array.isArray(results.sentences) ? results.sentences : []),
+    [results.sentences]
+  );
+
+  const storytelling = results.storytelling;
+  const hasStorytelling = storytelling && Array.isArray(storytelling.sections) && storytelling.sections.length > 0;
+
+  const storytellingTaskStatus = submission?.tasks?.storytelling_generation?.status;
+  const isGenerating = storytellingTaskStatus === 'pending' || storytellingTaskStatus === 'processing';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2 style={{ color: 'red' }}>Error: {error}</h2>
+      </div>
+    );
+  }
+
+  if (!submission) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2>No submission data</h2>
+      </div>
+    );
+  }
+
+  if (hasStorytelling) {
+    return (
+      <div className="overview-page">
+        <StorytellingLayout
+          submission={submission}
+          storytelling={storytelling}
+          safeTopics={safeTopics}
+          safeSentences={safeSentences}
+          submissionId={submissionId}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="overview-page">
+      {isGenerating && (
+        <div className="storytelling-generating-banner">
+          Generating AI story...
+        </div>
+      )}
+      <StaticCarousel
+        submission={submission}
+        safeTopics={safeTopics}
+        safeSentences={safeSentences}
+        submissionId={submissionId}
+        articleSummaryText={articleSummaryText}
+      />
     </div>
   );
 }

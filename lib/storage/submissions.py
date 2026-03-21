@@ -8,13 +8,14 @@ from pymongo.database import Database
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
-    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree"]
+    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "storytelling_generation"]
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
         "mindmap": ["split_topic_generation"],
         "prefix_tree": ["split_topic_generation"],
+        "storytelling_generation": ["summarization", "mindmap"],
     }
 
     def __init__(self, db: Database) -> None:
@@ -77,6 +78,12 @@ class SubmissionsStorage:
                     "started_at": None,
                     "completed_at": None,
                     "error": None
+                },
+                "storytelling_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
                 }
             },
             "read_topics": [],
@@ -93,7 +100,8 @@ class SubmissionsStorage:
                 "subtopics": [],
                 "summary": [],
                 "summary_mappings": [],
-                "prefix_tree": {}
+                "prefix_tree": {},
+                "storytelling": {}
             }
         }
 
@@ -196,6 +204,9 @@ class SubmissionsStorage:
 
         if "prefix_tree" in names:
             update_fields["results.prefix_tree"] = {}
+
+        if "storytelling_generation" in names:
+            update_fields["results.storytelling"] = {}
 
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},

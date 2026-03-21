@@ -8,6 +8,7 @@ ALLOWED_TASKS: List[str] = [
     "summarization",
     "mindmap",
     "prefix_tree",
+    "storytelling_generation",
 ]
 
 # Priority values for task types (lower = higher priority)
@@ -17,4 +18,5 @@ TASK_PRIORITIES: Dict[str, int] = {
     "summarization": 3,
     "mindmap": 3,
     "prefix_tree": 3,
+    "storytelling_generation": 4,
 }

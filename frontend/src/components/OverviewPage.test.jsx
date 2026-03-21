@@ -141,4 +141,129 @@ describe('OverviewPage', () => {
     const zeros = screen.getAllByText('0');
     expect(zeros.length).toBeGreaterThan(0); // 0 sentences and/or topics
   });
+
+  describe('storytelling layout', () => {
+    const mockStorytellingSubmission = {
+      ...mockSubmission,
+      tasks: {
+        storytelling_generation: { status: 'completed' },
+      },
+      results: {
+        ...mockSubmission.results,
+        storytelling: {
+          title: 'The Story of This Article',
+          sections: [
+            { type: 'narrative', text: 'An insightful opening paragraph.', style: 'intro' },
+            { type: 'stats', items: [{ label: 'Sentences', value: '3' }, { label: 'Topics', value: '2' }] },
+            { type: 'key_findings', findings: ['Finding one about the article', 'Finding two that is notable'] },
+            { type: 'highlight', topic: 'Topic A', text: 'Topic A is very prominent', insight: 'This reveals something interesting' },
+            { type: 'narrative', text: 'A closing thought.', style: 'conclusion' },
+          ],
+        },
+      },
+    };
+
+    beforeEach(() => {
+      global.fetch = vi.fn(async (url) => {
+        if (url.includes('/word-cloud') || url.includes('/tags')) {
+          return { ok: true, json: async () => ({ words: [], sentence_count: 0 }) };
+        }
+        if (url.includes('/read-progress')) {
+          return { ok: true, json: async () => ({ read_count: 0, total_count: 3 }) };
+        }
+        return { ok: true, json: async () => mockStorytellingSubmission };
+      });
+    });
+
+    it('renders storytelling title when storytelling data is present', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('The Story of This Article');
+    });
+
+    it('renders narrative intro text', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('An insightful opening paragraph.');
+    });
+
+    it('renders key findings', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('Finding one about the article');
+      await screen.findByText('Finding two that is notable');
+    });
+
+    it('renders highlight section', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('Topic A is very prominent');
+      await screen.findByText('This reveals something interesting');
+    });
+
+    it('renders TOC with chart and named section entries', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('The Story of This Article');
+      // TOC entries for named sections (may appear in both TOC and section heading)
+      expect(screen.getAllByText('Introduction').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Key Findings').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Conclusion').length).toBeGreaterThan(0);
+    });
+
+    it('shows Open Full View link', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('The Story of This Article');
+      const link = screen.getByText('Open Full View');
+      expect(link.getAttribute('href')).toBe('/page/text/test-id-123');
+    });
+
+    it('shows Regenerate Story button', async () => {
+      render(<OverviewPage />);
+      await screen.findByText('The Story of This Article');
+      expect(screen.getByText('Regenerate Story')).toBeInTheDocument();
+    });
+
+    it('does not render unknown section types', async () => {
+      global.fetch = vi.fn(async (url) => {
+        if (url.includes('/read-progress')) {
+          return { ok: true, json: async () => ({ read_count: 0, total_count: 0 }) };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            ...mockStorytellingSubmission,
+            results: {
+              ...mockStorytellingSubmission.results,
+              storytelling: {
+                title: 'Test',
+                sections: [
+                  { type: 'unknown_type', data: 'should be ignored' },
+                  { type: 'narrative', text: 'Valid narrative.', style: 'body' },
+                ],
+              },
+            },
+          }),
+        };
+      });
+
+      render(<OverviewPage />);
+      await screen.findByText('Valid narrative.');
+      // unknown type renders nothing — no crash
+    });
+  });
+
+  it('shows generating banner when storytelling task is pending', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (url.includes('/read-progress')) {
+        return { ok: true, json: async () => ({ read_count: 0, total_count: 3 }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          tasks: { storytelling_generation: { status: 'processing' } },
+          results: { ...mockSubmission.results, storytelling: {} },
+        }),
+      };
+    });
+
+    render(<OverviewPage />);
+    await screen.findByText('Generating AI story...');
+  });
 });
