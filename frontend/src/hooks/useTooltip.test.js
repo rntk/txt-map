@@ -24,6 +24,12 @@ describe('useTooltip', () => {
       result.current.showTooltip(topics, 100, 200);
     });
 
+    expect(result.current.tooltip).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
     expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics, meta: null });
   });
 
@@ -42,6 +48,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20);
+      vi.advanceTimersByTime(300);
     });
     expect(result.current.tooltip).not.toBeNull();
 
@@ -62,6 +69,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20);
+      vi.advanceTimersByTime(300);
     });
 
     act(() => {
@@ -82,6 +90,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'A' }], 1, 2);
+      vi.advanceTimersByTime(300);
     });
     act(() => {
       result.current.scheduleHide();
@@ -98,11 +107,58 @@ describe('useTooltip', () => {
     expect(result.current.tooltip).toEqual({ x: 3, y: 4, topics: [{ topic: 'B' }], meta: null });
   });
 
+  it('scheduleHide cancels a pending show before the tooltip appears', () => {
+    const { result } = renderHook(() => useTooltip());
+
+    act(() => {
+      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
+      result.current.scheduleHide();
+      vi.runAllTimers();
+    });
+
+    expect(result.current.tooltip).toBeNull();
+  });
+
+  it('updates the pending tooltip position before it becomes visible', () => {
+    const { result } = renderHook(() => useTooltip());
+
+    act(() => {
+      result.current.showTooltip([{ topic: 'Art' }], 10, 20, { word: 'first' });
+      result.current.updateTooltipPosition(30, 40, { word: 'second' });
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(result.current.tooltip).toEqual({
+      x: 30,
+      y: 40,
+      topics: [{ topic: 'Art' }],
+      meta: { word: 'second' },
+    });
+  });
+
+  it('updates the visible tooltip position immediately', () => {
+    const { result } = renderHook(() => useTooltip());
+
+    act(() => {
+      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
+      vi.advanceTimersByTime(300);
+      result.current.updateTooltipPosition(50, 60);
+    });
+
+    expect(result.current.tooltip).toEqual({
+      x: 50,
+      y: 60,
+      topics: [{ topic: 'Art' }],
+      meta: null,
+    });
+  });
+
   it('hideTooltip immediately sets tooltip to null', () => {
     const { result } = renderHook(() => useTooltip());
 
     act(() => {
       result.current.showTooltip([{ topic: 'History' }], 5, 6);
+      vi.advanceTimersByTime(300);
     });
     act(() => {
       result.current.hideTooltip();
@@ -135,5 +191,21 @@ describe('useTooltip', () => {
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockRestore();
+  });
+
+  it('hides an already visible tooltip when the hook is disabled', () => {
+    const { result, rerender } = renderHook(({ enabled }) => useTooltip(enabled), {
+      initialProps: { enabled: true },
+    });
+
+    act(() => {
+      result.current.showTooltip([{ topic: 'X' }], 0, 0);
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.tooltip).not.toBeNull();
+
+    rerender({ enabled: false });
+
+    expect(result.current.tooltip).toBeNull();
   });
 });

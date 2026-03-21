@@ -4,13 +4,17 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import WordPage from './WordPage';
 
 const mockUseSubmission = vi.fn();
+const mockTextDisplay = vi.fn();
 
 vi.mock('../hooks/useSubmission', () => ({
   useSubmission: (...args) => mockUseSubmission(...args),
 }));
 
 vi.mock('./TextDisplay', () => ({
-  default: ({ sentences }) => <div data-testid="text-display">{sentences.join(' ')}</div>,
+  default: (props) => {
+    mockTextDisplay(props);
+    return <div data-testid="text-display">{props.sentences.join(' ')}</div>;
+  },
 }));
 
 vi.mock('./CircularPackingChart', () => ({
@@ -35,6 +39,7 @@ vi.mock('../utils/summaryTimeline', () => ({
 
 describe('WordPage header layout', () => {
   beforeEach(() => {
+    mockTextDisplay.mockClear();
     mockUseSubmission.mockReturnValue({
       submission: {
         status: {
@@ -71,11 +76,12 @@ describe('WordPage header layout', () => {
     render(<WordPage />);
 
     expect(screen.getByRole('button', { name: /Back to Article/i })).toBeInTheDocument();
-    expect(screen.getByText('Word Analysis:')).toBeInTheDocument();
+    expect(screen.getByText('Sentences matching:')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sentences' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Topics (Circles)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Summaries' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tags Cloud' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Show tooltips')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Refresh/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/summarization/i)).not.toBeInTheDocument();
   });
@@ -83,7 +89,8 @@ describe('WordPage header layout', () => {
   it('switches visible content when a different tab is selected', () => {
     render(<WordPage />);
 
-    expect(screen.getByText(/Sentences matching "beta" \(2\)/i)).toBeInTheDocument();
+    expect(screen.getByText('Sentences matching:')).toBeInTheDocument();
+    expect(screen.getAllByTestId('text-display')).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Topics (Circles)' }));
     expect(screen.getByTestId('circular-packing-chart')).toBeInTheDocument();
@@ -93,5 +100,20 @@ describe('WordPage header layout', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Tags Cloud' }));
     expect(screen.getByTestId('topics-tag-cloud')).toBeInTheDocument();
+  });
+
+  it('passes tooltipEnabled and submissionId to TextDisplay', () => {
+    render(<WordPage />);
+
+    expect(mockTextDisplay).toHaveBeenCalled();
+    const initialProps = mockTextDisplay.mock.calls[0][0];
+    expect(initialProps.tooltipEnabled).toBe(true);
+    expect(initialProps.submissionId).toBe('sub-123');
+
+    fireEvent.click(screen.getByLabelText('Show tooltips'));
+
+    const latestProps = mockTextDisplay.mock.calls.at(-1)[0];
+    expect(latestProps.tooltipEnabled).toBe(false);
+    expect(latestProps.submissionId).toBe('sub-123');
   });
 });

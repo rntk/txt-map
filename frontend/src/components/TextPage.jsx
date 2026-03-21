@@ -319,6 +319,8 @@ function TextPage() {
     <div className="app">
       <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
         <TextPageActionsPortal>
+          <a className="text-list-link" href={`/page/overview/${submissionId}`} style={{ fontSize: '11px' }}>Guided Overview</a>
+
           <DropdownMenu buttonContent={<span>Status</span>}>
             <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Task Status</div>
             <StatusIndicator tasks={status.tasks} />

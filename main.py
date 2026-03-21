@@ -51,6 +51,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/diff")
 @app.get("/page/cache")
 @app.get("/page/topics")
+@app.get("/page/overview/{submission_id}")
 def serve_frontend_page():
     return FileResponse(FRONTEND_INDEX)
 

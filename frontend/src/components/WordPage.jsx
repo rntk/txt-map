@@ -25,8 +25,9 @@ export default function WordPage() {
 
   const [activeTab, setActiveTab] = useState('sentences');
   const [selectedTopics, setSelectedTopics] = useState([]);
-  const [hoveredTopic, setHoveredTopic] = useState(null);
+  const [hoveredTopic] = useState(null);
   const [summaryModalTopic, setSummaryModalTopic] = useState(null);
+  const [tooltipEnabled, setTooltipEnabled] = useState(true);
 
   const {
     submission,
@@ -119,7 +120,7 @@ export default function WordPage() {
     });
   }, []);
 
-  const { sentencesInfo, topics, summaries, timelineItems, allSentences, allTopics } = matchingData;
+  const { sentencesInfo, topics, timelineItems, allSentences, allTopics } = matchingData;
 
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
@@ -151,6 +152,16 @@ export default function WordPage() {
             ← Back to Article
           </button>
           <h2 className="word-page-title">Sentences matching: <span className="word-page-word-highlight">"{word}"</span></h2>
+          {activeTab === 'sentences' && (
+            <label className="grouped-topics-toggle word-page-tooltip-toggle">
+              <input
+                type="checkbox"
+                checked={tooltipEnabled}
+                onChange={() => setTooltipEnabled(prev => !prev)}
+              />
+              Show tooltips
+            </label>
+          )}
           <div className="tab-bar word-page-tab-bar">
             <div className="tabs">
               {VIS_TABS.map(tab => (
@@ -190,6 +201,8 @@ export default function WordPage() {
                         articleIndex={0}
                         onToggleRead={toggleRead}
                         onToggleTopic={toggleTopic}
+                        tooltipEnabled={tooltipEnabled}
+                        submissionId={submissionId}
                       />
                     </div>
                   ))}
@@ -228,7 +241,7 @@ export default function WordPage() {
                 handleSummaryClick={handleSummaryClick}
                 articles={articles}
                 onClose={() => setActiveTab('sentences')}
-                onShowInArticle={(topic) => {
+                onShowInArticle={() => {
                   navigate(`/page/text/${submissionId}`);
                 }}
               />

@@ -1,9 +1,17 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import TextDisplay from './TextDisplay';
 
 describe('TextDisplay', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const defaultProps = {
     sentences: ['First sentence.', 'Second sentence.', 'Third sentence.'],
     selectedTopics: [],
@@ -665,6 +673,67 @@ describe('TextDisplay', () => {
 
       const summaryButton = document.querySelector('.topic-summary-link');
       expect(summaryButton).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Tooltip word exploration link', () => {
+    const originalCaretPositionFromPoint = document.caretPositionFromPoint;
+    const originalCaretRangeFromPoint = document.caretRangeFromPoint;
+
+    afterEach(() => {
+      document.caretPositionFromPoint = originalCaretPositionFromPoint;
+      document.caretRangeFromPoint = originalCaretRangeFromPoint;
+    });
+
+    it('shows a single word-page link for a hovered word token after the delay', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          rawHtml="<p>Hello world</p>"
+          submissionId="sub-123"
+          articleTopics={[
+            {
+              name: 'Topic1',
+              sentences: [],
+              ranges: [{ start: 3, end: 8 }],
+            },
+          ]}
+        />
+      );
+
+      fireEvent.mouseOver(screen.getByText('Hello'));
+      expect(screen.queryByRole('link', { name: 'Explore "Hello"' })).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      const links = screen.getAllByRole('link', { name: 'Explore "Hello"' });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute('href', '/page/word/sub-123/Hello');
+    });
+
+    it('shows a word-page link for sentence-level hover targets using the cursor word', () => {
+      render(<TextDisplay {...defaultProps} submissionId="sub-123" />);
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      const sentenceTextNode = sentenceToken.firstChild;
+      document.caretPositionFromPoint = vi.fn(() => ({
+        offsetNode: sentenceTextNode,
+        offset: 2,
+      }));
+      document.caretRangeFromPoint = undefined;
+
+      fireEvent.mouseOver(sentenceToken, { clientX: 20, clientY: 20 });
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(screen.getByRole('link', { name: 'Explore "First"' })).toHaveAttribute(
+        'href',
+        '/page/word/sub-123/First'
+      );
     });
   });
 

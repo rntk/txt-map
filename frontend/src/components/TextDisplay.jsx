@@ -9,6 +9,28 @@ const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 
+/**
+ * @typedef {Object} TextDisplayProps
+ * @property {string[]} sentences
+ * @property {Array} selectedTopics
+ * @property {{ name: string }|null} hoveredTopic
+ * @property {Set<string>|string[]} readTopics
+ * @property {Array} articleTopics
+ * @property {number} articleIndex
+ * @property {Object|null} [paragraphMap]
+ * @property {Object} [topicSummaries]
+ * @property {(topic: Object, summary: string) => void} [onShowTopicSummary]
+ * @property {string|null} [rawHtml]
+ * @property {(topic: Object) => void} [onToggleRead]
+ * @property {(topic: Object) => void} [onToggleTopic]
+ * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} [onNavigateTopic]
+ * @property {boolean} [tooltipEnabled]
+ * @property {string} [submissionId]
+ */
+
+/**
+ * @param {TextDisplayProps} props
+ */
 function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
@@ -136,8 +158,104 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }, [safeArticleTopics]);
 
   // --- Tooltip state ---
-  const { tooltip, lastTargetRef, showTooltip, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
+  const { tooltip, lastTargetRef, showTooltip, updateTooltipPosition, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
   const isDraggingRef = useRef(false);
+  const tooltipContainerRef = useRef(null);
+
+  const getTooltipPosition = useCallback((clientX, clientY) => {
+    // Keep the tooltip close enough to the pointer so it feels anchored to the
+    // current hover location even with the delayed show.
+    let x = clientX - 2;
+    let y = clientY - 2;
+
+    const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
+    const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
+
+    x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
+    y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
+
+    return { x, y };
+  }, []);
+
+  const getHoverWord = useCallback((token, clientX, clientY) => {
+    if (!token || !token.textContent) {
+      return null;
+    }
+
+    if (token.classList.contains('word-token')) {
+      const rawWord = token.textContent.trim().replace(/[^a-zA-ZÀ-ÿ0-9\-']/g, '');
+      return rawWord.length > 1 ? rawWord : null;
+    }
+
+    const normalizeWord = (value) => {
+      const cleaned = value.replace(/[^a-zA-ZÀ-ÿ0-9\-']/g, '');
+      return cleaned.length > 1 ? cleaned : null;
+    };
+
+    const fullText = token.textContent;
+    const getTextOffsetWithinToken = (targetNode, localOffset) => {
+      const walker = document.createTreeWalker(token, NodeFilter.SHOW_TEXT);
+      let traversed = 0;
+      let currentNode = walker.nextNode();
+
+      while (currentNode) {
+        const nodeText = currentNode.textContent || '';
+        if (currentNode === targetNode) {
+          return traversed + Math.max(0, Math.min(localOffset, nodeText.length));
+        }
+        traversed += nodeText.length;
+        currentNode = walker.nextNode();
+      }
+
+      return null;
+    };
+    let offset = null;
+
+    if (document.caretPositionFromPoint) {
+      const caretPosition = document.caretPositionFromPoint(clientX, clientY);
+      if (caretPosition?.offsetNode && token.contains(caretPosition.offsetNode)) {
+        if (caretPosition.offsetNode.nodeType === Node.TEXT_NODE) {
+          offset = getTextOffsetWithinToken(caretPosition.offsetNode, caretPosition.offset);
+        }
+      }
+    } else if (document.caretRangeFromPoint) {
+      const caretRange = document.caretRangeFromPoint(clientX, clientY);
+      if (caretRange?.startContainer && token.contains(caretRange.startContainer)) {
+        if (caretRange.startContainer.nodeType === Node.TEXT_NODE) {
+          offset = getTextOffsetWithinToken(caretRange.startContainer, caretRange.startOffset);
+        }
+      }
+    }
+
+    if (offset === null) {
+      const fallbackWord = fullText.trim().split(/\s+/).find(Boolean) || '';
+      return normalizeWord(fallbackWord);
+    }
+
+    let start = offset;
+    let end = offset;
+    while (start > 0 && /[a-zA-ZÀ-ÿ0-9\-']/.test(fullText[start - 1])) {
+      start -= 1;
+    }
+    while (end < fullText.length && /[a-zA-ZÀ-ÿ0-9\-']/.test(fullText[end])) {
+      end += 1;
+    }
+
+    return normalizeWord(fullText.slice(start, end));
+  }, []);
+
+  const buildTooltipMeta = useCallback((token, clientX, clientY) => {
+    const hoverWord = getHoverWord(token, clientX, clientY);
+    if (token.dataset.sentenceIndex !== undefined) {
+      return {
+        sentenceIdx: Number(token.dataset.sentenceIndex),
+        totalSentences: safeSentences.length,
+        word: hoverWord,
+      };
+    }
+
+    return { word: hoverWord };
+  }, [getHoverWord, safeSentences.length]);
 
   const handleTextMouseDown = useCallback(() => {
     isDraggingRef.current = true;
@@ -202,57 +320,57 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
     lastTargetRef.current = token;
 
-    // Position tooltip right at the cursor
-    // Using -2 to put the cursor slightly inside the tooltip boundary
-    // to ensure the transition from token hover to tooltip hover is seamless.
-    let x = e.clientX - 2;
-    let y = e.clientY - 2;
+    const { x, y } = getTooltipPosition(e.clientX, e.clientY);
 
-    // Clamp to viewport instead of flipping to the other side
-    const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
-    const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
-
-    x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
-    y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
-
-    let meta = null;
-    const rawWord = token.textContent ? token.textContent.trim().replace(/[^a-zA-ZÀ-ÿ0-9\-']/g, '') : '';
-    const hoverWord = rawWord.length > 1 ? rawWord : null;
-    if (token.dataset.sentenceIndex !== undefined) {
-      const idx = Number(token.dataset.sentenceIndex);
-      meta = { sentenceIdx: idx, totalSentences: safeSentences.length, word: hoverWord };
-    } else {
-      meta = { word: hoverWord };
-    }
+    const meta = buildTooltipMeta(token, e.clientX, e.clientY);
 
     showTooltip(matchedTopics, x, y, meta);
   }, [
+    buildTooltipMeta,
     cancelHide,
     findTopicsForChar,
     findTopicsForSentence,
+    getTooltipPosition,
     lastTargetRef,
-    safeSentences.length,
     scheduleHide,
     showTooltip,
     tooltipEnabled,
   ]);
 
+  const handleMouseMove = useCallback((e) => {
+    if (isDraggingRef.current || !tooltipEnabled) return;
+
+    const token = e.target.closest('.word-token, .sentence-token');
+    if (!token || token !== lastTargetRef.current) {
+      return;
+    }
+
+    const meta = buildTooltipMeta(token, e.clientX, e.clientY);
+    const { x, y } = getTooltipPosition(e.clientX, e.clientY);
+
+    updateTooltipPosition(x, y, meta);
+  }, [buildTooltipMeta, getTooltipPosition, lastTargetRef, tooltipEnabled, updateTooltipPosition]);
+
   const handleMouseOut = useCallback((e) => {
     const token = e.target.closest('.word-token, .sentence-token');
     if (!token) return;
+    if (tooltipContainerRef.current?.contains(e.relatedTarget)) {
+      return;
+    }
     scheduleHide();
   }, [scheduleHide]);
 
   // Tooltip JSX - Use createPortal to move it to document.body
   const tooltipEl = tooltip ? createPortal(
     <div
+      ref={tooltipContainerRef}
       className="text-topic-tooltip"
       style={{ left: tooltip.x, top: tooltip.y }}
       onMouseEnter={cancelHide}
       onMouseLeave={scheduleHide}
     >
       {tooltip.meta && tooltip.meta.sentenceIdx !== undefined && (
-        <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '6px', borderBottom: '1px solid #444', paddingBottom: '4px' }}>
+        <div className="text-topic-tooltip-meta">
           Sentence {tooltip.meta.sentenceIdx + 1} / {tooltip.meta.totalSentences}
         </div>
       )}
@@ -261,21 +379,24 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           const isRead = readTopicsSet.has(topic.name);
           const isSelected = safeSelectedTopics.some(t => t.name === topic.name);
           return (
-            <div key={topic.name} style={{ marginBottom: i < tooltip.topics.length - 1 ? 10 : 0 }}>
+            <div
+              key={topic.name}
+              className={`text-topic-tooltip-topic${i < tooltip.topics.length - 1 ? ' text-topic-tooltip-topic--spaced' : ''}`}
+            >
               <div className="text-topic-tooltip-name">{topic.name}</div>
               {rangeCount > 1 && (
                 <div className="text-topic-tooltip-warning">
                   This topic has {rangeCount} separate ranges. Some may not be visible.
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+              <div className="text-topic-tooltip-actions">
                 {onToggleTopic && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', color: '#ddd' }}>
+                  <label className="text-topic-tooltip-toggle">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => onToggleTopic(topic)}
-                      style={{ margin: 0, cursor: 'pointer' }}
+                      className="text-topic-tooltip-toggle-input"
                     />
                     Highlight
                   </label>
@@ -305,22 +426,21 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                   </>
                 )}
               </div>
-              {submissionId && tooltip.meta?.word && (
-                <div style={{ marginTop: '6px' }}>
-                  <a
-                    className="text-topic-tooltip-btn"
-                    href={`/page/word/${submissionId}/${encodeURIComponent(tooltip.meta.word)}`}
-                    style={{ textDecoration: 'none', display: 'inline-block' }}
-                  >
-                    Explore "{tooltip.meta.word}"
-                  </a>
-                </div>
-              )}
             </div>
           );
         })
       ) : (
         <div style={{ fontSize: '12px', color: '#aaa' }}>No topics assigned to this sentence</div>
+      )}
+      {submissionId && tooltip.meta?.word && (
+        <div className="text-topic-tooltip-footer">
+          <a
+            className="text-topic-tooltip-btn text-topic-tooltip-link"
+            href={`/page/word/${submissionId}/${encodeURIComponent(tooltip.meta.word)}`}
+          >
+            Explore "{tooltip.meta.word}"
+          </a>
+        </div>
       )}
     </div>,
     document.body
@@ -350,6 +470,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
           onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
+          onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
         />
         {tooltipEl}
@@ -364,6 +485,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           className="text-content"
           onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
+          onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
         >
           {paragraphs.map((para, paraIdx) => (
@@ -405,6 +527,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         className="text-content"
         onMouseDown={handleTextMouseDown}
         onMouseOver={handleMouseOver}
+        onMouseMove={handleMouseMove}
         onMouseOut={handleMouseOut}
       >
         <p className="article-text">
