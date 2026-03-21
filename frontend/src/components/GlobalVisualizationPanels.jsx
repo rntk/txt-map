@@ -6,6 +6,7 @@ import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
+import TreemapChart from './TreemapChart';
 
 function GlobalVisualizationPanels({
   fullscreenGraph,
@@ -67,6 +68,19 @@ function GlobalVisualizationPanels({
         <FullScreenGraph title="Dataset Structure" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <ArticleStructureChart topics={chartTopics} sentences={chartSentences} />
+          </div>
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === 'treemap' && (
+        <FullScreenGraph title="Treemap" onClose={onClose}>
+          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <p style={{ marginBottom: '12px' }}>
+              Treemap visualization: top-level topics contain their subtopics. Rectangle size reflects sentence count.
+            </p>
+            <div style={{ flex: 1 }}>
+              <TreemapChart topics={chartTopics} sentences={chartSentences} />
+            </div>
           </div>
         </FullScreenGraph>
       )}

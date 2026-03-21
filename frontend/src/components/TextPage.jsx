@@ -32,6 +32,7 @@ const FULLSCREEN_TABS = [
   { key: 'radar_chart', label: 'Radar Chart' },
   { key: 'grid_view', label: 'Grid View' },
   { key: 'article_structure', label: 'Article Structure' },
+  { key: 'treemap', label: 'Treemap' },
 ];
 
 

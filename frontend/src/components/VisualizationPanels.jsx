@@ -11,6 +11,7 @@ import GridView from './GridView';
 import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
+import TreemapChart from './TreemapChart';
 
 function VisualizationPanels({
   fullscreenGraph,
@@ -99,11 +100,11 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'circular_packing' && (
         <FullScreenGraph title="Topic Circles" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <p style={{ marginBottom: '12px' }}>
+          <div className="visualization-panel-shell">
+            <p className="visualization-panel-intro">
               Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
             </p>
-            <div style={{ flex: 1 }}>
+            <div className="visualization-panel-body">
               <CircularPackingChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
             </div>
           </div>
@@ -131,6 +132,19 @@ function VisualizationPanels({
         <FullScreenGraph title="Article Structure" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+          </div>
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === 'treemap' && (
+        <FullScreenGraph title="Treemap" onClose={onClose}>
+          <div className="visualization-panel-shell">
+            <p className="visualization-panel-intro">
+              Treemap visualization: top-level topics contain their subtopics. Rectangle size reflects sentence count.
+            </p>
+            <div className="visualization-panel-body">
+              <TreemapChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+            </div>
           </div>
         </FullScreenGraph>
       )}

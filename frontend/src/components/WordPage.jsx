@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useSubmission } from '../hooks/useSubmission';
 import TextDisplay from './TextDisplay';
 import CircularPackingChart from './CircularPackingChart';
+import TreemapChart from './TreemapChart';
 import TopicsTagCloud from './TopicsTagCloud';
 import SummaryTimeline from './SummaryTimeline';
 import TopicSentencesModal from './shared/TopicSentencesModal';
@@ -10,6 +11,7 @@ import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 const VIS_TABS = [
   { key: 'sentences', label: 'Sentences' },
   { key: 'circles', label: 'Topics (Circles)' },
+  { key: 'treemap', label: 'Topics (Treemap)' },
   { key: 'summaries', label: 'Summaries' },
   { key: 'tags', label: 'Tags Cloud' }
 ];
@@ -199,6 +201,16 @@ export default function WordPage() {
           {activeTab === 'circles' && (
             <div className="word-page-chart-container">
               <CircularPackingChart
+                topics={topics}
+                sentences={allSentences}
+                onShowInArticle={() => {}}
+              />
+            </div>
+          )}
+
+          {activeTab === 'treemap' && (
+            <div className="word-page-chart-container">
+              <TreemapChart
                 topics={topics}
                 sentences={allSentences}
                 onShowInArticle={() => {}}

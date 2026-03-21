@@ -3112,6 +3112,82 @@ body {
   margin: 0 auto;
 }
 
+.visualization-panel-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.visualization-panel-intro {
+  margin: 0 0 12px;
+}
+
+.visualization-panel-body {
+  flex: 1;
+}
+
+.treemap-chart {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.treemap-level-switcher {
+  padding: 12px 0 8px;
+}
+
+.treemap-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.treemap-body {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  aspect-ratio: 5 / 4;
+  max-height: 720px;
+}
+
+.treemap-body--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: auto;
+}
+
+.treemap-no-data {
+  color: #666;
+  font-style: italic;
+  padding: 24px 0;
+}
+
+.treemap-no-data--standalone {
+  margin: 0;
+}
+
+.treemap-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.treemap-tooltip {
+  position: absolute;
+  z-index: 100;
+  max-width: 240px;
+  padding: 6px 10px;
+  color: #fff;
+  white-space: pre-wrap;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0;
+}
+
 
 
 

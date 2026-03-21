@@ -16,6 +16,7 @@ const FULLSCREEN_TABS = [
   { key: 'radar_chart', label: 'Radar Chart' },
   { key: 'grid_view', label: 'Grid View' },
   { key: 'dataset_structure', label: 'Dataset Structure' },
+  { key: 'treemap', label: 'Treemap' },
 ];
 
 function GlobalTopicsPage() {

@@ -6,8 +6,7 @@ import Breadcrumbs from './shared/Breadcrumbs';
 import { useTopicLevel } from '../hooks/useTopicLevel';
 import { useScopeNavigation } from '../hooks/useScopeNavigation';
 import {
-  getTopicParts,
-  isWithinScope,
+  buildScopedHierarchy,
   getScopeLabel,
   getLevelLabel,
   hasDeeperChildren
@@ -25,51 +24,7 @@ const PACK_PADDING = 1;
 const PACK_AREA_RATIO = 0.7;
 const CIRCLE_ENLARGE_FACTOR = 1.6;
 
-export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) {
-  const root = { name: 'root', fullPath: '', children: [] };
-  const nodeMap = new Map();
-  nodeMap.set('', root);
-
-  const safeTopics = Array.isArray(topics) ? topics : [];
-  const safeLevel = Math.max(0, selectedLevel);
-  const absoluteDepth = scopePath.length + safeLevel;
-
-  const sorted = [...safeTopics].sort((a, b) => getTopicParts(a).length - getTopicParts(b).length);
-
-  sorted.forEach((topic) => {
-    const parts = getTopicParts(topic);
-    if (!isWithinScope(parts, scopePath) || parts.length <= absoluteDepth) {
-      return;
-    }
-
-    const visibleParts = parts.slice(absoluteDepth);
-
-    for (let i = 0; i < visibleParts.length; i += 1) {
-      const segment = visibleParts[i];
-      const originalParts = parts.slice(0, absoluteDepth + i + 1);
-      const pathKey = originalParts.join('>');
-      const parentPath = i === 0 ? '' : parts.slice(0, absoluteDepth + i).join('>');
-
-      if (!nodeMap.has(pathKey)) {
-        const isLeaf = i === visibleParts.length - 1;
-        const node = {
-          name: segment,
-          fullPath: pathKey,
-          value: isLeaf ? Math.max(1, Array.isArray(topic.sentences) ? topic.sentences.length : 1) : 0,
-          children: [],
-          topic: isLeaf ? topic : null,
-        };
-        nodeMap.set(pathKey, node);
-        const parent = nodeMap.get(parentPath);
-        if (parent) {
-          parent.children.push(node);
-        }
-      }
-    }
-  });
-
-  return root;
-}
+export { buildScopedHierarchy } from '../utils/topicHierarchy';
 
 // Wrap label into lines that fit within maxWidth pixels at given fontSize
 function wrapLines(label, maxWidth, fontSize) {
@@ -132,6 +87,16 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   });
 }
 
+/**
+ * @typedef {Object} CircularPackingChartProps
+ * @property {import('../utils/topicHierarchy').TopicHierarchyInput[]} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: { fullPath?: string, displayName?: string }) => void} [onShowInArticle]
+ */
+
+/**
+ * @param {CircularPackingChartProps} props
+ */
 export default function CircularPackingChart({ topics, sentences = [], onShowInArticle }) {
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);

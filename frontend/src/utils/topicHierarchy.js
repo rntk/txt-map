@@ -1,3 +1,18 @@
+/**
+ * @typedef {Object} TopicHierarchyInput
+ * @property {string} [name]
+ * @property {number[]} [sentences]
+ */
+
+/**
+ * @typedef {Object} ScopedHierarchyNode
+ * @property {string} name
+ * @property {string} fullPath
+ * @property {number} [value]
+ * @property {ScopedHierarchyNode[]} children
+ * @property {TopicHierarchyInput | null} [topic]
+ */
+
 export function getTopicParts(topicOrName) {
   const raw = typeof topicOrName === 'string' ? topicOrName : topicOrName?.name;
   return String(raw || '')
@@ -73,6 +88,65 @@ export function getScopedMaxLevel(topics, scopePath = []) {
   });
 
   return maxLevel;
+}
+
+/**
+ * Build a relative hierarchy for scoped chart renderers.
+ *
+ * @param {TopicHierarchyInput[]} topics
+ * @param {string[]} [scopePath=[]]
+ * @param {number} [selectedLevel=0]
+ * @returns {ScopedHierarchyNode}
+ */
+export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) {
+  /** @type {ScopedHierarchyNode} */
+  const root = { name: 'root', fullPath: '', children: [] };
+  /** @type {Map<string, ScopedHierarchyNode>} */
+  const nodeMap = new Map();
+  nodeMap.set('', root);
+
+  const safeTopics = Array.isArray(topics) ? topics : [];
+  const safeLevel = Math.max(0, selectedLevel);
+  const absoluteDepth = scopePath.length + safeLevel;
+
+  const sorted = [...safeTopics].sort((a, b) => getTopicParts(a).length - getTopicParts(b).length);
+
+  sorted.forEach((topic) => {
+    const parts = getTopicParts(topic);
+    if (!isWithinScope(parts, scopePath) || parts.length <= absoluteDepth) {
+      return;
+    }
+
+    const visibleParts = parts.slice(absoluteDepth);
+
+    for (let index = 0; index < visibleParts.length; index += 1) {
+      const segment = visibleParts[index];
+      const originalParts = parts.slice(0, absoluteDepth + index + 1);
+      const pathKey = originalParts.join('>');
+      const parentPath = index === 0 ? '' : parts.slice(0, absoluteDepth + index).join('>');
+
+      if (!nodeMap.has(pathKey)) {
+        const isLeaf = index === visibleParts.length - 1;
+        /** @type {ScopedHierarchyNode} */
+        const node = {
+          name: segment,
+          fullPath: pathKey,
+          value: isLeaf ? Math.max(1, Array.isArray(topic.sentences) ? topic.sentences.length : 1) : 0,
+          children: [],
+          topic: isLeaf ? topic : null,
+        };
+
+        nodeMap.set(pathKey, node);
+
+        const parent = nodeMap.get(parentPath);
+        if (parent) {
+          parent.children.push(node);
+        }
+      }
+    }
+  });
+
+  return root;
 }
 
 export function buildScopedChartData(topics, sentences = [], scopePath = [], selectedLevel = 0) {
