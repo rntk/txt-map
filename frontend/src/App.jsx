@@ -29,13 +29,9 @@ const PAGE_COMPONENTS = {
   word: WordPage,
 };
 
-function getSaveHintText(saveState, settings) {
+function getSaveHintText(saveState) {
   if (saveState === 'error') {
     return 'Save failed';
-  }
-
-  if (settings.llm_applies_on_next_task) {
-    return 'Applies on next task';
   }
 
   return '';
@@ -66,7 +62,7 @@ function App() {
     settings &&
     (draftProvider !== settings.llm_provider || draftModel !== settings.llm_model)
   );
-  const saveHintText = settings ? getSaveHintText(saveState, settings) : '';
+  const saveHintText = settings ? getSaveHintText(saveState) : '';
 
   const handleProviderChange = (event) => {
     const nextProviderName = event.target.value;
@@ -113,7 +109,6 @@ function App() {
 
     return (
       <div className="llm-provider-badge" aria-label="LLM settings">
-        <span className="llm-provider-badge__label">Model</span>
         <select
           aria-label="LLM provider"
           className="llm-provider-badge__select"
@@ -146,7 +141,7 @@ function App() {
         >
           {saveState === 'saving' ? 'Saving...' : 'Apply'}
         </button>
-        <span className="llm-provider-badge__hint">{saveHintText}</span>
+        {saveHintText ? <span className="llm-provider-badge__hint">{saveHintText}</span> : null}
       </div>
     );
   };
