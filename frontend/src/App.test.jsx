@@ -48,6 +48,39 @@ describe('App LLM selector', () => {
     expect(screen.getByText('Applies on next task')).toBeInTheDocument();
   });
 
+  it('renders topbar controls without the legacy app shell header', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        llm_provider: 'OpenAI',
+        llm_model: 'gpt-4o',
+        llm_applies_on_next_task: true,
+        llm_available_providers: [
+          {
+            key: 'openai',
+            name: 'OpenAI',
+            models: ['gpt-4o', 'gpt-5-mini'],
+            default_model: 'gpt-4o',
+          },
+        ],
+      }),
+    }));
+
+    const { container } = render(<App />);
+
+    await screen.findByLabelText('LLM provider');
+
+    expect(container.querySelector('.app-shell__header')).toBeNull();
+
+    const topbar = container.querySelector('.app-shell__topbar');
+    const portalTarget = container.querySelector('#global-menu-portal-target');
+
+    expect(topbar).not.toBeNull();
+    expect(portalTarget).not.toBeNull();
+    expect(topbar?.contains(portalTarget)).toBe(true);
+    expect(topbar?.contains(screen.getByLabelText('LLM provider'))).toBe(true);
+  });
+
   it('switches model to provider default when provider changes', async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,

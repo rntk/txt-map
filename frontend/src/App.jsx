@@ -18,54 +18,6 @@ const navigationItems = [
   { title: 'Global Topics', link: '/page/topics', badge: 'GT', description: 'Cross-source topics' },
 ];
 
-const routeMeta = {
-  menu: {
-    eyebrow: 'Editorial workspace',
-    title: 'Overview',
-    subtitle: 'Upload new material and move through the analysis tools from one dashboard.'
-  },
-  texts: {
-    eyebrow: 'Submissions',
-    title: 'Texts List',
-    subtitle: 'Review stored submissions, statuses, metadata, and jump into individual analysis.'
-  },
-  tasks: {
-    eyebrow: 'Operations',
-    title: 'Task Control',
-    subtitle: 'Manage background processing, inspect queue state, and retry work when needed.'
-  },
-  diff: {
-    eyebrow: 'Comparison',
-    title: 'Semantic Diff',
-    subtitle: 'Run and inspect topic-aware diffs between any two submissions.'
-  },
-  cache: {
-    eyebrow: 'Operations',
-    title: 'LLM Cache',
-    subtitle: 'Inspect cached model responses and clear stale entries without leaving the workspace.'
-  },
-  topics: {
-    eyebrow: 'Knowledge map',
-    title: 'Global Topics',
-    subtitle: 'Explore themes aggregated across submissions and compare topic evidence by source.'
-  },
-  text: {
-    eyebrow: 'Submission detail',
-    title: 'Text Analysis',
-    subtitle: 'Read the article, inspect summaries, and navigate topics in one focused layout.'
-  },
-  word: {
-    eyebrow: 'Submission detail',
-    title: 'Word Analysis',
-    subtitle: 'Analyze topics, summaries, and contexts containing exactly this word.'
-  },
-  notFound: {
-    eyebrow: 'Navigation',
-    title: 'Page not found',
-    subtitle: 'The requested route does not exist in this workspace.'
-  }
-};
-
 const PAGE_COMPONENTS = {
   cache: CachePage,
   diff: DiffPage,
@@ -201,13 +153,12 @@ function App() {
 
   const renderWithGlobalMenu = (content, pageKey) => {
     const currentPath = window.location.pathname;
-    const meta = routeMeta[pageKey] || routeMeta.notFound;
 
     return (
       <div className={`app-shell${pageKey === 'menu' ? ' app-shell--home' : ''}`}>
         <div className="app-shell__main">
-          <nav className="app-shell__topbar" aria-label="Global navigation">
-            <div className="app-shell__topnav">
+          <div className="app-shell__topbar">
+            <nav className="app-shell__topnav" aria-label="Global navigation">
               {navigationItems.map((item) => {
                 const isActive = currentPath === item.link || currentPath.startsWith(`${item.link}/`);
                 return (
@@ -220,21 +171,12 @@ function App() {
                   </a>
                 );
               })}
-            </div>
-          </nav>
-          <header className="app-shell__header">
-            <div className="app-shell__header-main">
-              <div className="app-shell__title-group">
-                <span className="app-shell__eyebrow">{meta.eyebrow}</span>
-                <h1 className="app-shell__title">{meta.title}</h1>
-                <p className="app-shell__subtitle">{meta.subtitle}</p>
-              </div>
-            </div>
-            <div className="app-shell__header-actions">
+            </nav>
+            <div className="app-shell__topbar-actions">
               <div id="global-menu-portal-target" className="app-shell__portal-target" />
               {renderLLMSelector()}
             </div>
-          </header>
+          </div>
           <main className="global-page-content">
             <div className={`page-surface${pageKey === 'menu' ? ' page-surface--home' : ''}`}>
               {content}

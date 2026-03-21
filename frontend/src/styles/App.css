@@ -3351,8 +3351,8 @@ textarea {
   position: sticky;
   top: 0;
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--shell-space-sm);
   padding: var(--shell-space-xs) var(--shell-space-lg);
   background: rgba(247, 247, 244, 0.88);
@@ -3366,6 +3366,17 @@ textarea {
   align-items: center;
   justify-content: flex-start;
   gap: 0.3rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.app-shell__topbar-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  margin-left: auto;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -3426,66 +3437,6 @@ textarea {
   min-width: 0;
 }
 
-.app-shell__header {
-  position: sticky;
-  top: 2.85rem;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--shell-space-md);
-  padding: var(--shell-space-2xs) var(--shell-space-lg);
-  background: rgba(247, 247, 244, 0.82);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(29, 30, 27, 0.05);
-  z-index: var(--z-global-menu);
-}
-
-.app-shell__header-main {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--shell-space-md);
-  min-width: 0;
-}
-
-.app-shell__title-group {
-  min-width: 0;
-}
-
-.app-shell__eyebrow {
-  display: inline-block;
-  margin-bottom: 0.1rem;
-  color: var(--shell-muted-strong);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.app-shell__title {
-  margin: 0;
-  font-size: clamp(0.95rem, 1.8vw, 1.35rem);
-  letter-spacing: -0.04em;
-  line-height: 1.05;
-}
-
-.app-shell__subtitle {
-  max-width: 54rem;
-  margin: 0.05rem 0 0;
-  color: var(--shell-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.app-shell__header-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 0.7rem;
-  margin-left: auto;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
 .app-shell__portal-target {
   display: flex;
   align-items: center;
@@ -3503,7 +3454,7 @@ textarea {
 }
 
 .page-surface {
-  min-height: calc(100vh - 7.5rem);
+  min-height: calc(100vh - 4.5rem);
   padding: 0.35rem;
   border: 1px solid rgba(29, 30, 27, 0.05);
   border-radius: 1rem;
@@ -3978,8 +3929,7 @@ textarea {
 
 
 @media (max-width: 1100px) {
-  .app-shell__topbar,
-  .app-shell__header {
+  .app-shell__topbar {
     padding-left: 1rem;
     padding-right: 1rem;
   }
@@ -3987,12 +3937,6 @@ textarea {
   .app-shell__topbar {
     padding-top: 0.45rem;
     padding-bottom: 0.45rem;
-  }
-
-  .app-shell__header {
-    top: 2.95rem;
-    padding-top: 0.45rem;
-    padding-bottom: 0.35rem;
   }
 
   .global-page-content {
@@ -4010,15 +3954,10 @@ textarea {
     justify-content: flex-start;
   }
 
-  .app-shell__header {
-    top: 8rem;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-shell__header-actions {
+  .app-shell__topbar-actions {
     margin-left: 0;
     justify-content: flex-start;
+    width: 100%;
   }
 
   .page-surface {
@@ -4046,12 +3985,6 @@ textarea {
 
   .app-shell__topbar {
     padding: 0.75rem;
-  }
-
-  .app-shell__header {
-    top: 9.6rem;
-    padding-top: 0.6rem;
-    padding-bottom: 0.45rem;
   }
 
   .llm-provider-badge {
