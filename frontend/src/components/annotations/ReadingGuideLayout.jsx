@@ -112,6 +112,23 @@ export default function ReadingGuideLayout({
     return ordered;
   }, [safeTopics, readingOrder]);
 
+  // Group consecutive topics that share the same parent path
+  const groupedTopics = useMemo(() => {
+    const groups = [];
+    for (const topic of orderedTopics) {
+      const parts = topic.name.split('>').map(s => s.trim());
+      const parentPath = parts.length > 1 ? parts.slice(0, -1).join(' > ') : null;
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.parentPath === parentPath && parentPath !== null) {
+        lastGroup.topics.push(topic);
+      } else {
+        groups.push({ parentPath, topics: [topic] });
+      }
+    }
+    return groups;
+  }, [orderedTopics]);
+
+
   // Nav bar shows must_read + recommended; skip/optional topics are still in the cards below
   const navTopicNames = useMemo(() => {
     return readingOrder.filter((name) => {
@@ -231,27 +248,40 @@ export default function ReadingGuideLayout({
 
       {/* Topic cards — ALL topics rendered, optional/skip/read start folded */}
       <div className="rg-topics">
-        {orderedTopics.map((topic) => (
-          <TopicCard
-            key={topic.name}
-            topic={topic}
-            topicAnnotation={topicAnnotations[topic.name]}
-            sentenceAnnotations={sentenceAnnotations}
-            sentences={safeSentences}
-            dataExtractions={dataExtractions}
-            isRead={readTopics ? readTopics.has(topic.name) : false}
-            onToggleRead={toggleRead}
-            cardRef={(el) => { cardRefs.current[topic.name] = el; }}
-            activeExtraction={activeExtraction}
-            lockedExtraction={lockedExtraction}
-            activeExtractionKey={activeExtractionKey}
-            hoveredExtractionKey={hoveredExtractionKey}
-            extractionHints={extractionHints}
-            onExtractionHoverStart={handleExtractionHoverStart}
-            onExtractionHoverEnd={handleExtractionHoverEnd}
-            onExtractionToggle={handleExtractionToggle}
-          />
-        ))}
+        {groupedTopics.map((group, gi) => {
+          const isGrouped = group.parentPath !== null && group.topics.length >= 2;
+          const cards = group.topics.map((topic) => (
+            <TopicCard
+              key={topic.name}
+              topic={topic}
+              topicAnnotation={topicAnnotations[topic.name]}
+              sentenceAnnotations={sentenceAnnotations}
+              sentences={safeSentences}
+              dataExtractions={dataExtractions}
+              isRead={readTopics ? readTopics.has(topic.name) : false}
+              onToggleRead={toggleRead}
+              cardRef={(el) => { cardRefs.current[topic.name] = el; }}
+              activeExtraction={activeExtraction}
+              lockedExtraction={lockedExtraction}
+              activeExtractionKey={activeExtractionKey}
+              hoveredExtractionKey={hoveredExtractionKey}
+              extractionHints={extractionHints}
+              onExtractionHoverStart={handleExtractionHoverStart}
+              onExtractionHoverEnd={handleExtractionHoverEnd}
+              onExtractionToggle={handleExtractionToggle}
+              showPath={!isGrouped}
+            />
+          ));
+          if (!isGrouped) return cards;
+          return (
+            <div key={`group-${gi}`} className="rg-topic-group">
+              <div className="rg-topic-group__header">
+                {group.parentPath.replace(/\s*>\s*/g, ' › ')}
+              </div>
+              <div className="rg-topic-group__cards">{cards}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Data dashboard */}

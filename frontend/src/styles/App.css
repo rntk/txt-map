@@ -4686,8 +4686,8 @@ textarea {
   flex-direction: column;
   gap: 1.25rem;
   padding: 1rem 1.25rem 2rem;
-  max-width: 860px;
-  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -4802,6 +4802,27 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+}
+
+/* Category group wrapper for adjacent cards sharing the same parent */
+.rg-topic-group {
+  border-left: 3px solid #e0e0e0;
+  padding-left: 0.5rem;
+}
+
+.rg-topic-group__header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #888;
+  padding: 0.2rem 0 0.3rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.rg-topic-group__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .rg-topic-card {
@@ -4984,8 +5005,44 @@ textarea {
 .rg-topic-card__body {
   padding: 0.75rem 1rem 0.9rem;
   display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.rg-topic-card__extractions {
+  flex: 0 0 220px;
+  min-width: 180px;
+  max-width: 260px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  padding-right: 0.85rem;
+  margin-right: 0.85rem;
+  background: rgba(0, 0, 0, 0.015);
+  border-radius: 6px 0 0 6px;
+}
+
+.rg-topic-card__content {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .rg-topic-card__body {
+    flex-direction: column;
+  }
+  .rg-topic-card__extractions {
+    flex: none;
+    max-width: none;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-right: 0;
+    margin-right: 0;
+    padding-bottom: 0.65rem;
+    margin-bottom: 0.65rem;
+    border-radius: 6px 6px 0 0;
+  }
 }
 
 /* Key sentences */

@@ -115,6 +115,7 @@ export default function TopicCard({
   onExtractionHoverStart,
   onExtractionHoverEnd,
   onExtractionToggle,
+  showPath = true,
 }) {
   const name = topic?.name || '';
   const topicSentences = useMemo(
@@ -141,6 +142,13 @@ export default function TopicCard({
   }, [lockedExtraction, topicSentences]);
   const isOpen = !folded || lockedSourceSentenceIndices.length > 0;
 
+  const hasTopicExtractions = useMemo(() => {
+    if (!Array.isArray(dataExtractions) || topicSentences.length === 0) return false;
+    return dataExtractions.some(
+      (ex) => Array.isArray(ex.source_sentences) && ex.source_sentences.some((idx) => topicSentences.includes(idx))
+    );
+  }, [dataExtractions, topicSentences]);
+
   // Key sentences: LLM-recommended (high importance), capped at 5
   const keySentenceIndices = recommendedSentences.length > 0
     ? recommendedSentences.slice(0, 5)
@@ -165,7 +173,7 @@ export default function TopicCard({
     >
       <div className="rg-topic-card__header" onClick={() => setFolded((f) => !f)}>
         <div className="rg-topic-card__title-row">
-          {fullPath && <span className="rg-topic-card__path">{fullPath} ›</span>}
+          {showPath && fullPath && <span className="rg-topic-card__path">{fullPath} ›</span>}
           <span className="rg-topic-card__name">{displayName}</span>
           <span className={`rg-topic-card__badge rg-topic-card__badge--${priority}`}>
             {PRIORITY_LABELS[priority] || priority}
@@ -201,38 +209,44 @@ export default function TopicCard({
 
       {isOpen && (
         <div className="rg-topic-card__body">
-          {visibleSentenceIndices.length > 0 && (
-            <div className="rg-topic-card__sentences">
-              {visibleSentenceIndices.map((idx) => {
-                const text = sentences && sentences[idx - 1];
-                if (!text) return null;
-                const annotation = sentenceAnnotations?.[String(idx)];
-                const isActiveSourceSentence = extractionIncludesSentence(activeExtraction, idx);
-                const isSourceReveal = isActiveSourceSentence && !keySentenceIndices.includes(idx);
-                return (
-                  <KeySentence
-                    key={idx}
-                    text={text}
-                    annotation={annotation}
-                    isActive={isActiveSourceSentence}
-                    isSourceReveal={isSourceReveal}
-                    activeExtraction={activeExtraction}
-                  />
-                );
-              })}
+          {hasTopicExtractions && (
+            <div className="rg-topic-card__extractions">
+              <DataExtractionTable
+                extractions={dataExtractions}
+                sentences={sentences}
+                topicSentences={topicSentences}
+                activeExtractionKey={activeExtractionKey}
+                extractionHints={extractionHints}
+                onExtractionHoverStart={onExtractionHoverStart}
+                onExtractionHoverEnd={onExtractionHoverEnd}
+                onExtractionToggle={onExtractionToggle}
+              />
             </div>
           )}
 
-          <DataExtractionTable
-            extractions={dataExtractions}
-            sentences={sentences}
-            topicSentences={topicSentences}
-            activeExtractionKey={activeExtractionKey}
-            extractionHints={extractionHints}
-            onExtractionHoverStart={onExtractionHoverStart}
-            onExtractionHoverEnd={onExtractionHoverEnd}
-            onExtractionToggle={onExtractionToggle}
-          />
+          <div className="rg-topic-card__content">
+            {visibleSentenceIndices.length > 0 && (
+              <div className="rg-topic-card__sentences">
+                {visibleSentenceIndices.map((idx) => {
+                  const text = sentences && sentences[idx - 1];
+                  if (!text) return null;
+                  const annotation = sentenceAnnotations?.[String(idx)];
+                  const isActiveSourceSentence = extractionIncludesSentence(activeExtraction, idx);
+                  const isSourceReveal = isActiveSourceSentence && !keySentenceIndices.includes(idx);
+                  return (
+                    <KeySentence
+                      key={idx}
+                      text={text}
+                      annotation={annotation}
+                      isActive={isActiveSourceSentence}
+                      isSourceReveal={isSourceReveal}
+                      activeExtraction={activeExtraction}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
