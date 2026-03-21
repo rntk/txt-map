@@ -373,12 +373,6 @@ body {
   transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
-.word-token:hover,
-.sentence-token:hover {
-  outline: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 2px;
-}
-
 .sentence-token {
   display: inline;
   transition: background-color 0.2s ease, opacity 0.2s ease;

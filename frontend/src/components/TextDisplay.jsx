@@ -178,7 +178,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   // Event delegation handler
   const handleMouseOver = useCallback((e) => {
     if (isDraggingRef.current) return;
-    if (!onToggleRead || !tooltipEnabled) return;
+    if (!tooltipEnabled) return;
     const token = e.target.closest('.word-token, .sentence-token');
     if (!token) {
       if (lastTargetRef.current) {
@@ -198,12 +198,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       matchedTopics = findTopicsForChar(token.dataset.charStart, token.dataset.charEnd);
     } else if (token.dataset.sentenceIndex !== undefined) {
       matchedTopics = findTopicsForSentence(token.dataset.sentenceIndex);
-    }
-
-    if (matchedTopics.length === 0) {
-      lastTargetRef.current = null;
-      scheduleHide();
-      return;
     }
 
     lastTargetRef.current = token;
@@ -237,7 +231,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     findTopicsForChar,
     findTopicsForSentence,
     lastTargetRef,
-    onToggleRead,
     safeSentences.length,
     scheduleHide,
     showTooltip,
@@ -251,80 +244,84 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }, [scheduleHide]);
 
   // Tooltip JSX - Use createPortal to move it to document.body
-  const tooltipEl = tooltip && onToggleRead ? createPortal(
+  const tooltipEl = tooltip ? createPortal(
     <div
       className="text-topic-tooltip"
       style={{ left: tooltip.x, top: tooltip.y }}
       onMouseEnter={cancelHide}
       onMouseLeave={scheduleHide}
     >
-      {tooltip.meta && (
+      {tooltip.meta && tooltip.meta.sentenceIdx !== undefined && (
         <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '6px', borderBottom: '1px solid #444', paddingBottom: '4px' }}>
           Sentence {tooltip.meta.sentenceIdx + 1} / {tooltip.meta.totalSentences}
         </div>
       )}
-      {tooltip.topics.map(({ topic, rangeCount }, i) => {
-        const isRead = readTopicsSet.has(topic.name);
-        const isSelected = safeSelectedTopics.some(t => t.name === topic.name);
-        return (
-          <div key={topic.name} style={{ marginBottom: i < tooltip.topics.length - 1 ? 10 : 0 }}>
-            <div className="text-topic-tooltip-name">{topic.name}</div>
-            {rangeCount > 1 && (
-              <div className="text-topic-tooltip-warning">
-                This topic has {rangeCount} separate ranges. Some may not be visible.
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
-              {onToggleTopic && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', color: '#ddd' }}>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleTopic(topic)}
-                    style={{ margin: 0, cursor: 'pointer' }}
-                  />
-                  Highlight
-                </label>
+      {tooltip.topics.length > 0 ? (
+        tooltip.topics.map(({ topic, rangeCount }, i) => {
+          const isRead = readTopicsSet.has(topic.name);
+          const isSelected = safeSelectedTopics.some(t => t.name === topic.name);
+          return (
+            <div key={topic.name} style={{ marginBottom: i < tooltip.topics.length - 1 ? 10 : 0 }}>
+              <div className="text-topic-tooltip-name">{topic.name}</div>
+              {rangeCount > 1 && (
+                <div className="text-topic-tooltip-warning">
+                  This topic has {rangeCount} separate ranges. Some may not be visible.
+                </div>
               )}
-              <button
-                className="text-topic-tooltip-btn"
-                onClick={() => handleToggleRead(topic)}
-              >
-                {isRead ? 'Mark Unread' : 'Mark Read'}
-              </button>
-              {onNavigateTopic && (
-                <>
-                  <button
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginTop: '4px' }}>
+                {onToggleTopic && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', color: '#ddd' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleTopic(topic)}
+                      style={{ margin: 0, cursor: 'pointer' }}
+                    />
+                    Highlight
+                  </label>
+                )}
+                <button
+                  className="text-topic-tooltip-btn"
+                  onClick={() => handleToggleRead(topic)}
+                >
+                  {isRead ? 'Mark Unread' : 'Mark Read'}
+                </button>
+                {onNavigateTopic && (
+                  <>
+                    <button
+                      className="text-topic-tooltip-btn"
+                      onClick={() => onNavigateTopic(topic, 'prev')}
+                      title="Scroll to previous occurrence"
+                    >
+                      ‹ Prev
+                    </button>
+                    <button
+                      className="text-topic-tooltip-btn"
+                      onClick={() => onNavigateTopic(topic, 'next')}
+                      title="Scroll to next occurrence"
+                    >
+                      Next ›
+                    </button>
+                  </>
+                )}
+              </div>
+              {submissionId && tooltip.meta?.word && (
+                <div style={{ marginTop: '6px' }}>
+                  <a
                     className="text-topic-tooltip-btn"
-                    onClick={() => onNavigateTopic(topic, 'prev')}
-                    title="Scroll to previous occurrence"
+                    href={`/page/word/${submissionId}/${encodeURIComponent(tooltip.meta.word)}`}
+                    style={{ textDecoration: 'none', display: 'inline-block' }}
                   >
-                    ‹ Prev
-                  </button>
-                  <button
-                    className="text-topic-tooltip-btn"
-                    onClick={() => onNavigateTopic(topic, 'next')}
-                    title="Scroll to next occurrence"
-                  >
-                    Next ›
-                  </button>
-                </>
+                    Explore "{tooltip.meta.word}"
+                  </a>
+                </div>
               )}
             </div>
-            {submissionId && tooltip.meta?.word && (
-              <div style={{ marginTop: '6px' }}>
-                <a
-                  className="text-topic-tooltip-btn"
-                  href={`/page/word/${submissionId}/${encodeURIComponent(tooltip.meta.word)}`}
-                  style={{ textDecoration: 'none', display: 'inline-block' }}
-                >
-                  Explore "{tooltip.meta.word}"
-                </a>
-              </div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })
+      ) : (
+        <div style={{ fontSize: '12px', color: '#aaa' }}>No topics assigned to this sentence</div>
+      )}
     </div>,
     document.body
   ) : null;

@@ -186,7 +186,7 @@ export default function WordPage() {
                         selectedTopics={selectedTopics}
                         hoveredTopic={hoveredTopic}
                         readTopics={readTopics}
-                        articleTopics={topics.filter(t => t.sentences.includes(index + 1))}
+                        articleTopics={topics.filter(t => t.sentences.includes(index + 1)).map(t => ({ ...t, sentences: [1] }))}
                         articleIndex={0}
                         onToggleRead={toggleRead}
                         onToggleTopic={toggleTopic}
