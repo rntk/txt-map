@@ -264,6 +264,6 @@ describe('OverviewPage', () => {
     });
 
     render(<OverviewPage />);
-    await screen.findByText('Generating AI story...');
+    await screen.findByText('Annotating article...');
   });
 });

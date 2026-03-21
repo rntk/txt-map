@@ -4,6 +4,7 @@ import ArticleStructureChart from './ArticleStructureChart';
 import MindmapResults from './MindmapResults';
 import TopicsTagCloud from './TopicsTagCloud';
 import SectionRenderer from './storytelling/SectionRenderer';
+import ReadingGuideLayout from './annotations/ReadingGuideLayout';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTextPageData } from '../hooks/useTextPageData';
 import { formatDate } from '../utils/chartConstants';
@@ -244,7 +245,7 @@ function StorytellingLayout({ submission, storytelling, safeTopics, safeSentence
 function OverviewPage() {
   const submissionId = window.location.pathname.split('/')[3];
 
-  const { submission, loading, error } = useSubmission(submissionId);
+  const { submission, loading, error, readTopics, toggleRead } = useSubmission(submissionId);
   const { safeTopics, articleSummaryText } = useTextPageData(
     submission,
     [],
@@ -257,6 +258,14 @@ function OverviewPage() {
     () => (Array.isArray(results.sentences) ? results.sentences : []),
     [results.sentences]
   );
+
+  // Fallback chain: annotations (new) → storytelling (legacy) → static carousel
+  const annotations = results.annotations;
+  const hasAnnotations =
+    annotations &&
+    typeof annotations === 'object' &&
+    annotations.topic_annotations &&
+    Object.keys(annotations.topic_annotations).length > 0;
 
   const storytelling = results.storytelling;
   const hasStorytelling = storytelling && Array.isArray(storytelling.sections) && storytelling.sections.length > 0;
@@ -288,6 +297,24 @@ function OverviewPage() {
     );
   }
 
+  // New annotation-driven reading guide
+  if (hasAnnotations) {
+    return (
+      <div className="overview-page">
+        <ReadingGuideLayout
+          submission={submission}
+          annotations={annotations}
+          safeTopics={safeTopics}
+          safeSentences={safeSentences}
+          submissionId={submissionId}
+          readTopics={readTopics}
+          toggleRead={toggleRead}
+        />
+      </div>
+    );
+  }
+
+  // Legacy LLM-generated storytelling layout
   if (hasStorytelling) {
     return (
       <div className="overview-page">
@@ -306,7 +333,7 @@ function OverviewPage() {
     <div className="overview-page">
       {isGenerating && (
         <div className="storytelling-generating-banner">
-          Generating AI story...
+          Annotating article...
         </div>
       )}
       <StaticCarousel

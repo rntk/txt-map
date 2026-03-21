@@ -101,7 +101,8 @@ class SubmissionsStorage:
                 "summary": [],
                 "summary_mappings": [],
                 "prefix_tree": {},
-                "storytelling": {}
+                "storytelling": {},
+                "annotations": {}
             }
         }
 

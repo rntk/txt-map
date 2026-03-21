@@ -183,7 +183,7 @@ class Worker:
                 raise ValueError(f"Submission {submission_id} not found")
 
             # Execute the handler (pass cache_store to LLM-using tasks)
-            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization"}
+            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization", "storytelling_generation"}
             if task_type in cache_tasks:
                 handler(submission, self.db, llm, cache_store=self.cache_store)
             else:
