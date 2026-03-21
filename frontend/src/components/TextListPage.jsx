@@ -126,8 +126,7 @@ function TextListPage() {
               <tr>
                 <th>Submission ID</th>
                 <th>Status</th>
-                <th>Created</th>
-                <th>Updated</th>
+                <th>Date</th>
                 <th>Source</th>
                 <th>Chars</th>
                 <th>Sentences</th>
@@ -145,8 +144,16 @@ function TextListPage() {
                       {submission.overall_status || 'pending'}
                     </span>
                   </td>
-                  <td>{formatDate(submission.created_at)}</td>
-                  <td>{formatDate(submission.updated_at)}</td>
+                  <td className="text-list-date-cell">
+                    <div className="text-list-date-row">
+                      <span className="text-list-date-label" title="Created">Created:</span>
+                      <span>{formatDate(submission.created_at)}</span>
+                    </div>
+                    <div className="text-list-date-row">
+                      <span className="text-list-date-label" title="Updated">Updated:</span>
+                      <span>{formatDate(submission.updated_at)}</span>
+                    </div>
+                  </td>
                   <td className="text-list-source">
                     {submission.source_url ? (
                       <a href={submission.source_url} target="_blank" rel="noopener noreferrer">

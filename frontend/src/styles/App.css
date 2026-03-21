@@ -1157,6 +1157,26 @@ body {
   color: #999;
 }
 
+.text-list-date-cell {
+  white-space: nowrap;
+}
+
+.text-list-date-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.text-list-date-row:not(:last-child) {
+  margin-bottom: 4px;
+}
+
+.text-list-date-label {
+  color: #666;
+  font-size: 12px;
+  cursor: help;
+}
+
 @media (max-width: 720px) {
   .task-page-header {
     flex-direction: column;
