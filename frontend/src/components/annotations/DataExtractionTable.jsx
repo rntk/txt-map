@@ -1,28 +1,41 @@
 import React from 'react';
 
 /**
- * Renders a single data extraction using the actual article sentences.
- * The LLM only provides source_sentence indices — no LLM-generated values.
+ * Renders a single data extraction.
+ * values[] are LLM-generated but grounding-checked server-side (each value
+ * is verified to appear verbatim in its source sentences before storage).
  */
 function ExtractionItem({ extraction, sentences }) {
-  const { label, source_sentences, display_suggestion } = extraction;
+  const { label, values, source_sentences, display_suggestion } = extraction;
   const displayMode = display_suggestion || 'inline';
+  const hasValues = Array.isArray(values) && values.length > 0;
 
-  const sourceSentences = (source_sentences || [])
-    .map((idx) => ({ idx, text: sentences && sentences[idx - 1] }))
-    .filter((s) => s.text);
+  // Fallback: if no grounded values survived, show the raw source sentences
+  if (!hasValues) {
+    const sourceSentences = (source_sentences || [])
+      .map((idx) => ({ idx, text: sentences && sentences[idx - 1] }))
+      .filter((s) => s.text);
+    if (sourceSentences.length === 0) return null;
+    return (
+      <div className="rg-extraction rg-extraction--inline">
+        {label && <span className="rg-extraction__label">{label}: </span>}
+        {sourceSentences.map(({ idx, text }) => (
+          <span key={idx} className="rg-extraction__value">{text}</span>
+        ))}
+      </div>
+    );
+  }
 
-  if (sourceSentences.length === 0) return null;
-
-  if (displayMode === 'table' && sourceSentences.length > 1) {
+  if ((displayMode === 'table' || displayMode === 'chart_bar') && values.length > 1) {
     return (
       <div className="rg-extraction rg-extraction--table">
         {label && <div className="rg-extraction__label">{label}</div>}
         <table className="rg-extraction__table">
           <tbody>
-            {sourceSentences.map(({ idx, text }) => (
-              <tr key={idx}>
-                <td className="rg-extraction__table-val">{text}</td>
+            {values.map((v, i) => (
+              <tr key={i}>
+                {v.key && <td className="rg-extraction__table-key">{v.key}</td>}
+                <td className="rg-extraction__table-val">{v.value}</td>
               </tr>
             ))}
           </tbody>
@@ -34,8 +47,11 @@ function ExtractionItem({ extraction, sentences }) {
   return (
     <div className="rg-extraction rg-extraction--inline">
       {label && <span className="rg-extraction__label">{label}: </span>}
-      {sourceSentences.map(({ idx, text }) => (
-        <span key={idx} className="rg-extraction__value">{text}</span>
+      {values.map((v, i) => (
+        <span key={i} className="rg-extraction__value">
+          {v.key ? `${v.key}: ` : ''}{v.value}
+          {i < values.length - 1 ? ' · ' : ''}
+        </span>
       ))}
     </div>
   );
