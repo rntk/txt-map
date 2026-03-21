@@ -1,5 +1,109 @@
 // Minimal HTML sanitizer to render article HTML safely without external deps.
 // Removes dangerous tags and attributes while preserving common formatting.
+
+// --- Style normalization helpers ---
+
+// Parse a CSS length value into { num, unit }. Returns null if unparseable.
+function parseCSSLength(val) {
+  const m = String(val).trim().match(/^(-?[\d.]+)(px|em|rem|%)?$/);
+  if (!m) return null;
+  return { num: parseFloat(m[1]), unit: m[2] || 'px' };
+}
+
+// Clamp a CSS length value string to [min, max] in the same unit.
+// Only clamps px values; passes through other units unchanged.
+function clampPx(val, min, max) {
+  const parsed = parseCSSLength(val);
+  if (!parsed || parsed.unit !== 'px') return val;
+  if (parsed.num < min) return `${min}px`;
+  if (parsed.num > max) return `${max}px`;
+  return val;
+}
+
+// Strip if negative, otherwise clamp px to max. Passes non-px through.
+function clampPxPositive(val, max) {
+  const parsed = parseCSSLength(val);
+  if (!parsed || parsed.unit !== 'px') return val;
+  if (parsed.num < 0) return null;
+  if (parsed.num > max) return `${max}px`;
+  return val;
+}
+
+// Clamp unitless line-height numbers; pass px through clampPx.
+function clampLineHeight(val) {
+  const str = String(val).trim();
+  // unitless number (e.g. "1.5")
+  const unitless = parseFloat(str);
+  if (!isNaN(unitless) && String(unitless) === str) {
+    return String(Math.min(3.0, Math.max(1.0, unitless)));
+  }
+  // px value
+  if (str.endsWith('px')) return clampPx(str, 14, 48);
+  return val;
+}
+
+// Returns true if the color is near-white (luminance > 0.93).
+// Handles rgb() and rgba() which is what getComputedStyle always returns.
+function isNearWhite(colorStr) {
+  const m = String(colorStr).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+  if (!m) return false;
+  const r = parseFloat(m[1]), g = parseFloat(m[2]), b = parseFloat(m[3]);
+  const luminance = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+  return luminance > 0.93;
+}
+
+// Extracts the generic font family keyword from a font stack.
+// "Helvetica Neue, Arial, sans-serif" → "sans-serif". Returns null if none found.
+const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui']);
+function extractGenericFamily(val) {
+  const parts = String(val).split(',');
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const family = parts[i].trim().replace(/['"]/g, '').toLowerCase();
+    if (GENERIC_FAMILIES.has(family)) return family;
+  }
+  return null;
+}
+
+const SAFE_DISPLAY = new Set(['block', 'inline', 'inline-block', 'list-item', 'none', 'table', 'table-row', 'table-cell', 'table-caption']);
+const SAFE_WHITESPACE = new Set(['normal', 'pre', 'pre-wrap', 'pre-line']);
+
+// Map of CSS property → handler(value) → transformed value string | null (strip)
+const styleHandlers = {
+  // Keep as-is
+  'font-weight':        (v) => v,
+  'font-style':         (v) => v,
+  'text-decoration':    (v) => v,
+  'text-decoration-line': (v) => v,
+  'text-transform':     (v) => v,
+  'text-align':         (v) => v,
+  'letter-spacing':     (v) => v,
+  'word-spacing':       (v) => v,
+  'list-style-type':    (v) => v,
+  'border-collapse':    (v) => v,
+  'vertical-align':     (v) => v,
+  'border-radius':      (v) => v,
+  // Special handling
+  'color':              (v) => isNearWhite(v) ? null : v,
+  'background-color':   () => null,
+  'font-family':        (v) => extractGenericFamily(v),
+  // Clamp to safe range (px)
+  'font-size':          (v) => clampPx(v, 10, 36),
+  'line-height':        (v) => clampLineHeight(v),
+  'text-indent':        (v) => clampPxPositive(v, 80),
+  'margin-top':         (v) => clampPxPositive(v, 32),
+  'margin-bottom':      (v) => clampPxPositive(v, 32),
+  'padding-top':        (v) => clampPxPositive(v, 24),
+  'padding-bottom':     (v) => clampPxPositive(v, 24),
+  'padding-left':       (v) => clampPxPositive(v, 40),
+  'padding-right':      (v) => clampPxPositive(v, 40),
+  // Filter by value
+  'display':            (v) => SAFE_DISPLAY.has(v.toLowerCase()) ? v : null,
+  'white-space':        (v) => SAFE_WHITESPACE.has(v.toLowerCase()) ? v : null,
+  // Strip entirely: width, max-width, height, max-height, min-width, min-height,
+  //   margin-left, margin-right, border-top/bottom/left/right, border, margin, padding,
+  //   list-style, border-color, border-width, border-style
+};
+
 export function sanitizeHTML(html) {
   if (!html || typeof document === 'undefined') return '';
   const template = document.createElement('template');
@@ -23,17 +127,6 @@ export function sanitizeHTML(html) {
     return v.startsWith(jsProto) || v.startsWith('data:') || v.startsWith(vbsProto);
   };
 
-  const allowedStyleProps = new Set([
-    'color', 'background-color', 'font-weight', 'font-style', 'text-decoration', 'text-transform',
-    'font-size', 'font-family', 'line-height', 'letter-spacing', 'word-spacing', 'text-align',
-    'margin', 'margin-left', 'margin-right', 'margin-top', 'margin-bottom',
-    'padding', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom',
-    'border', 'border-left', 'border-right', 'border-top', 'border-bottom', 'border-color',
-    'border-width', 'border-style', 'border-radius', 'border-collapse', 'display', 'width', 'height', 'max-width',
-    'min-width', 'max-height', 'min-height', 'white-space',
-    'list-style-type', 'list-style', 'vertical-align', 'text-indent', 'text-decoration-line'
-  ]);
-
   const sanitizeStyle = (styleValue) => {
     if (!styleValue) return '';
     return String(styleValue)
@@ -46,7 +139,6 @@ export function sanitizeHTML(html) {
         const prop = decl.slice(0, splitIdx).trim().toLowerCase();
         const val = decl.slice(splitIdx + 1).trim();
         const lowerVal = val.toLowerCase();
-        if (!allowedStyleProps.has(prop)) return '';
         if (
           lowerVal.includes('expression(') ||
           lowerVal.includes(`java${'script:'}`) ||
@@ -55,7 +147,11 @@ export function sanitizeHTML(html) {
         ) {
           return '';
         }
-        return `${prop}: ${val}`;
+        const handler = styleHandlers[prop];
+        if (!handler) return '';
+        const result = handler(val);
+        if (result === null) return '';
+        return `${prop}: ${result}`;
       })
       .filter(Boolean)
       .join('; ');

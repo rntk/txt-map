@@ -493,6 +493,21 @@ describe('TextDisplay', () => {
       expect(textContent.innerHTML).toContain('Hello world');
     });
 
+    it('preserves white-space: pre in sanitized rawHtml content', () => {
+      const rawHtml = '<div style="white-space: pre">line 1\n  line 2</div>';
+      const props = {
+        ...defaultProps,
+        rawHtml,
+        articleTopics: [],
+      };
+
+      render(<TextDisplay {...props} />);
+
+      const preformattedBlock = document.querySelector('.text-content div');
+      expect(preformattedBlock).toBeInTheDocument();
+      expect(preformattedBlock).toHaveAttribute('style', 'white-space: pre');
+    });
+
     it('handles articleTopics without ranges property', () => {
       const rawHtml = '<p>Hello world</p>';
       const props = {

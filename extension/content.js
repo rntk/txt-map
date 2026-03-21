@@ -228,6 +228,12 @@
     function inlineStyles(original, clone) {
       if (original.nodeType !== Node.ELEMENT_NODE) return;
 
+      // Temporarily remove extension classes so they don't pollute computed styles
+      const hadSelected = original.classList.contains('rsstag-selected');
+      const hadHighlight = original.classList.contains('rsstag-element-highlight');
+      if (hadSelected) original.classList.remove('rsstag-selected');
+      if (hadHighlight) original.classList.remove('rsstag-element-highlight');
+
       const computed = window.getComputedStyle(original);
       const defaults = getDefaultStyle(original.tagName.toLowerCase());
       const parts = [];
@@ -241,11 +247,15 @@
         }
       }
 
+      // Restore extension classes on original
+      if (hadSelected) original.classList.add('rsstag-selected');
+      if (hadHighlight) original.classList.add('rsstag-element-highlight');
+
       if (parts.length > 0) {
         clone.style.cssText = parts.join('; ');
       }
 
-      // Strip extension classes
+      // Strip extension classes from clone
       clone.classList.remove('rsstag-selected', 'rsstag-element-highlight');
 
       // Recurse into children

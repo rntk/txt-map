@@ -349,6 +349,9 @@ body {
 
 .text-content {
   line-height: 1.6;
+  overflow-x: auto;
+  max-width: 100%;
+  contain: inline-size;
 }
 
 .article-paragraph {
