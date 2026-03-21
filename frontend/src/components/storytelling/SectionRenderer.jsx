@@ -29,7 +29,7 @@ function ChartSection({ section, dataCtx }) {
   const entry = COMPONENT_REGISTRY[componentName];
   if (!entry) return null;
 
-  const props = assembleChartProps(componentName, dataCtx);
+  const props = assembleChartProps(componentName, dataCtx, section);
   if (!props) return null;
 
   const ChartComponent = entry.component;

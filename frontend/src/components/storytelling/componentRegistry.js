@@ -51,10 +51,35 @@ export const COMPONENT_REGISTRY = {
   },
 };
 
+const MIN_FILTERED_TOPICS = 2;
+
+/**
+ * Pre-filter topics based on LLM-specified chart filter hints.
+ * Falls back to the full list if filtering yields fewer than MIN_FILTERED_TOPICS.
+ */
+export function filterTopics(topics, chartSpec) {
+  if (!chartSpec || !Array.isArray(topics) || topics.length === 0) return topics;
+
+  let filtered = topics;
+
+  if (Array.isArray(chartSpec.topic_filter) && chartSpec.topic_filter.length > 0) {
+    const allowSet = new Set(chartSpec.topic_filter);
+    filtered = topics.filter(t => allowSet.has(t.name));
+  } else if (typeof chartSpec.scope === 'string' && chartSpec.scope.length > 0) {
+    const prefix = chartSpec.scope;
+    filtered = topics.filter(t => {
+      const name = t.name || '';
+      return name === prefix || name.startsWith(prefix + ' > ');
+    });
+  }
+
+  return filtered.length >= MIN_FILTERED_TOPICS ? filtered : topics;
+}
+
 /**
  * Assemble props for a chart component from submission data context.
  */
-export function assembleChartProps(componentName, ctx) {
+export function assembleChartProps(componentName, ctx, chartSpec = null) {
   const entry = COMPONENT_REGISTRY[componentName];
   if (!entry) return null;
 
@@ -64,7 +89,7 @@ export function assembleChartProps(componentName, ctx) {
   for (const need of entry.dataNeeds) {
     switch (need) {
       case 'topics':
-        props.topics = ctx.topics || [];
+        props.topics = filterTopics(ctx.topics || [], chartSpec);
         break;
       case 'sentences':
         props.sentences = ctx.sentences || [];

@@ -216,7 +216,7 @@ export default function ReadingGuideLayout({
           {recommendedCharts.slice(0, 2).map((chartSpec, i) => {
             const entry = COMPONENT_REGISTRY[chartSpec.component];
             if (!entry) return null;
-            const props = assembleChartProps(chartSpec.component, dataCtx);
+            const props = assembleChartProps(chartSpec.component, dataCtx, chartSpec);
             const ChartComponent = entry.component;
             return (
               <div key={i} className="rg-chart-block">

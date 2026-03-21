@@ -57,7 +57,7 @@ TOPICS (name | sentence count | summary):
 Total: {sentence_count} sentences, {topic_count} topics.
 </article_data>
 
-AVAILABLE CHART COMPONENTS:
+AVAILABLE CHART COMPONENTS (name | best for):
 {chart_components}
 
 OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
@@ -74,7 +74,12 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
     "fold_topics": ["<topic_name>", ...],
     "highlight_topics": ["<topic_name>", ...],
     "recommended_charts": [
-      {{"component": "<ComponentName>", "rationale": "<short_reason>"}}
+      {{
+        "component": "<ComponentName>",
+        "rationale": "<short_reason>",
+        "topic_filter": ["<topic_name>", ...],
+        "scope": null
+      }}
     ]
   }}
 }}
@@ -88,6 +93,9 @@ RULES:
 - fold_topics: list optional and skip topics
 - recommended_charts: choose 1-3 charts that best illustrate this article's content
 - chart component must be one of: {valid_components}
+- topic_filter: array of exact topic names from the input to show in this chart, or null to show all topics; use this to focus a chart on the most important topics (e.g., must_read and recommended topics)
+- scope: a hierarchy prefix string like "Category > Subcategory" to scope the chart to one subtree, or null; use this when the article has a dominant topic cluster worth drilling into
+- if both topic_filter and scope are set, topic_filter takes precedence; for broad overview charts (TreemapChart, TopicsTagCloud) prefer null for both to show the full picture
 """
 
 SENTENCE_ANNOTATION_PROMPT = """\
@@ -265,6 +273,12 @@ def _validate_topic_annotations(data: Any, known_topics: List[str]) -> bool:
     for c in charts:
         if not isinstance(c, dict) or c.get("component") not in VALID_COMPONENTS:
             return False
+        tf = c.get("topic_filter")
+        if tf is not None and not isinstance(tf, list):
+            return False
+        scope = c.get("scope")
+        if scope is not None and not isinstance(scope, str):
+            return False
     return True
 
 
@@ -387,7 +401,21 @@ def _build_topic_annotation_prompt(submission: Dict[str, Any]) -> str:
         topic_rows.append(f"  {name} | {count} sentences | {summary_short}")
     topics_table = "\n".join(topic_rows) if topic_rows else "  (no topics available)"
 
-    chart_components = "\n".join(f"  {c}" for c in sorted(VALID_COMPONENTS))
+    chart_component_descriptions = {
+        "ArticleStructureChart": "showing narrative flow and topic ordering across the article",
+        "CircularPackingChart": "nested topic hierarchy with proportional circle sizes",
+        "MarimekkoChartTab": "proportional area comparison of topics side by side",
+        "MindmapResults": "mind map of topic relationships and sub-topics",
+        "RadarChart": "multi-dimensional comparison of a focused set of topics",
+        "TopicsBarChart": "comparing topic sizes as bars; good for a focused subset",
+        "TopicsRiverChart": "topic distribution across the article timeline",
+        "TopicsTagCloud": "word-cloud style overview; best with all topics",
+        "TreemapChart": "comparing relative sizes of topics/subtopics; best with all topics",
+    }
+    chart_components = "\n".join(
+        f"  {c} | {chart_component_descriptions.get(c, '')}"
+        for c in sorted(VALID_COMPONENTS)
+    )
     valid_components = ", ".join(sorted(VALID_COMPONENTS))
 
     return TOPIC_ANNOTATION_PROMPT.format(
@@ -463,8 +491,8 @@ def _generate_fallback_annotations(submission: Dict[str, Any]) -> Dict[str, Any]
             "fold_topics": [],
             "highlight_topics": reading_order[:3],
             "recommended_charts": [
-                {"component": "TreemapChart", "rationale": "topic_size_comparison"},
-                {"component": "ArticleStructureChart", "rationale": "narrative_flow"},
+                {"component": "TreemapChart", "rationale": "topic_size_comparison", "topic_filter": None, "scope": None},
+                {"component": "ArticleStructureChart", "rationale": "narrative_flow", "topic_filter": None, "scope": None},
             ],
         },
     }
@@ -513,7 +541,7 @@ def process_storytelling_generation(
 
     for attempt in range(3):
         try:
-            response = _call(prompt1, "topic_annotation_v1")
+            response = _call(prompt1, "topic_annotation_v2")
             parsed = _parse_json(response)
             if parsed and _validate_topic_annotations(parsed, list(topic_names)):
                 topic_data = parsed
