@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const PRIORITY_COLORS = {
   must_read: '#1a73e8',
@@ -20,13 +20,44 @@ export default function ArticleTreeNav({
   onTopicClick,
   totalSentences,
 }) {
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!scrollRef.current || !activeTopic) return;
+    const activeEl = scrollRef.current.querySelector('.article-tree-node--active');
+    if (activeEl) {
+      // Find the scrollable container (.rg-tree-panel)
+      const container = activeEl.closest('.rg-tree-panel');
+      if (container) {
+        const parentRect = container.getBoundingClientRect();
+        const elRect = activeEl.getBoundingClientRect();
+
+        // Only scroll if the active element is outside the visible area of the sidebar
+        // This prevents constant "fighting" with the user's manual scroll
+        const isVisible = elRect.top >= parentRect.top && elRect.bottom <= parentRect.bottom;
+
+        if (!isVisible) {
+          // Calculate the target scroll position to center the element in the sidebar
+          const elOffsetTop = activeEl.offsetTop;
+          const containerHeight = container.offsetHeight;
+          const elHeight = activeEl.offsetHeight;
+
+          container.scrollTo({
+            top: elOffsetTop - containerHeight / 2 + elHeight / 2,
+            behavior: 'smooth',
+          });
+        }
+      }
+    }
+  }, [activeTopic]);
+
   return (
     <nav className="article-tree-nav" aria-label="Article topics">
       <div className="article-tree-nav__title">Article Flow</div>
       <div className="article-tree-nav__track">
         {/* Thin vertical connecting line */}
         <div className="article-tree-nav__line" />
-        <div className="article-tree-nav__items">
+        <div className="article-tree-nav__items" ref={scrollRef}>
           {orderedTopics.map((topic) => {
             const parts = topic.name.split('>').map((s) => s.trim());
             const depth = parts.length - 1;
@@ -34,6 +65,7 @@ export default function ArticleTreeNav({
             const priority = topicAnnotations[topic.name]?.reading_priority || 'recommended';
             const isRead = readTopics?.has(topic.name);
             const isActive = activeTopic === topic.name;
+            const isParentActive = activeTopic && activeTopic !== topic.name && activeTopic.startsWith(topic.name + ' >');
 
             // Proportional position in the article (0–100)
             const minSentence =
@@ -47,7 +79,7 @@ export default function ArticleTreeNav({
               <button
                 key={topic.name}
                 type="button"
-                className={`article-tree-node${isActive ? ' article-tree-node--active' : ''}${isRead ? ' article-tree-node--read' : ''}`}
+                className={`article-tree-node${isActive ? ' article-tree-node--active' : ''}${isParentActive ? ' article-tree-node--parent-active' : ''}${isRead ? ' article-tree-node--read' : ''}`}
                 style={{ paddingLeft: `${10 + depth * 13}px` }}
                 onClick={() => onTopicClick(topic.name)}
                 title={topic.name.replace(/\s*>\s*/g, ' › ')}

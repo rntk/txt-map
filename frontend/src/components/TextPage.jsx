@@ -547,8 +547,23 @@ function TextPage() {
                 />
               ) : activeTab === 'raw_text' ? (
                 <div className="summary-content">
-                  <div className="raw-text-meta" style={{ marginBottom: '10px' }}>
-                    {rawText.length.toLocaleString()} characters
+                  <div className="raw-text-meta" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{rawText.length.toLocaleString()} characters</span>
+                    <button
+                      className="action-btn"
+                      style={{ padding: '2px 8px', fontSize: '11px' }}
+                      onClick={() => navigator.clipboard.writeText(rawText)}
+                    >
+                      Copy
+                    </button>
+                    <a
+                      className="action-btn"
+                      style={{ padding: '2px 8px', fontSize: '11px', textDecoration: 'none', verticalAlign: 'middle' }}
+                      href={URL.createObjectURL(new Blob([rawText], { type: 'text/plain' }))}
+                      download={`${submission.source_url || submissionId}.txt`}
+                    >
+                      Download
+                    </a>
                   </div>
                   <RawTextDisplay
                     rawText={rawText}
@@ -559,24 +574,32 @@ function TextPage() {
                 </div>
               ) : (
                 articles.map((article, index) => (
-                  <TextDisplay
-                    key={index}
-                    sentences={article.sentences}
-                    selectedTopics={selectedTopics}
-                    hoveredTopic={hoveredTopic}
-                    readTopics={readTopics}
-                    articleTopics={article.topics}
-                    articleIndex={index}
-                    topicSummaries={article.topic_summaries}
-                    paragraphMap={article.paragraph_map}
-                    rawHtml={article.raw_html}
-                    markerWordIndices={article.marker_word_indices}
-                    onToggleRead={toggleRead}
-                    onToggleTopic={toggleTopic}
-                    onNavigateTopic={navigateTopicSentence}
-                    tooltipEnabled={tooltipEnabled}
-                    submissionId={submissionId}
-                  />
+                  article.sentences.length === 0 ? (
+                    <div
+                      key={index}
+                      className="article-section"
+                      dangerouslySetInnerHTML={{ __html: (() => { const m = article.raw_html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return m ? m[1] : article.raw_html; })() }}
+                    />
+                  ) : (
+                    <TextDisplay
+                      key={index}
+                      sentences={article.sentences}
+                      selectedTopics={selectedTopics}
+                      hoveredTopic={hoveredTopic}
+                      readTopics={readTopics}
+                      articleTopics={article.topics}
+                      articleIndex={index}
+                      topicSummaries={article.topic_summaries}
+                      paragraphMap={article.paragraph_map}
+                      rawHtml={article.raw_html}
+                      markerWordIndices={article.marker_word_indices}
+                      onToggleRead={toggleRead}
+                      onToggleTopic={toggleTopic}
+                      onNavigateTopic={navigateTopicSentence}
+                      tooltipEnabled={tooltipEnabled}
+                      submissionId={submissionId}
+                    />
+                  )
                 ))
               )}
             </div>

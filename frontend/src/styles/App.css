@@ -4796,7 +4796,7 @@ textarea {
   width: 210px;
   flex-shrink: 0;
   position: sticky;
-  top: 1rem;
+  top: 3.5rem; /* Account for global topbar */
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
   overflow-x: hidden;
@@ -4880,6 +4880,11 @@ textarea {
   box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3);
 }
 
+.article-tree-node--parent-active {
+  font-weight: 600;
+  color: #444;
+}
+
 .article-tree-node--read {
   opacity: 0.45;
 }
@@ -4928,17 +4933,28 @@ textarea {
 
 /* Category group wrapper for adjacent cards sharing the same parent */
 .rg-topic-group {
-  border-left: 3px solid #e0e0e0;
-  padding-left: 0.5rem;
+  border: 1px solid #eaeaea;
+  border-radius: 12px;
+  background-color: #fafafa;
+  padding: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .rg-topic-group__header {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #888;
-  padding: 0.2rem 0 0.3rem;
-  letter-spacing: 0.02em;
+  position: sticky;
+  top: 3.5rem; /* Offset for global app-shell topbar */
+  z-index: 10;
+  background-color: #fafafa;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #333; /* Darker for better contrast */
+  padding: 0.6rem 0.4rem;
+  margin-top: -0.2rem;
+  margin-bottom: 0.8rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  border-bottom: 1px solid #eaeaea;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02); /* Slight shadow when sticky */
 }
 
 .rg-topic-group__cards {
