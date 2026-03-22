@@ -150,11 +150,15 @@ export default function TopicCard({
   }, [dataExtractions, topicSentences]);
 
   // Key sentences: LLM-recommended (high importance), capped at 5
+  const highImportanceIndices = topicSentences
+    .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
+    .slice(0, 5);
+
   const keySentenceIndices = recommendedSentences.length > 0
     ? recommendedSentences.slice(0, 5)
-    : topicSentences
-        .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
-        .slice(0, 5);
+    : highImportanceIndices.length > 0
+        ? highImportanceIndices
+        : topicSentences.slice(0, 3);
   const visibleSentenceIndices = useMemo(() => {
     const merged = new Set([...keySentenceIndices, ...lockedSourceSentenceIndices]);
     return [...merged].sort((a, b) => a - b);
