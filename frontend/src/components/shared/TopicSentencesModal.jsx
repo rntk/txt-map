@@ -117,12 +117,13 @@ function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInA
                                             ↑ Extend before
                                         </button>
                                     )}
-                                    {group.map(idx => {
+                                    {group.map((idx, sentencePos) => {
                                         const isExtended = extendedIndices.has(idx);
+                                        const isFirst = sentencePos === 0;
                                         return (
                                             <div
                                                 key={idx}
-                                                className={`topic-sentences-modal__sentence${isExtended ? ' topic-sentences-modal__sentence--extended' : ''}`}
+                                                className={`topic-sentences-modal__sentence${isFirst ? ' topic-sentences-modal__sentence--first' : ''}${isExtended ? ' topic-sentences-modal__sentence--extended' : ''}`}
                                             >
                                                 <span className="topic-sentences-modal__sentence-num">{idx}.</span>
                                                 <span className="topic-sentences-modal__sentence-text">

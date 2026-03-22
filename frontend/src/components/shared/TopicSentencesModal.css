@@ -14,9 +14,9 @@
 
 .topic-sentences-modal {
     background: #fff;
-    width: 80vw;
-    max-width: 1100px;
-    height: 75vh;
+    width: 90vw;
+    max-width: 1430px;
+    height: 90vh;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     display: flex;
@@ -36,7 +36,7 @@
 
 .topic-sentences-modal__header h3 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.4rem;
     color: #333;
 }
 
@@ -60,37 +60,45 @@
 }
 
 .topic-sentences-modal__body {
-    padding: 20px;
+    padding: 20px 28px;
     overflow-y: auto;
 }
 
 .topic-sentences-modal__sentence {
     display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #eee;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-left: 4px;
 }
 
-.topic-sentences-modal__sentence:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+.topic-sentences-modal__sentence--first {
+    padding-top: 2px;
 }
 
 .topic-sentences-modal__sentence-num {
-    font-weight: bold;
-    color: #888;
-    min-width: 30px;
+    font-size: 1rem;
+    font-weight: normal;
+    color: #aaa;
+    min-width: 34px;
+    padding-top: 3px;
+    text-align: right;
+    flex-shrink: 0;
+    user-select: none;
 }
 
 .topic-sentences-modal__sentence-text {
-    color: #444;
-    line-height: 1.5;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.25rem;
+    color: #333;
+    line-height: 1.75;
 }
 
 .topic-sentences-modal__sentence--extended {
-    background: #fdf9e3;
+    background: #fdf6e3;
+    border-left: 3px solid #f0c060;
+    padding-left: 8px;
+    margin-left: -4px;
+    border-radius: 2px;
 }
 
 .topic-sentences-modal__range-group {
@@ -98,8 +106,10 @@
 }
 
 .topic-sentences-modal__range-separator {
-    border-top: 2px dashed #ddd;
-    margin: 12px 0;
+    border: none;
+    border-top: 2px dashed #d0d0d0;
+    margin: 20px 0;
+    position: relative;
 }
 
 .topic-sentences-modal__extend-btn {
@@ -110,7 +120,7 @@
     border: 1px dashed #aac;
     border-radius: 4px;
     color: #557;
-    font-size: 0.85rem;
+    font-size: 1.1rem;
     cursor: pointer;
     text-align: center;
     margin: 4px 0;
@@ -122,7 +132,7 @@
 }
 
 .topic-sentences-modal__show-in-article {
-    font-size: 12px;
+    font-size: 16px;
     padding: 4px 10px;
     border: 1px solid #a0b8d0;
     border-radius: 4px;
@@ -141,7 +151,7 @@
     padding: 10px 20px;
     background: #f9f9f9;
     border-bottom: 1px solid #eee;
-    font-size: 0.95rem;
+    font-size: 1.25rem;
     color: #444;
 }
 
