@@ -169,6 +169,7 @@ export default function ReadingGuideLayout({
     topics: safeTopics,
     sentences: safeSentences,
     topicMindmaps: results.topic_mindmaps || {},
+    dataExtractions,
   };
 
   const mustReadCount = Object.values(topicAnnotations).filter(

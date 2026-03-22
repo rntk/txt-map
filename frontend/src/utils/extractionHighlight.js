@@ -2,14 +2,33 @@
  * @typedef {Object} ExtractionValue
  * @property {string} [key]
  * @property {string} [value]
+ * @property {string} [category]
+ * @property {string} [date]
+ * @property {string} [start]
+ * @property {string} [end]
+ */
+
+/**
+ * @typedef {Object} VisualizationConfig
+ * @property {string} [x_label]
+ * @property {string} [y_label]
+ * @property {string} [unit]
+ */
+
+/**
+ * @typedef {Object} ExtractionVisualization
+ * @property {string} chart_type - bar|line|timeline|gantt|table|inline
+ * @property {VisualizationConfig} [config]
  */
 
 /**
  * @typedef {Object} DataExtraction
  * @property {string} [label]
+ * @property {string} [type]
  * @property {number[]} [source_sentences]
  * @property {ExtractionValue[]} [values]
  * @property {string} [display_suggestion]
+ * @property {ExtractionVisualization} [visualization]
  */
 
 /**

@@ -7,6 +7,7 @@ import CircularPackingChart from '../CircularPackingChart';
 import RadarChart from '../RadarChart';
 import MarimekkoChartTab from '../MarimekkoChartTab';
 import MindmapResults from '../MindmapResults';
+import DataChartOverview from '../annotations/charts/DataChartOverview';
 
 /**
  * Registry mapping LLM-output component names to actual React components.
@@ -48,6 +49,22 @@ export const COMPONENT_REGISTRY = {
   MindmapResults: {
     component: MindmapResults,
     dataNeeds: ['mindmapData'],
+  },
+  // Data-driven charts — render extractions matching their chart type
+  DataBarChart: {
+    component: DataChartOverview,
+    dataNeeds: ['dataExtractions'],
+    chartType: 'bar',
+  },
+  DataLineChart: {
+    component: DataChartOverview,
+    dataNeeds: ['dataExtractions'],
+    chartType: 'line',
+  },
+  DataTimelineChart: {
+    component: DataChartOverview,
+    dataNeeds: ['dataExtractions'],
+    chartType: 'timeline',
   },
 };
 
@@ -103,9 +120,17 @@ export function assembleChartProps(componentName, ctx, chartSpec = null) {
           sentences: ctx.sentences || [],
         };
         break;
+      case 'dataExtractions':
+        props.dataExtractions = ctx.dataExtractions || [];
+        break;
       default:
         break;
     }
+  }
+
+  // Pass chartType for data-driven overview charts
+  if (entry.chartType) {
+    props.chartType = entry.chartType;
   }
 
   // Charts that support onShowInArticle get a noop in overview context

@@ -1,5 +1,7 @@
 import React from 'react';
 import { buildExtractionKey } from '../../utils/extractionHighlight';
+import DataChart from './charts/DataChart';
+import { isVisualChart } from '../../utils/dataChartUtils';
 
 /**
  * @typedef {import('../../utils/extractionHighlight').DataExtraction} DataExtraction
@@ -77,6 +79,23 @@ function ExtractionItem({
   const extractionKey = buildExtractionKey(extraction);
   const isActive = extractionKey === activeExtractionKey;
   const hintText = extractionHints?.[extractionKey] || '';
+
+  // Visual chart rendering (bar, line, timeline, gantt)
+  if (hasValues && isVisualChart(extraction)) {
+    return (
+      <ExtractionActivator
+        className="rg-extraction rg-extraction--chart"
+        extractionKey={extractionKey}
+        isActive={isActive}
+        title={hintText || undefined}
+        onExtractionHoverStart={onExtractionHoverStart}
+        onExtractionHoverEnd={onExtractionHoverEnd}
+        onExtractionToggle={onExtractionToggle}
+      >
+        <DataChart extraction={extraction} />
+      </ExtractionActivator>
+    );
+  }
 
   // Fallback: if no grounded values survived, show the raw source sentences
   if (!hasValues) {

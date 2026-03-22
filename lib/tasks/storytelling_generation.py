@@ -19,10 +19,15 @@ VALID_READING_PRIORITIES = {"must_read", "recommended", "optional", "skip"}
 VALID_SKIP_REASONS = {None, "repetitive", "tangential", "too_brief"}
 VALID_IMPORTANCE = {"high", "normal", "low"}
 VALID_FLAGS = {"quote", "data_point", "unique_insight", "opinion", "definition"}
-VALID_EXTRACTION_TYPES = {"statistic", "comparison", "timeline_event", "ranking"}
+VALID_EXTRACTION_TYPES = {
+    "statistic", "comparison", "timeline_event", "ranking",
+    "trend", "proportion", "process_flow", "overlap",
+}
 VALID_DISPLAY_SUGGESTIONS = {"table", "chart_bar", "inline"}
+VALID_CHART_TYPES = {"bar", "line", "timeline", "gantt", "table", "inline"}
 
 VALID_COMPONENTS = {
+    # Topic-structure charts
     "TreemapChart",
     "ArticleStructureChart",
     "TopicsRiverChart",
@@ -32,6 +37,10 @@ VALID_COMPONENTS = {
     "RadarChart",
     "MarimekkoChartTab",
     "MindmapResults",
+    # Data-driven charts (rendered from extracted data)
+    "DataBarChart",
+    "DataLineChart",
+    "DataTimelineChart",
 }
 
 # ─── Prompt templates ────────────────────────────────────────────────────────
@@ -96,6 +105,7 @@ RULES:
 - topic_filter: array of exact topic names from the input to show in this chart, or null to show all topics; use this to focus a chart on the most important topics (e.g., must_read and recommended topics)
 - scope: a hierarchy prefix string like "Category > Subcategory" to scope the chart to one subtree, or null; use this when the article has a dominant topic cluster worth drilling into
 - if both topic_filter and scope are set, topic_filter takes precedence; for broad overview charts (TreemapChart, TopicsTagCloud) prefer null for both to show the full picture
+- DataBarChart, DataLineChart, DataTimelineChart are data-driven charts: they visualize extracted numerical/timeline data rather than topic structure; recommend these when the article contains rich quantitative or chronological data; set topic_filter and scope to null for these
 """
 
 SENTENCE_ANNOTATION_PROMPT = """\
@@ -150,11 +160,26 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
 {{
   "data_extractions": [
     {{
-      "type": "statistic|comparison|timeline_event|ranking",
+      "type": "statistic|comparison|timeline_event|ranking|trend|proportion|process_flow|overlap",
       "source_sentences": [<sentence_index>, ...],
       "label": "<short descriptive label, 2-6 words>",
-      "values": [{{"key": "<row label>", "value": "<exact value from the text>"}}],
-      "display_suggestion": "table|chart_bar|inline"
+      "values": [{{
+        "key": "<row label>",
+        "value": "<exact value from the text>",
+        "category": "<optional grouping category, omit if not applicable>",
+        "date": "<exact date string from the text, omit if not applicable>",
+        "start": "<exact start date/period from the text, for ranges/gantt only>",
+        "end": "<exact end date/period from the text, for ranges/gantt only>"
+      }}],
+      "display_suggestion": "table|chart_bar|inline",
+      "visualization": {{
+        "chart_type": "bar|line|timeline|gantt|table|inline",
+        "config": {{
+          "x_label": "<optional axis label, omit if not needed>",
+          "y_label": "<optional axis label, omit if not needed>",
+          "unit": "<optional unit like $, %, count, omit if not needed>"
+        }}
+      }}
     }}
   ]
 }}
@@ -163,8 +188,11 @@ RULES:
 - source_sentences must be indices from the input above
 - values must be copied verbatim from the source sentences — do NOT paraphrase, round, or invent values
 - label is a short descriptor only (e.g. "Revenue growth", "Election results") — no numbers
-- type: statistic=single fact/number, comparison=two or more values side by side, timeline_event=dated event, ranking=ordered list
-- display_suggestion: table for comparisons/rankings, chart_bar for numeric comparisons, inline for single stats
+- type: statistic=single fact/number, comparison=two or more values side by side, timeline_event=dated event, ranking=ordered list, trend=values changing over time, proportion=parts of a whole, process_flow=sequential steps, overlap=overlapping categories
+- display_suggestion: table for comparisons/rankings, chart_bar for numeric comparisons, inline for single stats (kept for backward compatibility)
+- visualization.chart_type: bar=numeric comparisons with 2+ values, line=trend over time or sequence, timeline=events with dates, gantt=processes with start+end dates, table=non-numeric comparisons, inline=single stats or very short lists
+- Only populate value fields that appear verbatim in the source text: use date for timeline events, start+end for gantt ranges, category for grouping; omit fields that are not present in the text
+- visualization is required for every extraction; choose inline only for a single standalone fact
 - Merge related sentences into one extraction; each sentence index may appear in at most one extraction
 - If no structured data can be extracted, return {{"data_extractions": []}}
 """
@@ -323,6 +351,16 @@ def _validate_data_extractions(data: Any) -> bool:
         for v in values:
             if not isinstance(v, dict):
                 return False
+        # visualization is optional but if present must be valid
+        viz = ex.get("visualization")
+        if viz is not None:
+            if not isinstance(viz, dict):
+                return False
+            if viz.get("chart_type") not in VALID_CHART_TYPES:
+                return False
+            config = viz.get("config")
+            if config is not None and not isinstance(config, dict):
+                return False
     return True
 
 
@@ -358,14 +396,24 @@ def _ground_data_extractions(
             raw = (v.get("value") or "").strip()
             if not raw:
                 continue
-            if any(raw.lower() in src for src in source_texts):
-                grounded_values.append(v)
-            else:
+            if not any(raw.lower() in src for src in source_texts):
                 logger.warning(
                     "[%s] Dropping ungrounded value '%s'='%s' from extraction '%s' "
                     "(not found in source sentences %s)",
                     submission_id, v.get("key"), raw, ex.get("label"), source_indices,
                 )
+                continue
+            # Ground-check optional date/start/end fields; drop field if ungrounded
+            grounded_v = dict(v)
+            for field in ("date", "start", "end"):
+                field_val = (grounded_v.get(field) or "").strip()
+                if field_val and not any(field_val.lower() in src for src in source_texts):
+                    logger.warning(
+                        "[%s] Removing ungrounded field '%s'='%s' from value in extraction '%s'",
+                        submission_id, field, field_val, ex.get("label"),
+                    )
+                    del grounded_v[field]
+            grounded_values.append(grounded_v)
 
         if not grounded_values:
             logger.warning(
@@ -411,6 +459,10 @@ def _build_topic_annotation_prompt(submission: Dict[str, Any]) -> str:
         "TopicsRiverChart": "topic distribution across the article timeline",
         "TopicsTagCloud": "word-cloud style overview; best with all topics",
         "TreemapChart": "comparing relative sizes of topics/subtopics; best with all topics",
+        # Data-driven charts
+        "DataBarChart": "horizontal bar chart of extracted numeric data; use when article has rich quantitative comparisons",
+        "DataLineChart": "line/trend chart of extracted sequential or time-series data; use when article has trends over time",
+        "DataTimelineChart": "timeline or Gantt chart of extracted events/processes with dates; use when article has chronological data",
     }
     chart_components = "\n".join(
         f"  {c} | {chart_component_descriptions.get(c, '')}"
@@ -541,7 +593,7 @@ def process_storytelling_generation(
 
     for attempt in range(3):
         try:
-            response = _call(prompt1, "topic_annotation_v2")
+            response = _call(prompt1, "topic_annotation_v3")
             parsed = _parse_json(response)
             if parsed and _validate_topic_annotations(parsed, list(topic_names)):
                 topic_data = parsed
@@ -670,7 +722,7 @@ def process_storytelling_generation(
             prompt3 = _build_data_extraction_prompt(batch)
             for attempt in range(2):
                 try:
-                    response = _call(prompt3, "data_extraction_v1")
+                    response = _call(prompt3, "data_extraction_v2")
                     parsed = _parse_json(response)
                     if parsed and _validate_data_extractions(parsed):
                         extractions = parsed.get("data_extractions", [])

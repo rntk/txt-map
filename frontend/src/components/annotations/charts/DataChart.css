@@ -1,0 +1,26 @@
+/* ─── Data Chart components ──────────────────────────────────────────────── */
+
+.dc-chart {
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.dc-chart svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.dc-chart__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.dc-chart--bar svg,
+.dc-chart--line svg,
+.dc-chart--timeline svg {
+  overflow: visible;
+}
