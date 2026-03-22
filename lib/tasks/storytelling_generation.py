@@ -15,6 +15,8 @@ from txt_splitt.cache import CacheEntry, _build_cache_key
 
 logger = logging.getLogger(__name__)
 
+MIN_SENTENCES_FOR_STANDALONE = 5  # Topics with fewer sentences get merged with siblings
+
 VALID_READING_PRIORITIES = {"must_read", "recommended", "optional", "skip"}
 VALID_SKIP_REASONS = {None, "repetitive", "tangential", "too_brief"}
 VALID_IMPORTANCE = {"high", "normal", "low"}
@@ -316,7 +318,12 @@ def _validate_sentence_annotations(data: Any, known_indices: List[int]) -> bool:
     sa = data.get("sentence_annotations")
     if not isinstance(sa, dict):
         return False
+    
+    known_strs = {str(i) for i in known_indices}
     for idx_str, ann in sa.items():
+        if idx_str not in known_strs:
+            logger.warning("LLM returned unexpected sentence index: %s (requested: %s)", idx_str, known_strs)
+            return False
         if not isinstance(ann, dict):
             return False
         if ann.get("importance") not in VALID_IMPORTANCE:
@@ -393,7 +400,7 @@ def _ground_data_extractions(
         values = ex.get("values", [])
         grounded_values = []
         for v in values:
-            raw = (v.get("value") or "").strip()
+            raw = str(v.get("value") or "").strip()
             if not raw:
                 continue
             if not any(raw.lower() in src for src in source_texts):
@@ -406,7 +413,7 @@ def _ground_data_extractions(
             # Ground-check optional date/start/end fields; drop field if ungrounded
             grounded_v = dict(v)
             for field in ("date", "start", "end"):
-                field_val = (grounded_v.get(field) or "").strip()
+                field_val = str(grounded_v.get(field) or "").strip()
                 if field_val and not any(field_val.lower() in src for src in source_texts):
                     logger.warning(
                         "[%s] Removing ungrounded field '%s'='%s' from value in extraction '%s'",
@@ -427,12 +434,148 @@ def _ground_data_extractions(
     return grounded
 
 
+# ─── Topic merging ────────────────────────────────────────────────────────────
+
+def _merge_small_topics(
+    topics: List[Dict],
+    min_sentences: int = MIN_SENTENCES_FOR_STANDALONE,
+) -> Tuple[List[Dict], Dict[str, List[str]]]:
+    """
+    Merge small sibling topics into their shared parent name.
+
+    A topic is "small" if it has fewer than min_sentences sentences.
+    Siblings share the same parent path (everything before the last ">").
+    Only merges when 2+ siblings are all small AND share a non-empty parent path
+    that is not already an existing topic name.
+
+    Returns (merged_topics, merge_map) where merge_map maps
+    merged_name -> [original_name, ...] only for groups that were actually merged.
+    """
+    if not topics:
+        return topics, {}
+
+    existing_names = {t.get("name", "") for t in topics}
+
+    # Group topics by parent path
+    from collections import defaultdict
+    groups: Dict[str, List[Dict]] = defaultdict(list)
+    for t in topics:
+        name = t.get("name", "")
+        parts = name.split(">")
+        parent_path = ">".join(parts[:-1]) if len(parts) > 1 else ""
+        groups[parent_path].append(t)
+
+    merged_topics: List[Dict] = []
+    merge_map: Dict[str, List[str]] = {}
+
+    for parent_path, group in groups.items():
+        # Don't merge top-level topics (no shared parent path)
+        if not parent_path:
+            merged_topics.extend(group)
+            continue
+
+        large = [t for t in group if len(t.get("sentences", [])) >= min_sentences]
+        small = [t for t in group if len(t.get("sentences", [])) < min_sentences]
+
+        merged_topics.extend(large)
+
+        if len(small) < 2:
+            merged_topics.extend(small)
+            continue
+
+        # Skip merge if parent name already exists as a topic (name collision)
+        if parent_path in existing_names:
+            merged_topics.extend(small)
+            continue
+
+        original_names = [t.get("name", "") for t in small]
+        merged_sentences = sorted(set(idx for t in small for idx in t.get("sentences", [])))
+        merged_ranges = [r for t in small for r in t.get("ranges", [])]
+
+        merged_topic: Dict[str, Any] = {"name": parent_path, "sentences": merged_sentences}
+        if merged_ranges:
+            merged_topic["ranges"] = merged_ranges
+
+        merged_topics.append(merged_topic)
+        merge_map[parent_path] = original_names
+
+    return merged_topics, merge_map
+
+
+def _build_merged_summaries(
+    merge_map: Dict[str, List[str]],
+    topic_summaries: Dict[str, str],
+) -> Dict[str, str]:
+    """Build a topic_summaries dict with concatenated summaries for merged topics."""
+    merged = dict(topic_summaries)
+    for merged_name, original_names in merge_map.items():
+        parts = [topic_summaries.get(n, "") for n in original_names]
+        merged[merged_name] = "; ".join(p for p in parts if p)
+    return merged
+
+
+def _fan_out_annotations(
+    topic_annotations: Dict[str, Any],
+    structural_suggestions: Dict[str, Any],
+    merge_map: Dict[str, List[str]],
+    original_topics: List[Dict],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Expand merged topic annotations back to original topic names.
+
+    For each merged topic, creates entries for all original constituent topics,
+    filtering recommended_sentences to only include sentences belonging to each
+    original topic. Expands merged names in structural_suggestions lists.
+    """
+    if not merge_map:
+        return topic_annotations, structural_suggestions
+
+    # Build sentence-set lookup for each original topic
+    orig_sentence_sets: Dict[str, set] = {
+        t.get("name", ""): set(t.get("sentences", [])) for t in original_topics
+    }
+
+    fanned: Dict[str, Any] = {}
+    for name, ann in topic_annotations.items():
+        if name in merge_map:
+            for orig in merge_map[name]:
+                ann_copy = dict(ann)
+                if "recommended_sentences" in ann_copy:
+                    orig_sents = orig_sentence_sets.get(orig, set())
+                    ann_copy["recommended_sentences"] = [
+                        s for s in ann_copy["recommended_sentences"] if s in orig_sents
+                    ]
+                fanned[orig] = ann_copy
+        else:
+            fanned[name] = ann
+
+    def _expand_list(names: List[str]) -> List[str]:
+        result = []
+        for name in names:
+            if name in merge_map:
+                result.extend(merge_map[name])
+            else:
+                result.append(name)
+        return result
+
+    fanned_suggestions = dict(structural_suggestions)
+    for key in ("reading_order", "fold_topics", "highlight_topics"):
+        if isinstance(fanned_suggestions.get(key), list):
+            fanned_suggestions[key] = _expand_list(fanned_suggestions[key])
+
+    return fanned, fanned_suggestions
+
+
 # ─── Prompt builders ──────────────────────────────────────────────────────────
 
-def _build_topic_annotation_prompt(submission: Dict[str, Any]) -> str:
+def _build_topic_annotation_prompt(
+    submission: Dict[str, Any],
+    override_topics: Optional[List[Dict]] = None,
+    override_summaries: Optional[Dict[str, str]] = None,
+) -> str:
     results = submission.get("results", {})
-    topics = results.get("topics", [])
-    topic_summaries = results.get("topic_summaries", {})
+    topics = override_topics if override_topics is not None else results.get("topics", [])
+    topic_summaries = override_summaries if override_summaries is not None else results.get("topic_summaries", {})
     article_summary = results.get("article_summary", {})
     sentences = results.get("sentences", [])
 
@@ -581,21 +724,34 @@ def process_storytelling_generation(
     def _call(prompt: str, version: str) -> str:
         return _call_llm_cached(prompt, llm, cache_store, namespace, version)
 
-    topic_names = {t.get("name", "") for t in topics}
-    topic_sentence_map: Dict[str, List[int]] = {
-        t.get("name", ""): t.get("sentences", []) for t in topics
-    }
+    # ── Topic merging (reduce granularity before LLM passes) ─────────────────
+    merged_topics, merge_map = _merge_small_topics(topics)
+    if merge_map:
+        logger.info(
+            "Topic merging: %d original → %d merged topics for %s (merged groups: %s)",
+            len(topics), len(merged_topics), submission_id,
+            {k: len(v) for k, v in merge_map.items()},
+        )
+        merged_summaries = _build_merged_summaries(merge_map, results.get("topic_summaries", {}))
+    else:
+        merged_summaries = None
+
+    merged_topic_names = {t.get("name", "") for t in merged_topics}
 
     # ── Pass 1: Topic-level annotation ───────────────────────────────────────
     logger.info("Annotation pass 1 (topic-level) for %s", submission_id)
     topic_data: Optional[Dict[str, Any]] = None
-    prompt1 = _build_topic_annotation_prompt(submission)
+    prompt1 = _build_topic_annotation_prompt(
+        submission,
+        override_topics=merged_topics if merge_map else None,
+        override_summaries=merged_summaries,
+    )
 
     for attempt in range(3):
         try:
             response = _call(prompt1, "topic_annotation_v3")
             parsed = _parse_json(response)
-            if parsed and _validate_topic_annotations(parsed, list(topic_names)):
+            if parsed and _validate_topic_annotations(parsed, list(merged_topic_names)):
                 topic_data = parsed
                 logger.info("Pass 1 succeeded on attempt %d", attempt + 1)
                 logger.info("Pass 1 parsed result: %s", json.dumps(topic_data, indent=2))
@@ -611,13 +767,14 @@ def process_storytelling_generation(
         _store_annotations(submission_id, db, annotations)
         return
 
-    topic_annotations: Dict[str, Any] = topic_data.get("topic_annotations", {})
-    structural_suggestions: Dict[str, Any] = topic_data.get("structural_suggestions", {})
+    # Annotations keyed by merged topic names (used for passes 2 and fan-out)
+    merged_topic_annotations: Dict[str, Any] = topic_data.get("topic_annotations", {})
+    merged_structural: Dict[str, Any] = topic_data.get("structural_suggestions", {})
 
-    # Fill in any topics the LLM missed with defaults
-    for name in topic_names:
-        if name not in topic_annotations:
-            topic_annotations[name] = {
+    # Fill in any merged topics the LLM missed with defaults
+    for name in merged_topic_names:
+        if name not in merged_topic_annotations:
+            merged_topic_annotations[name] = {
                 "reading_priority": "recommended",
                 "skip_reason": None,
                 "recommended_sentences": [],
@@ -628,15 +785,16 @@ def process_storytelling_generation(
     all_sentence_annotations: Dict[str, Any] = {}
     data_point_sentences: Dict[int, str] = {}  # index → text for pass 3
 
+    # Iterate merged topics so each LLM call sees a fuller sentence range
     important_topics = [
-        t for t in topics
-        if topic_annotations.get(t.get("name", ""), {}).get("reading_priority")
+        t for t in merged_topics
+        if merged_topic_annotations.get(t.get("name", ""), {}).get("reading_priority")
         in ("must_read", "recommended")
     ]
     logger.info(
         "Pass 2: annotating %d/%d topics for %s",
         len(important_topics),
-        len(topics),
+        len(merged_topics),
         submission_id,
     )
 
@@ -674,8 +832,12 @@ def process_storytelling_generation(
 
             if chunk_data:
                 sa = chunk_data.get("sentence_annotations", {})
-                all_sentence_annotations.update(sa)
+                # Ensure we only process indices that were actually requested in this chunk
+                requested_strs = {str(i) for i in chunk_indices}
                 for idx_str, ann in sa.items():
+                    if idx_str not in requested_strs:
+                        continue
+                    all_sentence_annotations[idx_str] = ann
                     if ann.get("importance") == "high":
                         try:
                             topic_recommended.append(int(idx_str))
@@ -693,17 +855,32 @@ def process_storytelling_generation(
                 for idx in chunk_indices:
                     all_sentence_annotations[str(idx)] = {"importance": "normal", "flags": []}
 
-        # Store recommended sentences back into topic annotation
+        # Store recommended sentences back into merged topic annotation
         if topic_recommended:
-            topic_annotations[topic_name]["recommended_sentences"] = sorted(topic_recommended)[:5]
+            merged_topic_annotations[topic_name]["recommended_sentences"] = sorted(topic_recommended)[:5]
 
-    # Default annotations for skipped topics
-    for topic in topics:
+    # Default annotations for skipped merged topics
+    for topic in merged_topics:
         topic_name = topic.get("name", "")
-        if topic_annotations.get(topic_name, {}).get("reading_priority") in ("optional", "skip"):
+        if merged_topic_annotations.get(topic_name, {}).get("reading_priority") in ("optional", "skip"):
             for idx in topic.get("sentences", []):
                 if str(idx) not in all_sentence_annotations:
                     all_sentence_annotations[str(idx)] = {"importance": "low", "flags": []}
+
+    # ── Fan out merged annotations to original topic names ────────────────────
+    topic_annotations, structural_suggestions = _fan_out_annotations(
+        merged_topic_annotations, merged_structural, merge_map, topics
+    )
+
+    # Fill in any original topics missing from annotations (e.g. LLM skipped)
+    original_topic_names = {t.get("name", "") for t in topics}
+    for name in original_topic_names:
+        if name not in topic_annotations:
+            topic_annotations[name] = {
+                "reading_priority": "recommended",
+                "skip_reason": None,
+                "recommended_sentences": [],
+            }
 
     # ── Pass 3: Data extraction ───────────────────────────────────────────────
     data_extractions: List[Dict[str, Any]] = []
