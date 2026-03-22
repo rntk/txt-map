@@ -296,7 +296,8 @@ describe('OverviewPage', () => {
 
       const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
       fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
-      const topicExtractionButton = within(topicCard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*48%/ });
+      // Badge now shows extraction type ('Data' since no type field); hint appears as tooltip
+      const topicExtractionButton = within(topicCard).getByRole('button', { name: 'Data' });
 
       expect(screen.queryByText('Revenue grew by 48% in Europe.')).not.toBeInTheDocument();
       expect(topicExtractionButton).toHaveAttribute('title', '1 hidden source sentence. Click to reveal.');
@@ -308,7 +309,8 @@ describe('OverviewPage', () => {
 
       const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
       fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
-      const topicExtractionButton = within(topicCard).getByRole('button', { name: /Revenue growth:\s*Europe:\s*48%/ });
+      // Badge now shows extraction type ('Data' since no type field)
+      const topicExtractionButton = within(topicCard).getByRole('button', { name: 'Data' });
 
       fireEvent.mouseEnter(topicExtractionButton);
       fireEvent.click(topicExtractionButton);

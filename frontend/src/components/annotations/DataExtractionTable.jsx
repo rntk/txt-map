@@ -28,7 +28,7 @@ function handleExtractionKeyDown(event, extractionKey, onExtractionToggle) {
   }
 }
 
-function ExtractionActivator({
+export function ExtractionActivator({
   as = 'div',
   className,
   extractionKey,

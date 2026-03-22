@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import DataExtractionTable from './DataExtractionTable';
+import ExtractionBadgeBar from './ExtractionBadgeBar';
 import {
   buildExtractionTextSegments,
   extractionIncludesSentence,
@@ -142,13 +142,6 @@ export default function TopicCard({
   }, [lockedExtraction, topicSentences]);
   const isOpen = !folded || lockedSourceSentenceIndices.length > 0;
 
-  const hasTopicExtractions = useMemo(() => {
-    if (!Array.isArray(dataExtractions) || topicSentences.length === 0) return false;
-    return dataExtractions.some(
-      (ex) => Array.isArray(ex.source_sentences) && ex.source_sentences.some((idx) => topicSentences.includes(idx))
-    );
-  }, [dataExtractions, topicSentences]);
-
   // Key sentences: LLM-recommended (high importance), capped at 5
   const highImportanceIndices = topicSentences
     .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
@@ -213,22 +206,16 @@ export default function TopicCard({
 
       {isOpen && (
         <div className="rg-topic-card__body">
-          {hasTopicExtractions && (
-            <div className="rg-topic-card__extractions">
-              <DataExtractionTable
-                extractions={dataExtractions}
-                sentences={sentences}
-                topicSentences={topicSentences}
-                activeExtractionKey={activeExtractionKey}
-                extractionHints={extractionHints}
-                onExtractionHoverStart={onExtractionHoverStart}
-                onExtractionHoverEnd={onExtractionHoverEnd}
-                onExtractionToggle={onExtractionToggle}
-              />
-            </div>
-          )}
-
           <div className="rg-topic-card__content">
+            <ExtractionBadgeBar
+              extractions={dataExtractions}
+              topicSentences={topicSentences}
+              activeExtractionKey={activeExtractionKey}
+              extractionHints={extractionHints}
+              onExtractionHoverStart={onExtractionHoverStart}
+              onExtractionHoverEnd={onExtractionHoverEnd}
+              onExtractionToggle={onExtractionToggle}
+            />
             {visibleSentenceIndices.length > 0 && (
               <div className="rg-topic-card__sentences">
                 {visibleSentenceIndices.map((idx) => {
@@ -256,3 +243,4 @@ export default function TopicCard({
     </div>
   );
 }
+
