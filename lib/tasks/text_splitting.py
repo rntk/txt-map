@@ -27,7 +27,15 @@ def process_text_splitting(submission: Dict[str, Any], db: Any, llm: Any) -> Non
 
     # Split article using txt_splitt (via article_splitter wrapper)
     max_chunk_chars = 84_000 #submission.get("max_chunk_chars", 24_000)
-    result = split_article_with_markers(source, llm, max_chunk_chars=max_chunk_chars)
+    temperature = submission.get("temperature", 0.0)
+    use_json = submission.get("use_json", False)
+    result = split_article_with_markers(
+        source,
+        llm,
+        max_chunk_chars=max_chunk_chars,
+        temperature=temperature,
+        use_json=use_json,
+    )
 
     # sentences are already list of strings
     sentences = result.sentences

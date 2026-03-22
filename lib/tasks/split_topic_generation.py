@@ -45,14 +45,20 @@ def process_split_topic_generation(
 
     tracer = Tracer()
     max_chunk_chars = submission.get("max_chunk_chars", 12_000)
-    logger.info(f"Max chunk chars: {max_chunk_chars}")
+    temperature = submission.get("temperature", 0.0)
+    logger.info(f"Max chunk chars: {max_chunk_chars}, temperature: {temperature}")
     
     # Retry loop for LLM failures
     last_error = None
     for attempt in range(max_retries + 1):
         try:
             result = split_article_with_markers(
-                source, llm, tracer=tracer, max_chunk_chars=max_chunk_chars, cache_store=cache_store
+                source,
+                llm,
+                tracer=tracer,
+                max_chunk_chars=max_chunk_chars,
+                cache_store=cache_store,
+                temperature=temperature,
             )
             last_error = None
             break

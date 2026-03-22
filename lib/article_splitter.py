@@ -15,6 +15,8 @@ from txt_splitt import (
     AdjacentSameTopicJoiner,
     Tracer,
     TracingLLMCallable,
+    RetryConfig,
+    RetryingLLMCallable,
 )
 from txt_splitt.cache import CachingLLMCallable
 
@@ -114,6 +116,9 @@ def split_article(
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
     cache_store: Optional[Any] = None,
+    temperature: float = 0.0,
+    retry_policy: Optional[RetryConfig] = None,
+    use_json: bool = False,
 ) -> ArticleSplitResult:
     """
     Split an article into sentences and topic ranges using txt_splitt.
@@ -124,6 +129,9 @@ def split_article(
         tracer: Optional tracer for pipeline debugging.
         anchor_every_words: Add a marker anchor roughly every N words.
         max_chunk_chars: Maximum characters per chunk for LLM processing.
+        temperature: LLM generation temperature.
+        retry_policy: Optional retry configuration for LLM calls.
+        use_json: Whether to use JSON output mode for LLM responses.
 
     Returns:
         ArticleSplitResult containing sentences and topics.
@@ -146,28 +154,45 @@ def split_article(
         )
 
     llm_adapter = _LLMCallableAdapter(llm)
+    llm_with_retry = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
+    
     cached_adapter = (
         CachingLLMCallable(
-            llm_adapter,
+            llm_with_retry,
             cache_store,
             namespace=_cache_namespace("article-split", llm),
         )
         if cache_store is not None
-        else llm_adapter
+        else llm_with_retry
     )
     llm_callable = TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
+
+    if retry_policy is None:
+        retry_policy = RetryConfig(
+            max_attempts=3,
+            temperature_schedule=[
+                temperature + 0.1,
+                temperature + 0.3,
+                temperature + 0.5,
+            ],
+        )
+
+    output_mode: Literal["text", "json"] = "json" if use_json else "text"
+    parser_mode: Literal["text", "json", "auto"] = "json" if output_mode == "json" else "auto"
 
     pipeline = Pipeline(
         splitter=splitter,
         marker=BracketMarker(),
         llm=TopicRangeLLM(
             client=llm_callable,
-            temperature=0.0,
+            temperature=temperature,
             chunker=OverlapChunker(max_chars=max_chunk_chars),
+            output_mode=output_mode,
+            retry_policy=retry_policy,
         ),
-        parser=TopicRangeParser(),
+        parser=TopicRangeParser(input_mode=parser_mode),
         gap_handler=LLMRepairingGapHandler(
-            llm_callable, temperature=0.0, tracer=tracer
+            llm_callable, temperature=temperature, tracer=tracer
         ),
         joiner=AdjacentSameTopicJoiner(),
         html_cleaner=html_cleaner,
@@ -192,6 +217,9 @@ def split_article_with_markers(
     anchor_every_words: int = 5,
     max_chunk_chars: int = 12_000,
     cache_store: Optional[Any] = None,
+    temperature: float = 0.0,
+    retry_policy: Optional[RetryConfig] = None,
+    use_json: bool = False,
 ) -> ArticleSplitResult:
     """Backward-compatible alias for split_article."""
     return split_article(
@@ -201,4 +229,7 @@ def split_article_with_markers(
         anchor_every_words=anchor_every_words,
         max_chunk_chars=max_chunk_chars,
         cache_store=cache_store,
+        temperature=temperature,
+        retry_policy=retry_policy,
+        use_json=use_json,
     )
