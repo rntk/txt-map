@@ -30,10 +30,11 @@ const menuItems = [
   }
 ];
 
-const ACCEPTED_EXTENSIONS = ['.html', '.htm', '.txt', '.md', '.pdf'];
+const ACCEPTED_EXTENSIONS = ['.html', '.htm', '.txt', '.md', '.pdf', '.fb2', '.epub'];
 const ACCEPTED_MIME = [
-  '.html', '.htm', '.txt', '.md', '.pdf',
+  '.html', '.htm', '.txt', '.md', '.pdf', '.fb2', '.epub',
   'text/html', 'text/plain', 'text/markdown', 'application/pdf',
+  'application/x-fictionbook+xml', 'application/epub+zip',
 ].join(',');
 
 function getUploadDescription(status, errorMessage) {
@@ -45,7 +46,7 @@ function getUploadDescription(status, errorMessage) {
     return errorMessage;
   }
 
-  return 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD.';
+  return 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD, FB2, EPUB.';
 }
 
 function UploadCard() {

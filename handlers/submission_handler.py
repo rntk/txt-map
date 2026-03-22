@@ -56,7 +56,7 @@ def post_submit(
     }
 
 
-ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf"}
+ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf", ".fb2", ".epub"}
 
 
 def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
@@ -94,6 +94,32 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Could not parse PDF: {e}")
 
+    if ext == ".fb2":
+        from lib.fb2_to_html import convert_fb2_to_html, extract_text_from_fb2
+        try:
+            html_content = convert_fb2_to_html(data)
+            text_content = extract_text_from_fb2(data)
+            if not text_content.strip():
+                raise HTTPException(status_code=400, detail="FB2 appears to contain no extractable text.")
+            return html_content, text_content
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not parse FB2: {e}")
+
+    if ext == ".epub":
+        from lib.epub_to_html import convert_epub_to_html, extract_text_from_epub
+        try:
+            html_content = convert_epub_to_html(data)
+            text_content = extract_text_from_epub(data)
+            if not text_content.strip():
+                raise HTTPException(status_code=400, detail="EPUB appears to contain no extractable text.")
+            return html_content, text_content
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not parse EPUB: {e}")
+
     raise HTTPException(
         status_code=415,
         detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
@@ -107,7 +133,7 @@ async def post_upload(
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ) -> Dict[str, str]:
     """
-    Accept an uploaded file (html, htm, txt, md, pdf), extract its text/html
+    Accept an uploaded file (html, htm, txt, md, pdf, fb2, epub), extract its text/html
     content, and process it the same way as a browser-extension submission.
     """
     filename = file.filename or ""

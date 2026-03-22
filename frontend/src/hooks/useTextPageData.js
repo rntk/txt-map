@@ -67,13 +67,14 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
 
     const articles = useMemo(() => {
         const safeSentences = Array.isArray(results.sentences) ? results.sentences : [];
-        if (safeSentences.length === 0) return [];
+        const rawHtml = submission?.html_content || '';
+        if (safeSentences.length === 0 && !rawHtml) return [];
         return [{
             sentences: safeSentences,
             topics: safeTopics,
             topic_summaries: results.topic_summaries || {},
             paragraph_map: results.paragraph_map || null,
-            raw_html: submission?.html_content || '',
+            raw_html: rawHtml,
             marker_word_indices: Array.isArray(results.marker_word_indices) ? results.marker_word_indices : []
         }];
     }, [submission, safeTopics, results]);
