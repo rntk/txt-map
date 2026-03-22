@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
 
   worker:
     build: .
@@ -40,14 +40,14 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-    command: ["python", "workers.py"]
+    command: [ "python", "workers.py" ]
     deploy:
-      replicas: 1  # Scale up for more parallel processing
+      replicas: 2 # Scale up for more parallel processing
 
   mongodb:
     image: mongo:8
     ports:
-      - "27017:27017"  # Standard MongoDB port
+      - "27017:27017" # Standard MongoDB port
     environment:
       - MONGO_INITDB_DATABASE=rss
     volumes:
@@ -55,7 +55,6 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-
   # Optional: LlamaCPP server (if you want to run it locally)
   # Uncomment the section below if you want to include LlamaCPP server
   # llamacpp:
@@ -71,6 +70,7 @@ services:
 
 volumes:
   mongodb_data:
+
 
 networks:
   app-network:
