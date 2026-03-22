@@ -292,9 +292,9 @@ describe('OverviewPage', () => {
 
     it('shows a hidden-sentence hint on hover without revealing the sentence', async () => {
       render(<OverviewPage />);
-      await screen.findByText('Topic A');
+      await screen.findAllByText('Topic A');
 
-      const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
+      const topicCard = screen.getAllByText('Topic A').map(el => el.closest('.rg-topic-card')).find(Boolean);
       fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
       // Badge now shows extraction type ('Data' since no type field); hint appears as tooltip
       const topicExtractionButton = within(topicCard).getByRole('button', { name: 'Data' });
@@ -305,9 +305,9 @@ describe('OverviewPage', () => {
 
     it('reveals and locks the source sentence on click, then clears it on second click', async () => {
       const { container } = render(<OverviewPage />);
-      await screen.findByText('Topic A');
+      await screen.findAllByText('Topic A');
 
-      const topicCard = screen.getByText('Topic A').closest('.rg-topic-card');
+      const topicCard = screen.getAllByText('Topic A').map(el => el.closest('.rg-topic-card')).find(Boolean);
       fireEvent.click(within(topicCard).getByRole('button', { name: 'Expand' }));
       // Badge now shows extraction type ('Data' since no type field)
       const topicExtractionButton = within(topicCard).getByRole('button', { name: 'Data' });

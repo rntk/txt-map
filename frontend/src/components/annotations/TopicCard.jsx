@@ -101,6 +101,7 @@ function KeySentence({ text, annotation, isActive, isSourceReveal, activeExtract
  */
 export default function TopicCard({
   topic,
+  topicSummary,
   topicAnnotation,
   sentenceAnnotations,
   sentences,
@@ -118,6 +119,7 @@ export default function TopicCard({
   showPath = true,
 }) {
   const name = topic?.name || '';
+  const finalSummary = topicSummary || topic?.summary;
   const topicSentences = useMemo(
     () => (Array.isArray(topic?.sentences) ? topic.sentences : []),
     [topic?.sentences]
@@ -130,9 +132,22 @@ export default function TopicCard({
   // optional and skip topics start folded; read topics also start folded
   const startFolded = priority === 'optional' || priority === 'skip' || isRead;
   const [folded, setFolded] = useState(startFolded);
+  const [viewMode, setViewMode] = useState('full');
 
   const displayName = name.includes('>') ? name.split('>').pop() : name;
   const fullPath = name.includes('>') ? name.split('>').slice(0, -1).join(' › ') : null;
+
+  // Debug summary presence
+  /*
+  useEffect(() => {
+    if (topic && topic.summary) {
+      console.log(`TopicCard: topic "${topic.name}" has summary: ${topic.summary.substring(0, 30)}...`);
+    } else if (topic) {
+      console.log(`TopicCard: topic "${topic.name}" has NO summary. Results keys:`, Object.keys(topic));
+    }
+  }, [topic]);
+  */
+
   const lockedSourceSentenceIndices = useMemo(() => {
     if (!lockedExtraction || !Array.isArray(lockedExtraction.source_sentences)) {
       return [];
@@ -183,6 +198,18 @@ export default function TopicCard({
           </div>
         )}
         <div className="rg-topic-card__header-actions">
+          {finalSummary && (
+            <button
+              className="rg-topic-card__toggle-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewMode((v) => (v === 'full' ? 'summary' : 'full'));
+              }}
+              title={`Switch to ${viewMode === 'full' ? 'summary' : 'full sentences'}`}
+            >
+              {viewMode === 'full' ? 'Summary' : 'Full'}
+            </button>
+          )}
           {onToggleRead && (
             <button
               className={`rg-read-btn${isRead ? ' rg-read-btn--read' : ''}`}
@@ -207,16 +234,22 @@ export default function TopicCard({
       {isOpen && (
         <div className="rg-topic-card__body">
           <div className="rg-topic-card__content">
-            <ExtractionBadgeBar
-              extractions={dataExtractions}
-              topicSentences={topicSentences}
-              activeExtractionKey={activeExtractionKey}
-              extractionHints={extractionHints}
-              onExtractionHoverStart={onExtractionHoverStart}
-              onExtractionHoverEnd={onExtractionHoverEnd}
-              onExtractionToggle={onExtractionToggle}
-            />
-            {visibleSentenceIndices.length > 0 && (
+            {viewMode === 'full' && (
+              <ExtractionBadgeBar
+                extractions={dataExtractions}
+                topicSentences={topicSentences}
+                activeExtractionKey={activeExtractionKey}
+                extractionHints={extractionHints}
+                onExtractionHoverStart={onExtractionHoverStart}
+                onExtractionHoverEnd={onExtractionHoverEnd}
+                onExtractionToggle={onExtractionToggle}
+              />
+            )}
+            {viewMode === 'summary' && finalSummary ? (
+              <div className="rg-topic-card__summary">
+                <p>{finalSummary}</p>
+              </div>
+            ) : visibleSentenceIndices.length > 0 && (
               <div className="rg-topic-card__sentences">
                 {visibleSentenceIndices.map((idx) => {
                   const text = sentences && sentences[idx - 1];

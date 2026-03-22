@@ -513,13 +513,28 @@ def process_summarization(
                 ]
 
                 if topic_sentences_text:
-                    # Summarize topic sentences
-                    ts_summary, _ = summarize_by_sentence_groups(
-                        topic_sentences_text, cached_llm, llm
-                    )
-                    topic_summaries[topic["name"]] = " ".join(ts_summary)
+                    if len(topic_sentences_text) == 1:
+                        # For single-sentence topics, just use the sentence summary
+                        ts_summary, _ = summarize_by_sentence_groups(
+                            topic_sentences_text, cached_llm, llm
+                        )
+                        topic_summaries[topic["name"]] = ts_summary[0] if ts_summary else ""
+                    else:
+                        # For multiple sentences, generate one concise summary
+                        topic_text = " ".join(topic_sentences_text)
+                        prompt = (
+                            "Summarize the following sentences into one concise, factual sentence (max 25 words).\n"
+                            "Text:\n" + topic_text + "\n\nSummary:"
+                        )
+                        try:
+                            summary_text = cached_llm.call(prompt, 0.0).strip()
+                            topic_summaries[topic["name"]] = summary_text
+                        except Exception as e:
+                            print(f"Error summarizing topic {topic['name']}: {e}")
+                            topic_summaries[topic["name"]] = ""
 
     # Update submission with results
+    print(f"Storing {len(topic_summaries)} topic summaries for submission {submission_id}")
     submissions_storage = SubmissionsStorage(db)
     submissions_storage.update_results(
         submission_id,

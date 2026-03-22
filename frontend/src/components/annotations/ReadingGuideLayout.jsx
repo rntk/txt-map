@@ -1,7 +1,8 @@
-import React, { useRef, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
 import ReadingOrderBar from './ReadingOrderBar';
 import TopicCard from './TopicCard';
 import DataExtractionTable from './DataExtractionTable';
+import ArticleTreeNav from './ArticleTreeNav';
 import { COMPONENT_REGISTRY, assembleChartProps } from '../storytelling/componentRegistry';
 import { buildExtractionKey } from '../../utils/extractionHighlight';
 
@@ -21,11 +22,14 @@ export default function ReadingGuideLayout({
   submissionId,
   readTopics,
   toggleRead,
+  topicSummaries = {},
 }) {
   const cardRefs = useRef({});
+  const elementToName = useRef(new Map());
   const results = submission?.results || {};
   const [hoveredExtractionKey, setHoveredExtractionKey] = useState(null);
   const [lockedExtractionKey, setLockedExtractionKey] = useState(null);
+  const [activeTopic, setActiveTopic] = useState(null);
 
   const {
     sentence_annotations: sentenceAnnotations = {},
@@ -89,28 +93,16 @@ export default function ReadingGuideLayout({
     return hints;
   }, [dataExtractions, safeTopics, topicAnnotations, sentenceAnnotations]);
 
-  // All topics ordered: reading_order first, then all remaining (nothing omitted)
+  // All topics sorted by article order (first sentence index), preserving natural article flow
   const orderedTopics = useMemo(() => {
-    const topicByName = {};
-    for (const t of safeTopics) topicByName[t.name] = t;
-
-    const ordered = [];
-    const seen = new Set();
-
-    for (const name of readingOrder) {
-      if (topicByName[name] && !seen.has(name)) {
-        ordered.push(topicByName[name]);
-        seen.add(name);
-      }
-    }
-    for (const t of safeTopics) {
-      if (!seen.has(t.name)) {
-        ordered.push(t);
-        seen.add(t.name);
-      }
-    }
-    return ordered;
-  }, [safeTopics, readingOrder]);
+    return [...safeTopics].sort((a, b) => {
+      const aMin =
+        Array.isArray(a.sentences) && a.sentences.length ? Math.min(...a.sentences) : Infinity;
+      const bMin =
+        Array.isArray(b.sentences) && b.sentences.length ? Math.min(...b.sentences) : Infinity;
+      return aMin - bMin;
+    });
+  }, [safeTopics]);
 
   // Group consecutive topics that share the same parent path
   const groupedTopics = useMemo(() => {
@@ -141,6 +133,29 @@ export default function ReadingGuideLayout({
     const el = cardRefs.current[name];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+
+  // Track which topic card is currently in view to highlight it in the tree
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the topmost intersecting entry
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) {
+          const name = elementToName.current.get(visible[0].target);
+          if (name) setActiveTopic(name);
+        }
+      },
+      { rootMargin: '-10% 0px -55% 0px' }
+    );
+
+    Object.entries(cardRefs.current).forEach(([, el]) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [orderedTopics]);
   const handleExtractionHoverStart = useCallback((extractionKey) => {
     setHoveredExtractionKey(extractionKey);
   }, []);
@@ -218,7 +233,7 @@ export default function ReadingGuideLayout({
         </div>
       </div>
 
-      {/* Reading order navigation */}
+      {/* Reading order quick-nav pills */}
       {navTopicNames.length > 0 && (
         <ReadingOrderBar
           topics={navTopicNames}
@@ -228,79 +243,100 @@ export default function ReadingGuideLayout({
         />
       )}
 
-      {/* Charts */}
-      {recommendedCharts.length > 0 && (
-        <div className="rg-charts">
-          {recommendedCharts.slice(0, 2).map((chartSpec, i) => {
-            const entry = COMPONENT_REGISTRY[chartSpec.component];
-            if (!entry) return null;
-            const props = assembleChartProps(chartSpec.component, dataCtx, chartSpec);
-            const ChartComponent = entry.component;
-            return (
-              <div key={i} className="rg-chart-block">
-                <div className="storytelling-chart__container">
-                  <ChartComponent {...props} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Topic cards — ALL topics rendered, optional/skip/read start folded */}
-      <div className="rg-topics">
-        {groupedTopics.map((group, gi) => {
-          const isGrouped = group.parentPath !== null && group.topics.length >= 2;
-          const cards = group.topics.map((topic) => (
-            <TopicCard
-              key={topic.name}
-              topic={topic}
-              topicAnnotation={topicAnnotations[topic.name]}
-              sentenceAnnotations={sentenceAnnotations}
-              sentences={safeSentences}
-              dataExtractions={dataExtractions}
-              isRead={readTopics ? readTopics.has(topic.name) : false}
-              onToggleRead={toggleRead}
-              cardRef={(el) => { cardRefs.current[topic.name] = el; }}
-              activeExtraction={activeExtraction}
-              lockedExtraction={lockedExtraction}
-              activeExtractionKey={activeExtractionKey}
-              hoveredExtractionKey={hoveredExtractionKey}
-              extractionHints={extractionHints}
-              onExtractionHoverStart={handleExtractionHoverStart}
-              onExtractionHoverEnd={handleExtractionHoverEnd}
-              onExtractionToggle={handleExtractionToggle}
-              showPath={!isGrouped}
-            />
-          ));
-          if (!isGrouped) return cards;
-          return (
-            <div key={`group-${gi}`} className="rg-topic-group">
-              <div className="rg-topic-group__header">
-                {group.parentPath.replace(/\s*>\s*/g, ' › ')}
-              </div>
-              <div className="rg-topic-group__cards">{cards}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Data dashboard */}
-      {dataExtractions.length > 0 && (
-        <div className="rg-data-dashboard">
-          <h3 className="rg-data-dashboard__title">Data Points</h3>
-          <DataExtractionTable
-            extractions={dataExtractions}
-            sentences={safeSentences}
-            activeExtractionKey={activeExtractionKey}
-            hoveredExtractionKey={hoveredExtractionKey}
-            extractionHints={extractionHints}
-            onExtractionHoverStart={handleExtractionHoverStart}
-            onExtractionHoverEnd={handleExtractionHoverEnd}
-            onExtractionToggle={handleExtractionToggle}
+      {/* Two-column body: tree nav + cards */}
+      <div className="rg-body">
+        {/* Left: sticky article-flow tree */}
+        <div className="rg-tree-panel">
+          <ArticleTreeNav
+            orderedTopics={orderedTopics}
+            topicAnnotations={topicAnnotations}
+            readTopics={readTopics}
+            activeTopic={activeTopic}
+            onTopicClick={scrollToTopic}
+            totalSentences={safeSentences.length}
           />
         </div>
-      )}
+
+        {/* Right: charts + cards + dashboard */}
+        <div className="rg-main-panel">
+          {/* Charts */}
+          {recommendedCharts.length > 0 && (
+            <div className="rg-charts">
+              {recommendedCharts.slice(0, 2).map((chartSpec, i) => {
+                const entry = COMPONENT_REGISTRY[chartSpec.component];
+                if (!entry) return null;
+                const props = assembleChartProps(chartSpec.component, dataCtx, chartSpec);
+                const ChartComponent = entry.component;
+                return (
+                  <div key={i} className="rg-chart-block">
+                    <div className="storytelling-chart__container">
+                      <ChartComponent {...props} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Topic cards — ALL topics, optional/skip/read start folded */}
+          <div className="rg-topics">
+            {groupedTopics.map((group, gi) => {
+              const isGrouped = group.parentPath !== null && group.topics.length >= 2;
+              const cards = group.topics.map((topic) => (
+                <TopicCard
+                  key={topic.name}
+                  topic={topic}
+                  topicSummary={topicSummaries[topic.name]}
+                  topicAnnotation={topicAnnotations[topic.name]}
+                  sentenceAnnotations={sentenceAnnotations}                  sentences={safeSentences}
+                  dataExtractions={dataExtractions}
+                  isRead={readTopics ? readTopics.has(topic.name) : false}
+                  onToggleRead={toggleRead}
+                  cardRef={(el) => {
+                    cardRefs.current[topic.name] = el;
+                    if (el) elementToName.current.set(el, topic.name);
+                  }}
+                  activeExtraction={activeExtraction}
+                  lockedExtraction={lockedExtraction}
+                  activeExtractionKey={activeExtractionKey}
+                  hoveredExtractionKey={hoveredExtractionKey}
+                  extractionHints={extractionHints}
+                  onExtractionHoverStart={handleExtractionHoverStart}
+                  onExtractionHoverEnd={handleExtractionHoverEnd}
+                  onExtractionToggle={handleExtractionToggle}
+                  showPath={!isGrouped}
+                />
+              ));
+              if (!isGrouped) return cards;
+              return (
+                <div key={`group-${gi}`} className="rg-topic-group">
+                  <div className="rg-topic-group__header">
+                    {group.parentPath.replace(/\s*>\s*/g, ' › ')}
+                  </div>
+                  <div className="rg-topic-group__cards">{cards}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Data dashboard */}
+          {dataExtractions.length > 0 && (
+            <div className="rg-data-dashboard">
+              <h3 className="rg-data-dashboard__title">Data Points</h3>
+              <DataExtractionTable
+                extractions={dataExtractions}
+                sentences={safeSentences}
+                activeExtractionKey={activeExtractionKey}
+                hoveredExtractionKey={hoveredExtractionKey}
+                extractionHints={extractionHints}
+                onExtractionHoverStart={handleExtractionHoverStart}
+                onExtractionHoverEnd={handleExtractionHoverEnd}
+                onExtractionToggle={handleExtractionToggle}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

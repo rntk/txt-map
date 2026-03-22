@@ -42,7 +42,24 @@ export function useSubmission(submissionId) {
         const response = await fetch(`/api/submission/${submissionId}/status`);
         if (response.ok) {
           const data = await response.json();
-          setSubmission(prev => prev ? { ...prev, status: { tasks: data.tasks, overall: data.overall_status } } : null);
+          
+          setSubmission(prev => {
+            if (!prev) return null;
+            
+            // If any task that was not completed before is now completed, refetch full data
+            const prevTasks = prev.status?.tasks || {};
+            const newTasks = data.tasks || {};
+            const anyNewCompleted = Object.keys(newTasks).some(
+              t => newTasks[t].status === 'completed' && prevTasks[t]?.status !== 'completed'
+            );
+            
+            if (anyNewCompleted) {
+              // Trigger a full refetch in the next tick
+              setTimeout(fetchSubmission, 0);
+            }
+
+            return { ...prev, status: { tasks: data.tasks, overall: data.overall_status } };
+          });
 
           if (data.overall_status === 'completed' || data.overall_status === 'failed') {
             clearInterval(interval);

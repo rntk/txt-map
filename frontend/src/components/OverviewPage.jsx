@@ -246,7 +246,7 @@ function OverviewPage() {
   const submissionId = window.location.pathname.split('/')[3];
 
   const { submission, loading, error, readTopics, toggleRead } = useSubmission(submissionId);
-  const { safeTopics, articleSummaryText } = useTextPageData(
+  const { allTopics: safeTopics, articleSummaryText } = useTextPageData(
     submission,
     [],
     null,
@@ -309,6 +309,7 @@ function OverviewPage() {
           submissionId={submissionId}
           readTopics={readTopics}
           toggleRead={toggleRead}
+          topicSummaries={results.topic_summaries || {}}
         />
       </div>
     );
