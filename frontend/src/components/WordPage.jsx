@@ -234,6 +234,8 @@ export default function WordPage() {
           {activeTab === 'summaries' && (
             <div className="word-page-timeline-container">
               <SummaryTimeline
+                mode="summary"
+                title="Topic Summaries"
                 summaryTimelineItems={timelineItems}
                 highlightedSummaryParas={new Set()}
                 summaryModalTopic={null}

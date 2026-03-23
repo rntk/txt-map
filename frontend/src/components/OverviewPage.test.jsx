@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import OverviewPage from './OverviewPage';
 
 // Stub all chart components so tests don't crash on D3/SVG
@@ -390,6 +390,97 @@ describe('OverviewPage', () => {
     });
   });
 
+  describe('annotation layout key insights', () => {
+    const annotationSubmission = {
+      ...mockSubmission,
+      results: {
+        ...mockSubmission.results,
+        topics: [
+          { name: 'Parent > Topic A', sentences: [1, 2] },
+          { name: 'Topic B', sentences: [3] },
+        ],
+        sentences: [
+          'Opening context sentence.',
+          'A critical detail.',
+          'Supporting context.',
+        ],
+        annotations: {
+          sentence_annotations: {
+            1: { importance: 'high', flags: [] },
+            2: { importance: 'normal', flags: [] },
+            3: { importance: 'normal', flags: [] },
+          },
+          topic_annotations: {
+            'Parent > Topic A': {
+              reading_priority: 'recommended',
+              recommended_sentences: [1],
+            },
+            'Topic B': {
+              reading_priority: 'optional',
+              recommended_sentences: [3],
+            },
+          },
+          data_extractions: [],
+          structural_suggestions: {
+            reading_order: ['Parent > Topic A', 'Topic B'],
+            recommended_charts: [],
+          },
+        },
+        insights: [
+          {
+            name: 'Important connection',
+            topics: ['Parent > Topic A'],
+            source_sentence_indices: [2],
+            ranges: [{ start: 1, end: 1 }],
+          },
+        ],
+      },
+    };
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = vi.fn();
+      global.fetch = vi.fn(async () => ({ ok: true, json: async () => annotationSubmission }));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('renders topic chips without source sentence text in the key insights card', async () => {
+      render(<OverviewPage />);
+
+      const insightsCard = await screen.findByText('Key Insights');
+      const insightsPanel = insightsCard.closest('.rg-insights-card');
+
+      expect(within(insightsPanel).getByText('Important connection')).toBeInTheDocument();
+      expect(within(insightsPanel).getByRole('button', { name: 'Topic A' })).toBeInTheDocument();
+      expect(within(insightsPanel).queryByText('A critical detail.')).not.toBeInTheDocument();
+    });
+
+    it('scrolls to and temporarily highlights the matching topic card on insight click', async () => {
+      render(<OverviewPage />);
+
+      const insightsCard = await screen.findByText('Key Insights');
+      const insightsPanel = insightsCard.closest('.rg-insights-card');
+      const topicButton = within(insightsPanel).getByRole('button', { name: 'Topic A' });
+      vi.useFakeTimers();
+
+      act(() => {
+        fireEvent.click(topicButton);
+      });
+
+      const topicCard = document.getElementById('topic-card-Parent%20%3E%20Topic%20A');
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+      expect(topicCard).toHaveClass('rg-topic-card--highlighted');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      expect(topicCard).not.toHaveClass('rg-topic-card--highlighted');
+    });
+  });
+
   it('shows generating banner when storytelling task is pending', async () => {
     global.fetch = vi.fn(async (url) => {
       if (url.includes('/read-progress')) {
@@ -407,5 +498,41 @@ describe('OverviewPage', () => {
 
     render(<OverviewPage />);
     await screen.findByText('Annotating article...');
+  });
+
+  it('renders topic-only highlight chips in legacy storytelling sections when topics are provided', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (url.includes('/word-cloud') || url.includes('/tags')) {
+        return { ok: true, json: async () => ({ words: [], sentence_count: 0 }) };
+      }
+      if (url.includes('/read-progress')) {
+        return { ok: true, json: async () => ({ read_count: 0, total_count: 3 }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          tasks: {
+            storytelling_generation: { status: 'completed' },
+          },
+          results: {
+            ...mockSubmission.results,
+            storytelling: {
+              title: 'The Story of This Article',
+              sections: [
+                { type: 'highlight', topics: ['Parent > Topic A', 'Topic B'], text: 'Should not render' },
+              ],
+            },
+          },
+        }),
+      };
+    });
+
+    render(<OverviewPage />);
+
+    await screen.findByText('The Story of This Article');
+    expect(screen.getByText('Topic A')).toBeInTheDocument();
+    expect(screen.getByText('Topic B')).toBeInTheDocument();
+    expect(screen.queryByText('Should not render')).not.toBeInTheDocument();
   });
 });

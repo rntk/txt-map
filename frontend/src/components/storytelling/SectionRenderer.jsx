@@ -1,6 +1,21 @@
 import React from 'react';
 import { COMPONENT_REGISTRY, assembleChartProps } from './componentRegistry';
 
+/**
+ * @typedef {Object} StorytellingSection
+ * @property {string} [type]
+ * @property {string} [style]
+ * @property {string} [text]
+ * @property {string} [topic]
+ * @property {string} [insight]
+ * @property {string[]} [topics]
+ * @property {Array<{label?: string, value?: string}>} [items]
+ * @property {string} [component]
+ * @property {string} [title]
+ * @property {string} [caption]
+ * @property {string[]} [findings]
+ */
+
 function NarrativeSection({ section }) {
   const style = section.style || 'body';
   return (
@@ -50,13 +65,31 @@ function ChartSection({ section, dataCtx }) {
 }
 
 function HighlightSection({ section }) {
+  const topics = Array.isArray(section.topics)
+    ? [...new Set(section.topics.filter((topicName) => typeof topicName === 'string' && topicName.trim()))]
+    : [];
+
   return (
     <div className="storytelling-highlight">
-      {section.topic && (
+      {topics.length > 0 ? (
+        <div className="storytelling-highlight__topics">
+          {topics.map((topicName) => (
+            <span
+              key={topicName}
+              className="storytelling-highlight__topic-chip"
+              title={topicName.includes('>') ? topicName : undefined}
+            >
+              {topicName.split('>').pop().trim()}
+            </span>
+          ))}
+        </div>
+      ) : section.topic ? (
         <span className="storytelling-highlight__topic">{section.topic}</span>
+      ) : null}
+      {topics.length === 0 && section.text && (
+        <p className="storytelling-highlight__text">{section.text}</p>
       )}
-      <p className="storytelling-highlight__text">{section.text}</p>
-      {section.insight && (
+      {topics.length === 0 && section.insight && (
         <p className="storytelling-highlight__insight">{section.insight}</p>
       )}
     </div>
@@ -80,6 +113,8 @@ function KeyFindingsSection({ section }) {
 /**
  * Renders a single section from the LLM-generated storytelling layout.
  * Unknown section types are silently skipped.
+ *
+ * @param {{ section?: StorytellingSection, dataCtx?: Object }} props
  */
 function SectionRenderer({ section, dataCtx }) {
   if (!section || !section.type) return null;

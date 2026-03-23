@@ -5,6 +5,10 @@ import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
 export function useTextPageData(submission, selectedTopics, hoveredTopic, readTopics) {
     const results = useMemo(() => (submission?.results || {}), [submission]);
+    const insights = useMemo(
+        () => (Array.isArray(results.insights) ? results.insights : []),
+        [results.insights]
+    );
     const safeTopics = useMemo(
         () => (Array.isArray(results.topics) ? results.topics : []),
         [results.topics]
@@ -110,6 +114,7 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
         rawTextFadeRanges,
         highlightedSummaryParas,
         articles,
+        insights,
         summaryTimelineItems,
         articleBulletMatches,
         articleTextMatches,

@@ -3,7 +3,11 @@ import FullScreenGraph from './FullScreenGraph';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 
 function SummaryTimeline({
+  mode = 'summary',
+  title,
   summaryTimelineItems,
+  insights,
+  sentences,
   highlightedSummaryParas,
   summaryModalTopic,
   closeSummaryModal,
@@ -12,23 +16,82 @@ function SummaryTimeline({
   onClose,
   onShowInArticle,
 }) {
+  const resolvedTitle = title || (mode === 'insights' ? 'Insights' : 'Topic Summaries');
+  const insightItems = Array.isArray(insights) ? insights : [];
+  const summaryItems = Array.isArray(summaryTimelineItems) ? summaryTimelineItems : [];
+
   return (
-    <FullScreenGraph title="Topic Summaries" onClose={onClose}>
-      <div className="summary-content" style={{ padding: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
+    <FullScreenGraph title={resolvedTitle} onClose={onClose}>
+      <div className="summary-content summary-content--fullscreen">
         <div className="summary-timeline">
-          {Array.isArray(summaryTimelineItems) && summaryTimelineItems.length > 0 ? (
-            summaryTimelineItems.map((item) => (
+          {mode === 'insights' ? (
+            insightItems.length > 0 ? (
+              insightItems.map((insight, index) => {
+                const insightTopics = Array.isArray(insight.topics) ? insight.topics : [];
+                const sourceSentenceIndices = Array.isArray(insight.source_sentence_indices)
+                  ? insight.source_sentence_indices
+                  : [];
+
+                return (
+                  <div
+                    key={`${insight.name}-${index}`}
+                    className="timeline-item timeline-item--insight"
+                  >
+                    <div className={`timeline-subtopic${insight.name ? '' : ' timeline-subtopic--empty'}`}>
+                      {insight.name || `Insight ${index + 1}`}
+                    </div>
+                    <div className="timeline-dot" />
+                    <div className="timeline-cards-group timeline-cards-group--insight">
+                      <div className="timeline-card timeline-card--insight-meta">
+                        <span className="timeline-label">Insight {index + 1}</span>
+                        {insightTopics.length > 0 ? (
+                          <div className="timeline-topic-links">
+                            {insightTopics.map((topicName) => (
+                              <button
+                                key={topicName}
+                                className="timeline-topic-link"
+                                onClick={() => onShowInArticle({ fullPath: topicName, displayName: topicName })}
+                                title="Show topic in article"
+                              >
+                                {topicName.split('>').pop().trim()}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      {sourceSentenceIndices.length > 0 ? (
+                        sourceSentenceIndices.map((sentenceIndex, sentenceOffset) => (
+                          <div key={`${insight.name}-${sentenceIndex}`} className="timeline-card">
+                            <span className="timeline-label">Sentence {sentenceIndex}</span>
+                            <p className="summary-paragraph-text">
+                              {insight.source_sentences?.[sentenceOffset] || sentences[sentenceIndex - 1] || ''}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        insight.source_sentences?.map((sentenceText, sentenceOffset) => (
+                          <div key={`${insight.name}-unmapped-${sentenceOffset}`} className="timeline-card">
+                            <span className="timeline-label">Source</span>
+                            <p className="summary-paragraph-text">{sentenceText}</p>
+                          </div>
+                        )) || (
+                          <div className="timeline-card">
+                            <p className="timeline-empty-text">No source sentences available.</p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p>No insights available. Processing may still be in progress...</p>
+            )
+          ) : summaryItems.length > 0 ? (
+            summaryItems.map((item) => (
               <React.Fragment key={item.index}>
                 {item.showSectionLabel && item.topLevelLabel && (
-                  <div
-                    className="timeline-section-marker"
-                    style={{
-                      '--timeline-section-bg': item.topicColor?.sectionSurface,
-                      '--timeline-section-border': item.topicColor?.sectionBorder,
-                      '--timeline-section-text': item.topicColor?.sectionText,
-                      '--timeline-section-dot': item.topicColor?.dot
-                    }}
-                  >
+                  <div className="timeline-section-marker">
                     <span className="timeline-section-pill">{item.topLevelLabel}</span>
                   </div>
                 )}
@@ -36,13 +99,6 @@ function SummaryTimeline({
                   id={`summary-para-${item.index}`}
                   data-summary-index={item.index}
                   className={`timeline-item${highlightedSummaryParas.has(item.index) ? ' summary-paragraph-highlighted' : ''}`}
-                  style={{
-                    '--timeline-topic-accent': item.topicColor?.accent,
-                    '--timeline-topic-dot': item.topicColor?.dot,
-                    '--timeline-topic-surface': item.topicColor?.surface,
-                    '--timeline-topic-border': item.topicColor?.border,
-                    '--timeline-subtopic-color': item.topicColor?.subtopicText
-                  }}
                 >
                   <div
                     className={`timeline-subtopic${item.subtopicLabel ? '' : ' timeline-subtopic--empty'}`}

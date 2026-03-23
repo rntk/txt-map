@@ -1,13 +1,15 @@
 """
 Unit tests for storytelling_generation topic merging and fan-out logic.
 """
-import pytest
 
 from lib.tasks.storytelling_generation import (
     _merge_small_topics,
     _build_merged_summaries,
     _fan_out_annotations,
-    MIN_SENTENCES_FOR_STANDALONE,
+)
+from lib.tasks.insights_generation import (
+    _insight_ranges_to_sentence_indices,
+    _map_insight_sentence_indices_to_topics,
 )
 
 
@@ -218,3 +220,57 @@ class TestFanOutAnnotations:
 
         assert result_ss["reading_order"] == ["Tech>AI>GPT", "Tech>AI>BERT", "Science>Biology"]
         assert result_ss["fold_topics"] == ["Tech>AI>GPT", "Tech>AI>BERT"]
+
+
+# =============================================================================
+# Insights mapping helpers
+# =============================================================================
+
+class _Range:
+    def __init__(self, start: int, end: int) -> None:
+        self.start = start
+        self.end = end
+
+
+class TestInsightMappingHelpers:
+    def test_ranges_convert_to_1_based_sentence_indices(self):
+        ranges = [_Range(0, 1), _Range(1, 2)]
+
+        result = _insight_ranges_to_sentence_indices(ranges)
+
+        assert result == [1, 2, 3]
+
+    def test_maps_single_topic(self):
+        topics = [
+            {"name": "Topic A", "sentences": [1, 2]},
+            {"name": "Topic B", "sentences": [3, 4]},
+        ]
+
+        result = _map_insight_sentence_indices_to_topics([2], topics)
+
+        assert result == ["Topic A"]
+
+    def test_maps_multiple_topics_in_article_order(self):
+        topics = [
+            {"name": "Topic A", "sentences": [1, 2]},
+            {"name": "Topic B", "sentences": [5, 6]},
+            {"name": "Topic C", "sentences": [3, 4]},
+        ]
+
+        result = _map_insight_sentence_indices_to_topics([6, 4, 2], topics)
+
+        assert result == ["Topic A", "Topic C", "Topic B"]
+
+    def test_dedupes_topic_hits_from_multiple_sentences(self):
+        topics = [{"name": "Topic A", "sentences": [1, 2, 3]}]
+
+        result = _map_insight_sentence_indices_to_topics([1, 2, 3], topics)
+
+        assert result == ["Topic A"]
+
+    def test_returns_empty_when_no_topics_match(self):
+        topics = [{"name": "Topic A", "sentences": [1, 2, 3]}]
+
+        result = _map_insight_sentence_indices_to_topics([9], topics)
+
+        assert result == []

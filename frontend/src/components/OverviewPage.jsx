@@ -304,6 +304,7 @@ function OverviewPage() {
         <ReadingGuideLayout
           submission={submission}
           annotations={annotations}
+          insights={results.insights || []}
           safeTopics={safeTopics}
           safeSentences={safeSentences}
           submissionId={submissionId}

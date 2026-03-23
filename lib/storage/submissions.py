@@ -8,14 +8,15 @@ from pymongo.database import Database
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
-    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "storytelling_generation"]
+    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation"]
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
         "mindmap": ["split_topic_generation"],
         "prefix_tree": ["split_topic_generation"],
-        "storytelling_generation": ["summarization", "mindmap"],
+        "insights_generation": ["split_topic_generation"],
+        "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
     }
 
     def __init__(self, db: Database) -> None:
@@ -79,6 +80,12 @@ class SubmissionsStorage:
                     "completed_at": None,
                     "error": None
                 },
+                "insights_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
+                },
                 "storytelling_generation": {
                     "status": "pending",
                     "started_at": None,
@@ -101,6 +108,7 @@ class SubmissionsStorage:
                 "summary": [],
                 "summary_mappings": [],
                 "prefix_tree": {},
+                "insights": [],
                 "storytelling": {},
                 "annotations": {}
             }
@@ -206,8 +214,12 @@ class SubmissionsStorage:
         if "prefix_tree" in names:
             update_fields["results.prefix_tree"] = {}
 
+        if "insights_generation" in names:
+            update_fields["results.insights"] = []
+
         if "storytelling_generation" in names:
             update_fields["results.storytelling"] = {}
+            update_fields["results.annotations"] = {}
 
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},

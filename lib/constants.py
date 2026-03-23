@@ -8,6 +8,7 @@ ALLOWED_TASKS: List[str] = [
     "summarization",
     "mindmap",
     "prefix_tree",
+    "insights_generation",
     "storytelling_generation",
 ]
 
@@ -18,5 +19,6 @@ TASK_PRIORITIES: Dict[str, int] = {
     "summarization": 3,
     "mindmap": 3,
     "prefix_tree": 3,
-    "storytelling_generation": 4,
+    "insights_generation": 4,
+    "storytelling_generation": 5,
 }

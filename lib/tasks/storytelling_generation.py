@@ -10,17 +10,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from lib.storage.submissions import SubmissionsStorage
-from txt_splitt import RetryConfig, RetryingLLMCallable
 from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
-from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
-from txt_splitt.insights import InsightParser, build_insight_llm
-from txt_splitt.sentences import (
-    BracketMarker,
-    OptimizingMarker,
-    OverlapChunker,
-    SparseRegexSentenceSplitter,
-)
-from lib.article_splitter import _LLMCallableAdapter
 
 
 logger = logging.getLogger(__name__)
@@ -1005,93 +995,6 @@ def _chunk_sentence_indices(indices: List[int]) -> List[List[int]]:
     return chunks
 
 
-# ─── Insights pipeline ────────────────────────────────────────────────────────
-
-def _generate_insights(
-    submission: Dict[str, Any],
-    llm: Any,
-    cache_store: Any,
-    namespace: str,
-) -> List[Dict[str, Any]]:
-    """
-    Run the txt_splitt insights pipeline on the submission source text.
-
-    Returns a list of insight dicts with keys:
-        name          - short descriptive title (3-8 words)
-        ranges        - list of {start, end} dicts (0-based, inclusive)
-        source_sentences - list of sentence texts covered by the ranges
-    """
-    source = submission.get("html_content") or submission.get("text_content", "")
-    if not source:
-        return []
-
-    # Clean HTML if needed
-    suffix = (submission.get("html_content") or "")
-    if suffix:
-        cleaner = HTMLParserTagStripCleaner(strip_tags={"style", "script"})
-        text, _ = cleaner.clean(source)
-    else:
-        text = source
-
-    splitter = SparseRegexSentenceSplitter(anchor_every_words=12)
-    marker = OptimizingMarker(BracketMarker())
-    sentence_list = splitter.split(text)
-    if not sentence_list:
-        return []
-    marked = marker.mark(text, sentence_list)
-
-    llm_adapter = _LLMCallableAdapter(llm)
-    llm_with_retry: Any = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
-    if cache_store is not None:
-        llm_callable = CachingLLMCallable(
-            llm_with_retry,
-            cache_store,
-            namespace=namespace + ":insights",
-            prompt_version="insights_v1",
-        )
-    else:
-        llm_callable = llm_with_retry
-
-    retry_policy = RetryConfig(
-        max_attempts=3,
-        temperature_schedule=[0.1, 0.3, 0.5],
-    )
-    insight_llm = build_insight_llm(
-        llm_callable,
-        temperature=0.0,
-        chunker=OverlapChunker(max_chars=84000),
-        retry_policy=retry_policy,
-    )
-    parser = InsightParser(input_mode="text")
-
-    try:
-        raw_response = insight_llm.query(marked)
-        insights = parser.parse(raw_response, marked.sentence_count)
-    except Exception as e:
-        logger.warning("Insights pipeline failed: %s", e)
-        return []
-
-    sentence_by_index = {s.index: s for s in sentence_list}
-    result = []
-    for insight in insights:
-        ranges = [{"start": r.start, "end": r.end} for r in insight.ranges]
-        source_sentences = []
-        seen = set()
-        for r in insight.ranges:
-            for idx in range(r.start, r.end + 1):
-                if idx not in seen:
-                    seen.add(idx)
-                    s = sentence_by_index.get(idx)
-                    if s is not None:
-                        source_sentences.append(s.text)
-        result.append({
-            "name": insight.name,
-            "ranges": ranges,
-            "source_sentences": source_sentences,
-        })
-    return result
-
-
 # ─── Fallback ─────────────────────────────────────────────────────────────────
 
 def _generate_fallback_annotations(submission: Dict[str, Any]) -> Dict[str, Any]:
@@ -1113,7 +1016,6 @@ def _generate_fallback_annotations(submission: Dict[str, Any]) -> Dict[str, Any]
         "sentence_annotations": {},
         "topic_annotations": topic_annotations,
         "data_extractions": [],
-        "key_insights": [],
         "structural_suggestions": {
             "reading_order": reading_order[:20],
             "fold_topics": [],
@@ -1135,7 +1037,7 @@ def process_storytelling_generation(
     Process storytelling/annotation generation for a submission.
 
     Three-pass approach:
-    1. Topic-level annotation + key insights (chunked, full sentences, multi-topic with overlap)
+    1. Topic-level annotation (chunked, full sentences, multi-topic with overlap)
     2. Sentence-level annotation (chunked, important topics only)
     3. Data extraction (batched data_point sentences)
 
@@ -1165,9 +1067,6 @@ def process_storytelling_generation(
             len(topics), len(merged_topics), submission_id,
             {k: len(v) for k, v in merge_map.items()},
         )
-        merged_summaries = _build_merged_summaries(merge_map, results.get("topic_summaries", {}))
-    else:
-        merged_summaries = None
 
     merged_topic_names = {t.get("name", "") for t in merged_topics}
 
@@ -1181,8 +1080,6 @@ def process_storytelling_generation(
     logger.info("Pass 1: %d topics → %d chunks for %s", len(merged_topics), len(chunks), submission_id)
 
     chunk_results: List[Tuple[Dict, Dict]] = []
-    any_chunk_failed = False
-
     for c_idx, chunk in enumerate(chunks):
         chunk_topic_names = [t.get("name", "") for t in chunk["topics"]]
         valid_indices = set(chunk["sentence_indices"])
@@ -1216,7 +1113,6 @@ def process_storytelling_generation(
                 logger.warning("Pass 1 chunk %d attempt %d (temp=%.1f) failed: %s", c_idx + 1, attempt + 1, temp, e)
 
         if not chunk_ok:
-            any_chunk_failed = True
             logger.warning("Pass 1 chunk %d failed for topics=%s — using defaults", c_idx + 1, chunk_topic_names)
             # Use fallback result for this chunk
             fallback_ta = {name: {"reading_priority": "recommended", "skip_reason": None} for name in chunk_topic_names}
@@ -1455,17 +1351,11 @@ def process_storytelling_generation(
     else:
         logger.info("Pass 3 skipped for %s: no data_point sentences found", submission_id)
 
-    # ── Insights pass: txt_splitt pipeline ───────────────────────────────────
-    logger.info("Insights pass (txt_splitt pipeline) for %s", submission_id)
-    key_insights = _generate_insights(submission, llm, cache_store, namespace)
-    logger.info("Insights pass: %d insights for %s", len(key_insights), submission_id)
-
     # ── Assemble and store ────────────────────────────────────────────────────
     annotations = {
         "sentence_annotations": all_sentence_annotations,
         "topic_annotations": topic_annotations,
         "data_extractions": data_extractions,
-        "key_insights": key_insights,
         "structural_suggestions": structural_suggestions,
     }
 
@@ -1478,12 +1368,11 @@ def process_storytelling_generation(
 
     _store_annotations(submission_id, db, annotations)
     logger.info(
-        "Annotation completed for %s: %d topics, %d sentences annotated, %d data extractions, %d key insights",
+        "Annotation completed for %s: %d topics, %d sentences annotated, %d data extractions",
         submission_id,
         len(topic_annotations),
         len(all_sentence_annotations),
         len(data_extractions),
-        len(key_insights),
     )
 
 

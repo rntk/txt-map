@@ -495,6 +495,13 @@ body {
   border: 1px solid #e0e0e0;
 }
 
+.summary-content--fullscreen {
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
 .summary-content h2 {
   margin-top: 0;
   margin-bottom: 10px;
@@ -727,6 +734,10 @@ body {
   box-shadow: 0 1px 6px rgba(0,0,0,0.08);
 }
 
+.timeline-cards-group--insight {
+  gap: 10px;
+}
+
 .timeline-cards-group .timeline-card {
   grid-column: unset;
   width: 100%;
@@ -744,6 +755,41 @@ body {
   padding: 1px 7px;
   margin-bottom: 4px;
   letter-spacing: 0.04em;
+}
+
+.timeline-item--insight .timeline-subtopic {
+  align-self: start;
+  padding-top: 10px;
+}
+
+.timeline-card--insight-meta {
+  background: #f7fafc;
+}
+
+.timeline-topic-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timeline-topic-link {
+  padding: 4px 9px;
+  border: 1px solid #c8d4e3;
+  border-radius: 999px;
+  background: #fff;
+  color: #2f5f96;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.timeline-topic-link:hover {
+  background: #eef5fb;
+}
+
+.timeline-empty-text {
+  margin: 0;
+  color: #667085;
 }
 
 .timeline-item.summary-paragraph-highlighted {
@@ -4634,6 +4680,22 @@ textarea {
   color: #1a73e8;
 }
 
+.storytelling-highlight__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.storytelling-highlight__topic-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+  border: 1px solid rgba(26, 115, 232, 0.18);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
 .storytelling-highlight__text {
   font-size: 0.95rem;
   font-weight: 600;
@@ -5018,6 +5080,16 @@ textarea {
   color: #999;
 }
 
+.rg-topic-card--highlighted {
+  animation: pulse-highlight 1.5s ease-in-out;
+  box-shadow: 0 0 0 2px #7c3aed;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% { box-shadow: 0 0 0 2px #7c3aed; }
+  50% { box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.5); }
+}
+
 .rg-topic-card__header {
   display: flex;
   align-items: center;
@@ -5365,6 +5437,37 @@ textarea {
 
 .rg-insight-item__sentence:last-child {
   margin-bottom: 0;
+}
+
+.rg-insight-item__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+.rg-insight-item__topic-link {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background: #f0f0ff;
+  color: #4c1d95;
+  border: 1px solid #d0c5ff;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.rg-insight-item__topic-link:hover {
+  background: #e0d5ff;
+  border-color: #7c3aed;
+}
+
+.rg-insight-item__no-topics {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.3rem 0 0;
+  font-style: italic;
 }
 
 

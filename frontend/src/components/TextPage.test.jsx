@@ -50,6 +50,14 @@ describe('TextPage raw text navigation', () => {
       paragraph_map: null,
       summary: [],
       summary_mappings: [],
+      insights: [
+        {
+          name: 'Important connection',
+          topics: ['Topic1'],
+          source_sentence_indices: [1],
+          ranges: [{ start: 0, end: 0 }],
+        },
+      ],
     },
   };
 
@@ -218,5 +226,17 @@ describe('TextPage raw text navigation', () => {
     await waitFor(() => {
       expect(screen.getByText('100%')).toBeInTheDocument();
     });
+  });
+
+  it('renders the fullscreen insights view with titles and source sentences', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+
+    expect(screen.getByText('Important connection')).toBeInTheDocument();
+    expect(screen.getByText('Sentence 1')).toBeInTheDocument();
+    expect(screen.getAllByText('Alpha Beta Gamma').length).toBeGreaterThan(0);
   });
 });

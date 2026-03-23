@@ -18,6 +18,7 @@ import { buildExtractionKey } from '../../utils/extractionHighlight';
 export default function ReadingGuideLayout({
   submission,
   annotations,
+  insights = [],
   safeTopics,
   safeSentences,
   submissionId,
@@ -31,6 +32,7 @@ export default function ReadingGuideLayout({
   const [hoveredExtractionKey, setHoveredExtractionKey] = useState(null);
   const [lockedExtractionKey, setLockedExtractionKey] = useState(null);
   const [activeTopic, setActiveTopic] = useState(null);
+  const [highlightedTopic, setHighlightedTopic] = useState(null);
   const [topicChartIdx, setTopicChartIdx] = useState(() => Math.floor(Math.random() * TOPIC_CHART_NAMES.length));
 
   const {
@@ -38,7 +40,6 @@ export default function ReadingGuideLayout({
     topic_annotations: topicAnnotations = {},
     data_extractions: dataExtractions = [],
     structural_suggestions: structuralSuggestions = {},
-    key_insights: keyInsights = [],
   } = annotations;
 
   const recommendedCharts = structuralSuggestions.recommended_charts || [];
@@ -136,6 +137,13 @@ export default function ReadingGuideLayout({
     const el = cardRefs.current[name];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+
+  const handleInsightTopicClick = useCallback((topicName) => {
+    setHighlightedTopic(topicName);
+    scrollToTopic(topicName);
+    // Clear highlight after 3 seconds
+    setTimeout(() => setHighlightedTopic(null), 3000);
+  }, [scrollToTopic]);
 
   // Track which topic card is currently in view to highlight it in the tree
   useEffect(() => {
@@ -235,9 +243,9 @@ export default function ReadingGuideLayout({
               <strong>{dataExtractions.length}</strong> data points
             </span>
           )}
-          {keyInsights.length > 0 && (
+          {insights.length > 0 && (
             <span className="rg-stat rg-stat--insight">
-              <strong>{keyInsights.length}</strong> key insights
+              <strong>{insights.length}</strong> key insights
             </span>
           )}
           {readCount > 0 && (
@@ -307,7 +315,7 @@ export default function ReadingGuideLayout({
           })()}
 
           {/* Key Insights card */}
-          <KeyInsightsCard keyInsights={keyInsights} />
+              <KeyInsightsCard keyInsights={insights} onTopicClick={handleInsightTopicClick} />
 
           {/* Topic cards — ALL topics, optional/skip/read start folded */}
           <div className="rg-topics">
@@ -319,9 +327,11 @@ export default function ReadingGuideLayout({
                   topic={topic}
                   topicSummary={topicSummaries[topic.name]}
                   topicAnnotation={topicAnnotations[topic.name]}
-                  sentenceAnnotations={sentenceAnnotations}                  sentences={safeSentences}
+                  sentenceAnnotations={sentenceAnnotations}
+                  sentences={safeSentences}
                   dataExtractions={dataExtractions}
                   isRead={readTopics ? readTopics.has(topic.name) : false}
+                  isHighlighted={highlightedTopic === topic.name}
                   onToggleRead={toggleRead}
                   cardRef={(el) => {
                     cardRefs.current[topic.name] = el;

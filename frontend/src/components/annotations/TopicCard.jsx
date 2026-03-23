@@ -17,6 +17,7 @@ import {
  * @property {string[]} [sentences]
  * @property {DataExtraction[]} [dataExtractions]
  * @property {boolean} [isRead]
+ * @property {boolean} [isHighlighted]
  * @property {(topic: Object) => void} [onToggleRead]
  * @property {(element: HTMLDivElement|null) => void} [cardRef]
  * @property {DataExtraction|null} [activeExtraction]
@@ -109,6 +110,7 @@ export default function TopicCard({
   sentences,
   dataExtractions,
   isRead,
+  isHighlighted,
   onToggleRead,
   cardRef,
   activeExtraction = null,
@@ -181,7 +183,7 @@ export default function TopicCard({
 
   return (
     <div
-      className={`rg-topic-card rg-topic-card--${priority}${isRead ? ' rg-topic-card--read' : ''}`}
+      className={`rg-topic-card rg-topic-card--${priority}${isRead ? ' rg-topic-card--read' : ''}${isHighlighted ? ' rg-topic-card--highlighted' : ''}`}
       ref={cardRef}
       id={`topic-card-${encodeURIComponent(name)}`}
     >

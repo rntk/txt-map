@@ -36,17 +36,19 @@ class TestConstants:
         assert "created_at" in SubmissionsStorage.indexes
         assert len(SubmissionsStorage.indexes) == 2
 
-    def test_task_names_contains_all_5_task_types(self):
-        """task_names contains all 5 task types."""
+    def test_task_names_contains_all_task_types(self):
+        """task_names contains all task types."""
         expected_tasks = [
             "split_topic_generation",
             "subtopics_generation",
             "summarization",
             "mindmap",
-            "prefix_tree"
+            "prefix_tree",
+            "insights_generation",
+            "storytelling_generation",
         ]
         assert SubmissionsStorage.task_names == expected_tasks
-        assert len(SubmissionsStorage.task_names) == 5
+        assert len(SubmissionsStorage.task_names) == 7
 
     def test_task_dependencies_correctly_defined(self):
         """task_dependencies correctly defined for all tasks."""
@@ -56,6 +58,8 @@ class TestConstants:
             "summarization": ["split_topic_generation"],
             "mindmap": ["split_topic_generation"],
             "prefix_tree": ["split_topic_generation"],
+            "insights_generation": ["split_topic_generation"],
+            "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
         }
         assert SubmissionsStorage.task_dependencies == expected_deps
 
@@ -78,15 +82,17 @@ class TestInit:
         assert storage._log is not None
         assert storage._log.name == "submissions"
 
-    def test_task_names_list_contains_5_task_types(self, mock_db):
-        """task_names list contains 5 task types."""
+    def test_task_names_list_contains_all_task_types(self, mock_db):
+        """task_names list contains all task types."""
         storage = SubmissionsStorage(mock_db)
-        assert len(storage.task_names) == 5
+        assert len(storage.task_names) == 7
         assert "split_topic_generation" in storage.task_names
         assert "subtopics_generation" in storage.task_names
         assert "summarization" in storage.task_names
         assert "mindmap" in storage.task_names
         assert "prefix_tree" in storage.task_names
+        assert "insights_generation" in storage.task_names
+        assert "storytelling_generation" in storage.task_names
 
     def test_task_dependencies_correctly_defined(self, mock_db):
         """task_dependencies correctly defined."""
@@ -96,6 +102,8 @@ class TestInit:
         assert storage.task_dependencies["summarization"] == ["split_topic_generation"]
         assert storage.task_dependencies["mindmap"] == ["split_topic_generation"]
         assert storage.task_dependencies["prefix_tree"] == ["split_topic_generation"]
+        assert storage.task_dependencies["insights_generation"] == ["split_topic_generation"]
+        assert storage.task_dependencies["storytelling_generation"] == ["summarization", "mindmap", "insights_generation"]
 
 
 # =============================================================================
@@ -210,8 +218,8 @@ class TestCreate:
         result = storage.create(html_content="<p>Test</p>")
         assert result["source_url"] == ""
 
-    def test_all_5_tasks_initialized_with_status_pending(self, mock_db):
-        """All 5 tasks initialized with status='pending'."""
+    def test_all_tasks_initialized_with_status_pending(self, mock_db):
+        """All tasks initialized with status='pending'."""
         storage = SubmissionsStorage(mock_db)
         result = storage.create(html_content="<p>Test</p>")
 
@@ -253,7 +261,10 @@ class TestCreate:
             "subtopics": [],
             "summary": [],
             "summary_mappings": [],
-            "prefix_tree": {}
+            "prefix_tree": {},
+            "insights": [],
+            "storytelling": {},
+            "annotations": {},
         }
 
         for key, expected_value in expected_results.items():
@@ -750,6 +761,16 @@ class TestClearResults:
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         assert update_doc["$set"]["results.prefix_tree"] == {}
 
+    def test_insights_generation_clears_insights(self, mock_db):
+        """insights_generation clears insights."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
+
+        storage.clear_results("sub-123", task_names=["insights_generation"])
+
+        update_doc = mock_db.submissions.update_one.call_args[0][1]
+        assert update_doc["$set"]["results.insights"] == []
+
     def test_updated_at_timestamp_updated(self, mock_db):
         """updated_at timestamp updated."""
         storage = SubmissionsStorage(mock_db)
@@ -791,16 +812,16 @@ class TestClearResults:
 class TestExpandRecalculationTasks:
     """Tests for SubmissionsStorage.expand_recalculation_tasks."""
 
-    def test_none_input_returns_all_5_tasks(self, mock_db):
-        """None input returns all 5 tasks."""
+    def test_none_input_returns_all_tasks(self, mock_db):
+        """None input returns all tasks."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(None)
 
         assert result == SubmissionsStorage.task_names
 
-    def test_all_input_returns_all_5_tasks(self, mock_db):
-        """['all'] returns all 5 tasks."""
+    def test_all_input_returns_all_tasks(self, mock_db):
+        """['all'] returns all tasks."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["all"])
@@ -813,7 +834,7 @@ class TestExpandRecalculationTasks:
 
         result = storage.expand_recalculation_tasks(["split_topic_generation"])
 
-        assert len(result) == 5
+        assert len(result) == 7
         assert set(result) == set(SubmissionsStorage.task_names)
 
     def test_subtopics_generation_returns_subtopics_and_mindmap(self, mock_db):
@@ -833,21 +854,21 @@ class TestExpandRecalculationTasks:
         # Only subtopics_generation should be returned since no task depends on it
         assert result == ["subtopics_generation"]
 
-    def test_summarization_returns_only_summarization(self, mock_db):
-        """['summarization'] returns only summarization (no dependents)."""
+    def test_summarization_returns_summarization_and_storytelling(self, mock_db):
+        """['summarization'] returns summarization and downstream storytelling."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["summarization"])
 
-        assert result == ["summarization"]
+        assert result == ["summarization", "storytelling_generation"]
 
-    def test_mindmap_returns_only_mindmap(self, mock_db):
-        """['mindmap'] returns only mindmap."""
+    def test_mindmap_returns_mindmap_and_storytelling(self, mock_db):
+        """['mindmap'] returns mindmap and downstream storytelling."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["mindmap"])
 
-        assert result == ["mindmap"]
+        assert result == ["mindmap", "storytelling_generation"]
 
     def test_prefix_tree_returns_only_prefix_tree(self, mock_db):
         """['prefix_tree'] returns only prefix_tree."""
@@ -857,6 +878,14 @@ class TestExpandRecalculationTasks:
 
         assert result == ["prefix_tree"]
 
+    def test_insights_generation_returns_insights_and_storytelling(self, mock_db):
+        """['insights_generation'] returns insights_generation and storytelling_generation."""
+        storage = SubmissionsStorage(mock_db)
+
+        result = storage.expand_recalculation_tasks(["insights_generation"])
+
+        assert result == ["insights_generation", "storytelling_generation"]
+
     def test_multiple_tasks_merged_correctly(self, mock_db):
         """Multiple tasks merged correctly."""
         storage = SubmissionsStorage(mock_db)
@@ -865,7 +894,7 @@ class TestExpandRecalculationTasks:
 
         assert "summarization" in result
         assert "mindmap" in result
-        assert len(result) == 2
+        assert "storytelling_generation" in result
 
     def test_invalid_task_names_filtered_out(self, mock_db):
         """Invalid task names filtered out."""

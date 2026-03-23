@@ -70,6 +70,10 @@ class TestTaskPriorities:
         """prefix_tree has priority 3."""
         assert TASK_PRIORITIES["prefix_tree"] == 3
 
+    def test_insights_generation_has_priority_4(self):
+        """insights_generation has priority 4."""
+        assert TASK_PRIORITIES["insights_generation"] == 4
+
     def test_all_task_types_have_priorities(self):
         """All task types from TASK_HANDLERS have priorities defined."""
         for task_type in TASK_HANDLERS.keys():
@@ -103,6 +107,11 @@ class TestTaskHandlers:
         """Handler for prefix_tree exists."""
         assert "prefix_tree" in TASK_HANDLERS
         assert callable(TASK_HANDLERS["prefix_tree"])
+
+    def test_insights_generation_handler_exists(self):
+        """Handler for insights_generation exists."""
+        assert "insights_generation" in TASK_HANDLERS
+        assert callable(TASK_HANDLERS["insights_generation"])
 
 
 class TestWorkerInit:
@@ -462,7 +471,7 @@ class TestWorkerClaimTask:
             "submission_id": "sub-123"
         }
         # Only return task for split_topic_generation, None for others
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
 
         result = worker.claim_task()
 
@@ -496,7 +505,7 @@ class TestWorkerClaimTask:
             "task_type": "split_topic_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
 
         worker.claim_task()
 
@@ -511,7 +520,7 @@ class TestWorkerClaimTask:
             "task_type": "split_topic_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
 
         worker.claim_task()
 
@@ -527,7 +536,7 @@ class TestWorkerClaimTask:
             "task_type": "split_topic_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
 
         worker.claim_task()
 
@@ -542,7 +551,7 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None]
 
         worker.claim_task()
 
@@ -555,7 +564,7 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None]
         worker._dependencies_met.return_value = False
 
         result = worker.claim_task()
@@ -1593,4 +1602,3 @@ class TestWorkerRun:
         # When running is False from start, the while loop condition is False
         # so claim_task should never be called
         worker.claim_task.assert_not_called()
-
