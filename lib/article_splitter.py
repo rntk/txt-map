@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Literal, Optional
 import logging
 
 from txt_splitt import RetryConfig, RetryingLLMCallable, Tracer, TracingLLMCallable
 from txt_splitt.cache import CachingLLMCallable
 from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
-from txt_splitt.pipeline import Pipeline
 from txt_splitt.sentences import (
     AdjacentSameTopicJoiner,
     BracketMarker,
@@ -15,6 +14,7 @@ from txt_splitt.sentences import (
     SparseRegexSentenceSplitter,
     TopicRangeLLM,
     TopicRangeParser,
+    build_pipeline,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ def split_article(
     output_mode: Literal["text", "json"] = "json" if use_json else "text"
     parser_mode: Literal["text", "json", "auto"] = "json" if output_mode == "json" else "auto"
 
-    pipeline = Pipeline(
+    pipeline = build_pipeline(
         splitter=splitter,
         marker=BracketMarker(),
         llm=TopicRangeLLM(

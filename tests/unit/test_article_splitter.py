@@ -688,7 +688,7 @@ class TestSplitArticleWithoutLLM:
 class TestSplitArticleWithLLM:
     """Test split_article with LLM (full pipeline)."""
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.TracingLLMCallable')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
@@ -725,7 +725,7 @@ class TestSplitArticleWithLLM:
         # Verify Pipeline was created (which uses the adapter)
         assert mock_pipeline_class.called
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.TracingLLMCallable')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
@@ -764,7 +764,7 @@ class TestSplitArticleWithLLM:
 
         mock_tracing_class.assert_called_once()
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -812,7 +812,7 @@ class TestSplitArticleWithLLM:
         assert 'html_cleaner' in call_kwargs
         assert 'offset_restorer' in call_kwargs
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.OverlapChunker')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
@@ -853,7 +853,7 @@ class TestSplitArticleWithLLM:
 
         mock_chunker_class.assert_called_once_with(max_chars=15000)
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -892,7 +892,7 @@ class TestSplitArticleWithLLM:
         call_kwargs = mock_topic_llm_class.call_args[1]
         assert call_kwargs["temperature"] == 0.0
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.LLMRepairingGapHandler')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
@@ -935,7 +935,7 @@ class TestSplitArticleWithLLM:
         call_kwargs = mock_gap_handler_class.call_args[1]
         assert call_kwargs["temperature"] == 0.0
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -976,7 +976,7 @@ class TestSplitArticleWithLLM:
 
         assert result.sentences == ["First.", "Second."]
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1021,7 +1021,7 @@ class TestSplitArticleWithLLM:
         assert len(result.topics) == 1
         assert result.topics[0]["name"] == "Topic"
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1199,7 +1199,7 @@ class TestEdgeCases:
 
         assert len(result.sentences) == 3
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1302,7 +1302,7 @@ class TestEdgeCases:
         assert result.sentences == []
         assert result.topics == []
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1345,7 +1345,7 @@ class TestEdgeCases:
         assert len(result.topics) == 1
         assert result.topics[0]["name"] == "Single Topic"
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1385,7 +1385,7 @@ class TestEdgeCases:
         assert len(result.sentences) == 2
         assert result.topics == []
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1437,7 +1437,7 @@ class TestEdgeCases:
         # Sentences should be deduplicated
         assert result.topics[0]["sentences"] == [1, 2, 3]
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1499,7 +1499,7 @@ class TestEdgeCases:
 class TestIntegration:
     """Integration tests for article splitter with mocked dependencies."""
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
@@ -1562,7 +1562,7 @@ class TestIntegration:
         assert result.topics[1]["name"] == "Content"
         assert result.topics[2]["name"] == "Conclusion"
 
-    @patch('lib.article_splitter.Pipeline')
+    @patch('lib.article_splitter.build_pipeline')
     @patch('lib.article_splitter.TopicRangeLLM')
     @patch('lib.article_splitter.SparseRegexSentenceSplitter')
     @patch('lib.article_splitter.HTMLParserTagStripCleaner')
