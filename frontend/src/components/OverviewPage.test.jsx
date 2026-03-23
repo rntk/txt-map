@@ -3,6 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import OverviewPage from './OverviewPage';
 
+// Stub all chart components so tests don't crash on D3/SVG
+vi.mock('./storytelling/componentRegistry', async (importOriginal) => {
+  const actual = await importOriginal();
+  const stubbed = Object.fromEntries(
+    Object.entries(actual.COMPONENT_REGISTRY).map(([name, entry]) => [
+      name,
+      { ...entry, component: ({ children }) => React.createElement('div', { 'data-testid': `chart-${name}` }, children) },
+    ])
+  );
+  return { ...actual, COMPONENT_REGISTRY: stubbed };
+});
+
 const mockSubmission = {
   submission_id: 'test-id-123',
   source_url: 'https://example.com/article',

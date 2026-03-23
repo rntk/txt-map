@@ -3,7 +3,7 @@ import ReadingOrderBar from './ReadingOrderBar';
 import TopicCard from './TopicCard';
 import DataExtractionTable from './DataExtractionTable';
 import ArticleTreeNav from './ArticleTreeNav';
-import { COMPONENT_REGISTRY, assembleChartProps } from '../storytelling/componentRegistry';
+import { COMPONENT_REGISTRY, assembleChartProps, TOPIC_CHART_NAMES, DATA_CHART_NAMES } from '../storytelling/componentRegistry';
 import { buildExtractionKey } from '../../utils/extractionHighlight';
 
 /**
@@ -30,6 +30,7 @@ export default function ReadingGuideLayout({
   const [hoveredExtractionKey, setHoveredExtractionKey] = useState(null);
   const [lockedExtractionKey, setLockedExtractionKey] = useState(null);
   const [activeTopic, setActiveTopic] = useState(null);
+  const [topicChartIdx, setTopicChartIdx] = useState(() => Math.floor(Math.random() * TOPIC_CHART_NAMES.length));
 
   const {
     sentence_annotations: sentenceAnnotations = {},
@@ -187,6 +188,21 @@ export default function ReadingGuideLayout({
     dataExtractions,
   };
 
+  const hasMindmapData = Object.keys(results.topic_mindmaps || {}).length > 0;
+  const dataCharts = recommendedCharts.filter(c => DATA_CHART_NAMES.has(c.component));
+
+  // All charts in one list: data-driven first (LLM-selected), then topic structure charts
+  const allCharts = useMemo(() => {
+    const topic = TOPIC_CHART_NAMES
+      .filter(name => name !== 'MindmapResults' || hasMindmapData)
+      .map(name => ({ type: 'topic', component: name }));
+    const data = dataCharts.map(spec => ({ type: 'data', component: spec.component, spec }));
+    return [...data, ...topic];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMindmapData, recommendedCharts]);
+
+  const currentChart = allCharts[topicChartIdx % allCharts.length];
+
   const mustReadCount = Object.values(topicAnnotations).filter(
     (a) => a.reading_priority === 'must_read'
   ).length;
@@ -259,24 +275,29 @@ export default function ReadingGuideLayout({
 
         {/* Right: charts + cards + dashboard */}
         <div className="rg-main-panel">
-          {/* Charts */}
-          {recommendedCharts.length > 0 && (
-            <div className="rg-charts">
-              {recommendedCharts.slice(0, 2).map((chartSpec, i) => {
-                const entry = COMPONENT_REGISTRY[chartSpec.component];
-                if (!entry) return null;
-                const props = assembleChartProps(chartSpec.component, dataCtx, chartSpec);
-                const ChartComponent = entry.component;
-                return (
-                  <div key={i} className="rg-chart-block">
-                    <div className="storytelling-chart__container">
-                      <ChartComponent {...props} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Single chart — full width, cycle through all available */}
+          {safeTopics.length > 0 && currentChart && (() => {
+            const entry = COMPONENT_REGISTRY[currentChart.component];
+            if (!entry) return null;
+            const props = assembleChartProps(currentChart.component, dataCtx, currentChart.spec || null);
+            const ChartComponent = entry.component;
+            return (
+              <div className="rg-chart-block">
+                <div className="rg-chart-block__header">
+                  <span className="rg-chart-block__title">Article structure</span>
+                  {allCharts.length > 1 && (
+                    <button
+                      className="action-btn rg-chart-cycle-btn"
+                      onClick={() => setTopicChartIdx(i => (i + 1) % allCharts.length)}
+                    >↻ Switch view</button>
+                  )}
+                </div>
+                <div className="storytelling-chart__container">
+                  <ChartComponent {...props} />
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Topic cards — ALL topics, optional/skip/read start folded */}
           <div className="rg-topics">

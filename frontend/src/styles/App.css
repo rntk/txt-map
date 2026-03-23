@@ -4924,6 +4924,27 @@ textarea {
   min-width: 0;
 }
 
+.rg-chart-block__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.rg-chart-block__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rg-chart-cycle-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
 /* Topic cards */
 .rg-topics {
   display: flex;

@@ -29,17 +29,7 @@ VALID_DISPLAY_SUGGESTIONS = {"table", "chart_bar", "inline"}
 VALID_CHART_TYPES = {"bar", "line", "timeline", "gantt", "table", "inline"}
 
 VALID_COMPONENTS = {
-    # Topic-structure charts
-    "TreemapChart",
-    "ArticleStructureChart",
-    "TopicsRiverChart",
-    "TopicsBarChart",
-    "TopicsTagCloud",
-    "CircularPackingChart",
-    "RadarChart",
-    "MarimekkoChartTab",
-    "MindmapResults",
-    # Data-driven charts (rendered from extracted data)
+    # Data-driven charts only — topic-structure charts are selected by the frontend
     "DataBarChart",
     "DataLineChart",
     "DataTimelineChart",
@@ -102,12 +92,10 @@ RULES:
 - recommended_sentences: leave empty [] — will be filled in a separate pass
 - reading_order: list only must_read and recommended topics, in the order a reader should tackle them
 - fold_topics: list optional and skip topics
-- recommended_charts: choose 1-3 charts that best illustrate this article's content
+- recommended_charts: choose 0-2 data-driven charts only if the article contains quantitative or chronological data; leave as [] if not
 - chart component must be one of: {valid_components}
-- topic_filter: array of exact topic names from the input to show in this chart, or null to show all topics; use this to focus a chart on the most important topics (e.g., must_read and recommended topics)
-- scope: a hierarchy prefix string like "Category > Subcategory" to scope the chart to one subtree, or null; use this when the article has a dominant topic cluster worth drilling into
-- if both topic_filter and scope are set, topic_filter takes precedence; for broad overview charts (TreemapChart, TopicsTagCloud) prefer null for both to show the full picture
-- DataBarChart, DataLineChart, DataTimelineChart are data-driven charts: they visualize extracted numerical/timeline data rather than topic structure; recommend these when the article contains rich quantitative or chronological data; set topic_filter and scope to null for these
+- topic_filter and scope must always be null for data-driven charts
+- DataBarChart: use when article has rich numeric comparisons; DataLineChart: use when article has trends over time; DataTimelineChart: use when article has events/processes with dates
 """
 
 SENTENCE_ANNOTATION_PROMPT = """\
@@ -410,6 +398,36 @@ def _validate_data_extractions(data: Any) -> bool:
     return True
 
 
+_UNIT_PATTERNS = [
+    (re.compile(r'[\$]|USD', re.IGNORECASE), 'currency_usd'),
+    (re.compile(r'€|EUR', re.IGNORECASE), 'currency_eur'),
+    (re.compile(r'£|GBP', re.IGNORECASE), 'currency_gbp'),
+    (re.compile(r'%|percent', re.IGNORECASE), 'percentage'),
+    (re.compile(r'\b(million|mn)\b', re.IGNORECASE), 'million'),
+    (re.compile(r'\b(billion|bn)\b', re.IGNORECASE), 'billion'),
+    (re.compile(r'\b(trillion|tn)\b', re.IGNORECASE), 'trillion'),
+    (re.compile(r'\b(kg|kilogram)', re.IGNORECASE), 'weight_kg'),
+    (re.compile(r'\b(lb|pound)', re.IGNORECASE), 'weight_lb'),
+    (re.compile(r'\b(km|kilometer|mile)', re.IGNORECASE), 'distance'),
+    (re.compile(r'\b(year|month|day|hour|minute|second)s?\b', re.IGNORECASE), 'time'),
+]
+
+_BARE_NUMBER_RE = re.compile(r'^[\d,\.\s]+$')
+
+MAX_SENTENCE_GAP = 10
+
+
+def _parse_unit(value_str: str) -> Optional[str]:
+    """Extract a unit category from a value string. Returns 'bare_number' for plain numbers,
+    a unit category string if a known unit is detected, or None if unknown."""
+    for pattern, unit_type in _UNIT_PATTERNS:
+        if pattern.search(value_str):
+            return unit_type
+    if _BARE_NUMBER_RE.match(value_str.strip()):
+        return 'bare_number'
+    return None
+
+
 def _ground_data_extractions(
     extractions: List[Dict[str, Any]],
     sentences: List[str],
@@ -420,6 +438,13 @@ def _ground_data_extractions(
     A value is grounded if its text appears (case-insensitive) as a substring in at
     least one of the extraction's source sentences. Ungrounded values are dropped with
     a warning; extractions with no grounded values left are dropped entirely.
+
+    Also applies:
+    - Source proximity check: source_sentences indices must not span more than
+      MAX_SENTENCE_GAP positions (values from very different article sections
+      likely describe different facts).
+    - Unit consistency check: grounded values must not mix incompatible unit types
+      (e.g., percentages and currency amounts on the same chart).
     """
     grounded = []
     for ex in extractions:
@@ -435,6 +460,18 @@ def _ground_data_extractions(
                 submission_id, ex.get("label"), source_indices,
             )
             continue
+
+        # Source proximity check — early exit before per-value work
+        valid_indices = [idx for idx in source_indices if 1 <= idx <= len(sentences)]
+        if len(valid_indices) >= 2:
+            span = max(valid_indices) - min(valid_indices)
+            if span > MAX_SENTENCE_GAP:
+                logger.warning(
+                    "[%s] Dropping extraction '%s': source sentences span %d indices "
+                    "(max %d), indices: %s",
+                    submission_id, ex.get("label"), span, MAX_SENTENCE_GAP, sorted(valid_indices),
+                )
+                continue
 
         values = ex.get("values", [])
         grounded_values = []
@@ -467,6 +504,17 @@ def _ground_data_extractions(
                 submission_id, ex.get("label"),
             )
             continue
+
+        # Unit consistency check — only meaningful if multiple values
+        if len(grounded_values) >= 2:
+            units = {_parse_unit(str(v.get("value", ""))) for v in grounded_values}
+            meaningful_units = units - {None, 'bare_number'}
+            if len(meaningful_units) > 1:
+                logger.warning(
+                    "[%s] Dropping extraction '%s': mixed unit types detected (%s)",
+                    submission_id, ex.get("label"), meaningful_units,
+                )
+                continue
 
         grounded.append({**ex, "values": grounded_values})
 
@@ -632,16 +680,6 @@ def _build_topic_annotation_prompt(
     topics_table = "\n".join(topic_rows) if topic_rows else "  (no topics available)"
 
     chart_component_descriptions = {
-        "ArticleStructureChart": "showing narrative flow and topic ordering across the article",
-        "CircularPackingChart": "nested topic hierarchy with proportional circle sizes",
-        "MarimekkoChartTab": "proportional area comparison of topics side by side",
-        "MindmapResults": "mind map of topic relationships and sub-topics",
-        "RadarChart": "multi-dimensional comparison of a focused set of topics",
-        "TopicsBarChart": "comparing topic sizes as bars; good for a focused subset",
-        "TopicsRiverChart": "topic distribution across the article timeline",
-        "TopicsTagCloud": "word-cloud style overview; best with all topics",
-        "TreemapChart": "comparing relative sizes of topics/subtopics; best with all topics",
-        # Data-driven charts
         "DataBarChart": "horizontal bar chart of extracted numeric data; use when article has rich quantitative comparisons",
         "DataLineChart": "line/trend chart of extracted sequential or time-series data; use when article has trends over time",
         "DataTimelineChart": "timeline or Gantt chart of extracted events/processes with dates; use when article has chronological data",
@@ -747,10 +785,7 @@ def _generate_fallback_annotations(submission: Dict[str, Any]) -> Dict[str, Any]
             "reading_order": reading_order[:20],
             "fold_topics": [],
             "highlight_topics": reading_order[:3],
-            "recommended_charts": [
-                {"component": "TreemapChart", "rationale": "topic_size_comparison", "topic_filter": None, "scope": None},
-                {"component": "ArticleStructureChart", "rationale": "narrative_flow", "topic_filter": None, "scope": None},
-            ],
+            "recommended_charts": [],
         },
     }
 

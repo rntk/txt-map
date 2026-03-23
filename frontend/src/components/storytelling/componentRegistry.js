@@ -10,6 +10,25 @@ import MindmapResults from '../MindmapResults';
 import DataChartOverview from '../annotations/charts/DataChartOverview';
 
 /**
+ * Topic-structure chart names — selected randomly by the frontend, not by the LLM.
+ * These visualize the topic structure in various ways; all work regardless of content.
+ */
+export const TOPIC_CHART_NAMES = [
+  'TreemapChart',
+  'ArticleStructureChart',
+  'TopicsRiverChart',
+  'TopicsBarChart',
+  'TopicsTagCloud',
+  'CircularPackingChart',
+  'RadarChart',
+  'MarimekkoChartTab',
+  'MindmapResults',
+];
+
+/** Data-driven chart names — selected by the LLM when the article has quantitative data. */
+export const DATA_CHART_NAMES = new Set(['DataBarChart', 'DataLineChart', 'DataTimelineChart']);
+
+/**
  * Registry mapping LLM-output component names to actual React components.
  * dataNeeds lists the keys required from the submission data context.
  */
