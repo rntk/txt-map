@@ -2,23 +2,20 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 import logging
 
-from txt_splitt import (
+from txt_splitt import RetryConfig, RetryingLLMCallable, Tracer, TracingLLMCallable
+from txt_splitt.cache import CachingLLMCallable
+from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
+from txt_splitt.pipeline import Pipeline
+from txt_splitt.sentences import (
+    AdjacentSameTopicJoiner,
     BracketMarker,
-    SparseRegexSentenceSplitter,
-    HTMLParserTagStripCleaner,
     LLMRepairingGapHandler,
     MappingOffsetRestorer,
-    Pipeline,
     OverlapChunker,
+    SparseRegexSentenceSplitter,
     TopicRangeLLM,
     TopicRangeParser,
-    AdjacentSameTopicJoiner,
-    Tracer,
-    TracingLLMCallable,
-    RetryConfig,
-    RetryingLLMCallable,
 )
-from txt_splitt.cache import CachingLLMCallable
 
 logger = logging.getLogger(__name__)
 

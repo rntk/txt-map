@@ -1,19 +1,10 @@
 import React from 'react';
 
-const INSIGHT_TYPE_LABELS = {
-  counterintuitive: 'Counterintuitive',
-  actionable_threshold: 'Actionable Threshold',
-  surprising_statistic: 'Surprising Statistic',
-  important_caveat: 'Important Caveat',
-  paradigm_shift: 'Paradigm Shift',
-};
-
 /**
  * KeyInsightsCard — displays key insights extracted from the article.
- * Each insight shows the verbatim source sentences + an insight type badge.
- * No LLM-generated text is displayed.
+ * Each insight shows its descriptive name and the verbatim source sentences.
  */
-export default function KeyInsightsCard({ keyInsights, sentences, onTopicClick }) {
+export default function KeyInsightsCard({ keyInsights }) {
   if (!keyInsights || keyInsights.length === 0) return null;
 
   return (
@@ -25,28 +16,11 @@ export default function KeyInsightsCard({ keyInsights, sentences, onTopicClick }
       </div>
       <div className="rg-insights-card__list">
         {keyInsights.map((insight, i) => {
-          const typeLabel = INSIGHT_TYPE_LABELS[insight.insight_type] || insight.insight_type;
-          const sourceSentences = (insight.sentence_indices || [])
-            .filter((idx) => idx >= 1 && idx <= (sentences || []).length)
-            .map((idx) => sentences[idx - 1])
-            .filter(Boolean);
+          const sourceSentences = insight.source_sentences || [];
 
           return (
             <div key={i} className="rg-insight-item">
-              <div className="rg-insight-item__meta">
-                <span className={`rg-insight-item__type rg-insight-item__type--${insight.insight_type}`}>
-                  {typeLabel}
-                </span>
-                {insight.topic && (
-                  <button
-                    className="rg-insight-item__topic-tag"
-                    onClick={() => onTopicClick && onTopicClick(insight.topic)}
-                    title={`Go to topic: ${insight.topic}`}
-                  >
-                    {insight.topic.split('>').pop().trim()}
-                  </button>
-                )}
-              </div>
+              <div className="rg-insight-item__name">{insight.name}</div>
               {sourceSentences.map((text, j) => (
                 <p key={j} className="rg-insight-item__sentence">{text}</p>
               ))}

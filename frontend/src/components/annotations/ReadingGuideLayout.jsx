@@ -307,10 +307,7 @@ export default function ReadingGuideLayout({
           })()}
 
           {/* Key Insights card */}
-          <KeyInsightsCard
-            keyInsights={keyInsights}
-            onTopicClick={scrollToTopic}
-          />
+          <KeyInsightsCard keyInsights={keyInsights} />
 
           {/* Topic cards — ALL topics, optional/skip/read start folded */}
           <div className="rg-topics">

@@ -10,7 +10,17 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from lib.storage.submissions import SubmissionsStorage
-from txt_splitt.cache import CacheEntry, _build_cache_key
+from txt_splitt import RetryConfig, RetryingLLMCallable
+from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
+from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
+from txt_splitt.insights import InsightParser, build_insight_llm
+from txt_splitt.sentences import (
+    BracketMarker,
+    OptimizingMarker,
+    OverlapChunker,
+    SparseRegexSentenceSplitter,
+)
+from lib.article_splitter import _LLMCallableAdapter
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +32,7 @@ OVERLAP_FRACTION = 0.10          # Sentence overlap fraction at chunk boundaries
 VALID_READING_PRIORITIES = {"must_read", "recommended", "optional", "skip"}
 VALID_SKIP_REASONS = {None, "repetitive", "tangential", "too_brief"}
 VALID_IMPORTANCE = {"high", "normal", "low"}
-VALID_FLAGS = {"quote", "data_point", "unique_insight", "opinion", "definition", "key_insight"}
+VALID_FLAGS = {"quote", "data_point", "unique_insight", "opinion", "definition"}
 VALID_EXTRACTION_TYPES = {
     "statistic", "comparison", "timeline_event", "ranking",
     "trend", "proportion", "process_flow", "overlap",
@@ -36,16 +46,6 @@ VALID_COMPONENTS = {
     "DataLineChart",
     "DataTimelineChart",
 }
-
-VALID_INSIGHT_TYPES = {
-    "counterintuitive",     # contradicts common assumptions
-    "actionable_threshold", # specific number/limit a reader can act on
-    "surprising_statistic", # a striking data point
-    "important_caveat",     # a limitation or warning that changes interpretation
-    "paradigm_shift",       # fundamentally changes how the reader understands something
-}
-
-MAX_INSIGHT_SENTENCES = 3  # Max sentences per key insight
 
 # ─── Prompt templates ────────────────────────────────────────────────────────
 
@@ -136,27 +136,13 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
       "reading_priority": "must_read|recommended|optional|skip",
       "skip_reason": null
     }}
-  }},
-  "key_insights": [
-    {{
-      "sentence_indices": [<int>],
-      "insight_type": "counterintuitive|actionable_threshold|surprising_statistic|important_caveat|paradigm_shift"
-    }}
-  ]
+  }}
 }}
 
 RULES:
 - Every topic name in TOPICS IN THIS CHUNK must appear in topic_annotations
 - reading_priority: "must_read" = essential core content (aim 20-40% overall), "recommended" = worth reading (aim 20-30% overall), "optional" = can skim, "skip" = skip entirely; topics with 1 sentence are rarely must_read
 - skip_reason must be null unless reading_priority is "skip" or "optional"; use one of: repetitive, tangential, too_brief
-- key_insights: identify 0-5 findings per chunk that a reader would want highlighted; leave empty [] if nothing stands out
-  - counterintuitive: contradicts common assumptions
-  - actionable_threshold: contains a specific number, limit, or setting a reader can act on
-  - surprising_statistic: a striking data point or measurement
-  - important_caveat: a limitation or warning that changes how to interpret results
-  - paradigm_shift: fundamentally reframes how the reader should think about something
-- sentence_indices: 1-3 indices from the sentences shown above that best express the insight (use exact indices)
-- Do NOT generate any explanatory text — sentence_indices and insight_type are the only output fields per insight
 """
 
 SENTENCE_ANNOTATION_PROMPT = """\
@@ -585,37 +571,6 @@ def _ground_data_extractions(
     return grounded
 
 
-def _ground_key_insights(
-    insights: List[Dict[str, Any]],
-    sentences: List[str],
-    submission_id: str,
-) -> List[Dict[str, Any]]:
-    """
-    Filter key insights to only keep those whose sentence_indices are all valid
-    (in-range) and within MAX_SENTENCE_GAP of each other.
-    Insights referencing out-of-range or widely scattered sentences are dropped.
-    """
-    grounded = []
-    for ki in insights:
-        indices = ki.get("sentence_indices", [])
-        valid = [idx for idx in indices if isinstance(idx, int) and 1 <= idx <= len(sentences)]
-        if not valid:
-            logger.warning(
-                "[%s] Dropping key insight (type=%s, topic=%s): no valid sentence indices %s",
-                submission_id, ki.get("insight_type"), ki.get("topic"), indices,
-            )
-            continue
-        if len(valid) >= 2 and max(valid) - min(valid) > MAX_SENTENCE_GAP:
-            logger.warning(
-                "[%s] Dropping key insight (type=%s, topic=%s): sentence indices span %d (max %d): %s",
-                submission_id, ki.get("insight_type"), ki.get("topic"),
-                max(valid) - min(valid), MAX_SENTENCE_GAP, sorted(valid),
-            )
-            continue
-        grounded.append({**ki, "sentence_indices": valid})
-    return grounded
-
-
 # ─── Topic merging ────────────────────────────────────────────────────────────
 
 def _merge_small_topics(
@@ -1005,97 +960,17 @@ def _validate_chunked_topic_annotations(
         if skip_reason not in VALID_SKIP_REASONS:
             return False
 
-    ki = data.get("key_insights")
-    if not isinstance(ki, list):
-        return False
-
-    for insight in ki:
-        if not isinstance(insight, dict):
-            return False
-        indices = insight.get("sentence_indices")
-        if not isinstance(indices, list) or len(indices) < 1 or len(indices) > MAX_INSIGHT_SENTENCES:
-            return False
-        if insight.get("insight_type") not in VALID_INSIGHT_TYPES:
-            return False
-        # topic is inferred in code — not validated from LLM output
-        # All sentence indices must be valid (allow context overlap indices too)
-        for idx in indices:
-            if not isinstance(idx, int) or idx not in valid_sentence_indices:
-                return False
-
     return True
-
-
-def _infer_topic_for_insight(sentence_indices: List[int], chunk_topics: List[Dict]) -> str:
-    """
-    Deterministically assign a topic to an insight based on which chunk topic
-    owns the most of the insight's sentence_indices. Falls back to the topic
-    that contains the lowest sentence index if there is a tie.
-    """
-    idx_set = set(sentence_indices)
-    best_topic = ""
-    best_count = -1
-    best_min_idx = float("inf")
-
-    for t in chunk_topics:
-        t_sentences = set(t.get("sentences", []))
-        overlap = len(idx_set & t_sentences)
-        min_idx = min(t_sentences) if t_sentences else float("inf")
-        if overlap > best_count or (overlap == best_count and min_idx < best_min_idx):
-            best_count = overlap
-            best_min_idx = min_idx
-            best_topic = t.get("name", "")
-
-    return best_topic
 
 
 def _merge_chunk_results(
     chunk_results: List[Tuple[Dict, Dict]],
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """
-    Merge topic_annotations and key_insights from all chunk results.
-
-    chunk_results is a list of (chunk_descriptor, parsed_llm_result) tuples.
-    Topic assignment for each insight is inferred from sentence ownership, not
-    taken from LLM output.
-    Returns (merged_topic_annotations, merged_key_insights).
-    """
+) -> Dict[str, Any]:
+    """Merge topic_annotations from all chunk results."""
     merged_ta: Dict[str, Any] = {}
-    all_insights: List[Dict[str, Any]] = []
-
-    for chunk, result in chunk_results:
-        ta = result.get("topic_annotations", {})
-        merged_ta.update(ta)
-        chunk_topics = chunk.get("topics", [])
-        for insight in result.get("key_insights", []):
-            # Infer topic from sentence ownership — do not trust LLM-generated field
-            inferred_topic = _infer_topic_for_insight(
-                insight.get("sentence_indices", []), chunk_topics
-            )
-            all_insights.append({**insight, "topic": inferred_topic})
-
-    # Deduplicate insights: if two share >50% of sentence_indices, keep the longer one
-    deduped: List[Dict[str, Any]] = []
-    for insight in all_insights:
-        idx_set = set(insight.get("sentence_indices", []))
-        is_dup = False
-        for kept in deduped:
-            kept_set = set(kept.get("sentence_indices", []))
-            if not idx_set or not kept_set:
-                continue
-            overlap = len(idx_set & kept_set)
-            union = len(idx_set | kept_set)
-            if union > 0 and overlap / union > 0.5:
-                # Keep the one with the longer insight text
-                if len(insight.get("insight", "")) > len(kept.get("insight", "")):
-                    deduped.remove(kept)
-                    deduped.append(insight)
-                is_dup = True
-                break
-        if not is_dup:
-            deduped.append(insight)
-
-    return merged_ta, deduped
+    for _chunk, result in chunk_results:
+        merged_ta.update(result.get("topic_annotations", {}))
+    return merged_ta
 
 
 def _derive_structural_suggestions(
@@ -1122,46 +997,99 @@ def _derive_structural_suggestions(
     }
 
 
-def _fan_out_key_insights(
-    key_insights: List[Dict[str, Any]],
-    merge_map: Dict[str, List[str]],
-    original_topics: List[Dict],
-) -> List[Dict[str, Any]]:
-    """
-    Remap key insight topic fields from merged names to original topic names.
-
-    For insights whose `topic` is a merged name, assign it to the original
-    topic that contains the most of the insight's sentence_indices.
-    """
-    if not merge_map:
-        return key_insights
-
-    orig_sentence_sets: Dict[str, set] = {
-        t.get("name", ""): set(t.get("sentences", [])) for t in original_topics
-    }
-
-    result = []
-    for insight in key_insights:
-        topic = insight.get("topic", "")
-        if topic in merge_map:
-            idx_set = set(insight.get("sentence_indices", []))
-            best_orig = max(
-                merge_map[topic],
-                key=lambda orig: len(idx_set & orig_sentence_sets.get(orig, set())),
-            )
-            insight = dict(insight)
-            insight["topic"] = best_orig
-        result.append(insight)
-
-    return result
-
-
 def _chunk_sentence_indices(indices: List[int]) -> List[List[int]]:
     """Split a list of sentence indices into chunks for context window safety."""
     chunks = []
     for i in range(0, len(indices), SENTENCES_PER_CHUNK):
         chunks.append(indices[i : i + SENTENCES_PER_CHUNK])
     return chunks
+
+
+# ─── Insights pipeline ────────────────────────────────────────────────────────
+
+def _generate_insights(
+    submission: Dict[str, Any],
+    llm: Any,
+    cache_store: Any,
+    namespace: str,
+) -> List[Dict[str, Any]]:
+    """
+    Run the txt_splitt insights pipeline on the submission source text.
+
+    Returns a list of insight dicts with keys:
+        name          - short descriptive title (3-8 words)
+        ranges        - list of {start, end} dicts (0-based, inclusive)
+        source_sentences - list of sentence texts covered by the ranges
+    """
+    source = submission.get("html_content") or submission.get("text_content", "")
+    if not source:
+        return []
+
+    # Clean HTML if needed
+    suffix = (submission.get("html_content") or "")
+    if suffix:
+        cleaner = HTMLParserTagStripCleaner(strip_tags={"style", "script"})
+        text, _ = cleaner.clean(source)
+    else:
+        text = source
+
+    splitter = SparseRegexSentenceSplitter(anchor_every_words=12)
+    marker = OptimizingMarker(BracketMarker())
+    sentence_list = splitter.split(text)
+    if not sentence_list:
+        return []
+    marked = marker.mark(text, sentence_list)
+
+    llm_adapter = _LLMCallableAdapter(llm)
+    llm_with_retry: Any = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
+    if cache_store is not None:
+        llm_callable = CachingLLMCallable(
+            llm_with_retry,
+            cache_store,
+            namespace=namespace + ":insights",
+            prompt_version="insights_v1",
+        )
+    else:
+        llm_callable = llm_with_retry
+
+    retry_policy = RetryConfig(
+        max_attempts=3,
+        temperature_schedule=[0.1, 0.3, 0.5],
+    )
+    insight_llm = build_insight_llm(
+        llm_callable,
+        temperature=0.0,
+        chunker=OverlapChunker(max_chars=84000),
+        retry_policy=retry_policy,
+    )
+    parser = InsightParser(input_mode="text")
+
+    try:
+        raw_response = insight_llm.query(marked)
+        insights = parser.parse(raw_response, marked.sentence_count)
+    except Exception as e:
+        logger.warning("Insights pipeline failed: %s", e)
+        return []
+
+    sentence_by_index = {s.index: s for s in sentence_list}
+    result = []
+    for insight in insights:
+        ranges = [{"start": r.start, "end": r.end} for r in insight.ranges]
+        source_sentences = []
+        seen = set()
+        for r in insight.ranges:
+            for idx in range(r.start, r.end + 1):
+                if idx not in seen:
+                    seen.add(idx)
+                    s = sentence_by_index.get(idx)
+                    if s is not None:
+                        source_sentences.append(s.text)
+        result.append({
+            "name": insight.name,
+            "ranges": ranges,
+            "source_sentences": source_sentences,
+        })
+    return result
 
 
 # ─── Fallback ─────────────────────────────────────────────────────────────────
@@ -1243,8 +1171,8 @@ def process_storytelling_generation(
 
     merged_topic_names = {t.get("name", "") for t in merged_topics}
 
-    # ── Pass 1: Chunked topic annotation + key insights ───────────────────────
-    logger.info("Annotation pass 1 (chunked topic + key insights) for %s", submission_id)
+    # ── Pass 1: Chunked topic annotation ─────────────────────────────────────
+    logger.info("Annotation pass 1 (chunked topic annotation) for %s", submission_id)
 
     article_summary = results.get("article_summary", {})
     article_summary_text = article_summary.get("text", "") if isinstance(article_summary, dict) else ""
@@ -1272,10 +1200,9 @@ def process_storytelling_generation(
                 if parsed and _validate_chunked_topic_annotations(parsed, chunk_topic_names, valid_indices):
                     chunk_results.append((chunk, parsed))
                     logger.info(
-                        "Pass 1 chunk %d/%d succeeded on attempt %d (temp=%.1f): topics=%s, insights=%d",
+                        "Pass 1 chunk %d/%d succeeded on attempt %d (temp=%.1f): topics=%s",
                         c_idx + 1, len(chunks), attempt + 1, temp,
                         chunk_topic_names,
-                        len(parsed.get("key_insights", [])),
                     )
                     logger.info("Pass 1 chunk %d parsed: %s", c_idx + 1, json.dumps(parsed, indent=2))
                     chunk_ok = True
@@ -1293,7 +1220,7 @@ def process_storytelling_generation(
             logger.warning("Pass 1 chunk %d failed for topics=%s — using defaults", c_idx + 1, chunk_topic_names)
             # Use fallback result for this chunk
             fallback_ta = {name: {"reading_priority": "recommended", "skip_reason": None} for name in chunk_topic_names}
-            chunk_results.append((chunk, {"topic_annotations": fallback_ta, "key_insights": []}))
+            chunk_results.append((chunk, {"topic_annotations": fallback_ta}))
 
     if not chunk_results:
         logger.warning("Pass 1 fully failed for %s — using fallback annotations", submission_id)
@@ -1302,11 +1229,7 @@ def process_storytelling_generation(
         return
 
     # Merge all chunk results
-    merged_topic_annotations_raw, key_insights = _merge_chunk_results(chunk_results)
-
-    # Ground key insights — drop any with invalid or scattered sentence indices
-    key_insights = _ground_key_insights(key_insights, sentences, submission_id)
-    logger.info("Pass 1: %d key insights after grounding for %s", len(key_insights), submission_id)
+    merged_topic_annotations_raw = _merge_chunk_results(chunk_results)
 
     # Derive structural suggestions deterministically
     merged_structural: Dict[str, Any] = _derive_structural_suggestions(merged_topic_annotations_raw, merged_topics)
@@ -1328,11 +1251,6 @@ def process_storytelling_generation(
                 "skip_reason": None,
                 "recommended_sentences": [],
             }
-
-    # Build set of key-insight sentence indices to inject flag in Pass 2
-    key_insight_indices: set = set()
-    for ki in key_insights:
-        key_insight_indices.update(ki.get("sentence_indices", []))
 
     # ── Pass 2: Sentence-level annotation ────────────────────────────────────
     logger.info("Annotation pass 2 (sentence-level) for %s", submission_id)
@@ -1362,16 +1280,6 @@ def process_storytelling_generation(
         for idx_str, ann in sa.items():
             if idx_str not in requested_strs:
                 continue
-            # Inject key_insight flag for sentences identified in Pass 1
-            try:
-                if int(idx_str) in key_insight_indices:
-                    flags = list(ann.get("flags", []))
-                    if "key_insight" not in flags:
-                        flags.append("key_insight")
-                    ann = dict(ann)
-                    ann["flags"] = flags
-            except (ValueError, TypeError):
-                pass
             all_sentence_annotations[idx_str] = ann
             if ann.get("importance") == "high" and topic_name_for_recommended:
                 topic_recommended_map.setdefault(topic_name_for_recommended, []).append(int(idx_str))
@@ -1500,7 +1408,6 @@ def process_storytelling_generation(
     topic_annotations, structural_suggestions = _fan_out_annotations(
         merged_topic_annotations, merged_structural, merge_map, topics
     )
-    key_insights = _fan_out_key_insights(key_insights, merge_map, topics)
 
     # Fill in any original topics missing from annotations (e.g. LLM skipped)
     original_topic_names = {t.get("name", "") for t in topics}
@@ -1547,6 +1454,11 @@ def process_storytelling_generation(
                     logger.warning("Pass 3 batch attempt %d failed: %s", attempt + 1, e)
     else:
         logger.info("Pass 3 skipped for %s: no data_point sentences found", submission_id)
+
+    # ── Insights pass: txt_splitt pipeline ───────────────────────────────────
+    logger.info("Insights pass (txt_splitt pipeline) for %s", submission_id)
+    key_insights = _generate_insights(submission, llm, cache_store, namespace)
+    logger.info("Insights pass: %d insights for %s", len(key_insights), submission_id)
 
     # ── Assemble and store ────────────────────────────────────────────────────
     annotations = {
