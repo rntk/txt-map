@@ -2,6 +2,8 @@ from unittest.mock import MagicMock, patch
 
 from lib.tasks.insights_generation import (
     _align_source_sentences_to_results_sentences,
+    _map_insight_ranges_to_topics_by_overlap,
+    _map_insight_source_sentences_to_topics,
     _insight_ranges_to_sentence_indices,
     _map_insight_sentence_indices_to_topics,
     process_insights_generation,
@@ -41,6 +43,31 @@ def test_aligns_source_sentences_to_canonical_results_sentences():
     result = _align_source_sentences_to_results_sentences(source_sentences, results_sentences)
 
     assert result == [2, 4]
+
+
+def test_maps_topics_from_source_sentences_when_indices_are_unavailable():
+    source_sentences = ["Sentence B.", "Sentence D."]
+    results_sentences = ["Sentence A.", "Sentence B.", "Sentence C.", "Sentence D."]
+    topics = [
+        {"name": "Topic A", "sentences": [2]},
+        {"name": "Topic B", "sentences": [4]},
+    ]
+
+    result = _map_insight_source_sentences_to_topics(source_sentences, results_sentences, topics)
+
+    assert result == ["Topic A", "Topic B"]
+
+
+def test_maps_topics_from_overlapping_ranges_without_exact_index_match():
+    ranges = [{"start": 4, "end": 5}]
+    topics = [
+        {"name": "Topic A", "ranges": [{"sentence_start": 2, "sentence_end": 4}]},
+        {"name": "Topic B", "ranges": [{"sentence_start": 6, "sentence_end": 8}]},
+    ]
+
+    result = _map_insight_ranges_to_topics_by_overlap(ranges, topics)
+
+    assert result == ["Topic B"]
 
 
 def test_process_insights_generation_stores_insights(mock_db):

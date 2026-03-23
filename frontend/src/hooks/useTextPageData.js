@@ -3,16 +3,51 @@ import { buildTopicStateRanges } from '../utils/textHighlight';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
+function mapInsightSentenceIndicesToTopics(insight, topics) {
+    const explicitTopics = Array.isArray(insight?.topics)
+        ? insight.topics.filter((topicName) => typeof topicName === 'string' && topicName.trim())
+        : [];
+    if (explicitTopics.length > 0) {
+        return [...new Set(explicitTopics)];
+    }
+
+    const sentenceIndices = Array.isArray(insight?.source_sentence_indices)
+        ? insight.source_sentence_indices.filter((value) => Number.isInteger(value))
+        : [];
+    if (sentenceIndices.length === 0 || !Array.isArray(topics) || topics.length === 0) {
+        return [];
+    }
+
+    const sentenceIndexSet = new Set(sentenceIndices);
+    const topicMatches = topics
+        .map((topic) => {
+            const topicName = typeof topic?.name === 'string' ? topic.name.trim() : '';
+            const topicSentences = Array.isArray(topic?.sentences) ? topic.sentences : [];
+            const matchingIndices = topicSentences.filter((sentenceIndex) => sentenceIndexSet.has(sentenceIndex));
+            if (!topicName || matchingIndices.length === 0) {
+                return null;
+            }
+            return { topicName, firstIndex: Math.min(...matchingIndices) };
+        })
+        .filter(Boolean)
+        .sort((left, right) => left.firstIndex - right.firstIndex);
+
+    return [...new Set(topicMatches.map((match) => match.topicName))];
+}
+
 export function useTextPageData(submission, selectedTopics, hoveredTopic, readTopics) {
     const results = useMemo(() => (submission?.results || {}), [submission]);
-    const insights = useMemo(
-        () => (Array.isArray(results.insights) ? results.insights : []),
-        [results.insights]
-    );
     const safeTopics = useMemo(
         () => (Array.isArray(results.topics) ? results.topics : []),
         [results.topics]
     );
+    const insights = useMemo(() => {
+        const rawInsights = Array.isArray(results.insights) ? results.insights : [];
+        return rawInsights.map((insight) => ({
+            ...insight,
+            topics: mapInsightSentenceIndicesToTopics(insight, safeTopics),
+        }));
+    }, [results.insights, safeTopics]);
     const rawText = submission?.text_content || '';
     const articleSummary = results.article_summary && typeof results.article_summary === 'object'
         ? results.article_summary

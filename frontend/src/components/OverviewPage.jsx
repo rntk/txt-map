@@ -246,7 +246,7 @@ function OverviewPage() {
   const submissionId = window.location.pathname.split('/')[3];
 
   const { submission, loading, error, readTopics, toggleRead } = useSubmission(submissionId);
-  const { allTopics: safeTopics, articleSummaryText } = useTextPageData(
+  const { allTopics: safeTopics, articleSummaryText, insights } = useTextPageData(
     submission,
     [],
     null,
@@ -304,7 +304,7 @@ function OverviewPage() {
         <ReadingGuideLayout
           submission={submission}
           annotations={annotations}
-          insights={results.insights || []}
+          insights={insights}
           safeTopics={safeTopics}
           safeSentences={safeSentences}
           submissionId={submissionId}

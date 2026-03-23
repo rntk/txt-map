@@ -457,6 +457,33 @@ describe('OverviewPage', () => {
       expect(within(insightsPanel).queryByText('A critical detail.')).not.toBeInTheDocument();
     });
 
+    it('derives topic chips from source sentence indices when topics are missing', async () => {
+      const fallbackSubmission = {
+        ...annotationSubmission,
+        results: {
+          ...annotationSubmission.results,
+          insights: [
+            {
+              name: 'Implicit mapping',
+              topics: [],
+              source_sentence_indices: [2],
+              ranges: [{ start: 1, end: 1 }],
+            },
+          ],
+        },
+      };
+      global.fetch = vi.fn(async () => ({ ok: true, json: async () => fallbackSubmission }));
+
+      render(<OverviewPage />);
+
+      const insightsCard = await screen.findByText('Key Insights');
+      const insightsPanel = insightsCard.closest('.rg-insights-card');
+
+      expect(within(insightsPanel).getByText('Implicit mapping')).toBeInTheDocument();
+      expect(within(insightsPanel).getByRole('button', { name: 'Topic A' })).toBeInTheDocument();
+      expect(within(insightsPanel).queryByText('No specific topics identified')).not.toBeInTheDocument();
+    });
+
     it('scrolls to and temporarily highlights the matching topic card on insight click', async () => {
       render(<OverviewPage />);
 
