@@ -47,6 +47,7 @@ const FLAG_LABELS = {
   unique_insight: 'Insight',
   opinion: 'Opinion',
   definition: 'Definition',
+  key_insight: 'Key Insight',
 };
 
 function SentenceBadges({ flags }) {
@@ -65,6 +66,7 @@ function SentenceBadges({ flags }) {
 function KeySentence({ text, annotation, isActive, isSourceReveal, activeExtraction }) {
   const importance = annotation?.importance || 'normal';
   const flags = annotation?.flags || [];
+  const isKeyInsight = flags.includes('key_insight');
   const segments = useMemo(
     () => (isActive ? buildExtractionTextSegments(text, activeExtraction) : [{ text, highlighted: false }]),
     [text, isActive, activeExtraction]
@@ -72,7 +74,7 @@ function KeySentence({ text, annotation, isActive, isSourceReveal, activeExtract
 
   return (
     <div
-      className={`rg-sentence rg-sentence--${importance}${isActive ? ' rg-sentence--active' : ''}${isSourceReveal ? ' rg-sentence--source-reveal' : ''}`}
+      className={`rg-sentence rg-sentence--${importance}${isActive ? ' rg-sentence--active' : ''}${isSourceReveal ? ' rg-sentence--source-reveal' : ''}${isKeyInsight ? ' rg-sentence--key-insight' : ''}`}
     >
       <span className="rg-sentence__text">
         {segments.map((segment, index) => (

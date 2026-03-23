@@ -5185,6 +5185,12 @@ textarea {
   color: #2e7d32;
 }
 
+/* "X key insights" stat in header */
+.rg-stat--insight {
+  background: #f3e8ff;
+  color: #6d28d9;
+}
+
 /* Read topic pill in nav bar */
 .rg-order-bar__pill--done {
   opacity: 0.45;
@@ -5278,6 +5284,122 @@ textarea {
   padding: 0.35rem 0.45rem;
 }
 
+/* Key insight sentence — purple left border + subtle tint */
+.rg-sentence--key-insight {
+  border-left: 3px solid #7c3aed;
+  padding-left: 0.5rem;
+  background: rgba(124, 58, 237, 0.05);
+}
+
+/* Key insight badge */
+.rg-sentence__badge--key_insight {
+  background: #7c3aed;
+  color: #fff;
+}
+
+/* ── Key Insights Card ────────────────────────────────────────────────────── */
+.rg-insights-card {
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.rg-insights-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rg-insights-card__icon {
+  font-size: 1.1rem;
+}
+
+.rg-insights-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #4c1d95;
+  margin: 0;
+  flex: 1;
+}
+
+.rg-insights-card__count {
+  font-size: 0.8rem;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-weight: 600;
+}
+
+.rg-insights-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.rg-insight-item {
+  padding: 0.65rem 0.85rem;
+  background: #fff;
+  border-radius: 7px;
+  border-left: 3px solid #7c3aed;
+}
+
+.rg-insight-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+/* Insight type badge */
+.rg-insight-item__type {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rg-insight-item__type--counterintuitive    { background: #fde8d8; color: #9a3412; }
+.rg-insight-item__type--actionable_threshold { background: #dcfce7; color: #166534; }
+.rg-insight-item__type--surprising_statistic { background: #fef9c3; color: #854d0e; }
+.rg-insight-item__type--important_caveat    { background: #fee2e2; color: #991b1b; }
+.rg-insight-item__type--paradigm_shift      { background: #ede9fe; color: #4c1d95; }
+
+/* Verbatim source sentence(s) */
+.rg-insight-item__sentence {
+  font-size: 0.85rem;
+  color: #1e1e2e;
+  margin: 0 0 0.25rem;
+  line-height: 1.5;
+}
+
+.rg-insight-item__sentence:last-child {
+  margin-bottom: 0;
+}
+
+.rg-insight-item__topic-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  background: #ede9fe;
+  color: #5b21b6;
+  border: none;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rg-insight-item__topic-tag:hover {
+  background: #ddd6fe;
+}
+
 .rg-sentence__text-highlight {
   background: rgba(255, 196, 0, 0.42);
   border-radius: 4px;
@@ -5305,6 +5427,7 @@ textarea {
 .rg-sentence__badge--unique_insight { background: #fce4ec; color: #880e4f; }
 .rg-sentence__badge--opinion      { background: #f3e5f5; color: #6a1b9a; }
 .rg-sentence__badge--definition   { background: #e3f2fd; color: #0d47a1; }
+.rg-sentence__badge--key_insight  { background: #7c3aed; color: #fff; }
 
 /* Data extractions */
 .rg-extractions {

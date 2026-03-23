@@ -3,6 +3,7 @@ import ReadingOrderBar from './ReadingOrderBar';
 import TopicCard from './TopicCard';
 import DataExtractionTable from './DataExtractionTable';
 import ArticleTreeNav from './ArticleTreeNav';
+import KeyInsightsCard from './KeyInsightsCard';
 import { COMPONENT_REGISTRY, assembleChartProps, TOPIC_CHART_NAMES, DATA_CHART_NAMES } from '../storytelling/componentRegistry';
 import { buildExtractionKey } from '../../utils/extractionHighlight';
 
@@ -37,6 +38,7 @@ export default function ReadingGuideLayout({
     topic_annotations: topicAnnotations = {},
     data_extractions: dataExtractions = [],
     structural_suggestions: structuralSuggestions = {},
+    key_insights: keyInsights = [],
   } = annotations;
 
   const recommendedCharts = structuralSuggestions.recommended_charts || [];
@@ -233,6 +235,11 @@ export default function ReadingGuideLayout({
               <strong>{dataExtractions.length}</strong> data points
             </span>
           )}
+          {keyInsights.length > 0 && (
+            <span className="rg-stat rg-stat--insight">
+              <strong>{keyInsights.length}</strong> key insights
+            </span>
+          )}
           {readCount > 0 && (
             <span className="rg-stat rg-stat--read">
               <strong>{readCount}</strong> read
@@ -298,6 +305,12 @@ export default function ReadingGuideLayout({
               </div>
             );
           })()}
+
+          {/* Key Insights card */}
+          <KeyInsightsCard
+            keyInsights={keyInsights}
+            onTopicClick={scrollToTopic}
+          />
 
           {/* Topic cards — ALL topics, optional/skip/read start folded */}
           <div className="rg-topics">
