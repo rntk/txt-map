@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-const TOOLTIP_SHOW_DELAY_MS = 300;
+const TOOLTIP_SHOW_DELAY_MS = 500;
+const TOOLTIP_UPDATE_DELAY_MS = 250;
 const TOOLTIP_HIDE_DELAY_MS = 200;
 
 /**
@@ -61,11 +62,14 @@ export function useTooltip(enabled = true) {
     clearHideTimeout();
     clearShowTimeout();
     pendingTooltipRef.current = { x, y, topics, meta };
+    
+    const delay = tooltip ? TOOLTIP_UPDATE_DELAY_MS : TOOLTIP_SHOW_DELAY_MS;
+    
     showTimeoutRef.current = setTimeout(() => {
       setTooltip(pendingTooltipRef.current);
       showTimeoutRef.current = null;
-    }, TOOLTIP_SHOW_DELAY_MS);
-  }, [clearHideTimeout, clearShowTimeout, enabled]);
+    }, delay);
+  }, [clearHideTimeout, clearShowTimeout, enabled, tooltip]);
 
   const updateTooltipPosition = useCallback((x, y, meta = undefined) => {
     if (pendingTooltipRef.current) {

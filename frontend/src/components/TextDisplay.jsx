@@ -159,15 +159,15 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }, [safeArticleTopics]);
 
   // --- Tooltip state ---
-  const { tooltip, lastTargetRef, showTooltip, updateTooltipPosition, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
+  const { tooltip, lastTargetRef, showTooltip, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
   const isDraggingRef = useRef(false);
   const tooltipContainerRef = useRef(null);
 
   const getTooltipPosition = useCallback((clientX, clientY) => {
     // Keep the tooltip close enough to the pointer so it feels anchored to the
     // current hover location even with the delayed show.
-    let x = clientX - 2;
-    let y = clientY - 2;
+    let x = clientX - 10;
+    let y = clientY - 10;
 
     const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
     const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
@@ -338,20 +338,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     tooltipEnabled,
   ]);
 
-  const handleMouseMove = useCallback((e) => {
-    if (isDraggingRef.current || !tooltipEnabled) return;
-
-    const token = e.target.closest('.word-token, .sentence-token');
-    if (!token || token !== lastTargetRef.current) {
-      return;
-    }
-
-    const meta = buildTooltipMeta(token, e.clientX, e.clientY);
-    const { x, y } = getTooltipPosition(e.clientX, e.clientY);
-
-    updateTooltipPosition(x, y, meta);
-  }, [buildTooltipMeta, getTooltipPosition, lastTargetRef, tooltipEnabled, updateTooltipPosition]);
-
   const handleMouseOut = useCallback((e) => {
     const token = e.target.closest('.word-token, .sentence-token');
     if (!token) return;
@@ -480,7 +466,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
           onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
-          onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
         />
         {tooltipEl}
@@ -495,7 +480,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
           className="text-content"
           onMouseDown={handleTextMouseDown}
           onMouseOver={handleMouseOver}
-          onMouseMove={handleMouseMove}
           onMouseOut={handleMouseOut}
         >
           {paragraphs.map((para, paraIdx) => (
@@ -537,7 +521,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         className="text-content"
         onMouseDown={handleTextMouseDown}
         onMouseOver={handleMouseOver}
-        onMouseMove={handleMouseMove}
         onMouseOut={handleMouseOut}
       >
         <p className="article-text">
