@@ -147,6 +147,33 @@
     border-color: #7aaac8;
 }
 
+.topic-sentences-modal__read-btn {
+    font-size: 16px;
+    padding: 4px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+    color: #555;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.topic-sentences-modal__read-btn:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+}
+
+.topic-sentences-modal__read-btn--active {
+    background: #e8f4e8;
+    border-color: #a8d8a8;
+    color: #2d6a2d;
+}
+
+.topic-sentences-modal__read-btn--active:hover {
+    background: #d8ead8;
+    border-color: #98c898;
+}
+
 .topic-sentences-modal__tabs {
     display: flex;
     border-bottom: 1px solid #ddd;

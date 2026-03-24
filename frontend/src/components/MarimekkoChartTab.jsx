@@ -9,7 +9,14 @@ import { useContainerSize } from '../hooks/useContainerSize';
 import { buildScopedChartData, getTopicParts, hasDeeperChildren } from '../utils/topicHierarchy';
 import '../styles/marimekko.css';
 
-const MarimekkoChartTab = ({ topics, sentences, onShowInArticle }) => {
+const MarimekkoChartTab = ({
+    topics,
+    sentences,
+    onShowInArticle,
+    readTopics,
+    onToggleRead,
+    markup,
+}) => {
     const { scopePath, navigateTo, drillInto } = useScopeNavigation();
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const { containerRef, containerSize } = useContainerSize(900);
@@ -84,6 +91,9 @@ const MarimekkoChartTab = ({ topics, sentences, onShowInArticle }) => {
                     sentences={safeSentences}
                     onClose={() => setModalTopic(null)}
                     onShowInArticle={onShowInArticle}
+                    readTopics={readTopics}
+                    onToggleRead={onToggleRead}
+                    markup={markup}
                 />
             )}
         </div>

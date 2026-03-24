@@ -22,13 +22,23 @@ function VisualizationPanels({
   submissionId,
   allTopics,
   onShowInArticle,
+  readTopics,
+  onToggleRead,
+  markup,
 }) {
   return (
     <>
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
           <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
-            <TopicsBarChart topics={allTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+            <TopicsBarChart
+              topics={allTopics}
+              sentences={safeSentences}
+              onShowInArticle={onShowInArticle}
+              readTopics={readTopics}
+              onToggleRead={onToggleRead}
+              markup={markup}
+            />
           </div>
         </FullScreenGraph>
       )}
@@ -39,7 +49,15 @@ function VisualizationPanels({
             <div style={{ marginBottom: '60px' }}>
               <h2>Topics River</h2>
               <p>Visualization of topic density across the article.</p>
-              <TopicsRiverChart topics={safeTopics} sentences={safeSentences} articleLength={safeSentences.length} onShowInArticle={onShowInArticle} />
+              <TopicsRiverChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                articleLength={safeSentences.length}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
             </div>
             <div className="subtopics-river-section">
               <h2>Subtopics River</h2>
@@ -51,6 +69,9 @@ function VisualizationPanels({
                   sentences={safeSentences}
                   articleLength={safeSentences.length}
                   onShowInArticle={onShowInArticle}
+                  readTopics={readTopics}
+                  onToggleRead={onToggleRead}
+                  markup={markup}
                 />
               ) : (
                 <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
@@ -63,7 +84,14 @@ function VisualizationPanels({
       {fullscreenGraph === 'marimekko' && (
         <FullScreenGraph title="Marimekko" onClose={onClose}>
           <div className="marimekko-container" style={{ padding: '20px' }}>
-            <MarimekkoChartTab topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+            <MarimekkoChartTab
+              topics={safeTopics}
+              sentences={safeSentences}
+              onShowInArticle={onShowInArticle}
+              readTopics={readTopics}
+              onToggleRead={onToggleRead}
+              markup={markup}
+            />
           </div>
         </FullScreenGraph>
       )}
@@ -105,7 +133,14 @@ function VisualizationPanels({
               Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
             </p>
             <div className="visualization-panel-body">
-              <CircularPackingChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+              <CircularPackingChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
             </div>
           </div>
         </FullScreenGraph>
@@ -114,7 +149,13 @@ function VisualizationPanels({
       {fullscreenGraph === 'radar_chart' && (
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <RadarChart topics={safeTopics} sentences={safeSentences} />
+            <RadarChart
+              topics={safeTopics}
+              sentences={safeSentences}
+              readTopics={readTopics}
+              onToggleRead={onToggleRead}
+              markup={markup}
+            />
           </div>
         </FullScreenGraph>
       )}
@@ -125,13 +166,23 @@ function VisualizationPanels({
           topicSummaries={results.topic_summaries || {}}
           sentences={safeSentences}
           onClose={onClose}
+          readTopics={readTopics}
+          onToggleRead={onToggleRead}
+          markup={markup}
         />
       )}
 
       {fullscreenGraph === 'article_structure' && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+            <ArticleStructureChart
+              topics={safeTopics}
+              sentences={safeSentences}
+              onShowInArticle={onShowInArticle}
+              readTopics={readTopics}
+              onToggleRead={onToggleRead}
+              markup={markup}
+            />
           </div>
         </FullScreenGraph>
       )}
@@ -143,7 +194,14 @@ function VisualizationPanels({
               Treemap visualization: top-level topics contain their subtopics. Rectangle size reflects sentence count.
             </p>
             <div className="visualization-panel-body">
-              <TreemapChart topics={safeTopics} sentences={safeSentences} onShowInArticle={onShowInArticle} />
+              <TreemapChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
             </div>
           </div>
         </FullScreenGraph>

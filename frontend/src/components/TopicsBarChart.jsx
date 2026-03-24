@@ -35,7 +35,14 @@ const BASE_COLORS = [
  *   value inside bar, label to the right
  * - Click a drillable topic to navigate into its subtopics
  */
-function TopicsBarChart({ topics, sentences = [], onShowInArticle }) {
+function TopicsBarChart({
+    topics,
+    sentences = [],
+    onShowInArticle,
+    readTopics,
+    onToggleRead,
+    markup,
+}) {
     const [hoveredBar, setHoveredBar] = useState(null);
     const { scopePath, navigateTo, drillInto } = useScopeNavigation();
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
@@ -215,6 +222,9 @@ function TopicsBarChart({ topics, sentences = [], onShowInArticle }) {
                     sentences={sentences}
                     onClose={() => setModalTopic(null)}
                     onShowInArticle={onShowInArticle}
+                    readTopics={readTopics}
+                    onToggleRead={onToggleRead}
+                    markup={markup}
                 />
             )}
         </div>

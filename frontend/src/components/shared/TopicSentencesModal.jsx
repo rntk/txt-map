@@ -20,9 +20,20 @@ function groupConsecutive(sortedIndices) {
     return groups;
 }
 
-function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInArticle, markup }) {
+function TopicSentencesModal({
+    topic,
+    sentences,
+    onClose,
+    headerExtra,
+    onShowInArticle,
+    markup,
+    readTopics = new Set(),
+    onToggleRead,
+}) {
     const [extendedIndices, setExtendedIndices] = useState(new Set());
     const [activeTab, setActiveTab] = useState('sentences');
+
+    const isRead = topic && readTopics instanceof Set ? readTopics.has(topic.name) : false;
 
     const topicMarkup = markup && topic
         ? (markup[topic.name] || markup[topic.displayName] || null)
@@ -87,6 +98,25 @@ function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInA
                 <div className="topic-sentences-modal__header">
                     <h3>{topic.displayName}</h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {onToggleRead && (
+                            <button
+                                type="button"
+                                className={`topic-sentences-modal__read-btn${isRead ? ' topic-sentences-modal__read-btn--active' : ''}`}
+                                onClick={() => {
+                                    const ranges = topic.ranges;
+                                    if (Array.isArray(ranges) && ranges.length > 1 && !isRead) {
+                                        const ok = window.confirm(
+                                            `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
+                                        );
+                                        if (!ok) return;
+                                    }
+                                    onToggleRead(topic);
+                                }}
+                                title={isRead ? 'Mark topic as unread' : 'Mark topic as read'}
+                            >
+                                {isRead ? 'Mark unread' : 'Mark as read'}
+                            </button>
+                        )}
                         {onShowInArticle && (
                             <button
                                 type="button"

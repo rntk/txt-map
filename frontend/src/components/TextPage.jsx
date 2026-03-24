@@ -633,6 +633,9 @@ function TextPage() {
               articles={articles}
               onClose={closeFullscreenGraph}
               onShowInArticle={handleShowInArticle}
+              readTopics={readTopics}
+              onToggleRead={toggleRead}
+              markup={submission?.results?.markup}
             />
           )}
 
@@ -649,6 +652,9 @@ function TextPage() {
               articles={articles}
               onClose={closeFullscreenGraph}
               onShowInArticle={handleShowInArticle}
+              readTopics={readTopics}
+              onToggleRead={toggleRead}
+              markup={submission?.results?.markup}
             />
           )}
 
@@ -661,6 +667,9 @@ function TextPage() {
             submissionId={submissionId}
             allTopics={allTopics}
             onShowInArticle={handleShowInArticle}
+            readTopics={readTopics}
+            onToggleRead={toggleRead}
+            markup={submission?.results?.markup}
           />
         </>) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
@@ -688,6 +697,8 @@ function TextPage() {
           sentences={summaryModalTopic._sentences || safeSentences}
           onClose={closeSummaryModal}
           markup={submission?.results?.markup}
+          readTopics={readTopics}
+          onToggleRead={toggleRead}
         />
       )}
 

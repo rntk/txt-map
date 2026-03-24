@@ -244,11 +244,15 @@ export default function WordPage() {
                 articles={articles}
                 onClose={() => setActiveTab('sentences')}
                 onShowInArticle={() => {
-                  navigate(`/page/text/${submissionId}`);
+                  setActiveTab('sentences');
                 }}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
               />
             </div>
           )}
+
 
           {activeTab === 'tags' && (
             <div>
@@ -270,6 +274,9 @@ export default function WordPage() {
           topic={summaryModalTopic}
           sentences={summaryModalTopic._sentences || allSentences}
           onClose={() => setSummaryModalTopic(null)}
+          readTopics={readTopics}
+          onToggleRead={toggleRead}
+          markup={submission?.results?.markup}
         />
       )}
     </div>

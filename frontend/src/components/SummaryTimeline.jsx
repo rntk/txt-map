@@ -15,6 +15,9 @@ function SummaryTimeline({
   articles,
   onClose,
   onShowInArticle,
+  readTopics,
+  onToggleRead,
+  markup,
 }) {
   const resolvedTitle = title || (mode === 'insights' ? 'Insights' : 'Topic Summaries');
   const insightItems = Array.isArray(insights) ? insights : [];
@@ -148,6 +151,9 @@ function SummaryTimeline({
             sentences={summaryModalTopic._sentences}
             onClose={closeSummaryModal}
             onShowInArticle={onShowInArticle}
+            readTopics={readTopics}
+            onToggleRead={onToggleRead}
+            markup={markup}
             headerExtra={
               <div>
                 <strong>Summary:</strong> {summaryModalTopic._summarySentence}

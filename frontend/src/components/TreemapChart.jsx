@@ -158,7 +158,14 @@ function getTreemapFillColor(nodeDatum, colorScale) {
 /**
  * @param {TreemapChartProps} props
  */
-export default function TreemapChart({ topics, sentences = [], onShowInArticle }) {
+export default function TreemapChart({
+  topics,
+  sentences = [],
+  onShowInArticle,
+  readTopics,
+  onToggleRead,
+  markup,
+}) {
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
   const [modalTopic, setModalTopic] = useState(null);
@@ -377,6 +384,9 @@ export default function TreemapChart({ topics, sentences = [], onShowInArticle }
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          readTopics={readTopics}
+          onToggleRead={onToggleRead}
+          markup={markup}
         />
       )}
     </div>

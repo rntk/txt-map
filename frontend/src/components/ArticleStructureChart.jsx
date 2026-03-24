@@ -32,7 +32,14 @@ function rollingAverage(data, windowSize) {
     });
 }
 
-function ArticleStructureChart({ topics, sentences = [], onShowInArticle }) {
+function ArticleStructureChart({
+    topics,
+    sentences = [],
+    onShowInArticle,
+    readTopics,
+    onToggleRead,
+    markup,
+}) {
     const { scopePath, navigateTo, drillInto } = useScopeNavigation();
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const [hoveredTopic, setHoveredTopic] = useState(null);
@@ -384,6 +391,9 @@ function ArticleStructureChart({ topics, sentences = [], onShowInArticle }) {
                     sentences={sentences}
                     onClose={() => setModalTopic(null)}
                     onShowInArticle={onShowInArticle}
+                    readTopics={readTopics}
+                    onToggleRead={onToggleRead}
+                    markup={markup}
                 />
             )}
         </div>
