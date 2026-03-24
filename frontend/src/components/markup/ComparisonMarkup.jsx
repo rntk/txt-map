@@ -1,4 +1,5 @@
 import React from 'react';
+import { getTextByIndex, getItemIndex } from './markupUtils';
 
 const COLUMN_COLORS = ['#e8f5e9', '#fce4ec', '#e3f2fd', '#fff3e0', '#f3e5f5'];
 
@@ -36,7 +37,7 @@ export default function ComparisonMarkup({ segment, sentences }) {
         {columns.map((col, i) => (
           <div key={i} className="markup-comparison__col">
             {col.items.map((item, j) => {
-              const text = item.text || (sentences && item.sentence_index != null ? sentences[item.sentence_index - 1] : '') || '';
+              const text = item.text || getTextByIndex(sentences, getItemIndex(item)) || '';
               return <div key={j} className="markup-comparison__item">{text}</div>;
             })}
           </div>

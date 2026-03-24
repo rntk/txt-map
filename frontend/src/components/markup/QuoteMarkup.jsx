@@ -1,11 +1,11 @@
 import React from 'react';
+import { getNestedIndices, getTextByIndex } from './markupUtils';
 
 export default function QuoteMarkup({ segment, sentences }) {
-  const { attribution, sentence_indices = [] } = segment.data || {};
-  const quoteText = sentence_indices
-    .slice()
-    .sort((a, b) => a - b)
-    .map(idx => (sentences && sentences[idx - 1]) ? sentences[idx - 1] : '')
+  const { attribution } = segment.data || {};
+  const quoteIndices = getNestedIndices(segment.data, 'position_indices', 'sentence_indices');
+  const quoteText = quoteIndices
+    .map(idx => getTextByIndex(sentences, idx))
     .filter(Boolean)
     .join(' ');
 

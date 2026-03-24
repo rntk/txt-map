@@ -1,4 +1,5 @@
 import React from 'react';
+import { getNestedIndices, getTextByIndex } from './markupUtils';
 
 /**
  * @typedef {Object} ParagraphGroup
@@ -22,9 +23,9 @@ export default function ParagraphMarkup({ segment, sentences }) {
     .map((paragraph) => {
       const indices = Array.isArray(paragraph.sentence_indices)
         ? [...paragraph.sentence_indices].sort((a, b) => a - b)
-        : [];
+        : getNestedIndices(paragraph, 'position_indices', 'sentence_indices');
       const text = indices
-        .map((idx) => (sentences && sentences[idx - 1] ? sentences[idx - 1] : ''))
+        .map((idx) => getTextByIndex(sentences, idx))
         .filter(Boolean)
         .join(' ')
         .trim();

@@ -39,6 +39,9 @@ function TopicSentencesModal({
         ? (markup[topic.name] || markup[topic.displayName] || null)
         : null;
     const hasEnrichedMarkup = topicMarkup && topicMarkup.segments && topicMarkup.segments.length > 0;
+    const markupUnits = Array.isArray(topicMarkup?.positions)
+        ? topicMarkup.positions.map((position) => position.text || '')
+        : sentences;
 
     useEffect(() => {
         setExtendedIndices(new Set());
@@ -155,9 +158,9 @@ function TopicSentencesModal({
                         {headerExtra}
                     </div>
                 )}
-                <div className="topic-sentences-modal__body">
+                    <div className="topic-sentences-modal__body">
                     {activeTab === 'enriched' && hasEnrichedMarkup ? (
-                        <MarkupRenderer segments={topicMarkup.segments} sentences={sentences} />
+                        <MarkupRenderer segments={topicMarkup.segments} sentences={markupUnits} />
                     ) : activeTab === 'raw' && hasEnrichedMarkup ? (
                         <pre className="topic-sentences-modal__raw-json">
                             {JSON.stringify(topicMarkup, null, 2)}

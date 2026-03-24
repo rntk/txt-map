@@ -1,4 +1,5 @@
 import React from 'react';
+import { getItemIndex, getTextByIndex } from './markupUtils';
 
 export default function ListMarkup({ segment, sentences }) {
   const items = segment.data?.items || [];
@@ -9,13 +10,14 @@ export default function ListMarkup({ segment, sentences }) {
     <div className="markup-segment">
       <Tag className={`markup-list${ordered ? ' markup-list--ordered' : ''}`}>
         {items.map((item, i) => {
-          const text = item.text || (sentences && sentences[item.sentence_index - 1]) || '';
+          const itemIndex = getItemIndex(item);
+          const text = item.text || getTextByIndex(sentences, itemIndex) || '';
           return (
             <li key={i} className="markup-list__item">
               {ordered
                 ? <span className="markup-list__ordinal">{i + 1}.</span>
                 : <>
-                    <span className="markup-list__num">{item.sentence_index != null ? `${item.sentence_index}.` : ''}</span>
+                    <span className="markup-list__num">{itemIndex != null ? `${itemIndex}.` : ''}</span>
                     <span className="markup-list__bullet">•</span>
                   </>
               }

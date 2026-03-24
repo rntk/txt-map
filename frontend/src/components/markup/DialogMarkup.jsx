@@ -1,4 +1,5 @@
 import React from 'react';
+import { getItemIndex, getTextByIndex } from './markupUtils';
 
 export default function DialogMarkup({ segment, sentences }) {
   const speakers = segment.data?.speakers || [];
@@ -11,7 +12,7 @@ export default function DialogMarkup({ segment, sentences }) {
       allLines.push({ speakerIdx, name: speaker.name, ...line });
     });
   });
-  allLines.sort((a, b) => a.sentence_index - b.sentence_index);
+  allLines.sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0));
 
   return (
     <div className="markup-segment markup-dialog">
@@ -21,7 +22,7 @@ export default function DialogMarkup({ segment, sentences }) {
           <div key={i} className={`markup-dialog__line markup-dialog__line--${side}`}>
             <span className="markup-dialog__speaker">{line.name}</span>
             <div className={`markup-dialog__bubble markup-dialog__bubble--${side}`}>
-              {line.text || (sentences && sentences[line.sentence_index - 1]) || ''}
+              {line.text || getTextByIndex(sentences, getItemIndex(line)) || ''}
             </div>
           </div>
         );

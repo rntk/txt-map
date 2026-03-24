@@ -1,4 +1,5 @@
 import React from 'react';
+import { getItemIndex, getTextByIndex } from './markupUtils';
 
 export default function CodeMarkup({ segment, sentences }) {
   const { language, items = [] } = segment.data || {};
@@ -7,10 +8,10 @@ export default function CodeMarkup({ segment, sentences }) {
 
   const codeText = items
     .slice()
-    .sort((a, b) => a.sentence_index - b.sentence_index)
+    .sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0))
     .map(item => item.text
       ? stripMarker(item.text)
-      : stripMarker(sentences && sentences[item.sentence_index - 1] || ''))
+      : stripMarker(getTextByIndex(sentences, getItemIndex(item))))
     .join('\n');
 
   if (!codeText) return null;

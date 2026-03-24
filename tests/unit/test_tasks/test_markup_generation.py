@@ -1,11 +1,15 @@
-from lib.tasks.markup_generation import _derive_indices_from_data, _validate_markup_response
+from lib.tasks.markup_generation import (
+    _build_markup_positions,
+    _derive_indices_from_data,
+    _validate_markup_response,
+)
 
 
 def test_derive_indices_from_paragraph_data() -> None:
     data = {
         "paragraphs": [
-            {"sentence_indices": [4, 5]},
-            {"sentence_indices": [6, 7]},
+            {"position_indices": [4, 5]},
+            {"position_indices": [6, 7]},
         ]
     }
 
@@ -19,11 +23,11 @@ def test_validate_markup_response_accepts_valid_paragraph_segment() -> None:
         "segments": [
             {
                 "type": "paragraph",
-                "sentence_indices": [1, 2, 3, 4],
+                "position_indices": [1, 2, 3, 4],
                 "data": {
                     "paragraphs": [
-                        {"sentence_indices": [1, 2]},
-                        {"sentence_indices": [3, 4]},
+                        {"position_indices": [1, 2]},
+                        {"position_indices": [3, 4]},
                     ]
                 },
             }
@@ -40,8 +44,8 @@ def test_validate_markup_response_derives_top_level_indices_for_paragraph_segmen
                 "type": "paragraph",
                 "data": {
                     "paragraphs": [
-                        {"sentence_indices": [2, 3]},
-                        {"sentence_indices": [4]},
+                        {"position_indices": [2, 3]},
+                        {"position_indices": [4]},
                     ]
                 },
             }
@@ -49,7 +53,7 @@ def test_validate_markup_response_derives_top_level_indices_for_paragraph_segmen
     }
 
     assert _validate_markup_response(response, [2, 3, 4]) is True
-    assert response["segments"][0]["sentence_indices"] == [2, 3, 4]
+    assert response["segments"][0]["position_indices"] == [2, 3, 4]
 
 
 def test_validate_markup_response_rejects_duplicate_nested_paragraph_indices() -> None:
@@ -57,11 +61,11 @@ def test_validate_markup_response_rejects_duplicate_nested_paragraph_indices() -
         "segments": [
             {
                 "type": "paragraph",
-                "sentence_indices": [1, 2, 3],
+                "position_indices": [1, 2, 3],
                 "data": {
                     "paragraphs": [
-                        {"sentence_indices": [1, 2]},
-                        {"sentence_indices": [2, 3]},
+                        {"position_indices": [1, 2]},
+                        {"position_indices": [2, 3]},
                     ]
                 },
             }
@@ -76,10 +80,10 @@ def test_validate_markup_response_rejects_mismatched_paragraph_coverage() -> Non
         "segments": [
             {
                 "type": "paragraph",
-                "sentence_indices": [1, 2, 3],
+                "position_indices": [1, 2, 3],
                 "data": {
                     "paragraphs": [
-                        {"sentence_indices": [1, 2]},
+                        {"position_indices": [1, 2]},
                     ]
                 },
             }
@@ -94,7 +98,7 @@ def test_validate_markup_response_rejects_empty_paragraph_groups() -> None:
         "segments": [
             {
                 "type": "paragraph",
-                "sentence_indices": [1, 2],
+                "position_indices": [1, 2],
                 "data": {
                     "paragraphs": [],
                 },
@@ -103,3 +107,45 @@ def test_validate_markup_response_rejects_empty_paragraph_groups() -> None:
     }
 
     assert _validate_markup_response(response, [1, 2]) is False
+
+
+def test_derive_indices_from_legacy_sentence_fields() -> None:
+    data = {
+        "pairs": [
+            {
+                "question_sentence_index": 3,
+                "answer_sentence_indices": [4, 5],
+            }
+        ]
+    }
+
+    result = _derive_indices_from_data("question_answer", data)
+
+    assert result == [3, 4, 5]
+
+
+def test_validate_markup_response_accepts_legacy_sentence_indices() -> None:
+    response = {
+        "segments": [
+            {
+                "type": "plain",
+                "sentence_indices": [1, 2],
+                "data": {},
+            }
+        ]
+    }
+
+    assert _validate_markup_response(response, [1, 2]) is True
+
+
+def test_build_markup_positions_splits_heading_like_content() -> None:
+    positions = _build_markup_positions(
+        [1],
+        ["What does computation mean? — How in-model execution differs from tool use."],
+    )
+
+    assert [position["text"] for position in positions] == [
+        "What does computation mean?",
+        "How in-model execution differs from tool use.",
+    ]
+    assert [position["source_sentence_index"] for position in positions] == [1, 1]

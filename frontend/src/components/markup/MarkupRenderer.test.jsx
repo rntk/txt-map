@@ -10,11 +10,11 @@ describe('MarkupRenderer paragraph support', () => {
         segments={[
           {
             type: 'paragraph',
-            sentence_indices: [1, 2, 3],
+            position_indices: [1, 2, 3],
             data: {
               paragraphs: [
-                { sentence_indices: [1, 2] },
-                { sentence_indices: [3] },
+                { position_indices: [1, 2] },
+                { position_indices: [3] },
               ],
             },
           },
@@ -55,5 +55,29 @@ describe('MarkupRenderer paragraph support', () => {
     expect(document.querySelectorAll('.markup-plain__sentence')).toHaveLength(2);
     expect(screen.getByText('1.')).toBeInTheDocument();
     expect(screen.getByText('2.')).toBeInTheDocument();
+  });
+
+  it('renders position-based title and body from markup-local units', () => {
+    render(
+      <MarkupRenderer
+        segments={[
+          {
+            type: 'title',
+            position_indices: [1, 2],
+            data: {
+              level: 2,
+              title_position_index: 1,
+            },
+          },
+        ]}
+        sentences={[
+          'How we turned LLMs to computers',
+          'We turn arbitrary C code into tokens the model can execute.',
+        ]}
+      />
+    );
+
+    expect(screen.getByText('How we turned LLMs to computers')).toBeInTheDocument();
+    expect(screen.getByText('We turn arbitrary C code into tokens the model can execute.')).toBeInTheDocument();
   });
 });

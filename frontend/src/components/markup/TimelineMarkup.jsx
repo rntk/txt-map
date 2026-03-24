@@ -1,7 +1,7 @@
 import React from 'react';
 import DataTimelineChart from '../annotations/charts/DataTimelineChart';
 
-export default function TimelineMarkup({ segment, sentences }) {
+export default function TimelineMarkup({ segment, sentences: _sentences }) {
   const { events = [] } = segment.data || {};
   if (events.length === 0) return null;
 

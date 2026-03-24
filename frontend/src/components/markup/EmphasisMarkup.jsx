@@ -1,4 +1,5 @@
 import React from 'react';
+import { getItemIndex, getTextByIndex } from './markupUtils';
 
 const STYLE_TAG = {
   bold: 'strong',
@@ -47,18 +48,17 @@ function applyHighlights(text, highlights) {
 
 export default function EmphasisMarkup({ segment, sentences }) {
   const { items = [] } = segment.data || {};
-  const sorted = items.slice().sort((a, b) => a.sentence_index - b.sentence_index);
+  const sorted = items.slice().sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0));
 
   return (
     <div className="markup-segment markup-emphasis">
       {sorted.map((item, i) => {
-        const rawText = sentences && sentences[item.sentence_index - 1]
-          ? sentences[item.sentence_index - 1]
-          : (item.text || '');
+        const itemIndex = getItemIndex(item);
+        const rawText = getTextByIndex(sentences, itemIndex) || item.text || '';
         const content = applyHighlights(rawText, item.highlights);
         return (
           <div key={i} className="markup-emphasis__sentence">
-            <span className="markup-plain__num">{item.sentence_index}.</span>
+            <span className="markup-plain__num">{itemIndex}.</span>
             <span className="markup-emphasis__text">{content}</span>
           </div>
         );

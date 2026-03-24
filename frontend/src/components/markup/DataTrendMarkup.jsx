@@ -1,7 +1,7 @@
 import React from 'react';
 import DataChart from '../annotations/charts/DataChart';
 
-export default function DataTrendMarkup({ segment, sentences }) {
+export default function DataTrendMarkup({ segment, sentences: _sentences }) {
   const { values = [], unit } = segment.data || {};
   if (values.length === 0) return null;
 
