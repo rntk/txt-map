@@ -96,6 +96,7 @@ function TopicsBarChart({
 
     const handleOpenModal = item => {
         setModalTopic({
+            name: item.fullPath,
             displayName: item.displayName,
             fullPath: item.fullPath,
             sentenceIndices: item.sentenceIndices || [],

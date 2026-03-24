@@ -5,6 +5,8 @@ import WordPage from './WordPage';
 
 const mockUseSubmission = vi.fn();
 const mockTextDisplay = vi.fn();
+const mockCircularPackingChart = vi.fn();
+const mockTreemapChart = vi.fn();
 
 vi.mock('../hooks/useSubmission', () => ({
   useSubmission: (...args) => mockUseSubmission(...args),
@@ -18,7 +20,17 @@ vi.mock('./TextDisplay', () => ({
 }));
 
 vi.mock('./CircularPackingChart', () => ({
-  default: () => <div data-testid="circular-packing-chart">Circles panel</div>,
+  default: (props) => {
+    mockCircularPackingChart(props);
+    return <div data-testid="circular-packing-chart">Circles panel</div>;
+  },
+}));
+
+vi.mock('./TreemapChart', () => ({
+  default: (props) => {
+    mockTreemapChart(props);
+    return <div data-testid="treemap-chart">Treemap panel</div>;
+  },
 }));
 
 vi.mock('./TopicsTagCloud', () => ({
@@ -40,6 +52,8 @@ vi.mock('../utils/summaryTimeline', () => ({
 describe('WordPage header layout', () => {
   beforeEach(() => {
     mockTextDisplay.mockClear();
+    mockCircularPackingChart.mockClear();
+    mockTreemapChart.mockClear();
     mockUseSubmission.mockReturnValue({
       submission: {
         status: {
@@ -56,6 +70,24 @@ describe('WordPage header layout', () => {
               sentences: [1],
             },
           ],
+          markup: {
+            'Topic 1': {
+              positions: [
+                {
+                  index: 1,
+                  text: 'Alpha beta gamma',
+                  source_sentence_index: 1,
+                },
+              ],
+              segments: [
+                {
+                  type: 'plain',
+                  position_indices: [1],
+                  data: {},
+                },
+              ],
+            },
+          },
           topic_summaries: {
             'Topic 1': 'Summary text',
           },
@@ -95,6 +127,9 @@ describe('WordPage header layout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Topics (Circles)' }));
     expect(screen.getByTestId('circular-packing-chart')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Topics (Treemap)' }));
+    expect(screen.getByTestId('treemap-chart')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Summaries' }));
     expect(screen.getByTestId('summary-timeline')).toBeInTheDocument();
 
@@ -115,5 +150,23 @@ describe('WordPage header layout', () => {
     const latestProps = mockTextDisplay.mock.calls.at(-1)[0];
     expect(latestProps.tooltipEnabled).toBe(false);
     expect(latestProps.submissionId).toBe('sub-123');
+  });
+
+  it('forwards markup to modal-capable chart tabs', () => {
+    render(<WordPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Topics (Circles)' }));
+    expect(mockCircularPackingChart).toHaveBeenCalledWith(expect.objectContaining({
+      markup: expect.objectContaining({
+        'Topic 1': expect.any(Object),
+      }),
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Topics (Treemap)' }));
+    expect(mockTreemapChart).toHaveBeenCalledWith(expect.objectContaining({
+      markup: expect.objectContaining({
+        'Topic 1': expect.any(Object),
+      }),
+    }));
   });
 });

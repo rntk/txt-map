@@ -249,6 +249,7 @@ function ArticleStructureChart({
                                             onClick={e => {
                                                 e.stopPropagation();
                                                 setModalTopic({
+                                                    name: block.fullPath,
                                                     displayName: block.displayName,
                                                     fullPath: block.fullPath,
                                                     sentenceIndices: block.sentenceIndices || [],

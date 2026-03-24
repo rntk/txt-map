@@ -257,6 +257,7 @@ export default function CircularPackingChart({
           const topicData = node.data.topic;
           if (topicData) {
             setModalTopic({
+              name: node.data.fullPath,
               displayName: node.data.name,
               fullPath: node.data.fullPath,
               sentenceIndices: Array.isArray(topicData.sentences) ? topicData.sentences : []

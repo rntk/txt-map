@@ -125,6 +125,7 @@ export default function WordPage() {
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
       setSummaryModalTopic({
+        name: topicName || 'Source Sentences',
         displayName: topicName || 'Source Sentences',
         fullPath: topicName || null,
         sentenceIndices: mapping.source_sentences,
@@ -217,6 +218,7 @@ export default function WordPage() {
                 topics={topics}
                 sentences={allSentences}
                 onShowInArticle={() => {}}
+                markup={submission?.results?.markup}
               />
             </div>
           )}
@@ -227,6 +229,7 @@ export default function WordPage() {
                 topics={topics}
                 sentences={allSentences}
                 onShowInArticle={() => {}}
+                markup={submission?.results?.markup}
               />
             </div>
           )}

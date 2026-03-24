@@ -35,19 +35,19 @@ export const DATA_CHART_NAMES = new Set(['DataBarChart', 'DataLineChart', 'DataT
 export const COMPONENT_REGISTRY = {
   TreemapChart: {
     component: TreemapChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   ArticleStructureChart: {
     component: ArticleStructureChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   TopicsRiverChart: {
     component: TopicsRiverChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   TopicsBarChart: {
     component: TopicsBarChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   TopicsTagCloud: {
     component: TopicsTagCloud,
@@ -55,7 +55,7 @@ export const COMPONENT_REGISTRY = {
   },
   CircularPackingChart: {
     component: CircularPackingChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   RadarChart: {
     component: RadarChart,
@@ -63,7 +63,7 @@ export const COMPONENT_REGISTRY = {
   },
   MarimekkoChartTab: {
     component: MarimekkoChartTab,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ['topics', 'sentences', 'markup'],
   },
   MindmapResults: {
     component: MindmapResults,
@@ -138,6 +138,9 @@ export function assembleChartProps(componentName, ctx, chartSpec = null) {
           topic_mindmaps: ctx.topicMindmaps || {},
           sentences: ctx.sentences || [],
         };
+        break;
+      case 'markup':
+        props.markup = ctx.markup || {};
         break;
       case 'dataExtractions':
         props.dataExtractions = ctx.dataExtractions || [];

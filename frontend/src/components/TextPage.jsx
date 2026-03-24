@@ -163,6 +163,7 @@ function TextPage() {
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
       setSummaryModalTopic({
+        name: topicName || 'Source Sentences',
         displayName: topicName || 'Source Sentences',
         fullPath: topicName || null,
         sentenceIndices: mapping.source_sentences,
@@ -240,7 +241,9 @@ function TextPage() {
   const handleBulletTopicSelect = useCallback((topic, sentenceIndices) => {
     setBulletSourceMenu(null);
     setSummaryModalTopic({
+      name: topic.name,
       displayName: topic.name,
+      fullPath: topic.name,
       sentenceIndices,
     });
   }, []);

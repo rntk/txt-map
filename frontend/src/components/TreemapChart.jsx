@@ -286,6 +286,7 @@ export default function TreemapChart({
 
           if (node.data.topic) {
             setModalTopic({
+              name: node.data.fullPath,
               displayName: node.data.name,
               fullPath: node.data.fullPath,
               sentenceIndices: Array.isArray(node.data.topic.sentences) ? node.data.topic.sentences : []

@@ -19,7 +19,7 @@ const SLIDES = [
   { key: 'tags', title: 'Tags Cloud' },
 ];
 
-function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, articleSummaryText }) {
+function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, articleSummaryText, markup }) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -88,7 +88,7 @@ function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, a
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Topic Landscape</h2>
             <div className="overview-chart-container">
-              <TreemapChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} />
+              <TreemapChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} markup={markup} />
             </div>
           </div>
         )}
@@ -96,7 +96,7 @@ function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, a
           <div className="overview-slide__content overview-slide__content--chart">
             <h2 className="overview-slide__title">Article Structure</h2>
             <div className="overview-chart-container">
-              <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} />
+              <ArticleStructureChart topics={safeTopics} sentences={safeSentences} onShowInArticle={noop} markup={markup} />
             </div>
           </div>
         )}
@@ -146,7 +146,7 @@ function StaticCarousel({ submission, safeTopics, safeSentences, submissionId, a
   );
 }
 
-function StorytellingLayout({ submission, storytelling, safeTopics, safeSentences, submissionId }) {
+function StorytellingLayout({ submission, storytelling, safeTopics, safeSentences, submissionId, markup }) {
   const sectionRefs = useRef([]);
   const results = submission?.results || {};
 
@@ -191,6 +191,7 @@ function StorytellingLayout({ submission, storytelling, safeTopics, safeSentence
     topics: safeTopics,
     sentences: safeSentences,
     topicMindmaps: results.topic_mindmaps || {},
+    markup,
   };
 
   return (
@@ -326,6 +327,7 @@ function OverviewPage() {
           safeTopics={safeTopics}
           safeSentences={safeSentences}
           submissionId={submissionId}
+          markup={results.markup || {}}
         />
       </div>
     );
@@ -344,6 +346,7 @@ function OverviewPage() {
         safeSentences={safeSentences}
         submissionId={submissionId}
         articleSummaryText={articleSummaryText}
+        markup={results.markup || {}}
       />
     </div>
   );

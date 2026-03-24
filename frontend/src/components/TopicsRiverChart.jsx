@@ -170,7 +170,9 @@ const TopicsRiverChart = ({
                 const topicObj = scopedData.find(t => t.name === d.key);
                 if (topicObj) {
                     setSelectedTopicForModal({
+                        name: topicObj.fullPath || topicObj.name,
                         displayName: topicObj.displayName || topicObj.name,
+                        fullPath: topicObj.fullPath || topicObj.name,
                         sentenceIndices: topicObj.sentences
                     });
                 }

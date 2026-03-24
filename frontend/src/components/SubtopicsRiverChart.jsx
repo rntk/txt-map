@@ -187,7 +187,9 @@ const SubtopicsRiverChart = ({
                 const subInfo = orderedSubtopics.find(st => st.name === d.key);
                 if (subInfo) {
                     setSelectedSubtopicForModal({
+                        name: subInfo.fullPath || subInfo.name,
                         displayName: subInfo.name,
+                        fullPath: subInfo.fullPath || subInfo.name,
                         sentenceIndices: subInfo.sentences || []
                     });
                 }

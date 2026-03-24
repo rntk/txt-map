@@ -4,6 +4,17 @@ import MarkupRenderer from '../markup/MarkupRenderer';
 
 const EXTEND_COUNT = 3;
 
+/**
+ * @typedef {Object} TopicSentencesModalTopic
+ * @property {string} [name]
+ * @property {string} [fullPath]
+ * @property {string} [displayName]
+ * @property {number[] | Set<number>} [sentenceIndices]
+ * @property {Array<unknown>} [ranges]
+ * @property {string[]} [_sentences]
+ * @property {string} [_summarySentence]
+ */
+
 function groupConsecutive(sortedIndices) {
     if (sortedIndices.length === 0) return [];
     const groups = [];
@@ -20,6 +31,66 @@ function groupConsecutive(sortedIndices) {
     return groups;
 }
 
+/**
+ * @param {TopicSentencesModalTopic | null | undefined} topic
+ * @returns {TopicSentencesModalTopic | null}
+ */
+function normalizeTopic(topic) {
+    if (!topic) {
+        return null;
+    }
+
+    const trimmedName = typeof topic.name === 'string' ? topic.name.trim() : '';
+    const trimmedFullPath = typeof topic.fullPath === 'string' ? topic.fullPath.trim() : '';
+    const trimmedDisplayName = typeof topic.displayName === 'string' ? topic.displayName.trim() : '';
+    const canonicalName = trimmedName || trimmedFullPath || trimmedDisplayName;
+    const normalizedSentenceIndices = Array.isArray(topic.sentenceIndices)
+        ? topic.sentenceIndices
+        : (topic.sentenceIndices instanceof Set ? Array.from(topic.sentenceIndices) : []);
+
+    if (!canonicalName) {
+        return {
+            ...topic,
+            displayName: trimmedDisplayName,
+            sentenceIndices: normalizedSentenceIndices,
+        };
+    }
+
+    return {
+        ...topic,
+        name: canonicalName,
+        fullPath: trimmedFullPath || canonicalName,
+        displayName: trimmedDisplayName || canonicalName,
+        sentenceIndices: normalizedSentenceIndices,
+    };
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} markup
+ * @param {TopicSentencesModalTopic | null} topic
+ * @returns {any}
+ */
+function resolveTopicMarkup(markup, topic) {
+    if (!markup || !topic) {
+        return null;
+    }
+
+    const candidateKeys = [...new Set(
+        [topic.name, topic.fullPath, topic.displayName]
+            .filter((key) => typeof key === 'string')
+            .map((key) => key.trim())
+            .filter(Boolean)
+    )];
+
+    for (const key of candidateKeys) {
+        if (markup[key]) {
+            return markup[key];
+        }
+    }
+
+    return null;
+}
+
 function TopicSentencesModal({
     topic,
     sentences,
@@ -32,12 +103,12 @@ function TopicSentencesModal({
 }) {
     const [extendedIndices, setExtendedIndices] = useState(new Set());
     const [activeTab, setActiveTab] = useState('sentences');
+    const normalizedTopic = normalizeTopic(topic);
 
-    const isRead = topic && readTopics instanceof Set ? readTopics.has(topic.name) : false;
-
-    const topicMarkup = markup && topic
-        ? (markup[topic.name] || markup[topic.displayName] || null)
-        : null;
+    const isRead = normalizedTopic && readTopics instanceof Set
+        ? readTopics.has(normalizedTopic.name)
+        : false;
+    const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
     const hasEnrichedMarkup = topicMarkup && topicMarkup.segments && topicMarkup.segments.length > 0;
     const markupUnits = Array.isArray(topicMarkup?.positions)
         ? topicMarkup.positions.map((position) => position.text || '')
@@ -46,8 +117,7 @@ function TopicSentencesModal({
     useEffect(() => {
         setExtendedIndices(new Set());
         setActiveTab(hasEnrichedMarkup ? 'enriched' : 'sentences');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [topic]);
+    }, [normalizedTopic?.name, hasEnrichedMarkup]);
 
     useEffect(() => {
         const handleKey = e => {
@@ -57,11 +127,9 @@ function TopicSentencesModal({
         return () => document.removeEventListener('keydown', handleKey);
     }, [onClose]);
 
-    if (!topic) return null;
+    if (!normalizedTopic) return null;
 
-    const indicesList = Array.isArray(topic.sentenceIndices)
-        ? topic.sentenceIndices
-        : (topic.sentenceIndices ? Array.from(topic.sentenceIndices) : []);
+    const indicesList = normalizedTopic.sentenceIndices || [];
 
     const sortedBase = [...indicesList].sort((a, b) => a - b);
     const allIndices = [...new Set([...sortedBase, ...extendedIndices])].sort((a, b) => a - b);
@@ -99,21 +167,21 @@ function TopicSentencesModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className="topic-sentences-modal__header">
-                    <h3>{topic.displayName}</h3>
+                    <h3>{normalizedTopic.displayName}</h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {onToggleRead && (
                             <button
                                 type="button"
                                 className={`topic-sentences-modal__read-btn${isRead ? ' topic-sentences-modal__read-btn--active' : ''}`}
                                 onClick={() => {
-                                    const ranges = topic.ranges;
+                                    const ranges = normalizedTopic.ranges;
                                     if (Array.isArray(ranges) && ranges.length > 1 && !isRead) {
                                         const ok = window.confirm(
-                                            `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
+                                            `"${normalizedTopic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
                                         );
                                         if (!ok) return;
                                     }
-                                    onToggleRead(topic);
+                                    onToggleRead(normalizedTopic);
                                 }}
                                 title={isRead ? 'Mark topic as unread' : 'Mark topic as read'}
                             >
@@ -124,7 +192,7 @@ function TopicSentencesModal({
                             <button
                                 type="button"
                                 className="topic-sentences-modal__show-in-article"
-                                onClick={() => { onShowInArticle(topic); onClose(); }}
+                                onClick={() => { onShowInArticle(normalizedTopic); onClose(); }}
                                 title="Close this panel and jump to the topic in the article"
                             >
                                 Show in article

@@ -42,6 +42,24 @@ describe('TextPage raw text navigation', () => {
           ranges: [{ start: 6, end: 10, sentence_start: 1, sentence_end: 1 }],
         },
       ],
+      markup: {
+        Topic1: {
+          positions: [
+            {
+              index: 1,
+              text: 'Alpha Beta Gamma',
+              source_sentence_index: 1,
+            },
+          ],
+          segments: [
+            {
+              type: 'plain',
+              position_indices: [1],
+              data: {},
+            },
+          ],
+        },
+      },
       topic_summaries: {},
       article_summary: {
         text: 'Brief article summary',
@@ -210,6 +228,8 @@ describe('TextPage raw text navigation', () => {
     // Menu should close and modal should open
     expect(screen.queryByText('Select topic:')).not.toBeInTheDocument();
     expect(document.querySelector('.topic-sentences-modal__header h3')).toHaveTextContent('Topic1');
+    expect(screen.getByRole('button', { name: 'Enriched' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Enriched' })).toHaveClass('topic-sentences-modal__tab--active');
   });
 
   it('renders the read progress gauge', async () => {
