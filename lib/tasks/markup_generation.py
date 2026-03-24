@@ -17,7 +17,7 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v6"
+MARKUP_PROMPT_VERSION = "markup_v7"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
@@ -147,7 +147,6 @@ def _log_llm_exchange(model_id: str, prompt: str, response: str, cached: bool = 
         f"{response}\n"
         f"{'=' * 80}"
     )
-    print(block, flush=True)
     logger.info(block)
 
 
@@ -157,6 +156,7 @@ def _call_llm_cached(
     cache_store: Any,
     namespace: str,
     temperature: float = 0.0,
+    skip_cache_read: bool = False,
 ) -> str:
     model_id = getattr(llm, "model_id", "unknown")
 
@@ -172,10 +172,11 @@ def _call_llm_cached(
         prompt=prompt,
         temperature=temperature,
     )
-    entry = cache_store.get(cache_key)
-    if entry is not None:
-        _log_llm_exchange(model_id, prompt, entry.response, cached=True)
-        return entry.response
+    if not skip_cache_read:
+        entry = cache_store.get(cache_key)
+        if entry is not None:
+            _log_llm_exchange(model_id, prompt, entry.response, cached=True)
+            return entry.response
 
     response = llm.call([prompt], temperature=temperature)
     _log_llm_exchange(model_id, prompt, response)
@@ -407,6 +408,13 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
                 ):
                     indices.add(int(position_index))
             return sorted(indices) if indices else None
+        if seg_type in ("callout", "data_trend"):
+            # These types have no per-item position indices in their data schema.
+            # Try recovering from position_indices accidentally placed inside data.
+            indices = sorted(
+                {int(i) for i in data.get("position_indices", data.get("sentence_indices", []))}
+            )
+            return indices or None
     except (KeyError, TypeError, ValueError):
         pass
     return None
@@ -548,12 +556,12 @@ def _classify_topic(
         last_idx = sentence_indices[-1]
         idx_set = set(sentence_indices)
         context_before = [
-            f"[CONTEXT] {{{i}}} {all_sentences[i - 1]}"
+            f"[CONTEXT] {all_sentences[i - 1]}"
             for i in range(max(1, first_idx - 2), first_idx)
             if i not in idx_set and 1 <= i <= len(all_sentences)
         ]
         context_after = [
-            f"[CONTEXT] {{{i}}} {all_sentences[i - 1]}"
+            f"[CONTEXT] {all_sentences[i - 1]}"
             for i in range(last_idx + 1, min(len(all_sentences) + 1, last_idx + 3))
             if i not in idx_set and 1 <= i <= len(all_sentences)
         ]
@@ -570,6 +578,7 @@ def _classify_topic(
     )
 
     temperatures = [0.0, 0.3, 0.5]
+    skip_cache = False
     for attempt in range(max_retries):
         temperature = temperatures[min(attempt, len(temperatures) - 1)]
         try:
@@ -579,7 +588,9 @@ def _classify_topic(
                 cache_store=cache_store,
                 namespace=namespace,
                 temperature=temperature,
+                skip_cache_read=skip_cache,
             )
+            skip_cache = False
             parsed = _parse_json(response)
             if parsed and _validate_markup_response(parsed, valid_position_indices):
                 parsed["positions"] = positions
@@ -588,6 +599,8 @@ def _classify_topic(
                 "Markup attempt %d/%d failed validation for topic '%s'",
                 attempt + 1, max_retries, topic_name,
             )
+            # Force a fresh LLM call next attempt so the bad cached response is overwritten
+            skip_cache = True
         except Exception as e:
             logger.warning(
                 "Markup LLM error attempt %d/%d for topic '%s': %s",

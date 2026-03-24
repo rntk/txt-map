@@ -54,7 +54,7 @@ export default function EmphasisMarkup({ segment, sentences }) {
     <div className="markup-segment markup-emphasis">
       {sorted.map((item, i) => {
         const itemIndex = getItemIndex(item);
-        const rawText = getTextByIndex(sentences, itemIndex) || item.text || '';
+        const rawText = item.text || getTextByIndex(sentences, itemIndex) || '';
         const content = applyHighlights(rawText, item.highlights);
         return (
           <div key={i} className="markup-emphasis__sentence">

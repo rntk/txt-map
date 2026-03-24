@@ -13,7 +13,7 @@ class SubmissionsStorage:
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
-        "mindmap": ["split_topic_generation"],
+        "mindmap": ["subtopics_generation"],
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
