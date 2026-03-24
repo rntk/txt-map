@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from lib.storage.submissions import SubmissionsStorage
+from txt_splitt import RetryingLLMCallable
 from txt_splitt.cache import CachingLLMCallable
 
 
@@ -73,7 +74,7 @@ Sentences:
         .replace("{sentences_text}", sentences_text)
     )
 
-    response = cached_llm.call(prompt, 0.0)
+    response = cached_llm.call(prompt, 0.5)
 
     subtopics = []
     for line in response.strip().split("\n"):
@@ -128,14 +129,15 @@ def process_subtopics_generation(
         return
 
     llm_adapter = _LLMAdapter(llm)
+    llm_with_retry = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
     if cache_store is not None:
         cached_llm = CachingLLMCallable(
-            llm_adapter,
+            llm_with_retry,
             cache_store,
             namespace=_cache_namespace("subtopics", llm),
         )
     else:
-        cached_llm = llm_adapter
+        cached_llm = llm_with_retry
 
     all_subtopics = []
 
