@@ -109,7 +109,11 @@ function TopicSentencesModal({
         ? readTopics.has(normalizedTopic.name)
         : false;
     const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
-    const hasEnrichedMarkup = topicMarkup && topicMarkup.segments && topicMarkup.segments.length > 0;
+    const hasEnrichedMarkup = Boolean(
+        topicMarkup
+        && Array.isArray(topicMarkup.segments)
+        && topicMarkup.segments.some(segment => segment?.type !== 'plain')
+    );
     const markupUnits = Array.isArray(topicMarkup?.positions)
         ? topicMarkup.positions.map((position) => position.text || '')
         : sentences;

@@ -57,6 +57,32 @@ describe('MarkupRenderer paragraph support', () => {
     expect(screen.getByText('2.')).toBeInTheDocument();
   });
 
+  it('synthesizes plain segments around non-plain markup', () => {
+    render(
+      <MarkupRenderer
+        segments={[
+          {
+            type: 'quote',
+            position_indices: [2],
+            data: {
+              attribution: 'Ada',
+              position_indices: [2],
+            },
+          },
+        ]}
+        sentences={[
+          'Intro sentence.',
+          '"Programs must be written for people to read."',
+          'Closing sentence.',
+        ]}
+      />
+    );
+
+    expect(document.querySelectorAll('.markup-plain__sentence')).toHaveLength(2);
+    expect(screen.getByText('Intro sentence.')).toBeInTheDocument();
+    expect(screen.getByText('Closing sentence.')).toBeInTheDocument();
+  });
+
   it('renders position-based title and body from markup-local units', () => {
     render(
       <MarkupRenderer

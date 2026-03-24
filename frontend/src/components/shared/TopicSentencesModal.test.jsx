@@ -25,9 +25,12 @@ describe('TopicSentencesModal markup resolution', () => {
             ],
             segments: [
               {
-                type: 'plain',
+                type: 'quote',
                 position_indices: [1],
-                data: {},
+                data: {
+                  attribution: 'Planck',
+                  position_indices: [1],
+                },
               },
             ],
           },
@@ -39,6 +42,41 @@ describe('TopicSentencesModal markup resolution', () => {
     expect(screen.getByRole('button', { name: 'Enriched' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Enriched' })).toHaveClass('topic-sentences-modal__tab--active');
     expect(screen.getByText('Quantum mechanics changed physics.')).toBeInTheDocument();
+  });
+
+  it('keeps enriched disabled when markup only contains plain segments', () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [1],
+        }}
+        sentences={['Quantum mechanics changed physics.']}
+        onClose={vi.fn()}
+        markup={{
+          'Science>Physics': {
+            positions: [
+              {
+                index: 1,
+                text: 'Quantum mechanics changed physics.',
+                source_sentence_index: 1,
+              },
+            ],
+            segments: [
+              {
+                type: 'plain',
+                position_indices: [1],
+                data: {},
+              },
+            ],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Enriched' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Sentences' })).toHaveClass('topic-sentences-modal__tab--active');
   });
 
   it('normalizes the topic name before toggling read state', () => {

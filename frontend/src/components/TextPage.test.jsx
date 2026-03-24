@@ -53,9 +53,12 @@ describe('TextPage raw text navigation', () => {
           ],
           segments: [
             {
-              type: 'plain',
+              type: 'quote',
               position_indices: [1],
-              data: {},
+              data: {
+                attribution: 'Test',
+                position_indices: [1],
+              },
             },
           ],
         },

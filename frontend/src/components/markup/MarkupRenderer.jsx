@@ -17,13 +17,67 @@ import TableMarkup from './TableMarkup';
 import QuestionAnswerMarkup from './QuestionAnswerMarkup';
 import CalloutMarkup from './CalloutMarkup';
 import KeyValueMarkup from './KeyValueMarkup';
+import { getSegmentIndices } from './markupUtils';
 
 export default function MarkupRenderer({ segments, sentences }) {
-  if (!segments || segments.length === 0) return null;
+  const segmentList = Array.isArray(segments) ? segments : [];
+  const totalIndices = Array.isArray(sentences) ? sentences.length : 0;
+
+  if (segmentList.length === 0 && totalIndices === 0) return null;
+
+  const segmentsWithStart = segmentList.map((segment) => ({
+    segment,
+    indices: getSegmentIndices(segment),
+  })).sort((left, right) => {
+    const leftStart = left.indices[0] ?? Number.MAX_SAFE_INTEGER;
+    const rightStart = right.indices[0] ?? Number.MAX_SAFE_INTEGER;
+    return leftStart - rightStart;
+  });
+
+  const coveredIndices = new Set(
+    segmentsWithStart.flatMap((item) => item.indices)
+  );
+  const renderedSegments = [];
+  let pendingPlainIndices = [];
+
+  for (let idx = 1; idx <= totalIndices; idx += 1) {
+    if (!coveredIndices.has(idx)) {
+      pendingPlainIndices.push(idx);
+      continue;
+    }
+
+    if (pendingPlainIndices.length > 0) {
+      renderedSegments.push({
+        type: 'plain',
+        position_indices: pendingPlainIndices,
+        data: {},
+      });
+      pendingPlainIndices = [];
+    }
+
+    while (segmentsWithStart.length > 0) {
+      const { segment, indices } = segmentsWithStart[0];
+      if (indices[0] !== idx) break;
+      renderedSegments.push(segment);
+      segmentsWithStart.shift();
+    }
+  }
+
+  if (pendingPlainIndices.length > 0) {
+    renderedSegments.push({
+      type: 'plain',
+      position_indices: pendingPlainIndices,
+      data: {},
+    });
+  }
+
+  while (segmentsWithStart.length > 0) {
+    renderedSegments.push(segmentsWithStart.shift().segment);
+  }
 
   return (
     <>
-      {segments.map((segment, i) => {
+      {renderedSegments.map((segment, i) => {
         switch (segment.type) {
           case 'dialog':
             return <DialogMarkup key={i} segment={segment} sentences={sentences} />;

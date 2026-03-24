@@ -138,6 +138,31 @@ def test_validate_markup_response_accepts_legacy_sentence_indices() -> None:
     assert _validate_markup_response(response, [1, 2]) is True
 
 
+def test_validate_markup_response_accepts_partial_coverage() -> None:
+    response = {
+        "segments": [
+            {
+                "type": "quote",
+                "position_indices": [2],
+                "data": {
+                    "attribution": "Ada",
+                    "position_indices": [2],
+                },
+            }
+        ]
+    }
+
+    assert _validate_markup_response(response, [1, 2, 3]) is True
+
+
+def test_validate_markup_response_accepts_empty_segments() -> None:
+    response = {
+        "segments": []
+    }
+
+    assert _validate_markup_response(response, [1, 2, 3]) is True
+
+
 def test_build_markup_positions_splits_heading_like_content() -> None:
     positions = _build_markup_positions(
         [1],

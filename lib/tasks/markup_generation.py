@@ -17,7 +17,7 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v7"
+MARKUP_PROMPT_VERSION = "markup_v8"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
@@ -75,8 +75,6 @@ MARKUP TYPES and their data schemas:
   data: {{"language": "<programming language or null>", "items": [{{"position_index": N}}]}}
 - "emphasis" — sentences containing key terms, warnings, or important phrases worth highlighting visually
   data: {{"items": [{{"position_index": N, "highlights": [{{"phrase": "<exact substring to emphasize>", "style": "bold|italic|highlight|underline"}}]}}]}}
-- "plain" — no special formatting needed
-  data: {{}}
 - "paragraph" — long-form prose split into readable paragraphs
   data: {{"paragraphs": [{{"position_indices": [N, ...]}}]}}
 - "title" — heading/section title followed by body text
@@ -94,10 +92,10 @@ MARKUP TYPES and their data schemas:
 
 RULES:
 - CRITICAL: every segment object MUST have a top-level "position_indices" array listing which indices it covers
-- Every index in the valid indices list must appear in exactly one segment
+- Only output segments for content that needs special formatting; uncovered indices are treated as implicit plain text by the application
 - Use only exact indices from the valid indices list — no other numbers
-- Only classify when content clearly matches a type; prefer "plain" for ambiguous content
-- Topics with fewer than 3 sentences should almost always be "plain" or "quote"
+- Do not emit "plain" segments unless the entire topic is a fallback due to validation or LLM failure
+- Only classify when content clearly matches a type; if content is ambiguous or ordinary prose, omit it from segments
 - A single topic may contain multiple segments of different types
 - Use "code" only when sentences contain actual code, commands, file paths, or clearly preformatted technical output
 - Use "emphasis" when a sentence contains a specific key term, warning, or critical phrase that deserves visual weight; highlights must be exact substrings from the sentence text
@@ -469,7 +467,7 @@ def _validate_markup_response(data: Any, valid_indices: List[int]) -> bool:
     if not isinstance(data, dict):
         return False
     segments = data.get("segments")
-    if not isinstance(segments, list) or len(segments) == 0:
+    if not isinstance(segments, list):
         return False
 
     seen_indices = set()
@@ -508,12 +506,6 @@ def _validate_markup_response(data: Any, valid_indices: List[int]) -> bool:
                 logger.warning("Markup segment index %s appears in multiple segments", idx)
                 return False
             seen_indices.add(idx)
-
-    # Every valid index must appear in exactly one segment
-    missing = set(valid_indices) - seen_indices
-    if missing:
-        logger.warning("Markup missing coverage for indices: %s", sorted(missing))
-        return False
 
     return True
 
