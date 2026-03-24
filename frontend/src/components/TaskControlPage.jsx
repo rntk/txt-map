@@ -261,7 +261,11 @@ function TaskControlPage() {
                         {task.id?.slice(0, 8) ?? task.id}…
                       </span>
                     </td>
-                    <td className="task-mono">{task.submission_id}</td>
+                    <td className="task-mono">
+                      <a href={`/page/text/${task.submission_id}`} className="task-link">
+                        {task.submission_id}
+                      </a>
+                    </td>
                     <td>{task.task_type}</td>
                     <td>
                       <span className={`task-status task-status-${task.status}`}>{task.status}</span>

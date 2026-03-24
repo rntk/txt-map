@@ -65,7 +65,7 @@ describe('TextPage raw text navigation', () => {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
 
   beforeEach(() => {
-    window.history.pushState({}, '', '/submission/view/test-submission-id');
+    window.history.pushState({}, '', '/page/text/test-submission-id');
 
     if (typeof navigator.sendBeacon === 'undefined') {
       navigator.sendBeacon = vi.fn();
