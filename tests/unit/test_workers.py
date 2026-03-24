@@ -935,6 +935,18 @@ class TestWorkerMarkTaskCompleted:
             "sub-123", "split_topic_generation", "completed"
         )
 
+    def test_deletes_completed_task_from_database(self, worker):
+        """Deletes completed task from task_queue database."""
+        task = {
+            "_id": "task-1",
+            "task_type": "split_topic_generation",
+            "submission_id": "sub-123"
+        }
+
+        worker._mark_task_completed(task)
+
+        worker.db.task_queue.delete_one.assert_called_once_with({"_id": "task-1"})
+
 
 class TestWorkerMarkTaskFailed:
     """Test Worker._mark_task_failed method."""

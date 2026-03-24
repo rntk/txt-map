@@ -205,7 +205,7 @@ class Worker:
             self._mark_task_failed(task, str(e))
 
     def _mark_task_completed(self, task):
-        """Mark task as completed in both task_queue and submission"""
+        """Mark task as completed in both task_queue and submission, then remove from DB"""
         now = datetime.now(UTC)
 
         # Update task queue
@@ -225,6 +225,9 @@ class Worker:
             task["task_type"],
             "completed"
         )
+
+        # Remove the completed task from the database
+        self.db.task_queue.delete_one({"_id": task["_id"]})
 
     def _mark_task_failed(self, task, error_msg):
         """Mark task as failed in both task_queue and submission"""
