@@ -16,12 +16,13 @@ from txt_splitt.cache import CacheEntry, _build_cache_key
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v4"
+MARKUP_PROMPT_VERSION = "markup_v5"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
     "timeline", "definition", "quote", "code", "emphasis", "plain",
     "title", "steps", "table", "question_answer", "callout", "key_value",
+    "paragraph",
 }
 
 # ─── Prompt template ──────────────────────────────────────────────────────────
@@ -75,6 +76,8 @@ MARKUP TYPES and their data schemas:
   data: {{"items": [{{"sentence_index": N, "highlights": [{{"phrase": "<exact substring to emphasize>", "style": "bold|italic|highlight|underline"}}]}}]}}
 - "plain" — no special formatting needed
   data: {{}}
+- "paragraph" — long-form prose split into readable paragraphs
+  data: {{"paragraphs": [{{"sentence_indices": [N, ...]}}]}}
 - "title" — heading/section title followed by body text
   data: {{"level": <2|3|4>, "title_sentence_index": N}}
 - "steps" — ordered procedural instructions where sequence matters
@@ -98,6 +101,7 @@ RULES:
 - Use "code" only when sentences contain actual code, commands, file paths, or clearly preformatted technical output
 - Use "emphasis" when a sentence contains a specific key term, warning, or critical phrase that deserves visual weight; highlights must be exact substrings from the sentence text
 - For "emphasis" highlights: "bold" for key terms/facts, "italic" for titles/foreign terms, "highlight" for warnings/critical info, "underline" for defined terms
+- Use "paragraph" for longer plain prose that would be easier to read when split into 2+ paragraphs; preserve sentence order and use it only when no more specific type fits better
 - Use "title" when a sentence is clearly a heading or section title; level 2 for major headings, 3 for sub-headings, 4 for minor; the title_sentence_index must be in this segment's sentence_indices
 - Use "steps" for procedural/instructional content where order of actions matters; prefer "list" for unordered enumerations
 - Use "table" when text describes multiple entities with 2+ comparable attributes that map naturally to rows and columns
@@ -242,9 +246,60 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
                     if si is not None:
                         indices.add(int(si))
             return sorted(indices) if indices else None
+        if seg_type == "paragraph":
+            indices = set()
+            for paragraph in data.get("paragraphs", []):
+                for sentence_index in paragraph.get("sentence_indices", []):
+                    indices.add(int(sentence_index))
+            return sorted(indices) if indices else None
     except (KeyError, TypeError, ValueError):
         pass
     return None
+
+
+def _validate_paragraph_data(segment: Dict[str, Any], valid_indices: List[int]) -> bool:
+    """Validate paragraph-specific nested sentence groupings."""
+    data = segment.get("data", {})
+    paragraphs = data.get("paragraphs")
+    if not isinstance(paragraphs, list) or len(paragraphs) == 0:
+        logger.warning("Paragraph segment missing non-empty data.paragraphs")
+        return False
+
+    top_level_indices = segment.get("sentence_indices")
+    if not isinstance(top_level_indices, list) or len(top_level_indices) == 0:
+        logger.warning("Paragraph segment missing top-level sentence_indices")
+        return False
+
+    nested_seen = set()
+    for paragraph in paragraphs:
+        if not isinstance(paragraph, dict):
+            logger.warning("Paragraph entry must be an object: %s", paragraph)
+            return False
+        paragraph_indices = paragraph.get("sentence_indices")
+        if not isinstance(paragraph_indices, list) or len(paragraph_indices) == 0:
+            logger.warning("Paragraph entry missing non-empty sentence_indices: %s", paragraph)
+            return False
+        for idx in paragraph_indices:
+            if not isinstance(idx, int):
+                logger.warning("Paragraph sentence index must be int: %s", idx)
+                return False
+            if idx not in valid_indices:
+                logger.warning("Paragraph sentence index %s not in valid_indices %s", idx, valid_indices)
+                return False
+            if idx in nested_seen:
+                logger.warning("Paragraph sentence index %s duplicated across paragraph blocks", idx)
+                return False
+            nested_seen.add(idx)
+
+    if nested_seen != set(top_level_indices):
+        logger.warning(
+            "Paragraph nested indices %s do not match top-level sentence_indices %s",
+            sorted(nested_seen),
+            sorted(top_level_indices),
+        )
+        return False
+
+    return True
 
 
 def _validate_markup_response(data: Any, valid_indices: List[int]) -> bool:
@@ -276,6 +331,9 @@ def _validate_markup_response(data: Any, valid_indices: List[int]) -> bool:
             else:
                 logger.warning("Segment type '%s' missing sentence_indices and cannot derive them", seg_type)
                 return False
+
+        if seg_type == "paragraph" and not _validate_paragraph_data(seg, valid_indices):
+            return False
 
         for idx in indices:
             if not isinstance(idx, int):

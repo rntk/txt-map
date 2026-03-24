@@ -27,6 +27,20 @@
   flex-shrink: 0;
 }
 
+.markup-paragraph {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.markup-paragraph__block {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #2f3640;
+}
+
 /* ─── Dialog ──────────────────────────────────────────────────────────────── */
 
 .markup-dialog {

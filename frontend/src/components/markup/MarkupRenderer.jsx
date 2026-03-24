@@ -10,6 +10,7 @@ import DefinitionMarkup from './DefinitionMarkup';
 import QuoteMarkup from './QuoteMarkup';
 import CodeMarkup from './CodeMarkup';
 import EmphasisMarkup from './EmphasisMarkup';
+import ParagraphMarkup from './ParagraphMarkup';
 import TitleMarkup from './TitleMarkup';
 import StepsMarkup from './StepsMarkup';
 import TableMarkup from './TableMarkup';
@@ -42,6 +43,8 @@ export default function MarkupRenderer({ segments, sentences }) {
             return <CodeMarkup key={i} segment={segment} sentences={sentences} />;
           case 'emphasis':
             return <EmphasisMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'paragraph':
+            return <ParagraphMarkup key={i} segment={segment} sentences={sentences} />;
           case 'title':
             return <TitleMarkup key={i} segment={segment} sentences={sentences} />;
           case 'steps':
