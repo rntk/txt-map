@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './TopicSentencesModal.css';
+import MarkupRenderer from '../markup/MarkupRenderer';
 
 const EXTEND_COUNT = 3;
 
@@ -19,11 +20,19 @@ function groupConsecutive(sortedIndices) {
     return groups;
 }
 
-function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInArticle }) {
+function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInArticle, markup }) {
     const [extendedIndices, setExtendedIndices] = useState(new Set());
+    const [activeTab, setActiveTab] = useState('sentences');
+
+    const topicMarkup = markup && topic
+        ? (markup[topic.name] || markup[topic.displayName] || null)
+        : null;
+    const hasEnrichedMarkup = topicMarkup && topicMarkup.segments && topicMarkup.segments.length > 0;
 
     useEffect(() => {
         setExtendedIndices(new Set());
+        setActiveTab(hasEnrichedMarkup ? 'enriched' : 'sentences');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [topic]);
 
     useEffect(() => {
@@ -63,6 +72,12 @@ function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInA
         setExtendedIndices(newSet);
     };
 
+    const tabs = [
+        { key: 'sentences', label: 'Sentences' },
+        { key: 'enriched', label: 'Enriched', disabled: !hasEnrichedMarkup },
+        { key: 'raw', label: 'Raw JSON', disabled: !hasEnrichedMarkup },
+    ];
+
     return (
         <div className="topic-sentences-modal__overlay" onClick={onClose}>
             <div
@@ -92,13 +107,32 @@ function TopicSentencesModal({ topic, sentences, onClose, headerExtra, onShowInA
                         </button>
                     </div>
                 </div>
+                <div className="topic-sentences-modal__tabs">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            className={`topic-sentences-modal__tab${activeTab === tab.key ? ' topic-sentences-modal__tab--active' : ''}${tab.disabled ? ' topic-sentences-modal__tab--disabled' : ''}`}
+                            onClick={() => !tab.disabled && setActiveTab(tab.key)}
+                            disabled={tab.disabled}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
                 {headerExtra && (
                     <div className="topic-sentences-modal__header-extra">
                         {headerExtra}
                     </div>
                 )}
                 <div className="topic-sentences-modal__body">
-                    {allIndices.length === 0 ? (
+                    {activeTab === 'enriched' && hasEnrichedMarkup ? (
+                        <MarkupRenderer segments={topicMarkup.segments} sentences={sentences} />
+                    ) : activeTab === 'raw' && hasEnrichedMarkup ? (
+                        <pre className="topic-sentences-modal__raw-json">
+                            {JSON.stringify(topicMarkup, null, 2)}
+                        </pre>
+                    ) : allIndices.length === 0 ? (
                         <p>No sentences found for this topic.</p>
                     ) : (
                         rangeGroups.map((group, groupIdx) => {

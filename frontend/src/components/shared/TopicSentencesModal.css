@@ -147,6 +147,55 @@
     border-color: #7aaac8;
 }
 
+.topic-sentences-modal__tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    background: #fafafa;
+    padding: 0 20px;
+    gap: 2px;
+}
+
+.topic-sentences-modal__tab {
+    padding: 8px 16px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.topic-sentences-modal__tab:hover:not(:disabled) {
+    color: #333;
+}
+
+.topic-sentences-modal__tab--active {
+    color: #1a6bb5;
+    border-bottom-color: #1a6bb5;
+}
+
+.topic-sentences-modal__tab--disabled {
+    color: #bbb;
+    cursor: not-allowed;
+}
+
+.topic-sentences-modal__raw-json {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #333;
+    background: #f7f7f7;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 16px;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
+}
+
 .topic-sentences-modal__header-extra {
     padding: 10px 20px;
     background: #f9f9f9;

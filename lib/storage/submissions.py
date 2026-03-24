@@ -8,7 +8,7 @@ from pymongo.database import Database
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
-    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation"]
+    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation", "markup_generation"]
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
@@ -17,6 +17,7 @@ class SubmissionsStorage:
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
+        "markup_generation": ["split_topic_generation"],
     }
 
     def __init__(self, db: Database) -> None:
@@ -91,6 +92,12 @@ class SubmissionsStorage:
                     "started_at": None,
                     "completed_at": None,
                     "error": None
+                },
+                "markup_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
                 }
             },
             "read_topics": [],
@@ -110,7 +117,8 @@ class SubmissionsStorage:
                 "prefix_tree": {},
                 "insights": [],
                 "storytelling": {},
-                "annotations": {}
+                "annotations": {},
+                "markup": {}
             }
         }
 
@@ -220,6 +228,9 @@ class SubmissionsStorage:
         if "storytelling_generation" in names:
             update_fields["results.storytelling"] = {}
             update_fields["results.annotations"] = {}
+
+        if "markup_generation" in names:
+            update_fields["results.markup"] = {}
 
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},

@@ -176,6 +176,15 @@ function TextPage() {
     setSummaryModalTopic(null);
   }, []);
 
+  const handleShowTopicSentences = useCallback((topic) => {
+    setSummaryModalTopic({
+      name: topic.name,
+      displayName: topic.name,
+      fullPath: topic.name,
+      sentenceIndices: topic.sentences || [],
+    });
+  }, []);
+
   const pendingShowTopicRef = useRef(null);
 
   const handleShowInArticle = useCallback((modalTopic) => {
@@ -338,6 +347,7 @@ function TextPage() {
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['storytelling_generation'], 'Story generation queued.')} disabled={actionLoading}>Story</button>
+              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
             </div>
 
             <hr style={{ margin: '4px 0', border: 'none', borderTop: '1px solid #eee' }} />
@@ -599,6 +609,7 @@ function TextPage() {
                       onToggleRead={toggleRead}
                       onToggleTopic={toggleTopic}
                       onNavigateTopic={navigateTopicSentence}
+                      onShowSentences={handleShowTopicSentences}
                       tooltipEnabled={tooltipEnabled}
                       submissionId={submissionId}
                     />
@@ -676,6 +687,7 @@ function TextPage() {
           topic={summaryModalTopic}
           sentences={summaryModalTopic._sentences || safeSentences}
           onClose={closeSummaryModal}
+          markup={submission?.results?.markup}
         />
       )}
 

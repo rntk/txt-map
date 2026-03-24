@@ -27,6 +27,7 @@ from lib.tasks.mindmap import process_mindmap
 from lib.tasks.prefix_tree import process_prefix_tree
 from lib.tasks.insights_generation import process_insights_generation
 from lib.tasks.storytelling_generation import process_storytelling_generation
+from lib.tasks.markup_generation import process_markup_generation
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +45,7 @@ TASK_DEPENDENCIES = {
     "prefix_tree": ["split_topic_generation"],
     "insights_generation": ["split_topic_generation"],
     "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
+    "markup_generation": ["split_topic_generation"],
 }
 
 # Task priorities (lower = higher priority)
@@ -55,6 +57,7 @@ TASK_PRIORITIES = {
     "prefix_tree": 3,
     "insights_generation": 4,
     "storytelling_generation": 5,
+    "markup_generation": 4,
 }
 
 # Task handlers mapping
@@ -66,6 +69,7 @@ TASK_HANDLERS = {
     "prefix_tree": process_prefix_tree,
     "insights_generation": process_insights_generation,
     "storytelling_generation": process_storytelling_generation,
+    "markup_generation": process_markup_generation,
 }
 
 
@@ -187,7 +191,7 @@ class Worker:
                 raise ValueError(f"Submission {submission_id} not found")
 
             # Execute the handler (pass cache_store to LLM-using tasks)
-            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization", "insights_generation", "storytelling_generation"}
+            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization", "insights_generation", "storytelling_generation", "markup_generation"}
             if task_type in cache_tasks:
                 handler(submission, self.db, llm, cache_store=self.cache_store)
             else:

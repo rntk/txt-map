@@ -26,12 +26,13 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} [onNavigateTopic]
  * @property {boolean} [tooltipEnabled]
  * @property {string} [submissionId]
+ * @property {(topic: Object) => void} [onShowSentences]
  */
 
 /**
  * @param {TextDisplayProps} props
  */
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -424,6 +425,15 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                       Next ›
                     </button>
                   </>
+                )}
+                {onShowSentences && (
+                  <button
+                    className="text-topic-tooltip-btn"
+                    onClick={() => { onShowSentences(topic); hideTooltip(); }}
+                    title="Open sentences modal for this topic"
+                  >
+                    View sentences
+                  </button>
                 )}
               </div>
             </div>

@@ -16,11 +16,12 @@ from txt_splitt.cache import CacheEntry, _build_cache_key
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v3"
+MARKUP_PROMPT_VERSION = "markup_v4"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
     "timeline", "definition", "quote", "code", "emphasis", "plain",
+    "title", "steps", "table", "question_answer", "callout", "key_value",
 }
 
 # ─── Prompt template ──────────────────────────────────────────────────────────
@@ -56,10 +57,10 @@ OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
 MARKUP TYPES and their data schemas:
 - "dialog" — conversation between speakers
   data: {{"speakers": [{{"name": "<speaker>", "lines": [{{"sentence_index": N}}]}}]}}
-- "comparison" — two-sided pros/cons or alternative comparison
-  data: {{"left_label": "<label>", "right_label": "<label>", "left_items": ["<verbatim text>", ...], "right_items": ["<verbatim text>", ...]}}
+- "comparison" — multi-column comparison of alternatives, pros/cons, or features
+  data: {{"columns": [{{"label": "<column label>", "items": [{{"sentence_index": N, "text": "<verbatim text>"}}]}}]}}
 - "list" — enumerated items or bullet points
-  data: {{"items": [{{"sentence_index": N}}]}}
+  data: {{"ordered": <true|false>, "items": [{{"sentence_index": N}}]}}
 - "data_trend" — numbers, statistics, trends (suitable for a chart)
   data: {{"values": [{{"label": "<category>", "value": "<verbatim value from text>"}}], "unit": "<optional unit or null>"}}
 - "timeline" — chronological events with dates
@@ -74,6 +75,18 @@ MARKUP TYPES and their data schemas:
   data: {{"items": [{{"sentence_index": N, "highlights": [{{"phrase": "<exact substring to emphasize>", "style": "bold|italic|highlight|underline"}}]}}]}}
 - "plain" — no special formatting needed
   data: {{}}
+- "title" — heading/section title followed by body text
+  data: {{"level": <2|3|4>, "title_sentence_index": N}}
+- "steps" — ordered procedural instructions where sequence matters
+  data: {{"items": [{{"sentence_index": N, "step_number": <int>}}]}}
+- "table" — structured tabular data with comparable attributes across entities
+  data: {{"headers": ["<col1>", ...], "rows": [{{"cells": ["<val1>", ...], "sentence_indices": [N]}}]}}
+- "question_answer" — questions followed by their answers
+  data: {{"pairs": [{{"question_sentence_index": N, "answer_sentence_indices": [M, ...]}}]}}
+- "callout" — important notice deserving visual separation (warning, tip, note, important)
+  data: {{"level": "<warning|tip|note|important>"}}
+- "key_value" — label:value pairs such as specs, properties, or config settings
+  data: {{"pairs": [{{"key": "<label>", "value": "<value>", "sentence_index": N}}]}}
 
 RULES:
 - CRITICAL: every segment object MUST have a top-level "sentence_indices" array listing which indices it covers
@@ -85,6 +98,15 @@ RULES:
 - Use "code" only when sentences contain actual code, commands, file paths, or clearly preformatted technical output
 - Use "emphasis" when a sentence contains a specific key term, warning, or critical phrase that deserves visual weight; highlights must be exact substrings from the sentence text
 - For "emphasis" highlights: "bold" for key terms/facts, "italic" for titles/foreign terms, "highlight" for warnings/critical info, "underline" for defined terms
+- Use "title" when a sentence is clearly a heading or section title; level 2 for major headings, 3 for sub-headings, 4 for minor; the title_sentence_index must be in this segment's sentence_indices
+- Use "steps" for procedural/instructional content where order of actions matters; prefer "list" for unordered enumerations
+- Use "table" when text describes multiple entities with 2+ comparable attributes that map naturally to rows and columns
+- Use "question_answer" when text contains explicit questions followed by answers
+- Use "callout" for warnings, tips, notes, or important notices; set level to warning/tip/note/important accordingly
+- Use "key_value" when text contains label:value pairs (specs, properties, settings)
+- For "list", set ordered=true when items have a natural sequence or ranking, ordered=false for unordered collections
+- For "comparison", use 2 or more columns as appropriate — not limited to binary comparisons
+- Lines marked [CONTEXT] are provided for background understanding only — do NOT include their indices in any segment's sentence_indices
 """
 
 
@@ -178,7 +200,7 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
     type-specific data fields. Returns a sorted list of ints, or None if impossible.
     """
     try:
-        if seg_type in ("code", "emphasis", "list"):
+        if seg_type in ("code", "emphasis", "list", "steps"):
             return sorted({int(item["sentence_index"]) for item in data.get("items", [])})
         if seg_type == "dialog":
             indices = set()
@@ -192,6 +214,34 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
             return sorted({int(i) for i in data.get("explanation_sentence_indices", [])})
         if seg_type == "quote":
             return sorted({int(i) for i in data.get("sentence_indices", [])})
+        if seg_type == "title":
+            ti = data.get("title_sentence_index")
+            return [int(ti)] if ti is not None else None
+        if seg_type == "table":
+            indices = set()
+            for row in data.get("rows", []):
+                for si in row.get("sentence_indices", []):
+                    indices.add(int(si))
+            return sorted(indices) if indices else None
+        if seg_type == "question_answer":
+            indices = set()
+            for pair in data.get("pairs", []):
+                qi = pair.get("question_sentence_index")
+                if qi is not None:
+                    indices.add(int(qi))
+                for ai in pair.get("answer_sentence_indices", []):
+                    indices.add(int(ai))
+            return sorted(indices) if indices else None
+        if seg_type == "key_value":
+            return sorted({int(p["sentence_index"]) for p in data.get("pairs", [])})
+        if seg_type == "comparison":
+            indices = set()
+            for col in data.get("columns", []):
+                for item in col.get("items", []):
+                    si = item.get("sentence_index")
+                    if si is not None:
+                        indices.add(int(si))
+            return sorted(indices) if indices else None
     except (KeyError, TypeError, ValueError):
         pass
     return None
@@ -286,6 +336,23 @@ def _classify_topic(
 
     if not lines:
         return _plain_fallback(sentence_indices)
+
+    # Add adjacent context sentences for short topics so the LLM can classify better
+    if len(sentence_indices) < 4:
+        first_idx = sentence_indices[0]
+        last_idx = sentence_indices[-1]
+        idx_set = set(sentence_indices)
+        context_before = [
+            f"[CONTEXT] {{{i}}} {all_sentences[i - 1]}"
+            for i in range(max(1, first_idx - 2), first_idx)
+            if i not in idx_set and 1 <= i <= len(all_sentences)
+        ]
+        context_after = [
+            f"[CONTEXT] {{{i}}} {all_sentences[i - 1]}"
+            for i in range(last_idx + 1, min(len(all_sentences) + 1, last_idx + 3))
+            if i not in idx_set and 1 <= i <= len(all_sentences)
+        ]
+        lines = context_before + lines + context_after
 
     numbered_sentences = "\n".join(lines)
     topic_name = topic.get("name", "Unknown")

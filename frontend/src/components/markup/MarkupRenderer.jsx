@@ -10,6 +10,12 @@ import DefinitionMarkup from './DefinitionMarkup';
 import QuoteMarkup from './QuoteMarkup';
 import CodeMarkup from './CodeMarkup';
 import EmphasisMarkup from './EmphasisMarkup';
+import TitleMarkup from './TitleMarkup';
+import StepsMarkup from './StepsMarkup';
+import TableMarkup from './TableMarkup';
+import QuestionAnswerMarkup from './QuestionAnswerMarkup';
+import CalloutMarkup from './CalloutMarkup';
+import KeyValueMarkup from './KeyValueMarkup';
 
 export default function MarkupRenderer({ segments, sentences }) {
   if (!segments || segments.length === 0) return null;
@@ -36,6 +42,18 @@ export default function MarkupRenderer({ segments, sentences }) {
             return <CodeMarkup key={i} segment={segment} sentences={sentences} />;
           case 'emphasis':
             return <EmphasisMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'title':
+            return <TitleMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'steps':
+            return <StepsMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'table':
+            return <TableMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'question_answer':
+            return <QuestionAnswerMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'callout':
+            return <CalloutMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'key_value':
+            return <KeyValueMarkup key={i} segment={segment} sentences={sentences} />;
           default:
             return <PlainMarkup key={i} segment={segment} sentences={sentences} />;
         }
