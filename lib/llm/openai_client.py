@@ -32,8 +32,7 @@ class OpenAIClient(LLMClient):
 
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         try:
-            prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]
-            logging.info(f"LLM request (preview): {prompt_preview}")
+            logging.info(f"LLM request: {user_msgs[0]}")
 
             # gpt-5-mini and gpt-5-nano don't support temperature parameter
             kwargs = {"service_tier": "flex"}
@@ -48,8 +47,7 @@ class OpenAIClient(LLMClient):
             content = response.choices[0].message.content
             if content is None:
                 raise RuntimeError("LLM returned empty response")
-            content_preview = content[:500] + "..." if len(content) > 500 else content
-            logging.info(f"LLM response content (preview): {content_preview}")
+            logging.info(f"LLM response: {content}")
             return content
         except RuntimeError:
             raise

@@ -42,9 +42,7 @@ class LLamaCPP(LLMClient):
         """Single attempt to call the LLM without retry logic."""
         conn = self.get_connection()
         try:
-            prompt_preview = user_msgs[0][:500] + "..." if len(user_msgs[0]) > 500 else user_msgs[0]
-            logging.info(f"LLM request (preview): {prompt_preview}")
-            logging.info(f"LLM request full length: {len(user_msgs[0])} chars")
+            logging.info(f"LLM request: {user_msgs[0]}")
 
             body = json.dumps(
                 {
@@ -67,13 +65,11 @@ class LLamaCPP(LLMClient):
             resp = json.loads(resp_body)
 
             content = resp.get("choices", [{}])[0].get("message", {}).get("content")
-            logging.info(f"LLM raw response: {resp}")
             if content is None:
                 logging.error("LLM response missing 'choices[0].message.content'")
                 logging.error(f"Full response: {resp}")
                 raise RuntimeError("LLM returned empty response")
-            content_preview = content[:500] + "..." if len(content) > 500 else content
-            logging.info(f"LLM response content (preview): {content_preview}")
+            logging.info(f"LLM response: {content}")
             return content
         except json.JSONDecodeError as e:
             err_msg = f"JSON decode error: {e}"
