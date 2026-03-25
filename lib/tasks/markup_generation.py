@@ -8,7 +8,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt.cache import CacheEntry, _build_cache_key
@@ -17,7 +17,7 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v8"
+MARKUP_PROMPT_VERSION = "markup_v12"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
@@ -43,73 +43,50 @@ TOPIC: {topic_name}
 {numbered_sentences}
 </topic_content>
 
-VALID MARKUP POSITION INDICES (only use these exact numbers): {valid_indices}
+VALID MARKUP POSITION INDICES: {valid_indices}
+WORDS are marked with [wN] markers. Use these indices for 'wrd_idx' fields.
 
 OUTPUT FORMAT — return ONLY valid JSON, no markdown fences, no extra text:
 {{
-  "segments": [
+  "segs": [
     {{
       "type": "<markup_type>",
-      "position_indices": [<list of markup position indices from valid indices above>],
+      "pos_idx": [<indices or "start-end" ranges>],
       "data": {{ <type-specific data> }}
     }}
   ]
 }}
 
-MARKUP TYPES and their data schemas:
+MARKUP TYPES and their abbreviated data schemas:
 - "dialog" — conversation between speakers
-  data: {{"speakers": [{{"name": "<speaker>", "lines": [{{"position_index": N}}]}}]}}
-- "comparison" — multi-column comparison of alternatives, pros/cons, or features
-  data: {{"columns": [{{"label": "<column label>", "items": [{{"position_index": N, "text": "<verbatim text>"}}]}}]}}
+  data: {{"spkrs": [{{"name": "<speaker>", "lines": [{{"pos_idx": N}}]}}]}}
+- "comparison" — multi-column comparison
+  data: {{"cols": [{{"lbl": "<label>", "items": [{{"pos_idx": N, "wrd_idx": ["w<N>", ...]}}]}}]}}
 - "list" — enumerated items or bullet points
-  data: {{"ordered": <true|false>, "items": [{{"position_index": N}}]}}
-- "data_trend" — numbers, statistics, trends (suitable for a chart)
-  data: {{"values": [{{"label": "<category>", "value": "<verbatim value from text>"}}], "unit": "<optional unit or null>"}}
-- "timeline" — chronological events with dates
-  data: {{"events": [{{"position_index": N, "date": "<date from text>"}}]}}
-- "definition" — term being defined or explained
-  data: {{"term": "<exact term>", "explanation_position_indices": [N, ...]}}
-- "quote" — direct quotation or attributed statement
-  data: {{"attribution": "<speaker if identifiable or null>", "position_indices": [N, ...]}}
-- "code" — source code, command-line output, file paths, or preformatted technical text
-  data: {{"language": "<programming language or null>", "items": [{{"position_index": N}}]}}
-- "emphasis" — sentences containing key terms, warnings, or important phrases worth highlighting visually
-  data: {{"items": [{{"position_index": N, "highlights": [{{"phrase": "<exact substring to emphasize>", "style": "bold|italic|highlight|underline"}}]}}]}}
-- "paragraph" — long-form prose split into readable paragraphs
-  data: {{"paragraphs": [{{"position_indices": [N, ...]}}]}}
-- "title" — heading/section title followed by body text
-  data: {{"level": <2|3|4>, "title_position_index": N}}
-- "steps" — ordered procedural instructions where sequence matters
-  data: {{"items": [{{"position_index": N, "step_number": <int>}}]}}
-- "table" — structured tabular data with comparable attributes across entities
-  data: {{"headers": ["<col1>", ...], "rows": [{{"cells": ["<val1>", ...], "position_indices": [N]}}]}}
-- "question_answer" — questions followed by their answers
-  data: {{"pairs": [{{"question_position_index": N, "answer_position_indices": [M, ...]}}]}}
-- "callout" — important notice deserving visual separation (warning, tip, note, important)
-  data: {{"level": "<warning|tip|note|important>"}}
-- "key_value" — label:value pairs such as specs, properties, or config settings
-  data: {{"pairs": [{{"key": "<label>", "value": "<value>", "position_index": N}}]}}
+  data: {{"ord": <true|false>}}
+- "data_trend" — numbers, statistics, trends. data: {{"vals": [{{"lbl": "<cat>", "wrd_idx": ["w<N>", ...]}}], "unit": "<unit>"}}
+- "timeline" — chronological events. data: {{"evts": [{{"pos_idx": N, "wrd_idx": ["w<N>", ...]}}]}}
+- "definition" — term and explanation. data: {{"term": ["w<N>", ...]}}
+- "quote" — direct quotation. data: {{"attr": "<speaker>"}}
+- "code" — source code or command output. data: {{"lang": "<lang>"}}
+- "emphasis" — highlights. data: {{"items": [{{"pos_idx": N, "hlts": [{{"wrd_idx": ["w<N>", ...], "styl": "bold|italic|underline"}}]}}]}}
+- "paragraph" — split into readable paragraphs. data: {{"paras": [{{"pos_idx": [<indices>]}}]}} (omit 'paras' if only one)
+- "title" — heading. data: {{"lvl": <2|3|4>}}
+- "steps" — procedural instructions. data: {{}}
+- "table" — structured table. data: {{"hdrs": ["<col1>", ...], "rows": [{{"cells": ["<val1>", ...], "pos_idx": [N]}}]}}
+- "question_answer" — Q&A. data: {{"pairs": [{{"qst_idx": N, "ans_idx": [<indices>]}}]}}
+- "callout" — important notice. data: {{"lvl": "<warning|tip|note|important>"}}
+- "key_value" — label:value. data: {{"pairs": [{{"key": "<label>", "wrd_idx": ["w<N>", ...], "pos_idx": N}}]}}
+- "plain" — plain text. data: {{}}
 
 RULES:
-- CRITICAL: every segment object MUST have a top-level "position_indices" array listing which indices it covers
-- Only output segments for content that needs special formatting; uncovered indices are treated as implicit plain text by the application
-- Use only exact indices from the valid indices list — no other numbers
-- Do not emit "plain" segments unless the entire topic is a fallback due to validation or LLM failure
-- Only classify when content clearly matches a type; if content is ambiguous or ordinary prose, omit it from segments
-- A single topic may contain multiple segments of different types
-- Use "code" only when sentences contain actual code, commands, file paths, or clearly preformatted technical output
-- Use "emphasis" when a sentence contains a specific key term, warning, or critical phrase that deserves visual weight; highlights must be exact substrings from the sentence text
-- For "emphasis" highlights: "bold" for key terms/facts, "italic" for titles/foreign terms, "highlight" for warnings/critical info, "underline" for defined terms
-- Use "paragraph" for longer plain prose that would be easier to read when split into 2+ paragraphs; preserve sentence order and use it only when no more specific type fits better
-- Use "title" when a sentence is clearly a heading or section title; level 2 for major headings, 3 for sub-headings, 4 for minor; the title_position_index must be in this segment's position_indices
-- Use "steps" for procedural/instructional content where order of actions matters; prefer "list" for unordered enumerations
-- Use "table" when text describes multiple entities with 2+ comparable attributes that map naturally to rows and columns
-- Use "question_answer" when text contains explicit questions followed by answers
-- Use "callout" for warnings, tips, notes, or important notices; set level to warning/tip/note/important accordingly
-- Use "key_value" when text contains label:value pairs (specs, properties, settings)
-- For "list", set ordered=true when items have a natural sequence or ranking, ordered=false for unordered collections
-- For "comparison", use 2 or more columns as appropriate — not limited to binary comparisons
-- Lines marked [CONTEXT] are provided for background understanding only — do NOT include their indices in any segment's position_indices
+- CRITICAL: every segment MUST have "pos_idx" array.
+- Use ranges like ["1-8"] ALWAYS for any sequence of 3+ indices.
+- Do not repeat 'pos_idx' inside 'data' if it matches the top-level 'pos_idx'.
+- Every sentence index MUST be assigned to exactly ONE segment. Do NOT overlap.
+- Do not use "title" for the very first sentence if it is exactly the TOPIC name (redundant).
+- For 'wrd_idx' fields: use [wN] markers only (e.g. ["w3", "w4"] or range "w3-w7"). Never copy text.
+- Lines marked [CONTEXT] are for background only — do NOT include their indices in "pos_idx".
 """
 
 _MARKUP_POSITION_SPLITTER = SparseRegexSentenceSplitter(
@@ -134,20 +111,6 @@ def _cache_namespace(llm_client: Any) -> str:
     return f"markup_classification:{model_id}"
 
 
-def _log_llm_exchange(model_id: str, prompt: str, response: str, cached: bool = False) -> None:
-    label = "CACHED RESPONSE" if cached else "RESPONSE"
-    block = (
-        f"\n{'=' * 80}\n"
-        f"MARKUP LLM CALL [{model_id}]\n"
-        f"{'-' * 36} PROMPT {'-' * 37}\n"
-        f"{prompt}\n"
-        f"{'-' * 35} {label} {'-' * (43 - len(label))}\n"
-        f"{response}\n"
-        f"{'=' * 80}"
-    )
-    logger.info(block)
-
-
 def _call_llm_cached(
     prompt: str,
     llm: Any,
@@ -160,7 +123,6 @@ def _call_llm_cached(
 
     if cache_store is None:
         response = llm.call([prompt], temperature=temperature)
-        _log_llm_exchange(model_id, prompt, response)
         return response
 
     cache_key = _build_cache_key(
@@ -173,11 +135,9 @@ def _call_llm_cached(
     if not skip_cache_read:
         entry = cache_store.get(cache_key)
         if entry is not None:
-            _log_llm_exchange(model_id, prompt, entry.response, cached=True)
             return entry.response
 
     response = llm.call([prompt], temperature=temperature)
-    _log_llm_exchange(model_id, prompt, response)
 
     cache_store.set(CacheEntry(
         key=cache_key,
@@ -280,12 +240,159 @@ def _split_markup_fragment(text: str) -> List[str]:
     return result
 
 
+def _expand_ranges(indices: Any) -> List[int]:
+    """Expand list items like [1, "3-5", 8, "w3", "w5-w7"] into [1, 3, 4, 5, 8]."""
+    if not isinstance(indices, list):
+        if isinstance(indices, (int, str)):
+            indices = [indices]
+        else:
+            return []
+
+    def _strip_w(s: str) -> str:
+        """Strip optional leading 'w' prefix from word-index strings."""
+        return s[1:] if s.startswith("w") else s
+
+    result = []
+    for item in indices:
+        if isinstance(item, int):
+            result.append(item)
+        elif isinstance(item, str):
+            item = item.strip()
+            # Handle ranges like "3-5" or "w3-w5" or "w3-5"
+            if "-" in item:
+                try:
+                    parts = item.split("-", 1)
+                    if len(parts) == 2:
+                        start, end = int(_strip_w(parts[0])), int(_strip_w(parts[1]))
+                        result.extend(range(start, end + 1))
+                    else:
+                        result.append(int(_strip_w(item)))
+                except ValueError:
+                    continue
+            else:
+                try:
+                    result.append(int(_strip_w(item)))
+                except ValueError:
+                    continue
+    return sorted(list(set(result)))
+
+
+def _expand_markup_response(data: Dict[str, Any], word_map: Dict[int, str]) -> Dict[str, Any]:
+    """Restore short keys, expand ranges, and hydrate word indices into strings."""
+    KEY_MAP = {
+        "segs": "segments",
+        "pos_idx": "position_indices",
+        "exp_idx": "explanation_position_indices",
+        "tit_idx": "title_position_index",
+        "qst_idx": "question_position_index",
+        "ans_idx": "answer_position_indices",
+        "spkrs": "speakers",
+        "cols": "columns",
+        "lbl": "label",
+        "vals": "values",
+        "evts": "events",
+        "attr": "attribution",
+        "hlts": "highlights",
+        "styl": "style",
+        "paras": "paragraphs",
+        "lvl": "level",
+        "step": "step_number",
+        "hdrs": "headers",
+        "ord": "ordered",
+        "lang": "language",
+        "wrd_idx": "word_indices",
+    }
+
+    def _get_text(idx_list: Any) -> str:
+        indices = _expand_ranges(idx_list)
+        return " ".join(word_map.get(i, "") for i in indices if i in word_map)
+
+    def _walk(obj: Any, parent_key: Optional[str] = None, current_type: Optional[str] = None) -> Any:
+        if isinstance(obj, list):
+            return [_walk(i, parent_key, current_type) for i in obj]
+        if not isinstance(obj, dict):
+            return obj
+
+        if "type" in obj:
+            current_type = obj["type"]
+
+        res = {}
+        for k, v in obj.items():
+            nk = KEY_MAP.get(k, k)
+            if k in ("pos_idx", "position_indices", "exp_idx", "explanation_position_indices",
+                     "ans_idx", "answer_position_indices", "tit_idx", "title_position_index",
+                     "qst_idx", "question_position_index", "wrd_idx", "word_indices"):
+                expanded = _expand_ranges(v)
+                if nk == "position_indices":
+                    # Determine if it should be singular position_index
+                    # Renderer expects singular for items, lines, events, pairs in most types
+                    is_singular = parent_key in ("items", "lines", "evts", "pairs")
+                    if current_type in ("quote", "paragraph") or (current_type == "table" and parent_key == "rows"):
+                        is_singular = False
+                    
+                    if is_singular:
+                        res["position_index"] = expanded[0] if expanded else None
+                    else:
+                        res["position_indices"] = expanded
+                elif nk in ("title_position_index", "question_position_index"):
+                    res[nk] = expanded[0] if expanded else None
+                else:
+                    res[nk] = expanded
+            else:
+                res[nk] = _walk(v, k, current_type)
+
+        widx = obj.get("wrd_idx", obj.get("word_indices"))
+        if widx is not None:
+            if current_type == "comparison": res["text"] = _get_text(widx)
+            elif current_type == "data_trend": res["value"] = _get_text(widx)
+            elif current_type == "timeline": res["date"] = _get_text(widx)
+            elif current_type == "emphasis": res["phrase"] = _get_text(widx)
+            elif current_type == "key_value": res["value"] = _get_text(widx)
+
+        if current_type == "definition" and "term" in obj and isinstance(obj["term"], list):
+            res["term"] = _get_text(obj["term"])
+
+        return res
+
+    expanded = _walk(data)
+
+    # Hydrate missing indices from top-level for types where they are redundant
+    if isinstance(expanded, dict) and "segments" in expanded:
+        for seg in expanded.get("segments", []):
+            stype = seg.get("type")
+            indices = seg.get("position_indices")
+            if not indices:
+                continue
+            sdata = seg.setdefault("data", {})
+            if stype == "title":
+                sdata.setdefault("title_position_index", indices[0])
+            elif stype == "quote":
+                sdata.setdefault("position_indices", indices)
+            elif stype == "definition":
+                sdata.setdefault("explanation_position_indices", indices)
+            elif stype == "paragraph":
+                if not sdata.get("paragraphs"):
+                    sdata["paragraphs"] = [{"position_indices": indices}]
+            elif stype in ("list", "code"):
+                if not sdata.get("items"):
+                    sdata["items"] = [{"position_index": idx} for idx in indices]
+            elif stype == "steps":
+                if not sdata.get("items"):
+                    sdata["items"] = [
+                        {"position_index": idx, "step_number": step}
+                        for step, idx in enumerate(indices, 1)
+                    ]
+    return expanded
+
+
 def _build_markup_positions(
     sentence_indices: List[int],
     all_sentences: List[str],
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Dict[int, str]]:
     positions: List[Dict[str, Any]] = []
+    word_map: Dict[int, str] = {}
     next_index = 1
+    next_word_index = 1
 
     for sentence_index in sentence_indices:
         if not (1 <= sentence_index <= len(all_sentences)):
@@ -295,16 +402,28 @@ def _build_markup_positions(
             cleaned = fragment.strip()
             if not cleaned:
                 continue
+
+            marked_fragment = ""
+            last_end = 0
+            for match in _WORD_RE.finditer(cleaned):
+                word = match.group()
+                word_map[next_word_index] = word
+                marked_fragment += cleaned[last_end:match.start()] + word + f"[w{next_word_index}]"
+                last_end = match.end()
+                next_word_index += 1
+            marked_fragment += cleaned[last_end:]
+
             positions.append(
                 {
                     "index": next_index,
                     "text": cleaned,
+                    "marked_text": marked_fragment,
                     "source_sentence_index": sentence_index,
                 }
             )
             next_index += 1
 
-    return positions
+    return positions, word_map
 
 
 # ─── Validation ────────────────────────────────────────────────────────────────
@@ -406,9 +525,8 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
                 ):
                     indices.add(int(position_index))
             return sorted(indices) if indices else None
-        if seg_type in ("callout", "data_trend"):
-            # These types have no per-item position indices in their data schema.
-            # Try recovering from position_indices accidentally placed inside data.
+        if seg_type in ("callout", "data_trend", "plain"):
+            # Try recovering from position_indices inside data if top-level is missing
             indices = sorted(
                 {int(i) for i in data.get("position_indices", data.get("sentence_indices", []))}
             )
@@ -423,6 +541,12 @@ def _validate_paragraph_data(segment: Dict[str, Any], valid_indices: List[int]) 
     data = segment.get("data", {})
     paragraphs = data.get("paragraphs")
     if not isinstance(paragraphs, list) or len(paragraphs) == 0:
+        # Paragraph hydration should have happened in _expand_markup_response,
+        # but we check again here as a safety fallback.
+        indices = segment.get("position_indices")
+        if indices:
+            data["paragraphs"] = [{"position_indices": indices}]
+            return True
         logger.warning("Paragraph segment missing non-empty data.paragraphs")
         return False
 
@@ -535,11 +659,11 @@ def _classify_topic(
 ) -> Dict[str, Any]:
     """Classify a single topic's sentences into markup segments."""
     sentence_indices = sorted(topic.get("sentences", []))
-    positions = _build_markup_positions(sentence_indices, all_sentences)
+    positions, word_map = _build_markup_positions(sentence_indices, all_sentences)
     if not positions:
         return {"positions": [], "segments": []}
 
-    lines = [f"{{{position['index']}}} {position['text']}" for position in positions]
+    lines = [f"{{{position['index']}}} {position['marked_text']}" for position in positions]
     valid_position_indices = [position["index"] for position in positions]
 
     # Add adjacent context sentences for short topics so the LLM can classify better
@@ -584,9 +708,12 @@ def _classify_topic(
             )
             skip_cache = False
             parsed = _parse_json(response)
-            if parsed and _validate_markup_response(parsed, valid_position_indices):
-                parsed["positions"] = positions
-                return parsed
+            if parsed:
+                # Expand response (restore short keys, hydrate words, expand ranges)
+                expanded = _expand_markup_response(parsed, word_map)
+                if _validate_markup_response(expanded, valid_position_indices):
+                    expanded["positions"] = positions
+                    return expanded
             logger.warning(
                 "Markup attempt %d/%d failed validation for topic '%s'",
                 attempt + 1, max_retries, topic_name,
