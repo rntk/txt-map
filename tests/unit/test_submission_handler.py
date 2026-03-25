@@ -24,7 +24,7 @@ def client(app):
 @pytest.fixture
 def mock_storage():
     storage = MagicMock()
-    storage.task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation"]
+    storage.task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation"]
     return storage
 
 @pytest.fixture
@@ -48,21 +48,21 @@ def test_post_submit(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 7
+    assert mock_task_queue.create.call_count == 6
 
 def test_post_upload(client, mock_storage, mock_task_queue):
     submission_id = str(uuid.uuid4())
     mock_storage.create.return_value = {"submission_id": submission_id}
-    
+
     response = client.post(
         "/api/upload",
         files={"file": ("test.html", b"<html></html>", "text/html")}
     )
-    
+
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 7
+    assert mock_task_queue.create.call_count == 6
 
 def test_get_submission_status(client, mock_storage, sample_submission):
     submission_id = sample_submission["submission_id"]

@@ -190,7 +190,8 @@ const SubtopicsRiverChart = ({
                         name: subInfo.fullPath || subInfo.name,
                         displayName: subInfo.name,
                         fullPath: subInfo.fullPath || subInfo.name,
-                        sentenceIndices: subInfo.sentences || []
+                        sentenceIndices: subInfo.sentences || [],
+                        ranges: Array.isArray(subInfo.ranges) ? subInfo.ranges : [],
                     });
                 }
             });

@@ -183,6 +183,7 @@ function TextPage() {
       displayName: topic.name,
       fullPath: topic.name,
       sentenceIndices: topic.sentences || [],
+      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
     });
   }, []);
 
@@ -245,6 +246,7 @@ function TextPage() {
       displayName: topic.name,
       fullPath: topic.name,
       sentenceIndices,
+      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
     });
   }, []);
 
@@ -333,8 +335,6 @@ function TextPage() {
     <div className="app">
       <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
         <TextPageActionsPortal>
-          <a className="text-list-link" href={`/page/overview/${submissionId}`} style={{ fontSize: '11px' }}>Guided Overview</a>
-
           <DropdownMenu buttonContent={<span>Status</span>}>
             <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Task Status</div>
             <StatusIndicator tasks={status.tasks} />
@@ -349,7 +349,6 @@ function TextPage() {
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['storytelling_generation'], 'Story generation queued.')} disabled={actionLoading}>Story</button>
               <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
             </div>
 

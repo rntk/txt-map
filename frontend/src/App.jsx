@@ -7,7 +7,6 @@ import TaskControlPage from './components/TaskControlPage';
 import TextListPage from './components/TextListPage';
 import TextPage from './components/TextPage';
 import WordPage from './components/WordPage';
-import OverviewPage from './components/OverviewPage';
 import './styles/App.css';
 
 const navigationItems = [
@@ -28,7 +27,6 @@ const PAGE_COMPONENTS = {
   texts: TextListPage,
   topics: GlobalTopicsPage,
   word: WordPage,
-  overview: OverviewPage,
 };
 
 function getSaveHintText(saveState) {

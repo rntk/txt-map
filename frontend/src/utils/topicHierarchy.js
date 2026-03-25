@@ -171,6 +171,7 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
         fullPath: key,
         displayName: groupParts[groupParts.length - 1] || key,
         sentenceIndices: new Set(),
+        ranges: [],
         fallbackChars: 0,
       });
     }
@@ -185,6 +186,10 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
       });
     } else if (!hasSentenceText && Number.isFinite(topic.totalChars)) {
       entry.fallbackChars += topic.totalChars;
+    }
+
+    if (Array.isArray(topic.ranges) && topic.ranges.length > 0) {
+      entry.ranges.push(...topic.ranges);
     }
   });
 
@@ -210,6 +215,13 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
         totalChars,
         sentenceCount: entry.sentenceIndices.size,
         sentenceIndices: indices,
+        ranges: entry.ranges
+          .filter(range => range && (Number.isInteger(range.sentence_start) || Number.isInteger(range.sentence_end)))
+          .sort((left, right) => {
+            const leftStart = Number.isInteger(left.sentence_start) ? left.sentence_start : Number.MAX_SAFE_INTEGER;
+            const rightStart = Number.isInteger(right.sentence_start) ? right.sentence_start : Number.MAX_SAFE_INTEGER;
+            return leftStart - rightStart;
+          }),
         firstSentence,
       };
     })

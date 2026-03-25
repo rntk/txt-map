@@ -253,6 +253,7 @@ function ArticleStructureChart({
                                                     displayName: block.displayName,
                                                     fullPath: block.fullPath,
                                                     sentenceIndices: block.sentenceIndices || [],
+                                                    ranges: Array.isArray(block.ranges) ? block.ranges : [],
                                                 });
                                             }}
                                             style={{ cursor: 'pointer' }}

@@ -4,7 +4,7 @@ import TopicCard from './TopicCard';
 import DataExtractionTable from './DataExtractionTable';
 import ArticleTreeNav from './ArticleTreeNav';
 import KeyInsightsCard from './KeyInsightsCard';
-import { COMPONENT_REGISTRY, assembleChartProps, TOPIC_CHART_NAMES, DATA_CHART_NAMES } from '../storytelling/componentRegistry';
+import { COMPONENT_REGISTRY, assembleChartProps, TOPIC_CHART_NAMES, DATA_CHART_NAMES } from './componentRegistry';
 import { buildExtractionKey } from '../../utils/extractionHighlight';
 
 /**
@@ -182,7 +182,7 @@ export default function ReadingGuideLayout({
       await fetch(`/api/submission/${submissionId}/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks: ['storytelling_generation'] }),
+        body: JSON.stringify({ tasks: ['markup_generation'] }),
       });
       window.location.reload();
     } catch (e) {

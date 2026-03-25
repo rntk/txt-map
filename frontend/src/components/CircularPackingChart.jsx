@@ -260,7 +260,8 @@ export default function CircularPackingChart({
               name: node.data.fullPath,
               displayName: node.data.name,
               fullPath: node.data.fullPath,
-              sentenceIndices: Array.isArray(topicData.sentences) ? topicData.sentences : []
+              sentenceIndices: Array.isArray(topicData.sentences) ? topicData.sentences : [],
+              ranges: Array.isArray(topicData.ranges) ? topicData.ranges : [],
             });
           }
         }

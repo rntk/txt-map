@@ -104,4 +104,205 @@ describe('TopicSentencesModal markup resolution', () => {
       sentenceIndices: [1],
     }));
   });
+
+  it('renders separate enriched range panels for non-adjacent source sentence groups', () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [1, 2, 10, 11],
+        }}
+        sentences={[
+          'Quantum mechanics changed physics.',
+          'Researchers debated the implications.',
+          'Context gap one.',
+          'Context gap two.',
+          'Context gap three.',
+          'Context gap four.',
+          'Context gap five.',
+          'Context gap six.',
+          'Context gap seven.',
+          'A later discovery shifted the field.',
+          'The community adopted the new model.',
+        ]}
+        onClose={vi.fn()}
+        markup={{
+          'Science>Physics': {
+            positions: [
+              {
+                index: 1,
+                text: 'Quantum mechanics changed physics.',
+                source_sentence_index: 1,
+              },
+              {
+                index: 2,
+                text: 'Researchers debated the implications.',
+                source_sentence_index: 2,
+              },
+              {
+                index: 3,
+                text: 'A later discovery shifted the field.',
+                source_sentence_index: 10,
+              },
+              {
+                index: 4,
+                text: 'The community adopted the new model.',
+                source_sentence_index: 11,
+              },
+            ],
+            segments: [
+              {
+                type: 'quote',
+                position_indices: [1, 2],
+                data: {
+                  attribution: 'Planck',
+                  position_indices: [1, 2],
+                },
+              },
+              {
+                type: 'quote',
+                position_indices: [3, 4],
+                data: {
+                  attribution: 'Bohr',
+                  position_indices: [3, 4],
+                },
+              },
+            ],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Range 1')).toBeInTheDocument();
+    expect(screen.getByText('Sentences 1-2')).toBeInTheDocument();
+    expect(screen.getByText('Range 2')).toBeInTheDocument();
+    expect(screen.getByText('Sentences 10-11')).toBeInTheDocument();
+    expect(screen.getByText('Quantum mechanics changed physics. Researchers debated the implications.')).toBeInTheDocument();
+    expect(screen.getByText('A later discovery shifted the field. The community adopted the new model.')).toBeInTheDocument();
+  });
+
+  it('falls back to topic sentence indices when markup positions do not include source sentence indices', () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [1, 2, 10, 11],
+          ranges: [
+            { sentence_start: 1, sentence_end: 2 },
+            { sentence_start: 10, sentence_end: 11 },
+          ],
+        }}
+        sentences={[
+          'Quantum mechanics changed physics.',
+          'Researchers debated the implications.',
+          'Context gap one.',
+          'Context gap two.',
+          'Context gap three.',
+          'Context gap four.',
+          'Context gap five.',
+          'Context gap six.',
+          'Context gap seven.',
+          'A later discovery shifted the field.',
+          'The community adopted the new model.',
+        ]}
+        onClose={vi.fn()}
+        markup={{
+          'Science>Physics': {
+            positions: [
+              { index: 1, text: 'Quantum mechanics changed physics.' },
+              { index: 2, text: 'Researchers debated the implications.' },
+              { index: 3, text: 'A later discovery shifted the field.' },
+              { index: 4, text: 'The community adopted the new model.' },
+            ],
+            segments: [
+              {
+                type: 'quote',
+                position_indices: [1, 2],
+                data: {
+                  attribution: 'Planck',
+                  position_indices: [1, 2],
+                },
+              },
+              {
+                type: 'quote',
+                position_indices: [3, 4],
+                data: {
+                  attribution: 'Bohr',
+                  position_indices: [3, 4],
+                },
+              },
+            ],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Range 1')).toBeInTheDocument();
+    expect(screen.getByText('Sentences 1-2')).toBeInTheDocument();
+    expect(screen.getByText('Range 2')).toBeInTheDocument();
+    expect(screen.getByText('Sentences 10-11')).toBeInTheDocument();
+  });
+
+  it('renders atomic data_trend markup only once and falls back to plain content in later ranges', () => {
+    const { container } = render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [1, 10],
+        }}
+        sentences={[
+          'Early reading.',
+          'Context gap one.',
+          'Context gap two.',
+          'Context gap three.',
+          'Context gap four.',
+          'Context gap five.',
+          'Context gap six.',
+          'Context gap seven.',
+          'Context gap eight.',
+          'Late reading.',
+        ]}
+        onClose={vi.fn()}
+        markup={{
+          'Science>Physics': {
+            positions: [
+              {
+                index: 1,
+                text: 'Early reading.',
+                source_sentence_index: 1,
+              },
+              {
+                index: 2,
+                text: 'Late reading.',
+                source_sentence_index: 10,
+              },
+            ],
+            segments: [
+              {
+                type: 'data_trend',
+                position_indices: [1, 2],
+                data: {
+                  values: [
+                    { label: 'Before', value: 10 },
+                    { label: 'After', value: 20 },
+                  ],
+                  unit: '%',
+                },
+              },
+            ],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Range 1')).toBeInTheDocument();
+    expect(screen.getByText('Sentence 1')).toBeInTheDocument();
+    expect(screen.getByText('Range 2')).toBeInTheDocument();
+    expect(screen.getByText('Sentence 10')).toBeInTheDocument();
+    expect(container.querySelectorAll('.markup-data-trend__chart-wrapper')).toHaveLength(1);
+    expect(screen.getByText('Late reading.')).toBeInTheDocument();
+  });
 });

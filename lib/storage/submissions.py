@@ -8,7 +8,7 @@ from pymongo.database import Database
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
-    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation", "markup_generation"]
+    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "markup_generation"]
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
@@ -16,7 +16,6 @@ class SubmissionsStorage:
         "mindmap": ["subtopics_generation"],
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
-        "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
         "markup_generation": ["split_topic_generation"],
     }
 
@@ -87,12 +86,6 @@ class SubmissionsStorage:
                     "completed_at": None,
                     "error": None
                 },
-                "storytelling_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None
-                },
                 "markup_generation": {
                     "status": "pending",
                     "started_at": None,
@@ -116,7 +109,6 @@ class SubmissionsStorage:
                 "summary_mappings": [],
                 "prefix_tree": {},
                 "insights": [],
-                "storytelling": {},
                 "annotations": {},
                 "markup": {}
             }
@@ -224,10 +216,6 @@ class SubmissionsStorage:
 
         if "insights_generation" in names:
             update_fields["results.insights"] = []
-
-        if "storytelling_generation" in names:
-            update_fields["results.storytelling"] = {}
-            update_fields["results.annotations"] = {}
 
         if "markup_generation" in names:
             update_fields["results.markup"] = {}

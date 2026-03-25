@@ -172,9 +172,6 @@ function TextListPage() {
                   <td>
                     <div className="text-list-actions">
                       <a className="text-list-link" href={`/page/text/${submission.submission_id}`}>Open</a>
-                      {submission.overall_status === 'completed' && (
-                        <a className="text-list-link" href={`/page/overview/${submission.submission_id}`}>Overview</a>
-                      )}
                       <RefreshButton
                         submissionId={submission.submission_id}
                         onRefresh={fetchSubmissions}

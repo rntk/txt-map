@@ -100,6 +100,7 @@ function TopicsBarChart({
             displayName: item.displayName,
             fullPath: item.fullPath,
             sentenceIndices: item.sentenceIndices || [],
+            ranges: Array.isArray(item.ranges) ? item.ranges : [],
         });
     };
 

@@ -20,7 +20,7 @@ def client():
 @pytest.fixture
 def mock_storage():
     storage = MagicMock()
-    storage.task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "storytelling_generation"]
+    storage.task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation"]
     return storage
 
 @pytest.fixture

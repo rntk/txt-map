@@ -7,7 +7,7 @@ import CircularPackingChart from '../CircularPackingChart';
 import RadarChart from '../RadarChart';
 import MarimekkoChartTab from '../MarimekkoChartTab';
 import MindmapResults from '../MindmapResults';
-import DataChartOverview from '../annotations/charts/DataChartOverview';
+import DataChartOverview from './charts/DataChartOverview';
 
 /**
  * Topic-structure chart names — selected randomly by the frontend, not by the LLM.

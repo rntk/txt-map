@@ -45,7 +45,7 @@ class TestConstants:
             "mindmap",
             "prefix_tree",
             "insights_generation",
-            "storytelling_generation",
+            "markup_generation",
         ]
         assert SubmissionsStorage.task_names == expected_tasks
         assert len(SubmissionsStorage.task_names) == 7
@@ -56,10 +56,10 @@ class TestConstants:
             "split_topic_generation": [],
             "subtopics_generation": ["split_topic_generation"],
             "summarization": ["split_topic_generation"],
-            "mindmap": ["split_topic_generation"],
+            "mindmap": ["subtopics_generation"],
             "prefix_tree": ["split_topic_generation"],
             "insights_generation": ["split_topic_generation"],
-            "storytelling_generation": ["summarization", "mindmap", "insights_generation"],
+            "markup_generation": ["split_topic_generation"],
         }
         assert SubmissionsStorage.task_dependencies == expected_deps
 
@@ -92,7 +92,7 @@ class TestInit:
         assert "mindmap" in storage.task_names
         assert "prefix_tree" in storage.task_names
         assert "insights_generation" in storage.task_names
-        assert "storytelling_generation" in storage.task_names
+        assert "markup_generation" in storage.task_names
 
     def test_task_dependencies_correctly_defined(self, mock_db):
         """task_dependencies correctly defined."""
@@ -100,10 +100,10 @@ class TestInit:
         assert storage.task_dependencies["split_topic_generation"] == []
         assert storage.task_dependencies["subtopics_generation"] == ["split_topic_generation"]
         assert storage.task_dependencies["summarization"] == ["split_topic_generation"]
-        assert storage.task_dependencies["mindmap"] == ["split_topic_generation"]
+        assert storage.task_dependencies["mindmap"] == ["subtopics_generation"]
         assert storage.task_dependencies["prefix_tree"] == ["split_topic_generation"]
         assert storage.task_dependencies["insights_generation"] == ["split_topic_generation"]
-        assert storage.task_dependencies["storytelling_generation"] == ["summarization", "mindmap", "insights_generation"]
+        assert storage.task_dependencies["markup_generation"] == ["split_topic_generation"]
 
 
 # =============================================================================
@@ -263,7 +263,6 @@ class TestCreate:
             "summary_mappings": [],
             "prefix_tree": {},
             "insights": [],
-            "storytelling": {},
             "annotations": {},
         }
 
@@ -844,31 +843,30 @@ class TestExpandRecalculationTasks:
         # subtopics_generation has dep split_topic_generation
         # summarization has dep split_topic_generation
         # mindmap has dep split_topic_generation
-        # prefix_tree has dep split_topic_generation
-        # So if we start with subtopics_generation, we only get subtopics_generation
-        # because no other task depends on subtopics_generation
+        # mindmap depends on subtopics_generation
+        # So if we start with subtopics_generation, we get both subtopics_generation and mindmap
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["subtopics_generation"])
 
-        # Only subtopics_generation should be returned since no task depends on it
-        assert result == ["subtopics_generation"]
+        # Both subtopics_generation and mindmap should be returned
+        assert result == ["subtopics_generation", "mindmap"]
 
-    def test_summarization_returns_summarization_and_storytelling(self, mock_db):
-        """['summarization'] returns summarization and downstream storytelling."""
+    def test_summarization_returns_only_summarization(self, mock_db):
+        """['summarization'] returns only summarization."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["summarization"])
 
-        assert result == ["summarization", "storytelling_generation"]
+        assert result == ["summarization"]
 
-    def test_mindmap_returns_mindmap_and_storytelling(self, mock_db):
-        """['mindmap'] returns mindmap and downstream storytelling."""
+    def test_mindmap_returns_only_mindmap(self, mock_db):
+        """['mindmap'] returns only mindmap."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["mindmap"])
 
-        assert result == ["mindmap", "storytelling_generation"]
+        assert result == ["mindmap"]
 
     def test_prefix_tree_returns_only_prefix_tree(self, mock_db):
         """['prefix_tree'] returns only prefix_tree."""
@@ -878,13 +876,13 @@ class TestExpandRecalculationTasks:
 
         assert result == ["prefix_tree"]
 
-    def test_insights_generation_returns_insights_and_storytelling(self, mock_db):
-        """['insights_generation'] returns insights_generation and storytelling_generation."""
+    def test_insights_generation_returns_only_insights_generation(self, mock_db):
+        """['insights_generation'] returns only insights_generation."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["insights_generation"])
 
-        assert result == ["insights_generation", "storytelling_generation"]
+        assert result == ["insights_generation"]
 
     def test_multiple_tasks_merged_correctly(self, mock_db):
         """Multiple tasks merged correctly."""
@@ -894,7 +892,6 @@ class TestExpandRecalculationTasks:
 
         assert "summarization" in result
         assert "mindmap" in result
-        assert "storytelling_generation" in result
 
     def test_invalid_task_names_filtered_out(self, mock_db):
         """Invalid task names filtered out."""

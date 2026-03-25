@@ -289,7 +289,8 @@ export default function TreemapChart({
               name: node.data.fullPath,
               displayName: node.data.name,
               fullPath: node.data.fullPath,
-              sentenceIndices: Array.isArray(node.data.topic.sentences) ? node.data.topic.sentences : []
+              sentenceIndices: Array.isArray(node.data.topic.sentences) ? node.data.topic.sentences : [],
+              ranges: Array.isArray(node.data.topic.ranges) ? node.data.topic.ranges : [],
             });
           }
         });
