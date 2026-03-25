@@ -4,6 +4,10 @@
   margin-bottom: 12px;
 }
 
+.markup-segment:first-child {
+  margin-top: 12px;
+}
+
 .markup-segment:last-child {
   margin-bottom: 0;
 }

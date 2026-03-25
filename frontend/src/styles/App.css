@@ -588,7 +588,7 @@ body {
 .summary-timeline {
   position: relative;
   padding: 8px 0 14px 0;
-  --summary-timeline-axis: 30%;
+  --summary-timeline-axis: 20%;
   --summary-timeline-gap: 48px;
 }
 
@@ -759,6 +759,8 @@ body {
 
 .timeline-item--insight .timeline-subtopic {
   align-self: start;
+  justify-self: start;
+  text-align: left;
   padding-top: 10px;
 }
 
