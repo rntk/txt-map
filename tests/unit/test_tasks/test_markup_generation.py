@@ -1,5 +1,6 @@
 from lib.tasks.markup_generation import (
     _build_markup_positions,
+    _build_markup_classification_prompt,
     _derive_indices_from_data,
     _validate_markup_response,
     _expand_ranges,
@@ -16,6 +17,23 @@ def test_expand_ranges() -> None:
     assert _expand_ranges(["w1", "w3-w5", "w8"]) == [1, 3, 4, 5, 8]
     assert _expand_ranges(["w10-w12"]) == [10, 11, 12]
     assert _expand_ranges(["w3-5"]) == [3, 4, 5]
+
+
+def test_build_markup_classification_prompt_puts_dynamic_content_last() -> None:
+    prompt = _build_markup_classification_prompt(
+        topic_name="Caching",
+        numbered_sentences="{1} Prefix reuse matters.",
+        valid_indices="1",
+    )
+
+    assert "OUTPUT FORMAT" in prompt
+    assert "RULES:" in prompt
+    assert "TOPIC: Caching" in prompt
+    assert "VALID MARKUP POSITION INDICES: 1" in prompt
+    assert "<topic_content>\n{1} Prefix reuse matters.\n</topic_content>" in prompt
+    assert prompt.index("OUTPUT FORMAT") < prompt.index("TOPIC: Caching")
+    assert prompt.index("RULES:") < prompt.index("TOPIC: Caching")
+    assert prompt.index("TOPIC: Caching") < prompt.rindex("<topic_content>")
 
 
 def test_expand_markup_response_hydrates_keys_and_words() -> None:
