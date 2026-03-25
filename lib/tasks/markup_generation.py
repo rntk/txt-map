@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 MARKUP_PROMPT_VERSION = "markup_v12"
 
+# Minimum sentence count below which adjacent context sentences are injected
+_CONTEXT_INJECT_THRESHOLD = 4
+# Number of sentences to include as context before/after the topic window
+_CONTEXT_WINDOW_SIZE = 2
+
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
     "timeline", "definition", "quote", "code", "emphasis", "plain",
@@ -267,11 +272,13 @@ def _expand_ranges(indices: Any) -> List[int]:
                     else:
                         result.append(int(_strip_w(item)))
                 except ValueError:
+                    logger.debug("Skipping malformed index range: %r", item)
                     continue
             else:
                 try:
                     result.append(int(_strip_w(item)))
                 except ValueError:
+                    logger.debug("Skipping malformed index value: %r", item)
                     continue
     return sorted(list(set(result)))
 
@@ -395,6 +402,10 @@ def _build_markup_positions(
 
     for sentence_index in sentence_indices:
         if not (1 <= sentence_index <= len(all_sentences)):
+            logger.warning(
+                "Skipping out-of-range sentence index %d (total sentences: %d)",
+                sentence_index, len(all_sentences),
+            )
             continue
         text = all_sentences[sentence_index - 1]
         for fragment in _split_markup_fragment(text):
@@ -530,8 +541,8 @@ def _derive_indices_from_data(seg_type: str, data: Dict[str, Any]) -> Optional[L
                 {int(i) for i in data.get("position_indices", data.get("sentence_indices", []))}
             )
             return indices or None
-    except (KeyError, TypeError, ValueError):
-        pass
+    except (KeyError, TypeError, ValueError) as e:
+        logger.debug("Could not derive position indices for type '%s': %s", seg_type, e)
     return None
 
 
@@ -673,18 +684,18 @@ def _classify_topic(
     valid_position_indices = [position["index"] for position in positions]
 
     # Add adjacent context sentences for short topics so the LLM can classify better
-    if len(sentence_indices) < 4:
+    if len(sentence_indices) < _CONTEXT_INJECT_THRESHOLD:
         first_idx = sentence_indices[0]
         last_idx = sentence_indices[-1]
         idx_set = set(sentence_indices)
         context_before = [
             f"[CONTEXT] {all_sentences[i - 1]}"
-            for i in range(max(1, first_idx - 2), first_idx)
+            for i in range(max(1, first_idx - _CONTEXT_WINDOW_SIZE), first_idx)
             if i not in idx_set and 1 <= i <= len(all_sentences)
         ]
         context_after = [
             f"[CONTEXT] {all_sentences[i - 1]}"
-            for i in range(last_idx + 1, min(len(all_sentences) + 1, last_idx + 3))
+            for i in range(last_idx + 1, min(len(all_sentences) + 1, last_idx + _CONTEXT_WINDOW_SIZE + 1))
             if i not in idx_set and 1 <= i <= len(all_sentences)
         ]
         lines = context_before + lines + context_after
