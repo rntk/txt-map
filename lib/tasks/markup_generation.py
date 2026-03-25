@@ -204,8 +204,7 @@ def _split_on_short_prefix(
 
 
 def _split_markup_fragment(text: str) -> List[str]:
-    fragments = [(text or "").splitlines() if text else [""]]
-    flattened = [line.strip() for group in fragments for line in group if line.strip()]
+    flattened = [line.strip() for line in (text or "").splitlines() if line.strip()]
     current = flattened if flattened else [text.strip()] if text and text.strip() else []
 
     for pattern, max_prefix_words, include_delimiter_on_left in (
@@ -326,7 +325,7 @@ def _expand_markup_response(data: Dict[str, Any], word_map: Dict[int, str]) -> D
                 if nk == "position_indices":
                     # Determine if it should be singular position_index
                     # Renderer expects singular for items, lines, events, pairs in most types
-                    is_singular = parent_key in ("items", "lines", "evts", "pairs")
+                    is_singular = parent_key in ("items", "lines", "events", "pairs")
                     if current_type in ("quote", "paragraph") or (current_type == "table" and parent_key == "rows"):
                         is_singular = False
                     
@@ -631,6 +630,13 @@ def _validate_markup_response(data: Any, valid_indices: List[int]) -> bool:
                 return False
             seen_indices.add(idx)
 
+    uncovered = set(valid_indices) - seen_indices
+    if uncovered:
+        logger.warning(
+            "Markup response covers %d/%d positions, missing: %s",
+            len(seen_indices), len(valid_indices), sorted(uncovered),
+        )
+
     return True
 
 
@@ -706,7 +712,6 @@ def _classify_topic(
                 temperature=temperature,
                 skip_cache_read=skip_cache,
             )
-            skip_cache = False
             parsed = _parse_json(response)
             if parsed:
                 # Expand response (restore short keys, hydrate words, expand ranges)
@@ -718,13 +723,13 @@ def _classify_topic(
                 "Markup attempt %d/%d failed validation for topic '%s'",
                 attempt + 1, max_retries, topic_name,
             )
-            # Force a fresh LLM call next attempt so the bad cached response is overwritten
-            skip_cache = True
         except Exception as e:
             logger.warning(
                 "Markup LLM error attempt %d/%d for topic '%s': %s",
                 attempt + 1, max_retries, topic_name, e,
             )
+        # Force a fresh LLM call on subsequent attempts so bad cached responses are bypassed
+        skip_cache = True
         if attempt < max_retries - 1:
             time.sleep(1.0 * (attempt + 1))
 
