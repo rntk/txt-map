@@ -196,13 +196,12 @@ function trieToHierarchy(node) {
 // ── Layout constants ───────────────────────────────────────────────────────────
 const FONT_MIN = 10;
 const FONT_MAX = 28;
-const H_GAP = 8;           // horizontal gap between words (px)
-const V_GAP = 3;           // vertical gap between sibling branches (px)
+const H_GAP = 8;            // horizontal gap between words (px)
+const V_GAP = 3;            // vertical gap between sibling branches (px)
 const LINE_HEIGHT_FACTOR = 1.5;
-const LEFT_PADDING = 16;
-const TOP_PADDING = 20;
+const PADDING = 20;
 const FONT_FAMILY = 'sans-serif';
-const MAX_DEPTH = 12;      // truncate very deep branches
+const MAX_DEPTH = 12;       // truncate very deep branches
 
 // ── Text measurement ───────────────────────────────────────────────────────────
 
@@ -235,11 +234,6 @@ function measureTextWidth(text, fontSize) {
 
 // ── Layout algorithm ───────────────────────────────────────────────────────────
 
-/**
- * Find the maximum count in the hierarchy tree.
- * @param {Object} node
- * @returns {number}
- */
 function findMaxCount(node) {
   let max = node.count || 0;
   (node.children || []).forEach(child => {
@@ -248,24 +242,12 @@ function findMaxCount(node) {
   return max;
 }
 
-/**
- * Compute font size from count and maxCount.
- * @param {number} count
- * @param {number} maxCount
- * @returns {number}
- */
 function computeFontSize(count, maxCount) {
   if (maxCount <= 0) return FONT_MIN;
-  const factor = Math.sqrt(count / maxCount);
-  return FONT_MIN + factor * (FONT_MAX - FONT_MIN);
+  return FONT_MIN + Math.sqrt(count / maxCount) * (FONT_MAX - FONT_MIN);
 }
 
-/**
- * Annotate each node with fontSize, textWidth, lineHeight (mutates node objects).
- * @param {Object} node
- * @param {number} maxCount
- * @param {number} depth
- */
+/** Annotate each node with fontSize, textWidth, lineHeight (mutates). */
 function annotateNode(node, maxCount, depth) {
   node.fontSize = computeFontSize(node.count, maxCount);
   node.textWidth = measureTextWidth(node.name, node.fontSize);
@@ -277,54 +259,44 @@ function annotateNode(node, maxCount, depth) {
   children.forEach(child => annotateNode(child, maxCount, depth + 1));
 }
 
-/**
- * Bottom-up pass: compute subtreeHeight for each node.
- * @param {Object} node
- * @returns {number}
- */
+/** Bottom-up pass: compute subtreeHeight for each node. */
 function computeSubtreeHeight(node) {
   const children = node._visibleChildren || [];
   if (children.length === 0) {
     node.subtreeHeight = node.lineHeight;
     return node.subtreeHeight;
   }
-  const totalChildHeight = children.reduce((sum, child) => sum + computeSubtreeHeight(child), 0);
-  const gaps = (children.length - 1) * V_GAP;
-  node.subtreeHeight = totalChildHeight + gaps;
+  const total = children.reduce((s, c) => s + computeSubtreeHeight(c), 0);
+  node.subtreeHeight = total + (children.length - 1) * V_GAP;
   return node.subtreeHeight;
 }
 
 /**
- * Top-down pass: assign (x, y) to each node.
- * @param {Object} node
- * @param {number} x
- * @param {number} y  — vertical center of this node's band
- * @param {Object|null} parent
+ * Top-down pass: assign (x, y) positions relative to pivot at (0, 0).
+ * For "right": child.x = parent.x + parent.textWidth + H_GAP  (x = left edge)
+ * For "left":  child.x = parent.x - H_GAP - child.textWidth   (x = left edge)
  */
-function assignPositions(node, x, y, parent) {
+function assignPositions(node, x, y, parent, direction) {
   node.x = x;
   node.y = y;
   node.parent = parent;
+  node.direction = direction;
 
   const children = node._visibleChildren || [];
   if (children.length === 0) return;
 
-  const childX = x + node.textWidth + H_GAP;
   let yOffset = y - node.subtreeHeight / 2;
-
   children.forEach(child => {
     const childY = yOffset + child.subtreeHeight / 2;
-    assignPositions(child, childX, childY, node);
+    const childX = direction === 'right'
+      ? x + node.textWidth + H_GAP
+      : x - H_GAP - child.textWidth;
+    assignPositions(child, childX, childY, node, direction);
     yOffset += child.subtreeHeight + V_GAP;
   });
 }
 
-/**
- * Flatten positioned tree into an array of nodes (for D3 data binding).
- * @param {Object} node
- * @param {Array} result
- * @returns {Array}
- */
+/** Flatten tree into array (pre-order). */
 function flattenTree(node, result = []) {
   result.push(node);
   (node._visibleChildren || []).forEach(child => flattenTree(child, result));
@@ -332,51 +304,37 @@ function flattenTree(node, result = []) {
 }
 
 /**
- * Compute the full text-flow layout.
- * @param {Object} hierarchy   — output of trieToHierarchy
- * @param {string} pivotLabel
- * @returns {{ nodes: Object[], width: number, height: number }}
+ * Compute layout for one side (left or right) relative to pivot at (0, 0).
+ * Returns a flat array of annotated+positioned nodes (not including the pivot itself).
  */
-function computeLayout(hierarchy, pivotLabel) {
+function computeOneSideLayout(hierarchy, pivotTextWidth, direction) {
+  const children = hierarchy.children || [];
+  if (children.length === 0) return [];
+
   const maxCount = Math.max(findMaxCount(hierarchy), 1);
 
-  // Annotate root (the virtual root whose name="" represents the pivot)
-  // We treat the pivot word as a pseudo-root node
-  const root = {
-    name: pivotLabel,
-    count: hierarchy.count,
-    children: hierarchy.children,
-    _visibleChildren: hierarchy.children || [],
+  // Virtual root standing in for the pivot
+  const pivotRoot = {
+    name: '__pivot__',
+    textWidth: pivotTextWidth,
+    fontSize: FONT_MAX,
+    lineHeight: FONT_MAX * LINE_HEIGHT_FACTOR,
+    _visibleChildren: children,
+    _depth: 0,
   };
-  root.fontSize = FONT_MAX;
-  root.textWidth = measureTextWidth(pivotLabel, root.fontSize);
-  root.lineHeight = root.fontSize * LINE_HEIGHT_FACTOR;
-  root._depth = 0;
 
-  // Annotate children
-  (root._visibleChildren || []).forEach(child => annotateNode(child, maxCount, 1));
+  children.forEach(child => annotateNode(child, maxCount, 1));
 
-  // Bottom-up
-  computeSubtreeHeight(root);
+  const totalH = children.reduce((s, c) => s + computeSubtreeHeight(c), 0);
+  pivotRoot.subtreeHeight = totalH + Math.max(0, children.length - 1) * V_GAP;
 
-  // Top-down — start at center vertically
-  const totalHeight = root.subtreeHeight + TOP_PADDING * 2;
-  assignPositions(root, LEFT_PADDING, totalHeight / 2, null);
+  // Pivot is at (0, 0); assign positions from there
+  assignPositions(pivotRoot, 0, 0, null, direction);
 
-  // Shift all y values so none are negative
-  const allNodes = flattenTree(root);
-  const minY = Math.min(...allNodes.map(n => n.y - n.lineHeight / 2));
-  const shift = minY < TOP_PADDING ? TOP_PADDING - minY : 0;
-  allNodes.forEach(n => { n.y += shift; });
-
-  const maxX = Math.max(...allNodes.map(n => n.x + n.textWidth));
-  const maxY = Math.max(...allNodes.map(n => n.y + n.lineHeight / 2));
-
-  return {
-    nodes: allNodes,
-    width: maxX + LEFT_PADDING,
-    height: maxY + TOP_PADDING,
-  };
+  // Return only the real nodes (not the virtual root)
+  const nodes = [];
+  children.forEach(c => flattenTree(c, nodes));
+  return nodes;
 }
 
 // ── React component ────────────────────────────────────────────────────────────
@@ -396,60 +354,123 @@ export default function WordTree({ entries, pivotLabel }) {
   useEffect(() => {
     if (!svgRef.current || safeEntries.length === 0) return;
 
-    // Build suffix trie (text flows right from pivot)
-    const rightTrie = buildTrie(safeEntries, "right");
-    const hierarchy = trieToHierarchy(rightTrie);
+    const pivotFontSize = FONT_MAX;
+    const pivotTextWidth = measureTextWidth(pivotLabel, pivotFontSize);
+    const pivotLineHeight = pivotFontSize * LINE_HEIGHT_FACTOR;
 
-    const { nodes, width, height } = computeLayout(hierarchy, pivotLabel);
+    // Build both tries
+    const rightTrie = buildTrie(safeEntries, 'right');
+    const leftTrie  = buildTrie(safeEntries, 'left');
 
+    // Compute positioned nodes for each side (relative to pivot at 0,0)
+    const rightNodes = computeOneSideLayout(trieToHierarchy(rightTrie), pivotTextWidth, 'right');
+    const leftNodes  = computeOneSideLayout(trieToHierarchy(leftTrie),  pivotTextWidth, 'left');
+    const allSideNodes = [...rightNodes, ...leftNodes];
+
+    // ── Compute SVG bounds ─────────────────────────────────────────────────────
+    const xs    = allSideNodes.map(n => n.x);
+    const xEnds = allSideNodes.map(n => n.x + n.textWidth);
+    const ys    = allSideNodes.map(n => n.y);
+
+    const minX = xs.length    > 0 ? Math.min(0, ...xs)             : 0;
+    const maxX = xEnds.length > 0 ? Math.max(pivotTextWidth, ...xEnds) : pivotTextWidth;
+    const minY = ys.length    > 0 ? Math.min(-pivotLineHeight / 2, ...ys.map((_, i) => allSideNodes[i].y - allSideNodes[i].lineHeight / 2)) : -pivotLineHeight / 2;
+    const maxY = ys.length    > 0 ? Math.max( pivotLineHeight / 2, ...ys.map((_, i) => allSideNodes[i].y + allSideNodes[i].lineHeight / 2)) :  pivotLineHeight / 2;
+
+    const offsetX = PADDING - minX;
+    const offsetY = PADDING - minY;
+    const svgWidth  = maxX - minX + PADDING * 2;
+    const svgHeight = maxY - minY + PADDING * 2;
+
+    // Pivot in SVG coordinates
+    const pivotSvgX = offsetX;
+    const pivotSvgY = offsetY;
+
+    // Apply offset to all side nodes
+    allSideNodes.forEach(n => {
+      n.x += offsetX;
+      n.y += offsetY;
+    });
+
+    // ── Compute connector data ─────────────────────────────────────────────────
+    // Draw connector only when the node's parent has 2+ siblings (branching).
+    const connectors = allSideNodes
+      .filter(n => n.parent && (n.parent._visibleChildren || []).length > 1)
+      .map(n => {
+        const dir = n.direction;
+        const isPivotParent = n.parent.name === '__pivot__';
+
+        // Parent edge toward the gap (after offset)
+        let x1, y1;
+        if (isPivotParent) {
+          x1 = dir === 'right' ? pivotSvgX + pivotTextWidth : pivotSvgX;
+          y1 = pivotSvgY;
+        } else {
+          x1 = dir === 'right' ? n.parent.x + n.parent.textWidth : n.parent.x;
+          y1 = n.parent.y;
+        }
+
+        // Child edge toward the gap (after offset)
+        const x2 = dir === 'right' ? n.x : n.x + n.textWidth;
+        const y2 = n.y;
+
+        return { x1, y1, x2, y2, count: n.count };
+      });
+
+    // ── Render ─────────────────────────────────────────────────────────────────
     const svg = d3.select(svgRef.current)
-      .attr("width", width)
-      .attr("height", height)
-      .html("");
+      .attr('width', svgWidth)
+      .attr('height', svgHeight)
+      .html('');
 
-    // ── Draw connectors (only when parent has 2+ children) ───────────────────
-    const connectorNodes = nodes.filter(n => n.parent && (n.parent._visibleChildren || []).length > 1);
-
-    svg.append("g")
-      .attr("class", "word-tree-graph__links")
-      .selectAll("path")
-      .data(connectorNodes)
+    // Connectors
+    svg.append('g')
+      .attr('class', 'word-tree-graph__links')
+      .selectAll('path')
+      .data(connectors)
       .enter()
-      .append("path")
-      .attr("class", "word-tree-graph__link")
-      .attr("d", d => {
-        const px = d.parent.x + d.parent.textWidth;
-        const py = d.parent.y;
-        const cx = d.x;
-        const cy = d.y;
-        const midX = (px + cx) / 2;
-        return `M${px},${py} C${midX},${py} ${midX},${cy} ${cx},${cy}`;
+      .append('path')
+      .attr('class', 'word-tree-graph__link')
+      .attr('d', d => {
+        const midX = (d.x1 + d.x2) / 2;
+        return `M${d.x1},${d.y1} C${midX},${d.y1} ${midX},${d.y2} ${d.x2},${d.y2}`;
       })
-      .attr("stroke-width", d => Math.max(0.8, Math.min(3, d.count * 0.4)));
+      .attr('stroke-width', d => Math.max(0.8, Math.min(3, d.count * 0.4)));
 
-    // ── Compute fill color scale ─────────────────────────────────────────────
-    const maxCount = Math.max(...nodes.map(n => n.count || 0), 1);
+    // Color scale (shared across both sides)
+    const maxCount = Math.max(...allSideNodes.map(n => n.count || 0), 1);
     const colorScale = d3.scaleLinear()
       .domain([0, maxCount])
-      .range(["#aaa", "#222"])
+      .range(['#aaa', '#222'])
       .clamp(true);
 
-    // ── Draw text nodes ──────────────────────────────────────────────────────
-    svg.append("g")
-      .attr("class", "word-tree-graph__nodes")
-      .selectAll("text")
-      .data(nodes)
+    // Pivot node descriptor (for unified data array)
+    const pivotDescriptor = {
+      name: pivotLabel,
+      x: pivotSvgX,
+      y: pivotSvgY,
+      fontSize: pivotFontSize,
+      textWidth: pivotTextWidth,
+      count: rightTrie.count,
+      _isPivot: true,
+    };
+
+    // Text nodes
+    svg.append('g')
+      .attr('class', 'word-tree-graph__nodes')
+      .selectAll('text')
+      .data([pivotDescriptor, ...allSideNodes])
       .enter()
-      .append("text")
-      .attr("class", d => d.parent === null
-        ? "word-tree-graph__pivot-text"
-        : "word-tree-graph__node-text")
-      .attr("x", d => d.x)
-      .attr("y", d => d.y)
-      .attr("dominant-baseline", "central")
-      .attr("text-anchor", "start")
-      .attr("font-size", d => d.fontSize)
-      .attr("fill", d => d.parent === null ? "#222" : colorScale(d.count))
+      .append('text')
+      .attr('class', d => d._isPivot
+        ? 'word-tree-graph__pivot-text'
+        : 'word-tree-graph__node-text')
+      .attr('x', d => d.x)
+      .attr('y', d => d.y)
+      .attr('dominant-baseline', 'central')
+      .attr('text-anchor', 'start')
+      .attr('font-size', d => d.fontSize)
+      .attr('fill', d => d._isPivot ? '#222' : colorScale(d.count))
       .text(d => d.name);
 
   }, [safeEntries, pivotLabel]);

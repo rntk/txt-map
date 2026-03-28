@@ -51,7 +51,7 @@ describe('WordTree helpers', () => {
 });
 
 describe('WordTree component', () => {
-  it('renders pivot and right-side tokens in the SVG', () => {
+  it('renders pivot, left-side and right-side tokens in the SVG', () => {
     const entries = [
       {
         id: '1',
@@ -82,6 +82,9 @@ describe('WordTree component', () => {
     // Right-side tokens from both entries appear
     expect(screen.getByText('gamma')).toBeInTheDocument();
     expect(screen.getByText('epsilon')).toBeInTheDocument();
+    // Left-side tokens from both entries appear
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Delta')).toBeInTheDocument();
     // Rendered inside an SVG
     expect(document.querySelector('svg')).toBeInTheDocument();
   });
