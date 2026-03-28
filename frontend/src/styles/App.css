@@ -4267,6 +4267,17 @@ textarea {
   font-weight: bold;
   fill: #222;
   cursor: default;
+  user-select: none;
+}
+
+.word-tree-graph__node-text {
+  font-family: sans-serif;
+  cursor: pointer;
+  user-select: none;
+}
+
+.word-tree-graph__node-text:hover {
+  text-decoration: underline;
 }
 
 .word-tree-graph__link {
@@ -4274,15 +4285,6 @@ textarea {
   stroke: #ff9800;
   stroke-opacity: 0.45;
   stroke-linecap: round;
-}
-
-.word-tree-graph__node-text {
-  font-family: sans-serif;
-  cursor: pointer;
-}
-
-.word-tree-graph__node-text:hover {
-  text-decoration: underline;
 }
 
 /* ── Overview / Wizard Mode ───────────────────────────────────────── */

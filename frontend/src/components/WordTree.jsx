@@ -160,9 +160,10 @@ export function buildWordTreeEntries(sentences, target, readSentenceIndices = ne
  * @returns {TrieNode}
  */
 function buildTrie(entries, side) {
-  const root = { name: "", children: new Map(), count: entries.length };
+  const root = { name: "", children: new Map(), count: entries.length, sentenceIndices: new Set() };
 
   entries.forEach((entry) => {
+    root.sentenceIndices.add(entry.sentenceIndex);
     let current = root;
     const tokens = side === "left"
       ? [...entry.leftTokens].reverse()
@@ -171,10 +172,11 @@ function buildTrie(entries, side) {
     tokens.forEach((token) => {
       const key = token.normalized;
       if (!current.children.has(key)) {
-        current.children.set(key, { name: token.text, children: new Map(), count: 0 });
+        current.children.set(key, { name: token.text, children: new Map(), count: 0, sentenceIndices: new Set() });
       }
       current = current.children.get(key);
       current.count++;
+      current.sentenceIndices.add(entry.sentenceIndex);
     });
   });
 
@@ -189,19 +191,26 @@ function trieToHierarchy(node) {
   return {
     name: node.name,
     count: node.count,
+    sentenceIndices: Array.from(node.sentenceIndices || []),
     children: Array.from(node.children.values()).map(trieToHierarchy)
   };
 }
 
 // ── Layout constants ───────────────────────────────────────────────────────────
-const FONT_MIN = 10;
-const FONT_MAX = 28;
-const H_GAP = 8;            // horizontal gap between words (px)
-const V_GAP = 3;            // vertical gap between sibling branches (px)
-const LINE_HEIGHT_FACTOR = 1.5;
-const PADDING = 20;
+const FONT_MIN = 13;
+const FONT_MAX = 34;
+const H_GAP = 16;           // horizontal gap between words (px)
+const V_GAP = 8;            // vertical gap between sibling branches (px)
+const LINE_HEIGHT_FACTOR = 1.6;
+const PADDING = 24;
 const FONT_FAMILY = 'sans-serif';
 const MAX_DEPTH = 12;       // truncate very deep branches
+
+// ── Highlight colors ───────────────────────────────────────────────────────────
+const COLOR_HIGHLIGHT  = '#d84315'; // active sentence path
+const COLOR_DIM        = '#d0d0d0'; // non-active nodes when something is highlighted
+const COLOR_LINK_DIM   = 0.08;
+const COLOR_LINK_ACTIVE = 0.75;
 
 // ── Text measurement ───────────────────────────────────────────────────────────
 
@@ -414,7 +423,7 @@ export default function WordTree({ entries, pivotLabel }) {
         const x2 = dir === 'right' ? n.x : n.x + n.textWidth;
         const y2 = n.y;
 
-        return { x1, y1, x2, y2, count: n.count };
+        return { x1, y1, x2, y2, count: n.count, _node: n };
       });
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -424,7 +433,7 @@ export default function WordTree({ entries, pivotLabel }) {
       .html('');
 
     // Connectors
-    svg.append('g')
+    const linkSel = svg.append('g')
       .attr('class', 'word-tree-graph__links')
       .selectAll('path')
       .data(connectors)
@@ -455,11 +464,13 @@ export default function WordTree({ entries, pivotLabel }) {
       _isPivot: true,
     };
 
+    const allTextData = [pivotDescriptor, ...allSideNodes];
+
     // Text nodes
-    svg.append('g')
+    const textSel = svg.append('g')
       .attr('class', 'word-tree-graph__nodes')
       .selectAll('text')
-      .data([pivotDescriptor, ...allSideNodes])
+      .data(allTextData)
       .enter()
       .append('text')
       .attr('class', d => d._isPivot
@@ -472,6 +483,68 @@ export default function WordTree({ entries, pivotLabel }) {
       .attr('font-size', d => d.fontSize)
       .attr('fill', d => d._isPivot ? '#222' : colorScale(d.count))
       .text(d => d.name);
+
+    // ── Interaction: hover/click highlights all nodes belonging to the same sentence ──
+    // Each node carries sentenceIndices (the sentences that pass through it).
+    // We find every node on both sides whose sentenceIndices overlaps with the
+    // hovered/clicked node so the full sentence is visible across left and right.
+    function sentenceNodes(node) {
+      const targetSentences = new Set(node.sentenceIndices || []);
+      const result = new Set();
+      allSideNodes.forEach(n => {
+        if ((n.sentenceIndices || []).some(si => targetSentences.has(si))) {
+          result.add(n);
+        }
+      });
+      return result;
+    }
+
+    let stickyChain = null; // node-reference set locked by click
+
+    function applyHighlight(chain) {
+      const active = chain !== null;
+      textSel.attr('fill', d => {
+        if (d._isPivot) return active ? COLOR_HIGHLIGHT : '#222';
+        return active
+          ? (chain.has(d) ? COLOR_HIGHLIGHT : COLOR_DIM)
+          : colorScale(d.count);
+      });
+      linkSel
+        .attr('stroke-opacity', d => active
+          ? (chain.has(d._node) ? COLOR_LINK_ACTIVE : COLOR_LINK_DIM)
+          : 0.45)
+        .attr('stroke', d => (active && chain.has(d._node)) ? COLOR_HIGHLIGHT : null);
+    }
+
+    textSel
+      .on('mouseover', function(event, d) {
+        if (stickyChain || d._isPivot) return;
+        applyHighlight(sentenceNodes(d));
+      })
+      .on('mouseout', function() {
+        if (stickyChain) return;
+        applyHighlight(null);
+      })
+      .on('click', function(event, d) {
+        if (d._isPivot) return;
+        event.stopPropagation();
+        const newChain = sentenceNodes(d);
+        // Toggle off if the same chain is already locked
+        if (stickyChain && stickyChain.size === newChain.size &&
+            [...newChain].every(n => stickyChain.has(n))) {
+          stickyChain = null;
+          applyHighlight(null);
+        } else {
+          stickyChain = newChain;
+          applyHighlight(stickyChain);
+        }
+      });
+
+    // Click on SVG background clears sticky selection
+    svg.on('click', function() {
+      stickyChain = null;
+      applyHighlight(null);
+    });
 
   }, [safeEntries, pivotLabel]);
 
