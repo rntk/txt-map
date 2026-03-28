@@ -178,6 +178,11 @@ export default function TreemapChart({
     [topics, scopePath, selectedLevel]
   );
 
+  const safeReadTopics = useMemo(
+    () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+    [readTopics]
+  );
+
   const hasHierarchyData = (hierarchyData.children || []).length > 0;
 
   useEffect(() => {
@@ -210,6 +215,23 @@ export default function TreemapChart({
 
     const g = svg.append('g');
     const nodes = root.descendants().filter((node) => node.depth > 0);
+
+    // Add pattern definition for read status indicator (diagonal lines)
+    const defs = svg.append('defs');
+    const pattern = defs.append('pattern')
+      .attr('id', 'read-pattern-treemap')
+      .attr('patternUnits', 'userSpaceOnUse')
+      .attr('width', 8)
+      .attr('height', 8)
+      .attr('patternTransform', 'rotate(45)');
+    
+    pattern.append('line')
+      .attr('x1', 0)
+      .attr('y1', 0)
+      .attr('x2', 0)
+      .attr('y2', 8)
+      .attr('stroke', 'rgba(0,0,0,0.12)')
+      .attr('stroke-width', 2);
 
     d3.select(containerRef.current).selectAll('.treemap-tooltip').remove();
     const tooltip = d3.select(containerRef.current)
@@ -300,6 +322,20 @@ export default function TreemapChart({
           return;
         }
 
+        // Add overlay pattern for read topics
+        const topicFullPath = node.data.fullPath;
+        if (topicFullPath && safeReadTopics.has(topicFullPath)) {
+          group.append('rect')
+            .attr('x', node.x0 + 1)
+            .attr('y', node.y0 + 1)
+            .attr('width', Math.max(0, rectWidth - 2))
+            .attr('height', Math.max(0, rectHeight - 2))
+            .attr('fill', 'url(#read-pattern-treemap)')
+            .attr('pointer-events', 'none')
+            .attr('rx', 3)
+            .style('opacity', 0.7);
+        }
+
         const fontSize = Math.min(16, Math.max(9, Math.min(rectWidth * 0.12, rectHeight * 0.28)));
         const maxLines = Math.max(1, Math.floor((rectHeight - 8) / (fontSize * 1.2)));
         const lines = wrapLines(node.data.name, rectWidth - 10, fontSize).slice(0, maxLines);
@@ -336,7 +372,7 @@ export default function TreemapChart({
       tooltip.remove();
       svg.selectAll('*').remove();
     };
-  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics]);
+  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics, safeReadTopics]);
 
   const scopeLabel = getScopeLabel(scopePath);
 

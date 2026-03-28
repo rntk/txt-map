@@ -57,6 +57,11 @@ function ArticleStructureChart({
         [topics, sentences, scopePath, selectedLevel]
     );
 
+    const safeReadTopics = useMemo(
+        () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+        [readTopics]
+    );
+
     const colorScale = useMemo(() => {
         const colors = {};
         chartData.forEach((item, i) => {
@@ -175,6 +180,24 @@ function ArticleStructureChart({
                         width={svgWidth}
                         height={SVG_HEIGHT}
                     >
+                        <defs>
+                            <pattern
+                                id="read-pattern-article-structure"
+                                patternUnits="userSpaceOnUse"
+                                width="8"
+                                height="8"
+                                patternTransform="rotate(45)"
+                            >
+                                <line
+                                    x1="0"
+                                    y1="0"
+                                    x2="0"
+                                    y2="8"
+                                    stroke="rgba(0,0,0,0.12)"
+                                    strokeWidth="2"
+                                />
+                            </pattern>
+                        </defs>
                         {layout.blocks.map(block => (
                             <rect
                                 key={block.fullPath}
@@ -200,6 +223,23 @@ function ArticleStructureChart({
                                 }}
                             />
                         ))}
+
+                        {/* Overlay pattern for read topics */}
+                        {layout.blocks.map(block => {
+                            if (!block.fullPath || !safeReadTopics.has(block.fullPath)) return null;
+                            return (
+                                <rect
+                                    key={`read-${block.fullPath}`}
+                                    x={MARGIN.left + block.x + 1}
+                                    y={MARGIN.top + 1}
+                                    width={Math.max(0, block.width - 2)}
+                                    height={Math.max(0, plotHeight - 2)}
+                                    fill="url(#read-pattern-article-structure)"
+                                    pointerEvents="none"
+                                    style={{ opacity: 0.6 }}
+                                />
+                            );
+                        })}
 
                         {layout.blocks.slice(1).map(block => (
                             <line

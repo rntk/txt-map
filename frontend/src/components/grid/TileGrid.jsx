@@ -12,8 +12,11 @@ function TileGrid({ items, onTileClick, isBackground }) {
         {items.map((item, i) => (
           <div
             key={item.label + i}
-            className={`grid-view-tile ${isBackground ? '' : 'grid-view-tile-interactive'}`}
+            className={`grid-view-tile ${isBackground ? '' : 'grid-view-tile-interactive'} ${item.isRead ? 'grid-view-tile--read' : ''}`}
             onClick={!isBackground && onTileClick ? () => onTileClick(item) : undefined}
+            style={item.isRead ? {
+              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.04) 4px, rgba(0,0,0,0.04) 8px)',
+            } : undefined}
           >
             <div className="grid-view-tile-content">
               <div className="grid-view-tile-label">{item.label}</div>

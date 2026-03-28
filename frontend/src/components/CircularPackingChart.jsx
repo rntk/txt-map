@@ -118,6 +118,11 @@ export default function CircularPackingChart({
     [topics, scopePath, selectedLevel]
   );
 
+  const safeReadTopics = useMemo(
+    () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+    [readTopics]
+  );
+
   const hasHierarchyData = (hierarchyData.children || []).length > 0;
 
   const resetZoom = () => {
@@ -196,6 +201,23 @@ export default function CircularPackingChart({
     const nodes = root.descendants().filter((node) => node.depth > 0);
     const isLeaf = (node) => !node.children || node.children.length === 0;
 
+    // Add pattern definition for read status indicator (diagonal lines)
+    const defs = svg.append('defs');
+    const pattern = defs.append('pattern')
+      .attr('id', 'read-pattern-circular')
+      .attr('patternUnits', 'userSpaceOnUse')
+      .attr('width', 8)
+      .attr('height', 8)
+      .attr('patternTransform', 'rotate(45)');
+    
+    pattern.append('line')
+      .attr('x1', 0)
+      .attr('y1', 0)
+      .attr('x2', 0)
+      .attr('y2', 8)
+      .attr('stroke', 'rgba(0,0,0,0.12)')
+      .attr('stroke-width', 2);
+
     const circles = g.selectAll('circle')
       .data(nodes)
       .enter()
@@ -267,6 +289,27 @@ export default function CircularPackingChart({
         }
       });
 
+    // Add overlay pattern for read topics
+    nodes.forEach((node) => {
+      if (!isLeaf(node)) return;
+      if (!node.data.topic) return;
+      
+      const topicFullPath = node.data.fullPath;
+      if (!topicFullPath) return;
+      
+      const isRead = safeReadTopics.has(topicFullPath);
+      if (!isRead) return;
+      if (node.r < 8) return;
+
+      g.append('circle')
+        .attr('cx', node.x)
+        .attr('cy', node.y)
+        .attr('r', node.r - 1)
+        .attr('fill', 'url(#read-pattern-circular)')
+        .attr('pointer-events', 'none')
+        .style('opacity', 0.7);
+    });
+
     nodes.forEach((node) => {
       if (isLeaf(node)) {
         if (node.r < 16) return;
@@ -312,7 +355,7 @@ export default function CircularPackingChart({
       tooltip.remove();
       svg.selectAll('*').remove();
     };
-  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics]);
+  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics, safeReadTopics]);
 
   const scopeLabel = getScopeLabel(scopePath);
 

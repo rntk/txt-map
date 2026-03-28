@@ -42,8 +42,13 @@ function Breadcrumb({ path, onNavigate }) {
 
 const TILE_GRID_COLS = 2;
 
-function GridView({ topics, topicSummaries, sentences, onClose }) {
+function GridView({ topics, topicSummaries, sentences, onClose, readTopics, onToggleRead, markup }) {
   const [currentPath, setCurrentPath] = useState([]);
+
+  const safeReadTopics = useMemo(
+    () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+    [readTopics]
+  );
 
   const currentKey = currentPath.length > 0 ? currentPath.join('>') : '';
 
@@ -119,6 +124,7 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
       const fallbackSentence = getFirstScopedSentence(data.topics, sentences);
       const previewText = truncateWithEllipsis(summary || fallbackSentence, 150);
       const previewLabel = summary ? 'Summary' : '';
+      const isRead = safeReadTopics.has(fullPath);
       return {
         label: segment,
         previewLabel,
@@ -128,6 +134,8 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
         sentenceCount: data.sentenceCount,
         segment,
         isLeaf,
+        isRead,
+        fullPath,
       };
     });
 
@@ -143,9 +151,12 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
           ? [...currentPath, item.segment].join('>')
           : item.segment;
         const summary = topicSummaries[fullPath] || '';
+        const isRead = safeReadTopics.has(fullPath);
         return {
           label: item.label,
           summary,
+          isRead,
+          fullPath,
         };
       });
     } else {
@@ -161,6 +172,7 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
           const fallbackSentence = getFirstScopedSentence(data.topics, sentences);
           const previewText = truncateWithEllipsis(summary || fallbackSentence, 150);
           const previewLabel = summary ? 'Summary' : '';
+          const isRead = safeReadTopics.has(fullPath);
           return {
             label: segment,
             previewLabel,
@@ -168,6 +180,8 @@ function GridView({ topics, topicSummaries, sentences, onClose }) {
             tags: buildTopTags(data.topics, sentences),
             topicCount: data.topics.length,
             sentenceCount: data.sentenceCount,
+            isRead,
+            fullPath,
           };
         });
       }
