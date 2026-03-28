@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import './TopicSentencesModal.css';
 import MarkupRenderer from '../markup/MarkupRenderer';
 import { getSegmentIndices } from '../markup/markupUtils';
+import { HighlightContext } from './HighlightContext';
+import HighlightedText from './HighlightedText';
 
 const EXTEND_COUNT = 3;
 
@@ -526,6 +528,15 @@ function TopicSentencesModal({
     const [activeTab, setActiveTab] = useState('sentences');
     const normalizedTopic = normalizeTopic(topic);
 
+    const highlightWords = useMemo(() => {
+        if (!normalizedTopic?.displayName) return [];
+        // Split by whitespace and remove leading/trailing non-alphanumeric characters from each word
+        return normalizedTopic.displayName
+            .split(/\s+/)
+            .map((w) => w.replace(/^[\W_]+|[\W_]+$/g, ''))
+            .filter((word) => word.length > 0);
+    }, [normalizedTopic?.displayName]);
+
     const isRead = normalizedTopic && readTopics instanceof Set
         ? readTopics.has(normalizedTopic.name)
         : false;
@@ -659,96 +670,100 @@ function TopicSentencesModal({
                     </div>
                 )}
                 <div className="topic-sentences-modal__body">
-                    {activeTab === 'enriched' && hasEnrichedMarkup ? (
-                        <div className="topic-sentences-modal__enriched-groups">
-                            {(enrichedRangeGroups.length > 0 ? enrichedRangeGroups : [{
-                                groupNumber: 1,
-                                firstSourceSentenceIndex: 1,
-                                lastSourceSentenceIndex: markupUnits.length,
-                                positions: Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],
-                            }]).map((rangeGroup) => {
-                                const groupMarkup = buildGroupMarkup(topicMarkup, rangeGroup);
-                                const groupMarkupUnits = groupMarkup.positions.map((position) => position.text || '');
-                                return (
-                                    <section
-                                        key={`${rangeGroup.groupNumber}-${rangeGroup.firstSourceSentenceIndex}-${rangeGroup.lastSourceSentenceIndex}`}
-                                        className="topic-sentences-modal__enriched-range"
-                                    >
-                                        <header className="topic-sentences-modal__enriched-range-header">
-                                            <span className="topic-sentences-modal__enriched-range-badge">
-                                                Range {rangeGroup.groupNumber}
-                                            </span>
-                                            <span className="topic-sentences-modal__enriched-range-title">
-                                                {formatSentenceSpan(
-                                                    rangeGroup.firstSourceSentenceIndex,
-                                                    rangeGroup.lastSourceSentenceIndex
-                                                )}
-                                            </span>
-                                        </header>
-                                        <div className="topic-sentences-modal__enriched-range-body">
-                                            <MarkupRenderer
-                                                segments={groupMarkup.segments}
-                                                sentences={groupMarkupUnits}
-                                            />
-                                        </div>
-                                    </section>
-                                );
-                            })}
-                        </div>
-                    ) : activeTab === 'raw' && hasEnrichedMarkup ? (
-                        <pre className="topic-sentences-modal__raw-json">
-                            {JSON.stringify(topicMarkup, null, 2)}
-                        </pre>
-                    ) : allIndices.length === 0 ? (
-                        <p>No sentences found for this topic.</p>
-                    ) : (
-                        rangeGroups.map((group, groupIdx) => {
-                            const firstIdx = group[0];
-                            const lastIdx = group[group.length - 1];
-                            const canExtendBefore = firstIdx > 1;
-                            const canExtendAfter = lastIdx < totalSentences;
-                            return (
-                                <div key={groupIdx} className="topic-sentences-modal__range-group">
-                                    {canExtendBefore && (
-                                        <button
-                                            type="button"
-                                            className="topic-sentences-modal__extend-btn"
-                                            onClick={() => extendBefore(firstIdx)}
+                    <HighlightContext.Provider value={highlightWords}>
+                        {activeTab === 'enriched' && hasEnrichedMarkup ? (
+                            <div className="topic-sentences-modal__enriched-groups">
+                                {(enrichedRangeGroups.length > 0 ? enrichedRangeGroups : [{
+                                    groupNumber: 1,
+                                    firstSourceSentenceIndex: 1,
+                                    lastSourceSentenceIndex: markupUnits.length,
+                                    positions: Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],
+                                }]).map((rangeGroup) => {
+                                    const groupMarkup = buildGroupMarkup(topicMarkup, rangeGroup);
+                                    const groupMarkupUnits = groupMarkup.positions.map((position) => position.text || '');
+                                    return (
+                                        <section
+                                            key={`${rangeGroup.groupNumber}-${rangeGroup.firstSourceSentenceIndex}-${rangeGroup.lastSourceSentenceIndex}`}
+                                            className="topic-sentences-modal__enriched-range"
                                         >
-                                            ↑ Extend before
-                                        </button>
-                                    )}
-                                    {group.map((idx, sentencePos) => {
-                                        const isExtended = extendedIndices.has(idx);
-                                        const isFirst = sentencePos === 0;
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className={`topic-sentences-modal__sentence${isFirst ? ' topic-sentences-modal__sentence--first' : ''}${isExtended ? ' topic-sentences-modal__sentence--extended' : ''}`}
-                                            >
-                                                <span className="topic-sentences-modal__sentence-num">{idx}.</span>
-                                                <span className="topic-sentences-modal__sentence-text">
-                                                    {sentences && sentences[idx - 1] ? sentences[idx - 1] : ''}
+                                            <header className="topic-sentences-modal__enriched-range-header">
+                                                <span className="topic-sentences-modal__enriched-range-badge">
+                                                    Range {rangeGroup.groupNumber}
                                                 </span>
+                                                <span className="topic-sentences-modal__enriched-range-title">
+                                                    {formatSentenceSpan(
+                                                        rangeGroup.firstSourceSentenceIndex,
+                                                        rangeGroup.lastSourceSentenceIndex
+                                                    )}
+                                                </span>
+                                            </header>
+                                            <div className="topic-sentences-modal__enriched-range-body">
+                                                <MarkupRenderer
+                                                    segments={groupMarkup.segments}
+                                                    sentences={groupMarkupUnits}
+                                                />
                                             </div>
-                                        );
-                                    })}
-                                    {canExtendAfter && (
-                                        <button
-                                            type="button"
-                                            className="topic-sentences-modal__extend-btn"
-                                            onClick={() => extendAfter(lastIdx)}
-                                        >
-                                            ↓ Extend after
-                                        </button>
-                                    )}
-                                    {groupIdx < rangeGroups.length - 1 && (
-                                        <div className="topic-sentences-modal__range-separator" />
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
+                                        </section>
+                                    );
+                                })}
+                            </div>
+                        ) : activeTab === 'raw' && hasEnrichedMarkup ? (
+                            <pre className="topic-sentences-modal__raw-json">
+                                {JSON.stringify(topicMarkup, null, 2)}
+                            </pre>
+                        ) : allIndices.length === 0 ? (
+                            <p>No sentences found for this topic.</p>
+                        ) : (
+                            rangeGroups.map((group, groupIdx) => {
+                                const firstIdx = group[0];
+                                const lastIdx = group[group.length - 1];
+                                const canExtendBefore = firstIdx > 1;
+                                const canExtendAfter = lastIdx < totalSentences;
+                                return (
+                                    <div key={groupIdx} className="topic-sentences-modal__range-group">
+                                        {canExtendBefore && (
+                                            <button
+                                                type="button"
+                                                className="topic-sentences-modal__extend-btn"
+                                                onClick={() => extendBefore(firstIdx)}
+                                            >
+                                                ↑ Extend before
+                                            </button>
+                                        )}
+                                        {group.map((idx, sentencePos) => {
+                                            const isExtended = extendedIndices.has(idx);
+                                            const isFirst = sentencePos === 0;
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`topic-sentences-modal__sentence${isFirst ? ' topic-sentences-modal__sentence--first' : ''}${isExtended ? ' topic-sentences-modal__sentence--extended' : ''}`}
+                                                >
+                                                    <span className="topic-sentences-modal__sentence-num">{idx}.</span>
+                                                    <span className="topic-sentences-modal__sentence-text">
+                                                        <HighlightedText
+                                                            text={sentences && sentences[idx - 1] ? sentences[idx - 1] : ''}
+                                                        />
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                        {canExtendAfter && (
+                                            <button
+                                                type="button"
+                                                className="topic-sentences-modal__extend-btn"
+                                                onClick={() => extendAfter(lastIdx)}
+                                            >
+                                                ↓ Extend after
+                                            </button>
+                                        )}
+                                        {groupIdx < rangeGroups.length - 1 && (
+                                            <div className="topic-sentences-modal__range-separator" />
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </HighlightContext.Provider>
                 </div>
             </div>
         </div>

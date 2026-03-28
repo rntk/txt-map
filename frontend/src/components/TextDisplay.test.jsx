@@ -705,7 +705,7 @@ describe('TextDisplay', () => {
       expect(screen.queryByRole('link', { name: 'Explore "Hello"' })).not.toBeInTheDocument();
 
       act(() => {
-        vi.advanceTimersByTime(300);
+        vi.advanceTimersByTime(500);
       });
 
       const links = screen.getAllByRole('link', { name: 'Explore "Hello"' });
@@ -727,7 +727,7 @@ describe('TextDisplay', () => {
       fireEvent.mouseOver(sentenceToken, { clientX: 20, clientY: 20 });
 
       act(() => {
-        vi.advanceTimersByTime(300);
+        vi.advanceTimersByTime(500);
       });
 
       expect(screen.getByRole('link', { name: 'Explore "First"' })).toHaveAttribute(

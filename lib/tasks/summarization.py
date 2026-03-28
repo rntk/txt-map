@@ -158,14 +158,6 @@ def summarize_by_sentence_groups(
         "Text:\n<text>{sentence}</text>\n\nSummary:"
     )
 
-    # Estimate template tokens for the whole prompt structure (mocked in tests)
-    template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
-    # max_text_tokens calculation is tested by unit tests
-    max_text_tokens = max(
-        1,
-        llm_client.max_context_tokens - template_tokens - max_groups_tokens_buffer
-    )
-
     all_summary_sentences: List[str] = []
     summary_mappings: List[Dict[str, Any]] = []
 

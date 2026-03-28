@@ -1,5 +1,6 @@
 import React from 'react';
 import { getItemIndex, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function DialogMarkup({ segment, sentences }) {
   const speakers = segment.data?.speakers || [];
@@ -18,11 +19,14 @@ export default function DialogMarkup({ segment, sentences }) {
     <div className="markup-segment markup-dialog">
       {allLines.map((line, i) => {
         const side = line.speakerIdx % 2 === 0 ? 'even' : 'odd';
+        const text = line.text || getTextByIndex(sentences, getItemIndex(line)) || '';
         return (
           <div key={i} className={`markup-dialog__line markup-dialog__line--${side}`}>
-            <span className="markup-dialog__speaker">{line.name}</span>
+            <span className="markup-dialog__speaker">
+              <HighlightedText text={line.name} />
+            </span>
             <div className={`markup-dialog__bubble markup-dialog__bubble--${side}`}>
-              {line.text || getTextByIndex(sentences, getItemIndex(line)) || ''}
+              <HighlightedText text={text} />
             </div>
           </div>
         );

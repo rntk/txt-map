@@ -1,5 +1,6 @@
 import React from 'react';
 import { getItemIndex, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function CodeMarkup({ segment, sentences }) {
   const { language, items = [] } = segment.data || {};
@@ -19,7 +20,11 @@ export default function CodeMarkup({ segment, sentences }) {
   return (
     <div className="markup-segment markup-code">
       {language && <div className="markup-code__lang">{language}</div>}
-      <pre className="markup-code__block"><code>{codeText}</code></pre>
+      <pre className="markup-code__block">
+        <code>
+          <HighlightedText text={codeText} />
+        </code>
+      </pre>
     </div>
   );
 }

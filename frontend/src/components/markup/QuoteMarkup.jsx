@@ -1,5 +1,6 @@
 import React from 'react';
 import { getNestedIndices, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function QuoteMarkup({ segment, sentences }) {
   const { attribution } = segment.data || {};
@@ -14,8 +15,14 @@ export default function QuoteMarkup({ segment, sentences }) {
   return (
     <div className="markup-segment">
       <blockquote className="markup-quote">
-        <p className="markup-quote__text">{quoteText}</p>
-        {attribution && <p className="markup-quote__attribution">{attribution}</p>}
+        <p className="markup-quote__text">
+          <HighlightedText text={quoteText} />
+        </p>
+        {attribution && (
+          <p className="markup-quote__attribution">
+            <HighlightedText text={attribution} />
+          </p>
+        )}
       </blockquote>
     </div>
   );

@@ -41,7 +41,7 @@ describe('TopicSentencesModal markup resolution', () => {
     expect(screen.getByRole('heading', { name: 'Physics' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enriched' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Enriched' })).toHaveClass('topic-sentences-modal__tab--active');
-    expect(screen.getByText('Quantum mechanics changed physics.')).toBeInTheDocument();
+    expect(screen.getAllByText((content, element) => element?.closest('.markup-quote__text')?.textContent?.includes('Quantum mechanics changed physics.')).length).toBeGreaterThan(0);
   });
 
   it('keeps enriched disabled when markup only contains plain segments', () => {
@@ -178,7 +178,7 @@ describe('TopicSentencesModal markup resolution', () => {
     expect(screen.getByText('Sentences 1-2')).toBeInTheDocument();
     expect(screen.getByText('Range 2')).toBeInTheDocument();
     expect(screen.getByText('Sentences 10-11')).toBeInTheDocument();
-    expect(screen.getByText('Quantum mechanics changed physics. Researchers debated the implications.')).toBeInTheDocument();
+    expect(screen.getAllByText((content, element) => element?.closest('.markup-quote__text')?.textContent?.includes('Quantum mechanics changed physics. Researchers debated the implications.')).length).toBeGreaterThan(0);
     expect(screen.getByText('A later discovery shifted the field. The community adopted the new model.')).toBeInTheDocument();
   });
 

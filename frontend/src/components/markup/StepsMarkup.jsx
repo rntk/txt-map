@@ -1,5 +1,6 @@
 import React from 'react';
 import { getItemIndex, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function StepsMarkup({ segment, sentences }) {
   const items = (segment.data?.items || []).slice().sort(
@@ -13,7 +14,9 @@ export default function StepsMarkup({ segment, sentences }) {
         return (
           <div key={i} className="markup-steps__item">
             <span className="markup-steps__number">{item.step_number ?? i + 1}</span>
-            <span className="markup-steps__text">{text}</span>
+            <span className="markup-steps__text">
+              <HighlightedText text={text} />
+            </span>
           </div>
         );
       })}

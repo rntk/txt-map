@@ -99,37 +99,6 @@ class TestSummarizeBySentenceGroupsBasic:
         assert summaries == []
         assert mappings == []
 
-    def test_estimates_template_tokens(self, mock_llm):
-        """Function estimates template tokens from LLM."""
-        sentences = ["Test sentence."]
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_llm
-        )
-
-        mock_llm.estimate_tokens.assert_called_once()
-
-    def test_calculates_max_text_tokens_from_context_limit(self, mock_llm):
-        """Function calculates max_text_tokens from context limit."""
-        sentences = ["Test sentence."]
-        
-        mock_llm.call.return_value = "Summary"
-
-        summarize_by_sentence_groups(
-            sentences, mock_llm, mock_llm
-        )
-
-        # Verify the budget calculation: max_text_tokens = context_size - template_tokens - buffer
-        # mock_llm.estimate_tokens returns 100 (template tokens)
-        # mock_llm.max_context_tokens is 11000
-        # Default buffer is 400
-        # So max_text_tokens should be 11000 - 100 - 400 = 10500
-        # Verify estimate_tokens was called with the template (without sentence content)
-        mock_llm.estimate_tokens.assert_called_once()
-        call_arg = mock_llm.estimate_tokens.call_args[0][0]
-        # The template should contain the prompt structure but not the sentence placeholder value
-        assert "{sentence}" not in call_arg
-
     def test_summarizes_each_sentence_group_individually(self, mock_llm):
         """Function summarizes each sentence group individually."""
         sentences = ["First sentence.", "Second sentence.", "Third sentence."]

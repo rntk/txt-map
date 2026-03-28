@@ -9,8 +9,7 @@ import io
 import re
 import zipfile
 import xml.etree.ElementTree as ET
-from html import escape
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 # Common XML namespaces used in EPUB
 _OPF_NS = "http://www.idpf.org/2007/opf"

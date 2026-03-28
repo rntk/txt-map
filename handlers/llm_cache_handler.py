@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 from handlers.dependencies import get_cache_store
 from lib.storage.llm_cache import MongoLLMCacheStore

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getSegmentIndices, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function TitleMarkup({ segment, sentences }) {
   const { level = 2, title_position_index, title_sentence_index } = segment.data || {};
@@ -14,11 +15,15 @@ export default function TitleMarkup({ segment, sentences }) {
 
   return (
     <div className="markup-segment markup-title">
-      <Tag className="markup-title__heading">{titleText}</Tag>
+      <Tag className="markup-title__heading">
+        <HighlightedText text={titleText} />
+      </Tag>
       {bodyIndices.map((idx, i) => (
         <div key={i} className="markup-title__body">
           <span className="markup-plain__num">{idx}.</span>
-          <span>{getTextByIndex(sentences, idx)}</span>
+          <span>
+            <HighlightedText text={getTextByIndex(sentences, idx)} />
+          </span>
         </div>
       ))}
     </div>

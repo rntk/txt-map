@@ -293,6 +293,14 @@
     color: var(--shell-muted-strong, #444);
 }
 
+.topic-sentences-modal__highlight {
+    background-color: #fff3b0;
+    color: #1d1e1b;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 600;
+}
+
 @media (max-width: 720px) {
     .topic-sentences-modal__body {
         padding: 16px;

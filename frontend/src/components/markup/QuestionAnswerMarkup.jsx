@@ -1,5 +1,6 @@
 import React from 'react';
 import { getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function QuestionAnswerMarkup({ segment, sentences }) {
   const pairs = segment.data?.pairs || [];
@@ -14,10 +15,14 @@ export default function QuestionAnswerMarkup({ segment, sentences }) {
         );
         return (
           <div key={i} className="markup-qa__pair">
-            <div className="markup-qa__question">{question}</div>
+            <div className="markup-qa__question">
+              <HighlightedText text={question} />
+            </div>
             <div className="markup-qa__answers">
               {answers.map((ans, j) => (
-                <div key={j} className="markup-qa__answer">{ans}</div>
+                <div key={j} className="markup-qa__answer">
+                  <HighlightedText text={ans} />
+                </div>
               ))}
             </div>
           </div>

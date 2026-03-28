@@ -1,5 +1,6 @@
 import React from 'react';
 import { getItemIndex, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function ListMarkup({ segment, sentences }) {
   const items = segment.data?.items || [];
@@ -21,7 +22,9 @@ export default function ListMarkup({ segment, sentences }) {
                     <span className="markup-list__bullet">•</span>
                   </>
               }
-              <span>{text}</span>
+              <span>
+                <HighlightedText text={text} />
+              </span>
             </li>
           );
         })}

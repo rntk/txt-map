@@ -1,5 +1,6 @@
 import React from 'react';
 import { getNestedIndices, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 /**
  * @typedef {Object} ParagraphGroup
@@ -40,7 +41,7 @@ export default function ParagraphMarkup({ segment, sentences }) {
     <div className="markup-segment markup-paragraph">
       {paragraphs.map((paragraphText, index) => (
         <p key={index} className="markup-paragraph__block">
-          {paragraphText}
+          <HighlightedText text={paragraphText} />
         </p>
       ))}
     </div>

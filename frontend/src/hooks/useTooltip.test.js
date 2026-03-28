@@ -27,7 +27,7 @@ describe('useTooltip', () => {
     expect(result.current.tooltip).toBeNull();
 
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
 
     expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics, meta: null });
@@ -48,7 +48,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
     expect(result.current.tooltip).not.toBeNull();
 
@@ -69,7 +69,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
 
     act(() => {
@@ -90,7 +90,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'A' }], 1, 2);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
     act(() => {
       result.current.scheduleHide();
@@ -125,7 +125,7 @@ describe('useTooltip', () => {
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20, { word: 'first' });
       result.current.updateTooltipPosition(30, 40, { word: 'second' });
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
 
     expect(result.current.tooltip).toEqual({
@@ -141,7 +141,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
       result.current.updateTooltipPosition(50, 60);
     });
 
@@ -158,7 +158,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'History' }], 5, 6);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
     act(() => {
       result.current.hideTooltip();
@@ -200,7 +200,7 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'X' }], 0, 0);
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(500);
     });
     expect(result.current.tooltip).not.toBeNull();
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getSegmentIndices, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 const LEVEL_LABELS = {
   warning: '⚠ Warning',
@@ -18,7 +19,7 @@ export default function CalloutMarkup({ segment, sentences }) {
       <div className="markup-callout__label">{label}</div>
       {indices.map((idx, i) => (
         <div key={i} className="markup-callout__text">
-          {getTextByIndex(sentences, idx)}
+          <HighlightedText text={getTextByIndex(sentences, idx)} />
         </div>
       ))}
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getTextByIndex, getItemIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 const COLUMN_COLORS = ['#e8f5e9', '#fce4ec', '#e3f2fd', '#fff3e0', '#f3e5f5'];
 
@@ -29,7 +30,7 @@ export default function ComparisonMarkup({ segment, sentences }) {
             className="markup-comparison__header"
             style={{ background: COLUMN_COLORS[i % COLUMN_COLORS.length] }}
           >
-            {col.label}
+            <HighlightedText text={col.label} />
           </div>
         ))}
       </div>
@@ -38,7 +39,11 @@ export default function ComparisonMarkup({ segment, sentences }) {
           <div key={i} className="markup-comparison__col">
             {col.items.map((item, j) => {
               const text = item.text || getTextByIndex(sentences, getItemIndex(item)) || '';
-              return <div key={j} className="markup-comparison__item">{text}</div>;
+              return (
+                <div key={j} className="markup-comparison__item">
+                  <HighlightedText text={text} />
+                </div>
+              );
             })}
           </div>
         ))}

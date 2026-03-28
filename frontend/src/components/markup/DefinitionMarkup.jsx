@@ -1,5 +1,6 @@
 import React from 'react';
 import { getNestedIndices, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 export default function DefinitionMarkup({ segment, sentences }) {
   const { term } = segment.data || {};
@@ -15,8 +16,16 @@ export default function DefinitionMarkup({ segment, sentences }) {
 
   return (
     <div className="markup-segment">
-      {term && <div className="markup-definition__term">{term}</div>}
-      {explanationText && <div className="markup-definition__explanation">{explanationText}</div>}
+      {term && (
+        <div className="markup-definition__term">
+          <HighlightedText text={term} />
+        </div>
+      )}
+      {explanationText && (
+        <div className="markup-definition__explanation">
+          <HighlightedText text={explanationText} />
+        </div>
+      )}
     </div>
   );
 }

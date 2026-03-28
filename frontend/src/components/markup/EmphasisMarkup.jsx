@@ -1,5 +1,6 @@
 import React from 'react';
 import { getItemIndex, getTextByIndex } from './markupUtils';
+import HighlightedText from '../shared/HighlightedText';
 
 const STYLE_TAG = {
   bold: 'strong',
@@ -9,7 +10,9 @@ const STYLE_TAG = {
 };
 
 function applyHighlights(text, highlights) {
-  if (!highlights || highlights.length === 0) return text;
+  if (!highlights || highlights.length === 0) {
+    return <HighlightedText text={text} />;
+  }
 
   // Build a list of non-overlapping ranges to wrap, sorted by position
   const ranges = [];
@@ -31,18 +34,26 @@ function applyHighlights(text, highlights) {
     }
   }
 
-  if (clean.length === 0) return text;
+  if (clean.length === 0) return <HighlightedText text={text} />;
 
   // Build React node array
   const parts = [];
   let pos = 0;
   clean.forEach(({ start, end, phrase, style }, i) => {
-    if (pos < start) parts.push(text.slice(pos, start));
+    if (pos < start) {
+      parts.push(<HighlightedText key={`plain-${i}`} text={text.slice(pos, start)} />);
+    }
     const Tag = STYLE_TAG[style] || 'strong';
-    parts.push(<Tag key={i} className={`markup-emphasis__${style}`}>{phrase}</Tag>);
+    parts.push(
+      <Tag key={`style-${i}`} className={`markup-emphasis__${style}`}>
+        <HighlightedText text={phrase} />
+      </Tag>
+    );
     pos = end;
   });
-  if (pos < text.length) parts.push(text.slice(pos));
+  if (pos < text.length) {
+    parts.push(<HighlightedText key="plain-final" text={text.slice(pos)} />);
+  }
   return parts;
 }
 
