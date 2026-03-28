@@ -7,6 +7,7 @@ const mockUseSubmission = vi.fn();
 const mockTextDisplay = vi.fn();
 const mockCircularPackingChart = vi.fn();
 const mockTreemapChart = vi.fn();
+const mockWordTree = vi.fn();
 
 vi.mock('../hooks/useSubmission', () => ({
   useSubmission: (...args) => mockUseSubmission(...args),
@@ -33,6 +34,34 @@ vi.mock('./TreemapChart', () => ({
   },
 }));
 
+vi.mock('./WordTree', () => ({
+  __esModule: true,
+  buildWordTreeEntries: (sentences, word) => {
+    const safeSentences = Array.isArray(sentences) ? sentences : [];
+    const normalizedWord = String(word || '').toLowerCase();
+    return safeSentences
+      .map((sentence, index) => ({
+        sentence,
+        index,
+      }))
+      .filter(({ sentence }) => sentence.toLowerCase().includes(normalizedWord))
+      .map(({ sentence, index }) => ({
+        id: `${index}-0-0`,
+        sentenceIndex: index,
+        sentenceNumber: index + 1,
+        sentenceText: sentence,
+        matchText: word,
+        leftTokens: [],
+        rightTokens: [],
+        isRead: false,
+      }));
+  },
+  default: (props) => {
+    mockWordTree(props);
+    return <div data-testid="word-tree">Tree panel</div>;
+  },
+}));
+
 vi.mock('./TopicsTagCloud', () => ({
   default: () => <div data-testid="topics-tag-cloud">Tags Cloud panel</div>,
 }));
@@ -54,6 +83,7 @@ describe('WordPage header layout', () => {
     mockTextDisplay.mockClear();
     mockCircularPackingChart.mockClear();
     mockTreemapChart.mockClear();
+    mockWordTree.mockClear();
     mockUseSubmission.mockReturnValue({
       submission: {
         status: {
@@ -110,6 +140,7 @@ describe('WordPage header layout', () => {
     expect(screen.getByRole('button', { name: /Back to Article/i })).toBeInTheDocument();
     expect(screen.getByText('Sentences matching:')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sentences' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tree' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Topics (Circles)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Summaries' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tags Cloud' })).toBeInTheDocument();
@@ -123,6 +154,9 @@ describe('WordPage header layout', () => {
 
     expect(screen.getByText('Sentences matching:')).toBeInTheDocument();
     expect(screen.getAllByTestId('text-display')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tree' }));
+    expect(screen.getByTestId('word-tree')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Topics (Circles)' }));
     expect(screen.getByTestId('circular-packing-chart')).toBeInTheDocument();
@@ -167,6 +201,42 @@ describe('WordPage header layout', () => {
       markup: expect.objectContaining({
         'Topic 1': expect.any(Object),
       }),
+    }));
+  });
+
+  it('marks tree entries as read when their sentence belongs to a read topic', () => {
+    mockUseSubmission.mockReturnValue({
+      submission: {
+        results: {
+          sentences: ['Alpha beta gamma', 'Another beta sentence'],
+          topics: [
+            {
+              name: 'Topic 1',
+              sentences: [2],
+            },
+          ],
+          topic_summaries: {},
+          summary: [],
+          summary_mappings: [],
+        },
+      },
+      loading: false,
+      error: null,
+      readTopics: new Set(['Topic 1']),
+      toggleRead: vi.fn(),
+    });
+
+    render(<WordPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tree' }));
+
+    expect(mockWordTree).toHaveBeenCalledWith(expect.objectContaining({
+      entries: expect.arrayContaining([
+        expect.objectContaining({
+          sentenceNumber: 2,
+          isRead: true,
+        }),
+      ]),
     }));
   });
 });

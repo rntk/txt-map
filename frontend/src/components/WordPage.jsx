@@ -6,10 +6,12 @@ import TreemapChart from './TreemapChart';
 import TopicsTagCloud from './TopicsTagCloud';
 import SummaryTimeline from './SummaryTimeline';
 import TopicSentencesModal from './shared/TopicSentencesModal';
+import WordTree, { buildWordTreeEntries } from './WordTree';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 
 const VIS_TABS = [
   { key: 'sentences', label: 'Sentences' },
+  { key: 'tree', label: 'Tree' },
   { key: 'circles', label: 'Topics (Circles)' },
   { key: 'treemap', label: 'Topics (Treemap)' },
   { key: 'summaries', label: 'Summaries' },
@@ -39,23 +41,36 @@ export default function WordPage() {
 
   // Derive subsets
   const matchingData = useMemo(() => {
-    if (!submission?.results) return { sentences: [], topics: [], summaries: [] };
+    if (!submission?.results) {
+      return {
+        sentencesInfo: [],
+        topics: [],
+        summaries: [],
+        timelineItems: [],
+        allSentences: [],
+        allTopics: [],
+        treeEntries: [],
+      };
+    }
 
     const allSentences = submission.results.sentences || [];
     const allTopics = submission.results.topics || [];
-
-    // 1. Find matched sentences
-    const wordPattern = new RegExp(`\\b${word}\\b`, 'i');
-
-    // We will keep them as original 1-indexed for reference
+    const treeEntries = buildWordTreeEntries(allSentences, word);
     const matchedSentencesInfo = [];
     const matchedSentence1BasedIndices = new Set();
+    const seenSentenceIndices = new Set();
 
-    allSentences.forEach((text, i) => {
-      if (wordPattern.test(text)) {
-        matchedSentencesInfo.push({ index: i, text });
-        matchedSentence1BasedIndices.add(i + 1);
+    treeEntries.forEach((entry) => {
+      if (seenSentenceIndices.has(entry.sentenceIndex)) {
+        return;
       }
+
+      seenSentenceIndices.add(entry.sentenceIndex);
+      matchedSentencesInfo.push({
+        index: entry.sentenceIndex,
+        text: allSentences[entry.sentenceIndex] || '',
+      });
+      matchedSentence1BasedIndices.add(entry.sentenceNumber);
     });
 
     // 2. Find topics containing matched sentences
@@ -108,6 +123,7 @@ export default function WordPage() {
       timelineItems: finalTimelineItems,
       allSentences: allSentences,
       allTopics: allTopics,
+      treeEntries,
     };
   }, [submission, word]);
 
@@ -120,7 +136,31 @@ export default function WordPage() {
     });
   }, []);
 
-  const { sentencesInfo, topics, timelineItems, allSentences, allTopics } = matchingData;
+  const { sentencesInfo, topics, timelineItems, allSentences, allTopics, treeEntries } = matchingData;
+
+  const readSentenceIndices = useMemo(() => {
+    const indices = new Set();
+    allTopics.forEach((topic) => {
+      if (!readTopics.has(topic.name)) {
+        return;
+      }
+
+      (topic.sentences || []).forEach((sentenceIndex) => {
+        if (Number.isInteger(sentenceIndex)) {
+          indices.add(sentenceIndex);
+        }
+      });
+    });
+    return indices;
+  }, [allTopics, readTopics]);
+
+  const treeEntriesWithReadState = useMemo(
+    () => treeEntries.map((entry) => ({
+      ...entry,
+      isRead: readSentenceIndices.has(entry.sentenceNumber),
+    })),
+    [readSentenceIndices, treeEntries]
+  );
 
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
@@ -210,6 +250,12 @@ export default function WordPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'tree' && (
+            <div className="word-page-tree-container">
+              <WordTree entries={treeEntriesWithReadState} pivotLabel={word} />
             </div>
           )}
 
