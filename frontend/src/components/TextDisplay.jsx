@@ -1,8 +1,10 @@
-import React, { useMemo, useCallback, useRef } from 'react';
+import React, { useMemo, useCallback, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
 import { useTooltip } from '../hooks/useTooltip';
+import { HighlightContext } from './shared/HighlightContext';
+import HighlightedText from './shared/HighlightedText';
 
 // Tooltip positioning constants
 const TOOLTIP_WIDTH = 260;
@@ -27,12 +29,13 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {boolean} [tooltipEnabled]
  * @property {string} [submissionId]
  * @property {(topic: Object) => void} [onShowSentences]
+ * @property {string[]} [highlightWords] - Words to highlight in the text
  */
 
 /**
  * @param {TextDisplayProps} props
  */
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -46,6 +49,18 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     readTopics instanceof Set ? readTopics : new Set(readTopics || [])
   , [readTopics]);
   const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
+
+  // Get highlight words from prop or context
+  const contextHighlightWords = useContext(HighlightContext);
+  const effectiveHighlightWords = useMemo(() => {
+    if (Array.isArray(highlightWords) && highlightWords.length > 0) {
+      return highlightWords;
+    }
+    if (Array.isArray(contextHighlightWords) && contextHighlightWords.length > 0) {
+      return contextHighlightWords;
+    }
+    return null;
+  }, [highlightWords, contextHighlightWords]);
 
   // Build character ranges from topic.ranges (in raw HTML string coordinates)
   const { highlightRanges, fadeRanges } = useMemo(() => {
@@ -531,8 +546,13 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                 data-article-index={articleIndex}
                 data-sentence-index={index}
                 className={`sentence-token ${highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
-                dangerouslySetInnerHTML={{ __html: sanitizeHTML(sentence) + ' ' }}
-              />
+              >
+                {effectiveHighlightWords ? (
+                  <HighlightedText text={sentence} words={effectiveHighlightWords} />
+                ) : (
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHTML(sentence) + ' ' }} />
+                )}
+              </span>
               {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
                 sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
                   <button

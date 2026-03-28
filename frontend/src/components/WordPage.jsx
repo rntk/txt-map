@@ -204,6 +204,7 @@ export default function WordPage() {
                         onToggleTopic={toggleTopic}
                         tooltipEnabled={tooltipEnabled}
                         submissionId={submissionId}
+                        highlightWords={[word]}
                       />
                     </div>
                   ))}
