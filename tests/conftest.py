@@ -30,14 +30,16 @@ def mock_submissions_storage(mock_db):
         "mindmap",
         "prefix_tree",
         "insights_generation",
+        "markup_generation",
     ]
     storage.task_dependencies = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
         "summarization": ["split_topic_generation"],
-        "mindmap": ["split_topic_generation"],
+        "mindmap": ["subtopics_generation"],
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
+        "markup_generation": ["split_topic_generation"],
     }
     return storage
 
@@ -88,6 +90,12 @@ def sample_submission():
                 "started_at": None,
                 "completed_at": None,
                 "error": None
+            },
+            "markup_generation": {
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "error": None
             }
         },
         "results": {
@@ -109,6 +117,7 @@ def sample_submission():
             "prefix_tree": {},
             "insights": [],
             "annotations": {},
+            "markup": {},
         }
     }
 

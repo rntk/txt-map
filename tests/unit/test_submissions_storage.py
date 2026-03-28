@@ -1038,11 +1038,7 @@ class TestGetOverallStatus:
 
         result = storage.get_overall_status(submission)
 
-        # With no tasks, all() on empty list returns True, so should be "completed"
-        # But actually statuses would be [], so any(s == "failed") is False
-        # all(s == "completed" for s in []) is True (vacuous truth)
-        # So it returns "completed"
-        assert result == "completed"
+        assert result == "pending"
 
     def test_missing_tasks_key_handling(self, mock_db):
         """Missing 'tasks' key handling."""
@@ -1051,8 +1047,42 @@ class TestGetOverallStatus:
 
         result = storage.get_overall_status(submission)
 
-        # .get("tasks", {}) returns {}, so same as empty tasks
+        assert result == "pending"
+
+    def test_ignores_legacy_storytelling_task(self, mock_db):
+        """Legacy storytelling task does not affect overall status."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "subtopics_generation": {"status": "completed"},
+                "summarization": {"status": "completed"},
+                "mindmap": {"status": "completed"},
+                "prefix_tree": {"status": "completed"},
+                "insights_generation": {"status": "completed"},
+                "markup_generation": {"status": "completed"},
+                "storytelling_generation": {"status": "pending"},
+            }
+        }
+
+        result = storage.get_overall_status(submission)
+
         assert result == "completed"
+
+    def test_get_known_tasks_filters_unknown_task_entries(self, mock_db):
+        """Only canonical task names are returned from submission tasks."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "storytelling_generation": {"status": "pending"},
+                "not_a_real_task": {"status": "failed"},
+            }
+        }
+
+        result = storage.get_known_tasks(submission)
+
+        assert result == {"split_topic_generation": {"status": "completed"}}
 
 
 # =============================================================================

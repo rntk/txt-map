@@ -24,7 +24,16 @@ def client(app):
 @pytest.fixture
 def mock_storage():
     storage = MagicMock()
-    storage.task_names = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation"]
+    storage.task_names = [
+        "split_topic_generation",
+        "subtopics_generation",
+        "summarization",
+        "mindmap",
+        "prefix_tree",
+        "insights_generation",
+        "markup_generation",
+    ]
+    storage.get_known_tasks.side_effect = lambda submission: submission.get("tasks", {})
     return storage
 
 @pytest.fixture
@@ -48,7 +57,7 @@ def test_post_submit(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 6
+    assert mock_task_queue.create.call_count == 7
 
 def test_post_upload(client, mock_storage, mock_task_queue):
     submission_id = str(uuid.uuid4())
@@ -62,7 +71,7 @@ def test_post_upload(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 6
+    assert mock_task_queue.create.call_count == 7
 
 def test_get_submission_status(client, mock_storage, sample_submission):
     submission_id = sample_submission["submission_id"]
@@ -75,6 +84,23 @@ def test_get_submission_status(client, mock_storage, sample_submission):
     assert response.json()["submission_id"] == submission_id
     assert response.json()["overall_status"] == "pending"
 
+
+def test_get_submission_status_filters_legacy_storytelling_task(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["tasks"]["storytelling_generation"] = {"status": "pending"}
+    mock_storage.get_by_id.return_value = sample_submission
+    mock_storage.get_overall_status.return_value = "completed"
+    mock_storage.get_known_tasks.side_effect = lambda submission: {
+        key: value
+        for key, value in submission["tasks"].items()
+        if key != "storytelling_generation"
+    }
+
+    response = client.get(f"/api/submission/{submission_id}/status")
+
+    assert response.status_code == 200
+    assert "storytelling_generation" not in response.json()["tasks"]
+
 def test_get_submission(client, mock_storage, sample_submission):
     submission_id = sample_submission["submission_id"]
     mock_storage.get_by_id.return_value = sample_submission
@@ -85,6 +111,23 @@ def test_get_submission(client, mock_storage, sample_submission):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert "results" in response.json()
+
+
+def test_get_submission_filters_legacy_storytelling_task(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["tasks"]["storytelling_generation"] = {"status": "pending"}
+    mock_storage.get_by_id.return_value = sample_submission
+    mock_storage.get_overall_status.return_value = "completed"
+    mock_storage.get_known_tasks.side_effect = lambda submission: {
+        key: value
+        for key, value in submission["tasks"].items()
+        if key != "storytelling_generation"
+    }
+
+    response = client.get(f"/api/submission/{submission_id}")
+
+    assert response.status_code == 200
+    assert "storytelling_generation" not in response.json()["status"]["tasks"]
 
 def test_delete_submission(client, mock_storage, mock_task_queue, sample_submission):
     submission_id = sample_submission["submission_id"]

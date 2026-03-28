@@ -1,15 +1,19 @@
 """Shared constants for the application."""
-from typing import List, Dict
+from typing import Any, Dict, List
 
-# Task types allowed for queue operations
-ALLOWED_TASKS: List[str] = [
+
+TASK_NAMES: List[str] = [
     "split_topic_generation",
     "subtopics_generation",
     "summarization",
     "mindmap",
     "prefix_tree",
     "insights_generation",
+    "markup_generation",
 ]
+
+# Task types allowed for queue operations.
+ALLOWED_TASKS: List[str] = TASK_NAMES.copy()
 
 # Priority values for task types (lower = higher priority)
 TASK_PRIORITIES: Dict[str, int] = {
@@ -19,4 +23,17 @@ TASK_PRIORITIES: Dict[str, int] = {
     "mindmap": 3,
     "prefix_tree": 3,
     "insights_generation": 4,
+    "markup_generation": 4,
 }
+
+
+def filter_known_tasks(tasks: Any) -> Dict[str, Dict[str, Any]]:
+    """Return only canonical task entries from an arbitrary task map."""
+    if not isinstance(tasks, dict):
+        return {}
+
+    return {
+        task_name: task_info
+        for task_name, task_info in tasks.items()
+        if task_name in TASK_NAMES and isinstance(task_info, dict)
+    }

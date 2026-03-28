@@ -89,6 +89,14 @@ const INDEX_ARRAY_KEYS = new Set([
     'explanation_sentence_indices',
 ]);
 
+const WORD_INDEX_ARRAY_KEYS = new Set([
+    'word_indices',
+    'answer_word_indices',
+    'question_word_indices',
+    'title_word_indices',
+    'term_word_indices',
+]);
+
 const INDEX_VALUE_KEYS = new Set([
     'position_index',
     'sentence_index',
@@ -289,10 +297,10 @@ function buildEnrichedRangeGroupsWithFallbacks(positions, sentenceIndices, range
     return groupsFromPositions;
 }
 
-function remapNestedMarkupValue(value, indexMap) {
+function remapNestedMarkupValue(value, positionIndexMap, wordIndexMap) {
     if (Array.isArray(value)) {
         return value
-            .map((item) => remapNestedMarkupValue(item, indexMap))
+            .map((item) => remapNestedMarkupValue(item, positionIndexMap, wordIndexMap))
             .filter((item) => item !== undefined);
     }
 
@@ -303,7 +311,7 @@ function remapNestedMarkupValue(value, indexMap) {
                 const remappedIndices = Array.isArray(nestedValue)
                     ? [...new Set(
                         nestedValue
-                            .map((index) => indexMap.get(index))
+                            .map((index) => positionIndexMap.get(index))
                             .filter((index) => Number.isInteger(index))
                     )].sort((a, b) => a - b)
                     : [];
@@ -313,15 +321,33 @@ function remapNestedMarkupValue(value, indexMap) {
                 return;
             }
 
+            if (WORD_INDEX_ARRAY_KEYS.has(key)) {
+                const remappedWordIndices = Array.isArray(nestedValue)
+                    ? [...new Set(
+                        nestedValue
+                            .map((index) => wordIndexMap.get(index))
+                            .filter((index) => Number.isInteger(index))
+                    )].sort((a, b) => a - b)
+                    : [];
+                if (remappedWordIndices.length > 0) {
+                    nextValue[key] = remappedWordIndices;
+                }
+                return;
+            }
+
             if (INDEX_VALUE_KEYS.has(key)) {
-                const remappedIndex = indexMap.get(nestedValue);
+                const remappedIndex = positionIndexMap.get(nestedValue);
                 if (Number.isInteger(remappedIndex)) {
                     nextValue[key] = remappedIndex;
                 }
                 return;
             }
 
-            const remappedNestedValue = remapNestedMarkupValue(nestedValue, indexMap);
+            const remappedNestedValue = remapNestedMarkupValue(
+                nestedValue,
+                positionIndexMap,
+                wordIndexMap
+            );
             if (remappedNestedValue !== undefined) {
                 nextValue[key] = remappedNestedValue;
             }
@@ -344,6 +370,24 @@ function buildGroupMarkup(topicMarkup, rangeGroup) {
     const groupPositionIndexMap = new Map(
         groupPositions.map((position, index) => [position.index, index + 1])
     );
+    const groupWordIndexMap = new Map();
+    let nextGroupWordIndex = 1;
+
+    groupPositions.forEach((position) => {
+        const wordStartIndex = Number.isInteger(position?.word_start_index)
+            ? position.word_start_index
+            : null;
+        const wordEndIndex = Number.isInteger(position?.word_end_index)
+            ? position.word_end_index
+            : null;
+        if (wordStartIndex == null || wordEndIndex == null || wordEndIndex < wordStartIndex) {
+            return;
+        }
+        for (let index = wordStartIndex; index <= wordEndIndex; index += 1) {
+            groupWordIndexMap.set(index, nextGroupWordIndex);
+            nextGroupWordIndex += 1;
+        }
+    });
 
     const remappedSegments = segments.reduce((nextSegments, segment) => {
         const segmentIndices = getSegmentIndices(segment);
@@ -359,7 +403,11 @@ function buildGroupMarkup(topicMarkup, rangeGroup) {
             return nextSegments;
         }
 
-        const remappedSegment = remapNestedMarkupValue(segment, groupPositionIndexMap);
+        const remappedSegment = remapNestedMarkupValue(
+            segment,
+            groupPositionIndexMap,
+            groupWordIndexMap
+        );
         remappedSegment.position_indices = overlappingIndices
             .map((index) => groupPositionIndexMap.get(index))
             .filter((index) => Number.isInteger(index))
@@ -374,10 +422,21 @@ function buildGroupMarkup(topicMarkup, rangeGroup) {
     }, []);
 
     return {
-        positions: groupPositions.map((position, index) => ({
-            ...position,
-            index: index + 1,
-        })),
+        positions: groupPositions.map((position, index) => {
+            const wordStartIndex = Number.isInteger(position?.word_start_index)
+                ? groupWordIndexMap.get(position.word_start_index)
+                : undefined;
+            const wordEndIndex = Number.isInteger(position?.word_end_index)
+                ? groupWordIndexMap.get(position.word_end_index)
+                : undefined;
+
+            return {
+                ...position,
+                index: index + 1,
+                ...(Number.isInteger(wordStartIndex) ? { word_start_index: wordStartIndex } : {}),
+                ...(Number.isInteger(wordEndIndex) ? { word_end_index: wordEndIndex } : {}),
+            };
+        }),
         segments: remappedSegments,
     };
 }

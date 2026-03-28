@@ -173,7 +173,7 @@ def get_submission_status(
 
     return {
         "submission_id": submission["submission_id"],
-        "tasks": submission["tasks"],
+        "tasks": submissions_storage.get_known_tasks(submission),
         "overall_status": overall_status
     }
 
@@ -196,7 +196,7 @@ def get_submission(
         "created_at": submission["created_at"],
         "status": {
             "overall": overall_status,
-            "tasks": submission["tasks"]
+            "tasks": submissions_storage.get_known_tasks(submission)
         },
         "results": submission["results"],
         "read_topics": submission.get("read_topics", [])

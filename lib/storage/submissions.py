@@ -4,11 +4,12 @@ from typing import Optional, List, Any, Dict
 from datetime import datetime, UTC
 
 from pymongo.database import Database
+from lib.constants import TASK_NAMES, filter_known_tasks
 
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
-    task_names: List[str] = ["split_topic_generation", "subtopics_generation", "summarization", "mindmap", "prefix_tree", "insights_generation", "markup_generation"]
+    task_names: List[str] = TASK_NAMES.copy()
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
@@ -263,6 +264,10 @@ class SubmissionsStorage:
         """List submissions applying a specific projection (no default sort)."""
         return list(self._db.submissions.find(filters, projection))
 
+    def get_known_tasks(self, submission: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Return only canonical tasks from a submission document."""
+        return filter_known_tasks(submission.get("tasks", {}))
+
     def aggregate_global_topics(self) -> List[dict[str, Any]]:
         """Return aggregated topic tree across all completed submissions."""
         pipeline = [
@@ -290,8 +295,11 @@ class SubmissionsStorage:
 
     def get_overall_status(self, submission: dict[str, Any]) -> str:
         """Determine overall status from task statuses"""
-        tasks: dict[str, Any] = submission.get("tasks", {})
+        tasks: dict[str, Any] = self.get_known_tasks(submission)
         statuses = [task.get("status") for task in tasks.values()]
+
+        if not statuses:
+            return "pending"
 
         if any(s == "failed" for s in statuses):
             return "failed"
