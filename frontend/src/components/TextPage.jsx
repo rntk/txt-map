@@ -13,6 +13,7 @@ import VisualizationPanels from './VisualizationPanels';
 import SummaryTimeline from './SummaryTimeline';
 import SummarySourceMenu from './SummarySourceMenu';
 import TopicSentencePanel from './TopicSentencePanel';
+import MarkupRenderer from './markup/MarkupRenderer';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
 import { useTextSelection } from '../hooks/useTextSelection';
@@ -79,7 +80,7 @@ function TextPage() {
     toggleReadAll: toggleReadAllBase,
   } = useSubmission(submissionId);
 
-  const { selectionData, clearSelection } = useTextSelection();
+  const { selectionData } = useTextSelection();
 
   const {
     safeTopics: _safeTopics,
@@ -113,6 +114,68 @@ function TextPage() {
   }, [articles, readTopics]);
 
   const readPercentage = readProgressInfo.total_count > 0 ? (readProgressInfo.read_count / readProgressInfo.total_count) * 100 : 0;
+
+  // Combine markup from all topics into global segments for the Markup tab
+  const combinedMarkup = useMemo(() => {
+    if (!submission?.results?.markup) {
+      return { segments: [], sentences: [] };
+    }
+
+    const markupData = submission.results.markup;
+    const allSegments = [];
+    const allSentences = [];
+
+    // Collect all sentences from all articles
+    articles.forEach((article) => {
+      if (article.sentences) {
+        allSentences.push(...article.sentences);
+      }
+    });
+
+    // Process each article's topics
+    articles.forEach((article) => {
+      const articleTopics = article.topics || [];
+
+      articleTopics.forEach((topic) => {
+        const topicMarkup = markupData[topic.name];
+        if (!topicMarkup || !topicMarkup.positions || !topicMarkup.segments) {
+          return;
+        }
+
+        // Build a map from position index to source sentence index
+        const positionToSentenceMap = new Map();
+        topicMarkup.positions.forEach((position) => {
+          if (position.index != null && position.source_sentence_index != null) {
+            positionToSentenceMap.set(position.index, position.source_sentence_index);
+          }
+        });
+
+        // Remap segments to use global sentence indices
+        topicMarkup.segments.forEach((segment) => {
+          const positionIndices = segment.position_indices;
+          if (!positionIndices || !Array.isArray(positionIndices)) {
+            return;
+          }
+
+          // Map position indices to global sentence indices
+          const globalIndices = positionIndices
+            .map((posIdx) => positionToSentenceMap.get(posIdx))
+            .filter((idx) => Number.isInteger(idx));
+
+          if (globalIndices.length > 0) {
+            // Create a new segment with remapped indices
+            const remappedSegment = {
+              ...segment,
+              position_indices: [...new Set(globalIndices)].sort((a, b) => a - b),
+            };
+            allSegments.push(remappedSegment);
+          }
+        });
+      });
+    });
+
+    return { segments: allSegments, sentences: allSentences };
+  }, [submission, articles]);
 
   const { navigateTopicSentence } = useTopicNavigation({
     activeTab,
@@ -457,8 +520,14 @@ function TextPage() {
                 >
                   Raw Text
                 </button>
+                <button
+                  className={`global-menu-link${activeTab === 'markup' ? ' active' : ''}`}
+                  onClick={() => handleTabClick('markup')}
+                >
+                  Markup
+                </button>
               </div>
-              {(activeTab === 'article' || activeTab === 'raw_text') && (
+              {(activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup') && (
                 <>
                   <label className="grouped-topics-toggle">
                     <input
@@ -468,6 +537,7 @@ function TextPage() {
                     />
                     Grouped by topics
                   </label>
+                  {activeTab !== 'markup' && (
                   <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
                     <input
                       type="checkbox"
@@ -476,6 +546,7 @@ function TextPage() {
                     />
                     Show tooltips
                   </label>
+                  )}
                 </>
               )}
               {submission.source_url && (
@@ -586,6 +657,19 @@ function TextPage() {
                     highlightRanges={rawTextHighlightRanges}
                     fadeRanges={rawTextFadeRanges}
                   />
+                </div>
+              ) : activeTab === 'markup' ? (
+                <div className="summary-content">
+                  {combinedMarkup.segments.length > 0 ? (
+                    <div className="markup-content">
+                      <MarkupRenderer
+                        segments={combinedMarkup.segments}
+                        sentences={combinedMarkup.sentences}
+                      />
+                    </div>
+                  ) : (
+                    <p>No markup available. Processing may still be in progress or no topics have markup generated.</p>
+                  )}
                 </div>
               ) : (
                 articles.map((article, index) => (
