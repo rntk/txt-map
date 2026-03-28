@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
 
 /**
  * @typedef {Object} WordTreeToken
@@ -143,195 +144,327 @@ export function buildWordTreeEntries(sentences, target, readSentenceIndices = ne
     }
   });
 
-  return entries.sort((entryA, entryB) => {
-    const leftA = entryA.leftTokens.map((token) => token.normalized).reverse().join('\u0000');
-    const leftB = entryB.leftTokens.map((token) => token.normalized).reverse().join('\u0000');
-    if (leftA !== leftB) {
-      return leftA.localeCompare(leftB);
-    }
-
-    const rightA = entryA.rightTokens.map((token) => token.normalized).join('\u0000');
-    const rightB = entryB.rightTokens.map((token) => token.normalized).join('\u0000');
-    if (rightA !== rightB) {
-      return rightA.localeCompare(rightB);
-    }
-
-    if (entryA.sentenceIndex !== entryB.sentenceIndex) {
-      return entryA.sentenceIndex - entryB.sentenceIndex;
-    }
-
-    return entryA.id.localeCompare(entryB.id);
-  });
+  return entries;
 }
+
+/**
+ * @typedef {Object} TrieNode
+ * @property {string} name
+ * @property {Map<string, TrieNode>} children
+ * @property {number} count
+ */
 
 /**
  * @param {WordTreeEntry[]} entries
- * @param {'left'|'right'} side
- * @returns {number}
+ * @param {"left"|"right"} side
+ * @returns {TrieNode}
  */
-function getMaxDepth(entries, side) {
-  return entries.reduce((maxDepth, entry) => {
-    const tokens = side === 'left' ? entry.leftTokens : entry.rightTokens;
-    return Math.max(maxDepth, tokens.length);
-  }, 0);
-}
+function buildTrie(entries, side) {
+  const root = { name: "", children: new Map(), count: entries.length };
 
-/**
- * @param {WordTreeEntry|null} entryA
- * @param {WordTreeEntry|null} entryB
- * @param {'left'|'right'} side
- * @param {number} depth
- * @returns {boolean}
- */
-function sharesBranch(entryA, entryB, side, depth) {
-  if (!entryA || !entryB) {
-    return false;
-  }
+  entries.forEach((entry) => {
+    let current = root;
+    const tokens = side === "left"
+      ? [...entry.leftTokens].reverse()
+      : entry.rightTokens;
 
-  const pathA = side === 'left'
-    ? entryA.leftTokens.map((token) => token.normalized).reverse()
-    : entryA.rightTokens.map((token) => token.normalized);
-  const pathB = side === 'left'
-    ? entryB.leftTokens.map((token) => token.normalized).reverse()
-    : entryB.rightTokens.map((token) => token.normalized);
-
-  if (!pathA[depth] || !pathB[depth]) {
-    return false;
-  }
-
-  for (let index = 0; index <= depth; index += 1) {
-    if (pathA[index] !== pathB[index]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * @param {WordTreeEntry} entry
- * @param {'left'|'right'} side
- * @param {number} maxDepth
- * @returns {(WordTreeToken|null)[]}
- */
-function buildDisplayColumns(entry, side, maxDepth) {
-  const nearestFirstTokens = side === 'left'
-    ? [...entry.leftTokens].reverse()
-    : entry.rightTokens;
-  const columns = new Array(maxDepth).fill(null);
-
-  nearestFirstTokens.forEach((token, depth) => {
-    const columnIndex = side === 'left' ? maxDepth - 1 - depth : depth;
-    columns[columnIndex] = token;
+    tokens.forEach((token) => {
+      const key = token.normalized;
+      if (!current.children.has(key)) {
+        current.children.set(key, { name: token.text, children: new Map(), count: 0 });
+      }
+      current = current.children.get(key);
+      current.count++;
+    });
   });
 
-  return columns;
+  return root;
 }
+
+/**
+ * @param {TrieNode} node
+ * @returns {Object}
+ */
+function trieToHierarchy(node) {
+  return {
+    name: node.name,
+    count: node.count,
+    children: Array.from(node.children.values()).map(trieToHierarchy)
+  };
+}
+
+// ── Layout constants ───────────────────────────────────────────────────────────
+const FONT_MIN = 10;
+const FONT_MAX = 28;
+const H_GAP = 8;           // horizontal gap between words (px)
+const V_GAP = 3;           // vertical gap between sibling branches (px)
+const LINE_HEIGHT_FACTOR = 1.5;
+const LEFT_PADDING = 16;
+const TOP_PADDING = 20;
+const FONT_FAMILY = 'sans-serif';
+const MAX_DEPTH = 12;      // truncate very deep branches
+
+// ── Text measurement ───────────────────────────────────────────────────────────
+
+let _canvasCtx = null;
+
+function getMeasureCtx() {
+  if (_canvasCtx) return _canvasCtx;
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    _canvasCtx = canvas.getContext('2d');
+  }
+  return _canvasCtx;
+}
+
+/**
+ * Measure text width at a given font size.
+ * Falls back to character-count estimate when canvas is unavailable (jsdom/SSR).
+ * @param {string} text
+ * @param {number} fontSize
+ * @returns {number}
+ */
+function measureTextWidth(text, fontSize) {
+  const ctx = getMeasureCtx();
+  if (ctx) {
+    ctx.font = `${fontSize}px ${FONT_FAMILY}`;
+    return ctx.measureText(text).width;
+  }
+  return text.length * fontSize * 0.6;
+}
+
+// ── Layout algorithm ───────────────────────────────────────────────────────────
+
+/**
+ * Find the maximum count in the hierarchy tree.
+ * @param {Object} node
+ * @returns {number}
+ */
+function findMaxCount(node) {
+  let max = node.count || 0;
+  (node.children || []).forEach(child => {
+    max = Math.max(max, findMaxCount(child));
+  });
+  return max;
+}
+
+/**
+ * Compute font size from count and maxCount.
+ * @param {number} count
+ * @param {number} maxCount
+ * @returns {number}
+ */
+function computeFontSize(count, maxCount) {
+  if (maxCount <= 0) return FONT_MIN;
+  const factor = Math.sqrt(count / maxCount);
+  return FONT_MIN + factor * (FONT_MAX - FONT_MIN);
+}
+
+/**
+ * Annotate each node with fontSize, textWidth, lineHeight (mutates node objects).
+ * @param {Object} node
+ * @param {number} maxCount
+ * @param {number} depth
+ */
+function annotateNode(node, maxCount, depth) {
+  node.fontSize = computeFontSize(node.count, maxCount);
+  node.textWidth = measureTextWidth(node.name, node.fontSize);
+  node.lineHeight = node.fontSize * LINE_HEIGHT_FACTOR;
+  node._depth = depth;
+
+  const children = depth < MAX_DEPTH ? (node.children || []) : [];
+  node._visibleChildren = children;
+  children.forEach(child => annotateNode(child, maxCount, depth + 1));
+}
+
+/**
+ * Bottom-up pass: compute subtreeHeight for each node.
+ * @param {Object} node
+ * @returns {number}
+ */
+function computeSubtreeHeight(node) {
+  const children = node._visibleChildren || [];
+  if (children.length === 0) {
+    node.subtreeHeight = node.lineHeight;
+    return node.subtreeHeight;
+  }
+  const totalChildHeight = children.reduce((sum, child) => sum + computeSubtreeHeight(child), 0);
+  const gaps = (children.length - 1) * V_GAP;
+  node.subtreeHeight = totalChildHeight + gaps;
+  return node.subtreeHeight;
+}
+
+/**
+ * Top-down pass: assign (x, y) to each node.
+ * @param {Object} node
+ * @param {number} x
+ * @param {number} y  — vertical center of this node's band
+ * @param {Object|null} parent
+ */
+function assignPositions(node, x, y, parent) {
+  node.x = x;
+  node.y = y;
+  node.parent = parent;
+
+  const children = node._visibleChildren || [];
+  if (children.length === 0) return;
+
+  const childX = x + node.textWidth + H_GAP;
+  let yOffset = y - node.subtreeHeight / 2;
+
+  children.forEach(child => {
+    const childY = yOffset + child.subtreeHeight / 2;
+    assignPositions(child, childX, childY, node);
+    yOffset += child.subtreeHeight + V_GAP;
+  });
+}
+
+/**
+ * Flatten positioned tree into an array of nodes (for D3 data binding).
+ * @param {Object} node
+ * @param {Array} result
+ * @returns {Array}
+ */
+function flattenTree(node, result = []) {
+  result.push(node);
+  (node._visibleChildren || []).forEach(child => flattenTree(child, result));
+  return result;
+}
+
+/**
+ * Compute the full text-flow layout.
+ * @param {Object} hierarchy   — output of trieToHierarchy
+ * @param {string} pivotLabel
+ * @returns {{ nodes: Object[], width: number, height: number }}
+ */
+function computeLayout(hierarchy, pivotLabel) {
+  const maxCount = Math.max(findMaxCount(hierarchy), 1);
+
+  // Annotate root (the virtual root whose name="" represents the pivot)
+  // We treat the pivot word as a pseudo-root node
+  const root = {
+    name: pivotLabel,
+    count: hierarchy.count,
+    children: hierarchy.children,
+    _visibleChildren: hierarchy.children || [],
+  };
+  root.fontSize = FONT_MAX;
+  root.textWidth = measureTextWidth(pivotLabel, root.fontSize);
+  root.lineHeight = root.fontSize * LINE_HEIGHT_FACTOR;
+  root._depth = 0;
+
+  // Annotate children
+  (root._visibleChildren || []).forEach(child => annotateNode(child, maxCount, 1));
+
+  // Bottom-up
+  computeSubtreeHeight(root);
+
+  // Top-down — start at center vertically
+  const totalHeight = root.subtreeHeight + TOP_PADDING * 2;
+  assignPositions(root, LEFT_PADDING, totalHeight / 2, null);
+
+  // Shift all y values so none are negative
+  const allNodes = flattenTree(root);
+  const minY = Math.min(...allNodes.map(n => n.y - n.lineHeight / 2));
+  const shift = minY < TOP_PADDING ? TOP_PADDING - minY : 0;
+  allNodes.forEach(n => { n.y += shift; });
+
+  const maxX = Math.max(...allNodes.map(n => n.x + n.textWidth));
+  const maxY = Math.max(...allNodes.map(n => n.y + n.lineHeight / 2));
+
+  return {
+    nodes: allNodes,
+    width: maxX + LEFT_PADDING,
+    height: maxY + TOP_PADDING,
+  };
+}
+
+// ── React component ────────────────────────────────────────────────────────────
 
 /**
  * @param {WordTreeProps} props
  * @returns {React.ReactElement}
  */
 export default function WordTree({ entries, pivotLabel }) {
+  const svgRef = useRef(null);
+
   const safeEntries = useMemo(
     () => (Array.isArray(entries) ? entries : []),
     [entries]
   );
-  const leftDepth = useMemo(() => getMaxDepth(safeEntries, 'left'), [safeEntries]);
-  const rightDepth = useMemo(() => getMaxDepth(safeEntries, 'right'), [safeEntries]);
+
+  useEffect(() => {
+    if (!svgRef.current || safeEntries.length === 0) return;
+
+    // Build suffix trie (text flows right from pivot)
+    const rightTrie = buildTrie(safeEntries, "right");
+    const hierarchy = trieToHierarchy(rightTrie);
+
+    const { nodes, width, height } = computeLayout(hierarchy, pivotLabel);
+
+    const svg = d3.select(svgRef.current)
+      .attr("width", width)
+      .attr("height", height)
+      .html("");
+
+    // ── Draw connectors (only when parent has 2+ children) ───────────────────
+    const connectorNodes = nodes.filter(n => n.parent && (n.parent._visibleChildren || []).length > 1);
+
+    svg.append("g")
+      .attr("class", "word-tree-graph__links")
+      .selectAll("path")
+      .data(connectorNodes)
+      .enter()
+      .append("path")
+      .attr("class", "word-tree-graph__link")
+      .attr("d", d => {
+        const px = d.parent.x + d.parent.textWidth;
+        const py = d.parent.y;
+        const cx = d.x;
+        const cy = d.y;
+        const midX = (px + cx) / 2;
+        return `M${px},${py} C${midX},${py} ${midX},${cy} ${cx},${cy}`;
+      })
+      .attr("stroke-width", d => Math.max(0.8, Math.min(3, d.count * 0.4)));
+
+    // ── Compute fill color scale ─────────────────────────────────────────────
+    const maxCount = Math.max(...nodes.map(n => n.count || 0), 1);
+    const colorScale = d3.scaleLinear()
+      .domain([0, maxCount])
+      .range(["#aaa", "#222"])
+      .clamp(true);
+
+    // ── Draw text nodes ──────────────────────────────────────────────────────
+    svg.append("g")
+      .attr("class", "word-tree-graph__nodes")
+      .selectAll("text")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .attr("class", d => d.parent === null
+        ? "word-tree-graph__pivot-text"
+        : "word-tree-graph__node-text")
+      .attr("x", d => d.x)
+      .attr("y", d => d.y)
+      .attr("dominant-baseline", "central")
+      .attr("text-anchor", "start")
+      .attr("font-size", d => d.fontSize)
+      .attr("fill", d => d.parent === null ? "#222" : colorScale(d.count))
+      .text(d => d.name);
+
+  }, [safeEntries, pivotLabel]);
 
   if (safeEntries.length === 0) {
     return (
       <div className="word-tree word-tree--empty">
-        <p className="word-page-no-occurrences">No occurrences of this word were found in the article.</p>
+        <p className="word-page-no-occurrences">No occurrences of this word were found.</p>
       </div>
     );
   }
 
   return (
-    <section className="word-tree" aria-label={`Context tree for ${pivotLabel}`}>
-      <div className="word-tree__legend">
-        <span className="word-tree__legend-chip">Read</span>
-        <span>Dimmed rows belong to already read sentences.</span>
-      </div>
-      <div className="word-tree__viewport">
-        <div className="word-tree__rows">
-          {safeEntries.map((entry, entryIndex) => {
-            const previousEntry = entryIndex > 0 ? safeEntries[entryIndex - 1] : null;
-            const nextEntry = entryIndex < safeEntries.length - 1 ? safeEntries[entryIndex + 1] : null;
-            const leftColumns = buildDisplayColumns(entry, 'left', leftDepth);
-            const rightColumns = buildDisplayColumns(entry, 'right', rightDepth);
-            const leftNearestFirst = entry.leftTokens.map((token) => token.normalized).reverse();
-            const rightNearestFirst = entry.rightTokens.map((token) => token.normalized);
-
-            return (
-              <div
-                key={entry.id}
-                className={`word-tree__row${entry.isRead ? ' word-tree__row--read' : ''}`}
-                title={`Sentence ${entry.sentenceNumber}: ${entry.sentenceText}`}
-              >
-                <div className="word-tree__branch word-tree__branch--left" aria-hidden="true">
-                  {leftColumns.map((token, columnIndex) => {
-                    if (!token) {
-                      return <div key={`left-${entry.id}-${columnIndex}`} className="word-tree__cell word-tree__cell--empty" />;
-                    }
-
-                    const depth = leftDepth - 1 - columnIndex;
-                    const sharedPrev = depth >= 0 && depth < leftNearestFirst.length
-                      ? sharesBranch(entry, previousEntry, 'left', depth)
-                      : false;
-                    const sharedNext = depth >= 0 && depth < leftNearestFirst.length
-                      ? sharesBranch(entry, nextEntry, 'left', depth)
-                      : false;
-
-                    return (
-                      <div
-                        key={`left-${entry.id}-${columnIndex}`}
-                        className={`word-tree__cell word-tree__cell--left word-tree__cell--filled${sharedPrev ? ' word-tree__cell--merge-prev' : ''}${sharedNext ? ' word-tree__cell--merge-next' : ''}`}
-                      >
-                        <span className="word-tree__token">{token.text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="word-tree__pivot-wrap">
-                  <span className="word-tree__pivot">{entry.matchText || pivotLabel}</span>
-                </div>
-
-                <div className="word-tree__branch word-tree__branch--right" aria-hidden="true">
-                  {rightColumns.map((token, columnIndex) => {
-                    if (!token) {
-                      return <div key={`right-${entry.id}-${columnIndex}`} className="word-tree__cell word-tree__cell--empty" />;
-                    }
-
-                    const depth = columnIndex;
-                    const sharedPrev = depth < rightNearestFirst.length
-                      ? sharesBranch(entry, previousEntry, 'right', depth)
-                      : false;
-                    const sharedNext = depth < rightNearestFirst.length
-                      ? sharesBranch(entry, nextEntry, 'right', depth)
-                      : false;
-
-                    return (
-                      <div
-                        key={`right-${entry.id}-${columnIndex}`}
-                        className={`word-tree__cell word-tree__cell--right word-tree__cell--filled${sharedPrev ? ' word-tree__cell--merge-prev' : ''}${sharedNext ? ' word-tree__cell--merge-next' : ''}`}
-                      >
-                        <span className="word-tree__token">{token.text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="word-tree__meta">
-                  <span className="word-tree__sentence-number">Sentence {entry.sentenceNumber}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
+    <div className="word-tree-graph-container">
+      <svg ref={svgRef}></svg>
+    </div>
   );
 }

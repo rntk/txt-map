@@ -51,7 +51,7 @@ describe('WordTree helpers', () => {
 });
 
 describe('WordTree component', () => {
-  it('renders rows and dims read entries', () => {
+  it('renders pivot and right-side tokens in the SVG', () => {
     const entries = [
       {
         id: '1',
@@ -77,13 +77,18 @@ describe('WordTree component', () => {
 
     render(<WordTree entries={entries} pivotLabel="beta" />);
 
-    expect(screen.getAllByText('beta')).toHaveLength(2);
-    expect(screen.getByText('Sentence 2').closest('.word-tree__row')).toHaveClass('word-tree__row--read');
+    // Pivot word appears exactly once as root text node
+    expect(screen.getAllByText('beta')).toHaveLength(1);
+    // Right-side tokens from both entries appear
+    expect(screen.getByText('gamma')).toBeInTheDocument();
+    expect(screen.getByText('epsilon')).toBeInTheDocument();
+    // Rendered inside an SVG
+    expect(document.querySelector('svg')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no entries', () => {
     render(<WordTree entries={[]} pivotLabel="beta" />);
 
-    expect(screen.getByText('No occurrences of this word were found in the article.')).toBeInTheDocument();
+    expect(screen.getByText('No occurrences of this word were found.')).toBeInTheDocument();
   });
 });
