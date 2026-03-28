@@ -83,6 +83,11 @@ function TopicsBarChart({
         return chartData.reduce((sum, item) => sum + item.totalChars, 0);
     }, [chartData]);
 
+    const safeReadTopics = useMemo(
+        () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
+        [readTopics]
+    );
+
     const scopeLabel = getScopeLabel(scopePath);
     const scopeCopy = scopePath.length === 0
         ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}).`
@@ -149,6 +154,7 @@ function TopicsBarChart({
                             const color = colorScale[item.fullPath] || '#999';
                             const isHovered = hoveredBar === index;
                             const isLast = index === chartData.length - 1;
+                            const isRead = safeReadTopics.has(item.fullPath);
 
                             return (
                                 <div
@@ -167,7 +173,7 @@ function TopicsBarChart({
                                         title={item.fullPath}
                                     >
                                         <div
-                                            className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}`}
+                                            className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}${isRead ? ' topics-bar-chart__bar--read' : ''}`}
                                             style={{
                                                 width: `${barWidthPercent}%`,
                                                 backgroundColor: color,
