@@ -37,6 +37,8 @@ def test_build_markup_classification_prompt_puts_dynamic_content_last() -> None:
     assert "Never use an index higher than the last [wN] marker" in prompt
     assert "Each line inside `<content>` is one markup position" in prompt
     assert "Do not emit a single-group paragraph" in prompt
+    assert 'Top-level "words" is OPTIONAL' in prompt
+    assert 'Every segment MUST have top-level "words"' not in prompt
     assert "<content>\nPrefix[w1] reuse[w2] matters.[w3]\n</content>" in prompt
     assert prompt.index("OUTPUT FORMAT") < prompt.rindex("<content>")
     assert prompt.index("DECISION RULES:") < prompt.rindex("<content>")
@@ -780,3 +782,160 @@ def test_classify_topic_retries_with_json_correction_prompt(caplog) -> None:
     assert result["segments"][0]["type"] == "quote"
     assert any("Fix the JSON syntax only" in prompt for prompt, _ in llm.calls)
     assert "Retrying markup response with JSON correction prompt for topic 'Test'" in caplog.text
+
+
+def test_expand_markup_response_title_without_title_words_derives_position_from_segment() -> None:
+    """A title segment without title_words in data still gets title_position_index from segment words."""
+    word_map = {1: "Section", 2: "Heading"}
+    word_to_position = {1: 3, 2: 3}
+    data = {
+        "segments": [
+            {
+                "type": "title",
+                "words": ["w1-w2"],
+                "data": {"level": 2},  # no title_words
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    seg = expanded["segments"][0]
+    assert seg["type"] == "title"
+    assert seg["word_indices"] == [1, 2]
+    assert seg["position_indices"] == [3]
+    # title_position_index derived from segment-level word_indices via fallback
+    assert seg["data"]["title_position_index"] == 3
+    assert "title_word_indices" not in seg["data"]
+
+
+def test_expand_markup_response_title_without_top_level_words_backfills_from_title_words() -> None:
+    word_map = {1: "Section", 2: "Heading"}
+    word_to_position = {1: 3, 2: 3}
+    data = {
+        "segments": [
+            {
+                "type": "title",
+                "data": {"level": 2, "title_words": ["w1-w2"]},
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    seg = expanded["segments"][0]
+    assert seg["word_indices"] == [1, 2]
+    assert seg["position_indices"] == [3]
+    assert seg["data"]["title_word_indices"] == [1, 2]
+    assert seg["data"]["title_position_index"] == 3
+
+
+def test_expand_markup_response_paragraph_without_top_level_words_backfills_word_indices() -> None:
+    """A paragraph segment without top-level words gets word_indices backfilled from its groups."""
+    word_map = {1: "First", 2: "para", 3: "Second", 4: "para"}
+    word_to_position = {1: 1, 2: 1, 3: 2, 4: 2}
+    data = {
+        "segments": [
+            {
+                "type": "paragraph",
+                # no top-level "words" field
+                "data": {
+                    "paragraphs": [
+                        {"words": ["w1-w2"]},
+                        {"words": ["w3-w4"]},
+                    ]
+                },
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    seg = expanded["segments"][0]
+    assert seg["type"] == "paragraph"
+    # word_indices backfilled from union of group word_indices
+    assert seg["word_indices"] == [1, 2, 3, 4]
+    # position_indices derived from group position_indices
+    assert seg["position_indices"] == [1, 2]
+    assert seg["data"]["paragraphs"][0]["word_indices"] == [1, 2]
+    assert seg["data"]["paragraphs"][1]["word_indices"] == [3, 4]
+
+
+def test_expand_markup_response_list_without_top_level_words_backfills_from_items() -> None:
+    word_map = {1: "First", 2: "item", 3: "Second", 4: "item"}
+    word_to_position = {1: 1, 2: 1, 3: 2, 4: 2}
+    data = {
+        "segments": [
+            {
+                "type": "list",
+                "data": {
+                    "ordered": False,
+                    "items": [
+                        {"words": ["w1-w2"]},
+                        {"words": ["w3-w4"]},
+                    ],
+                },
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    seg = expanded["segments"][0]
+    assert seg["word_indices"] == [1, 2, 3, 4]
+    assert seg["position_indices"] == [1, 2]
+    assert seg["data"]["items"][0]["position_index"] == 1
+    assert seg["data"]["items"][1]["position_index"] == 2
+
+
+def test_expand_markup_response_data_trend_without_top_level_words_backfills_from_values() -> None:
+    word_map = {1: "Revenue", 2: "$5", 3: "million"}
+    word_to_position = {1: 1, 2: 1, 3: 1}
+    data = {
+        "segments": [
+            {
+                "type": "data_trend",
+                "data": {
+                    "values": [
+                        {"label": ["w1"], "words": ["w2-w3"]},
+                    ],
+                },
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    seg = expanded["segments"][0]
+    assert seg["word_indices"] == [1, 2, 3]
+    assert seg["position_indices"] == [1]
+    assert seg["data"]["position_indices"] == [1]
+    assert seg["data"]["values"][0]["label"] == "Revenue"
+    assert seg["data"]["values"][0]["label_word_indices"] == [1]
+
+
+def test_validate_markup_response_paragraph_without_top_level_words_passes_validation() -> None:
+    """A paragraph segment without top-level words is valid after backfill in _expand."""
+    word_map = {1: "First", 2: "line", 3: "Second", 4: "line", 5: "Third", 6: "line"}
+    word_to_position = {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3}
+    data = {
+        "segments": [
+            {
+                "type": "paragraph",
+                "data": {
+                    "paragraphs": [
+                        {"words": ["w1-w2"]},
+                        {"words": ["w3-w6"]},
+                    ]
+                },
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+    result = _validate_markup_response(expanded, [1, 2, 3])
+
+    assert result is True
+    seg = expanded["segments"][0]
+    assert seg["word_indices"] == [1, 2, 3, 4, 5, 6]
+    assert seg["position_indices"] == [1, 2, 3]

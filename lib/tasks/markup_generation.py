@@ -45,7 +45,7 @@ Your goal is to generate metadata for a piece of plain text to enable rich/forma
 Return ONLY valid JSON, no markdown fences, no extra text:
 {{
   "segments": [
-    {{"type": "<type>", "words": [<word ranges>], "data": {{<type-specific>}}}}
+    {{"type": "<type>", "data": {{<type-specific>}}}}
   ]
 }}
 
@@ -86,7 +86,7 @@ In schemas below, W = a word-range array.
   - If you cannot form 2+ clean groups from whole positions, omit `paragraph`
     {{"paragraphs": [{{"words": W}}]}}
   title — heading
-    {{"level": 2|3|4, "title_words": W}}
+    {{"level": 2|3|4}}
   steps — numbered procedural instructions (each item = one concise action; need 2+ items)
     {{"items": [{{"words": W, "step": <int>}}]}}
   table — structured rows sharing same columns
@@ -109,12 +109,14 @@ In schemas below, W = a word-range array.
 - Use "title" only for a heading followed by body content, not for a repeated topic name.
 
 ### STRUCTURE RULES:
-- Every segment MUST have top-level "words" covering a contiguous span (sorted ascending).
+- Top-level "words" is OPTIONAL. Include it only when it adds useful segment-level coverage that is not already obvious from nested fields.
+- If you include top-level "words", it must cover one contiguous span (sorted ascending).
+- For `paragraph`, prefer omitting top-level "words" and rely on `data.paragraphs[*].words`.
+- Avoid duplicating the exact same range at the top level when nested fields already fully define the segment.
 - If the same type applies to non-contiguous ranges, emit separate segments.
 - Use ranges ["w1-w8"] for any 3+ consecutive indices.
 - Never use an index higher than the last [wN] marker.
 - Do not overlap words across segments.
-- Do not repeat nested word ranges identical to the segment's top-level "words".
 - Keep nested items, rows, events, and groups in reading order.
 
 ### EXAMPLE:
@@ -122,7 +124,6 @@ In schemas below, W = a word-range array.
   "segments": [
     {{
       "type": "paragraph",
-      "words": ["w1-w10"],
       "data": {{
         "paragraphs": [{{"words": ["w1-w4"]}}, {{"words": ["w5-w10"]}}]
       }}
@@ -166,7 +167,7 @@ def _call_llm_cached(
     skip_cache_read: bool = False,
 ) -> str:
     model_id = getattr(llm, "model_id", "unknown")
-    prompt_version: str = "markup_v22"
+    prompt_version: str = "markup_v23"
 
     if cache_store is None:
         response = llm.call([prompt], temperature=temperature)
@@ -384,6 +385,40 @@ def _segment_word_indices_are_contiguous(indices: List[int]) -> bool:
         return False
     ordered = sorted(set(indices))
     return ordered == list(range(ordered[0], ordered[-1] + 1))
+
+
+def _collect_nested_word_indices(value: Any) -> List[int]:
+    indices: List[int] = []
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if key == "word_indices" or key.endswith("_word_indices"):
+                if isinstance(nested, list):
+                    indices.extend(index for index in nested if isinstance(index, int))
+            indices.extend(_collect_nested_word_indices(nested))
+    elif isinstance(value, list):
+        for item in value:
+            indices.extend(_collect_nested_word_indices(item))
+    return indices
+
+
+def _derive_segment_word_indices(
+    segment: Dict[str, Any],
+) -> List[int]:
+    stype = segment.get("type")
+    data = segment.get("data", {})
+    if not isinstance(data, dict):
+        return []
+
+    if stype == "paragraph":
+        paragraph_indices = _collect_nested_word_indices(data.get("paragraphs", []))
+        return sorted(set(paragraph_indices))
+    if stype == "title":
+        title_indices = data.get("title_word_indices", [])
+        if isinstance(title_indices, list):
+            return sorted({index for index in title_indices if isinstance(index, int)})
+
+    nested_indices = _collect_nested_word_indices(data)
+    return sorted(set(nested_indices))
 
 
 def _expand_markup_response(
@@ -675,12 +710,23 @@ def _expand_markup_response(
                         if position_index is not None:
                             item["position_index"] = position_index
         elif stype == "paragraph":
+            group_word_indices: List[int] = []
+            group_position_indices: List[int] = []
             for paragraph in sdata.get("paragraphs", []):
                 if "position_indices" not in paragraph:
                     paragraph["position_indices"] = _position_indices_from_words(
                         paragraph.get("word_indices"),
                         word_to_position,
                     )
+                group_word_indices.extend(paragraph.get("word_indices") or [])
+                group_position_indices.extend(paragraph.get("position_indices") or [])
+            # Backfill segment-level word_indices and position_indices from the
+            # union of all group values so overlap detection and validation work
+            # correctly even when the LLM omits the now-optional top-level "words" field.
+            if group_word_indices and not seg_word_indices:
+                segment.setdefault("word_indices", sorted(set(group_word_indices)))
+            if group_position_indices and "position_indices" not in segment:
+                segment["position_indices"] = sorted(set(group_position_indices))
         elif stype == "callout" and seg_word_indices:
             sdata.setdefault(
                 "position_indices",
@@ -708,6 +754,10 @@ def _expand_markup_response(
     if isinstance(expanded, dict) and "segments" in expanded:
         to_remove = []
         for seg in expanded.get("segments", []):
+            if not seg.get("word_indices"):
+                derived_word_indices = _derive_segment_word_indices(seg)
+                if derived_word_indices:
+                    seg["word_indices"] = derived_word_indices
             _hydrate_segment_positions(seg)
             stype = seg.get("type")
             indices = seg.get("position_indices")
