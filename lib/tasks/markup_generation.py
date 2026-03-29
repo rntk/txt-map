@@ -18,8 +18,6 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v21"
-
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
     "timeline", "definition", "quote", "code", "emphasis",
@@ -57,19 +55,24 @@ In schemas below, W = a word-range array.
 
 ### TYPES AND DATA SCHEMAS:
   dialog — conversation between speakers
-    {{"speakers": [{{"name": "<who>", "lines": [{{"words": W}}]}}]}}
+    {{"speakers": [{{"name": W, "lines": [{{"words": W}}]}}]}}
+    (name = word range pointing to the speaker's name in the text)
   comparison — side-by-side alternatives
-    {{"columns": [{{"label": "<col>", "items": [{{"words": W}}]}}]}}
+    {{"columns": [{{"label": W, "items": [{{"words": W}}]}}]}}
+    (label = word range pointing to the column header text in the source)
   list — bullet or numbered items
     {{"ordered": true|false, "items": [{{"words": W}}]}}
   data_trend — statistics or numbers
-    {{"values": [{{"label": "<category>", "words": W}}], "unit": "<unit>"}}
+    {{"values": [{{"label": W, "words": W}}], "unit": W}}
+    (label = word range pointing to the category name; unit = word range pointing to the unit string, omit if not present)
   timeline — chronological events
-    {{"events": [{{"words": W, "description": "<what happened>"}}]}}
+    {{"events": [{{"words": W, "description": W}}]}}
+    (description = word range pointing to the descriptive text for that event)
   definition — term and explanation
     {{"term": W}}
   quote — direct quotation
-    {{"attribution": "<speaker>"}}
+    {{"attribution": W}}
+    (attribution = word range pointing to the speaker/source name in the text; omit key entirely if no attribution is present in the text)
   code — code snippet
     {{"language": "<lang>", "items": [{{"words": W}}]}}
   emphasis — highlighted phrases
@@ -87,13 +90,15 @@ In schemas below, W = a word-range array.
   steps — numbered procedural instructions (each item = one concise action; need 2+ items)
     {{"items": [{{"words": W, "step": <int>}}]}}
   table — structured rows sharing same columns
-    {{"headers": ["<col>", ...], "rows": [{{"cells": ["<val>", ...], "words": W}}]}}
+    {{"headers": [W, ...], "rows": [{{"cells": [W, ...], "words": W}}]}}
+    (each header and each cell is a word range pointing to that text in the source; do NOT write string values)
   question_answer — Q&A pairs
     {{"pairs": [{{"question": W, "answer": W}}]}}
   callout — important notice
     {{"level": "warning|tip|note|important"}}
   key_value — label:value facts
-    {{"pairs": [{{"key": "<label>", "words": W}}]}}
+    {{"pairs": [{{"key": W, "words": W}}]}}
+    (key = word range pointing to the label text in the source)
 
 ### DECISION RULES:
 - Prefer the simplest valid type. If evidence is weak, omit — uncovered text renders as plain automatically.
@@ -161,6 +166,7 @@ def _call_llm_cached(
     skip_cache_read: bool = False,
 ) -> str:
     model_id = getattr(llm, "model_id", "unknown")
+    prompt_version: str = "markup_v22"
 
     if cache_store is None:
         response = llm.call([prompt], temperature=temperature)
@@ -169,7 +175,7 @@ def _call_llm_cached(
     cache_key = _build_cache_key(
         namespace=namespace,
         model_id=model_id,
-        prompt_version=MARKUP_PROMPT_VERSION,
+        prompt_version=prompt_version,
         prompt=prompt,
         temperature=temperature,
     )
@@ -186,7 +192,7 @@ def _call_llm_cached(
         created_at=time.time(),
         namespace=namespace,
         model_id=model_id,
-        prompt_version=MARKUP_PROMPT_VERSION,
+        prompt_version=prompt_version,
         temperature=temperature,
     ))
     return response
@@ -433,6 +439,22 @@ def _expand_markup_response(
         "title_position_index", "question_position_index", "answer_position_indices",
     }
 
+    # Fields that were previously free-text strings but are now word ranges (v22+).
+    # When the value is a word-range list, expand and hydrate to text.
+    # When the value is already a string (old cached response), keep as-is.
+    _GROUNDED_SCALAR_KEYS = {"attribution", "name", "label", "description", "unit", "key"}
+
+    def _is_word_range_list(v: Any) -> bool:
+        """Return True if v is a non-empty list containing only supported index/range forms."""
+        if not isinstance(v, list) or len(v) == 0:
+            return False
+
+        for item in v:
+            if not isinstance(item, (int, str)):
+                return False
+
+        return len(_expand_ranges(v)) > 0
+
     def _get_text(idx_list: Any) -> str:
         indices = _expand_ranges(idx_list)
         return " ".join(word_map.get(i, "") for i in indices if i in word_map)
@@ -466,6 +488,27 @@ def _expand_markup_response(
                     res[nk] = expanded[0] if expanded else None
                 else:
                     res[nk] = expanded
+            elif nk in _GROUNDED_SCALAR_KEYS and _is_word_range_list(v):
+                # v22+: field is a word range → expand and hydrate to text string
+                res[nk] = _get_text(v)
+            elif nk == "headers" and isinstance(v, list):
+                # v22+: headers may be [W, W, ...] (array of word ranges) or ["str", ...] (legacy)
+                hydrated: List[str] = []
+                for elem in v:
+                    if _is_word_range_list(elem):
+                        hydrated.append(_get_text(elem))
+                    else:
+                        hydrated.append(elem if isinstance(elem, str) else str(elem))
+                res[nk] = hydrated
+            elif nk == "cells" and isinstance(v, list):
+                # v22+: cells may be [W, W, ...] (array of word ranges) or ["str", ...] (legacy)
+                hydrated = []
+                for elem in v:
+                    if _is_word_range_list(elem):
+                        hydrated.append(_get_text(elem))
+                    else:
+                        hydrated.append(elem if isinstance(elem, str) else str(elem))
+                res[nk] = hydrated
             else:
                 res[nk] = _walk(v, k, current_type)
 

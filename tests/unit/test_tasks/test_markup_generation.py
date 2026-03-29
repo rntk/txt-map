@@ -145,6 +145,65 @@ def test_expand_markup_response_preserves_plural_for_quote_and_paragraph() -> No
     assert "position_index" not in expanded["segments"][1]["data"]["paragraphs"][0]
 
 
+def test_expand_markup_response_hydrates_grounded_scalars_with_numeric_ranges() -> None:
+    word_map = {
+        1: "Ada",
+        2: "Lovelace",
+        3: "January",
+        4: "1843",
+    }
+    word_to_position = {1: 1, 2: 1, 3: 2, 4: 2}
+    data = {
+        "segs": [
+            {
+                "type": "quote",
+                "wrd_idx": ["w1-w4"],
+                "data": {"attr": [1, "2"]},
+            },
+            {
+                "type": "timeline",
+                "wrd_idx": ["w3-w4"],
+                "data": {
+                    "evts": [{"wrd_idx": ["w3-w4"], "desc": ["3-4"]}],
+                },
+            },
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+
+    assert expanded["segments"][0]["data"]["attribution"] == "Ada Lovelace"
+    assert expanded["segments"][1]["data"]["events"][0]["description"] == "January 1843"
+
+
+def test_expand_markup_response_hydrates_table_headers_and_cells_with_numeric_ranges() -> None:
+    word_map = {
+        1: "Year",
+        2: "Revenue",
+        3: "2024",
+        4: "$10M",
+    }
+    word_to_position = {1: 1, 2: 1, 3: 2, 4: 2}
+    data = {
+        "segs": [
+            {
+                "type": "table",
+                "wrd_idx": ["w1-w4"],
+                "data": {
+                    "hdrs": [[1], ["2"]],
+                    "rows": [{"cells": [["3"], [4]], "wrd_idx": ["w3-w4"]}],
+                },
+            }
+        ]
+    }
+
+    expanded = _expand_markup_response(data, word_map, word_to_position)
+    table = expanded["segments"][0]["data"]
+
+    assert table["headers"] == ["Year", "Revenue"]
+    assert table["rows"][0]["cells"] == ["2024", "$10M"]
+
+
 def test_expand_markup_response_collapses_multi_position_title_to_first_position() -> None:
     word_map = {1: "Main", 2: "heading", 3: "continued"}
     word_to_position = {1: 1, 2: 1, 3: 2}
