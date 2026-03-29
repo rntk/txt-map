@@ -3,6 +3,7 @@ from lib.tasks.markup_generation import (
     _build_markup_classification_prompt,
     _derive_indices_from_data,
     _validate_markup_response,
+    _validate_steps_data,
     _expand_ranges,
     _expand_markup_response,
 )
@@ -516,3 +517,40 @@ def test_validate_markup_response_rejects_overlapping_word_ranges() -> None:
     }
 
     assert _validate_markup_response(response, [1, 2], [1, 2, 3]) is False
+
+
+def test_validate_steps_data_rejects_fewer_than_two_items() -> None:
+    """Steps with 0 or 1 items should be rejected."""
+    assert _validate_steps_data({"data": {}}) is False
+    assert _validate_steps_data({"data": {"items": []}}) is False
+    assert _validate_steps_data({"data": {"items": [{"word_indices": [1]}]}}) is False
+
+
+def test_validate_steps_data_accepts_two_or_more_items() -> None:
+    """Steps with 2+ items should pass."""
+    segment = {
+        "data": {
+            "items": [
+                {"word_indices": [1, 2], "step_number": 1},
+                {"word_indices": [3, 4], "step_number": 2},
+            ]
+        }
+    }
+    assert _validate_steps_data(segment) is True
+
+
+def test_validate_markup_response_rejects_single_step() -> None:
+    """A steps segment with only 1 item should fail full validation."""
+    response = {
+        "segments": [
+            {
+                "type": "steps",
+                "word_indices": [1, 2, 3],
+                "position_indices": [1],
+                "data": {
+                    "items": [{"word_indices": [1, 2, 3], "position_index": 1, "step_number": 1}]
+                },
+            }
+        ]
+    }
+    assert _validate_markup_response(response, [1], [1, 2, 3]) is False

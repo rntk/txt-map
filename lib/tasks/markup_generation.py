@@ -17,7 +17,7 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v18"
+MARKUP_PROMPT_VERSION = "markup_v19"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
@@ -73,7 +73,7 @@ TYPES AND DATA SCHEMAS:
     {{"paragraphs": [{{"words": W}}]}}
   title — heading
     {{"level": 2|3|4, "title_words": W}}
-  steps — numbered procedural instructions
+  steps — numbered procedural instructions (each item = one concise action; need 2+ items)
     {{"items": [{{"words": W, "step": <int>}}]}}
   table — structured rows sharing same columns
     {{"headers": ["<col>", ...], "rows": [{{"cells": ["<val>", ...], "words": W}}]}}
@@ -86,7 +86,7 @@ TYPES AND DATA SCHEMAS:
 
 DECISION RULES:
 - Prefer the simplest valid type. If evidence is weak, omit — uncovered text renders as plain automatically.
-- Use "steps" only for ordered imperative instructions. Use "list" for non-procedural items.
+- Use "steps" ONLY when ALL of the following are true: (a) the content is an ordered procedure, (b) each item starts with an imperative/action verb (e.g., "Open", "Click", "Run", "Add"), (c) each item is one concise action — not a paragraph of explanation, (d) there are at least 2 distinct steps. If the text merely describes a process narratively or items lack action verbs, use "list" or "paragraph" instead.
 - Use "table" only when rows share columns. Use "comparison" for alternatives. Use "key_value" for label:value facts.
 - Use "callout" only for explicit warning, tip, note, or important-advice content.
 - Use "paragraph" ONLY when splitting into 2+ groups each covering 2+ positions. Otherwise omit.
@@ -795,6 +795,19 @@ def _validate_paragraph_data(segment: Dict[str, Any], valid_indices: List[int]) 
     return True
 
 
+def _validate_steps_data(segment: Dict[str, Any]) -> bool:
+    """Validate steps-specific data: require at least 2 items."""
+    data = segment.get("data", {})
+    items = data.get("items")
+    if not isinstance(items, list) or len(items) < 2:
+        logger.warning(
+            "Steps segment needs at least 2 items, got %d — omit instead",
+            len(items) if isinstance(items, list) else 0,
+        )
+        return False
+    return True
+
+
 def _segment_indices_are_contiguous(indices: List[int]) -> bool:
     if not indices:
         return False
@@ -884,6 +897,8 @@ def _validate_markup_response(
             seg["position_indices"] = indices
 
         if seg_type == "paragraph" and not _validate_paragraph_data(seg, valid_indices):
+            return False
+        if seg_type == "steps" and not _validate_steps_data(seg):
             return False
 
         normalized_indices = sorted(set(indices))

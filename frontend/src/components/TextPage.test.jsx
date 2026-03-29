@@ -262,4 +262,83 @@ describe('TextPage raw text navigation', () => {
     expect(screen.getByText('Sentence 1')).toBeInTheDocument();
     expect(screen.getAllByText('Alpha Beta Gamma').length).toBeGreaterThan(0);
   });
+
+  it('renders the Markup tab in article order without duplicating the original source sentence', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          html_content: '<p>Intro.</p><p><strong>Beta one.</strong> Beta two.</p><p>Outro.</p>',
+          results: {
+            ...mockSubmission.results,
+            sentences: ['Intro.', 'Beta one. Beta two.', 'Outro.'],
+            topics: [
+              {
+                name: 'Topic1',
+                sentences: [2],
+                ranges: [{ start: 0, end: 0, sentence_start: 2, sentence_end: 2 }],
+              },
+            ],
+            markup: {
+              Topic1: {
+                positions: [
+                  {
+                    index: 1,
+                    text: 'Beta one.',
+                    source_sentence_index: 2,
+                  },
+                  {
+                    index: 2,
+                    text: 'Beta two.',
+                    source_sentence_index: 2,
+                  },
+                ],
+                segments: [
+                  {
+                    type: 'quote',
+                    position_indices: [1],
+                    data: {
+                      attribution: 'Ada',
+                      position_indices: [1],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        }),
+      };
+    });
+
+    const { container } = render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
+
+    expect(screen.getByText('Intro.')).toBeInTheDocument();
+    expect(screen.getByText('Beta one.')).toBeInTheDocument();
+    expect(screen.getByText('Beta two.')).toBeInTheDocument();
+    expect(screen.getByText('Outro.')).toBeInTheDocument();
+    expect(screen.queryByText('Beta one. Beta two.')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.markup-quote')).toHaveLength(1);
+  });
+
+  it('keeps the Markup tab visible even when grouped-by-topics was enabled earlier', async () => {
+    const { container } = render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Grouped by topics' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
+
+    expect(screen.queryByRole('checkbox', { name: 'Grouped by topics' })).not.toBeInTheDocument();
+    expect(container.querySelector('.markup-quote')).toBeInTheDocument();
+  });
 });
