@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 
 
 # Import module under test
+from lib.llm_queue.client import QueuedLLMClient
+
 from workers import (
     Worker,
     TASK_DEPENDENCIES,
@@ -657,7 +659,8 @@ class TestWorkerProcessTask:
              patch('workers.SemanticDiffsStorage'):
             mock_db = MagicMock()
             mock_llm = MagicMock()
-            worker = Worker(mock_db, mock_llm)
+            mock_queue_store = MagicMock()
+            worker = Worker(mock_db, mock_llm, queue_store=mock_queue_store)
             yield worker
 
     @patch('workers.TASK_HANDLERS')
@@ -733,7 +736,7 @@ class TestWorkerProcessTask:
     @patch('workers.TASK_HANDLERS')
     @patch('workers.create_llm_client')
     def test_calls_handler_with_submission_db_llm(self, mock_create_llm, mock_handlers, worker):
-        """Non-cache tasks (e.g. mindmap) called with (submission, db, llm) only."""
+        """Non-cache tasks (e.g. mindmap) called with (submission, db, QueuedLLMClient) only."""
         task = {
             "_id": "task-1",
             "task_type": "mindmap",
@@ -746,18 +749,23 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
-        active_llm = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
-        mock_create_llm.return_value = active_llm
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o",
+            model_id="openai:gpt-4o", max_context_tokens=128000,
+        )
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
 
-            mock_handler.assert_called_once_with(submission, worker.db, active_llm)
+        args, kwargs = mock_handler.call_args
+        assert args[0] == submission
+        assert args[1] is worker.db
+        assert isinstance(args[2], QueuedLLMClient)
 
     @patch('workers.TASK_HANDLERS')
     @patch('workers.create_llm_client')
     def test_calls_cache_task_handler_with_runtime_llm(self, mock_create_llm, mock_handlers, worker):
-        """Cache tasks receive the per-task LLM client and cache store."""
+        """Cache tasks receive a QueuedLLMClient and cache store."""
         task = {
             "_id": "task-1",
             "task_type": "summarization",
@@ -768,13 +776,19 @@ class TestWorkerProcessTask:
         mock_handlers.get.return_value = mock_handler
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
-        active_llm = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
-        mock_create_llm.return_value = active_llm
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o",
+            model_id="openai:gpt-4o", max_context_tokens=128000,
+        )
 
         with patch.object(worker, '_mark_task_completed'):
             worker.process_task(task)
 
-        mock_handler.assert_called_once_with(submission, worker.db, active_llm, cache_store=worker.cache_store)
+        args, kwargs = mock_handler.call_args
+        assert args[0] == submission
+        assert args[1] is worker.db
+        assert isinstance(args[2], QueuedLLMClient)
+        assert kwargs.get("cache_store") is worker.cache_store
 
     @patch('workers.TASK_HANDLERS')
     @patch('workers.create_llm_client')

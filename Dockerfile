@@ -41,6 +41,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY lifespan.py .
+COPY llm_workers.py .
 COPY workers.py .
 COPY post.txt .
 COPY handlers/ ./handlers/

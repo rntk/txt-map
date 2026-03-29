@@ -10,6 +10,7 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from lib.llm_queue.client import QueuedLLMClient
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt.cache import CacheEntry, _build_cache_key
 from txt_splitt.sentences import SparseRegexSentenceSplitter
@@ -1198,6 +1199,88 @@ def _classify_topic(
     }
 
 
+# ─── Parallel classification helper ───────────────────────────────────────────
+
+def _process_topic_response(
+    response_text: str,
+    topic_name: str,
+    positions: List[Dict[str, Any]],
+    word_map: Dict[int, Any],
+    word_to_position: Dict[int, int],
+    valid_position_indices: List[int],
+    valid_word_indices: List[int],
+    llm: Any,
+    max_retries: int = 3,
+) -> Dict[str, Any]:
+    """
+    Process a pre-fetched LLM response for markup classification.
+
+    Handles JSON parsing, correction prompts (business-logic retry), and
+    validation. Falls back to auto-paragraph on persistent failure.
+    This is extracted so the parallel path can reuse the same logic as
+    the sequential ``_classify_topic()`` inner loop.
+    """
+    temperatures = [0.0, 0.3, 0.5]
+
+    def _try_response(resp: str, attempt: int) -> Optional[Dict[str, Any]]:
+        parsed, parse_error = _parse_json_with_error(resp)
+        if parsed is None and parse_error is not None:
+            correction_prompt = _build_markup_correction_prompt(resp, parse_error)
+            logger.info("Retrying markup with JSON correction for topic '%s'", topic_name)
+            corrected = llm.call(correction_prompt, 0.0)
+            parsed, _ = _parse_json_with_error(corrected)
+        if not parsed:
+            return None
+        expanded = _expand_markup_response(parsed, word_map, word_to_position)
+        if not _validate_markup_response(expanded, valid_position_indices, valid_word_indices):
+            return None
+        covered_indices: set = set()
+        for seg in expanded.get("segments", []):
+            covered_indices.update(seg.get("position_indices", []))
+        uncovered = sorted(set(valid_position_indices) - covered_indices)
+        if uncovered:
+            auto_segs = _auto_paragraph_uncovered(uncovered)
+            if auto_segs:
+                expanded["segments"].extend(auto_segs)
+                expanded["segments"].sort(key=lambda s: s.get("position_indices", [0])[0])
+        expanded["positions"] = positions
+        return expanded
+
+    # First attempt uses the provided (pre-fetched) response.
+    result = _try_response(response_text, 1)
+    if result:
+        return result
+
+    logger.warning("Markup attempt 1/%d failed validation for topic '%s'", max_retries, topic_name)
+
+    # Business-logic retries with escalating temperature.
+    prompt = _build_markup_classification_prompt(
+        numbered_sentences="\n".join(p["marked_text"] for p in positions)
+    )
+    for attempt in range(2, max_retries + 1):
+        temperature = temperatures[min(attempt - 1, len(temperatures) - 1)]
+        try:
+            retry_response = llm.call(prompt, temperature)
+            result = _try_response(retry_response, attempt)
+            if result:
+                return result
+        except Exception as e:
+            logger.warning(
+                "Markup LLM error attempt %d/%d for topic '%s': %s",
+                attempt, max_retries, topic_name, e,
+            )
+        logger.warning(
+            "Markup attempt %d/%d failed validation for topic '%s'",
+            attempt, max_retries, topic_name,
+        )
+        if attempt < max_retries:
+            time.sleep(1.0 * attempt)
+
+    logger.warning("Markup falling back to plain for topic '%s'", topic_name)
+    segments = _auto_paragraph_uncovered(valid_position_indices) or _plain_fallback(valid_position_indices)
+    return {"positions": positions, "segments": segments}
+
+
 # ─── Main task handler ─────────────────────────────────────────────────────────
 
 def process_markup_generation(
@@ -1226,21 +1309,83 @@ def process_markup_generation(
     namespace = _cache_namespace(llm)
     markup: Dict[str, Any] = {}
 
-    for i, topic in enumerate(topics):
-        topic_name = topic.get("name", f"topic_{i}")
+    if isinstance(llm, QueuedLLMClient):
+        # ── Parallel path ──────────────────────────────────────────────────────
+        # Build all prompts (CPU), submit all first-attempt LLM calls at once,
+        # then gather and handle business-logic retries per topic.
+
+        # Step 1: Build positions and prompts for all topics.
+        topic_prep = []
+        for i, topic in enumerate(topics):
+            topic_name = topic.get("name", f"topic_{i}")
+            sentence_indices = sorted(topic.get("sentences", []))
+            positions, word_map, word_to_position = _build_markup_positions(
+                sentence_indices, all_sentences
+            )
+            if not positions:
+                topic_prep.append((topic_name, None, None, None, None, None, None))
+                continue
+            valid_position_indices = [p["index"] for p in positions]
+            valid_word_indices = sorted(word_map.keys())
+            prompt = _build_markup_classification_prompt(
+                numbered_sentences="\n".join(p["marked_text"] for p in positions)
+            )
+            topic_prep.append(
+                (topic_name, positions, word_map, word_to_position,
+                 valid_position_indices, valid_word_indices, prompt)
+            )
+
+        # Step 2: Submit all first-attempt prompts in parallel (skip empty topics).
+        futures = []
+        for item in topic_prep:
+            topic_name, positions, *_, prompt = item
+            if positions is None:
+                futures.append(None)
+            else:
+                futures.append(llm.submit(prompt, 0.0))
+
         logger.info(
-            "[%s] markup_generation: classifying topic %d/%d '%s'",
-            submission_id, i + 1, len(topics), topic_name,
+            "[%s] markup_generation: submitted %d topic prompts in parallel",
+            submission_id, sum(f is not None for f in futures),
         )
-        result = _classify_topic(
-            topic=topic,
-            all_sentences=all_sentences,
-            llm=llm,
-            cache_store=cache_store,
-            namespace=namespace,
-            max_retries=max_retries,
-        )
-        markup[topic_name] = result
+
+        # Step 3: Gather results and process (with business-logic retries).
+        for item, future in zip(topic_prep, futures):
+            topic_name, positions, word_map, word_to_position, \
+                valid_position_indices, valid_word_indices, prompt = item
+            if positions is None:
+                markup[topic_name] = {"positions": [], "segments": []}
+                continue
+            response_text = future.result()
+            result = _process_topic_response(
+                response_text=response_text,
+                topic_name=topic_name,
+                positions=positions,
+                word_map=word_map,
+                word_to_position=word_to_position,
+                valid_position_indices=valid_position_indices,
+                valid_word_indices=valid_word_indices,
+                llm=llm,
+                max_retries=max_retries,
+            )
+            markup[topic_name] = result
+    else:
+        # ── Sequential path (legacy LLMClient or test mocks) ──────────────────
+        for i, topic in enumerate(topics):
+            topic_name = topic.get("name", f"topic_{i}")
+            logger.info(
+                "[%s] markup_generation: classifying topic %d/%d '%s'",
+                submission_id, i + 1, len(topics), topic_name,
+            )
+            result = _classify_topic(
+                topic=topic,
+                all_sentences=all_sentences,
+                llm=llm,
+                cache_store=cache_store,
+                namespace=namespace,
+                max_retries=max_retries,
+            )
+            markup[topic_name] = result
 
     storage.update_results(submission_id, {"markup": markup})
     logger.info(

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 import logging
 
+from lib.llm_queue.client import QueuedLLMClient
 from txt_splitt import RetryConfig, RetryingLLMCallable, Tracer, TracingLLMCallable
 from txt_splitt.cache import CachingLLMCallable
 from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
@@ -43,6 +44,19 @@ class _LLMCallableAdapter:
         result_preview = result[:300] + "..." if len(result) > 300 else result
         logger.info(f"LLMCallableAdapter received response ({len(result)} chars): {result_preview}")
         return result
+
+
+def _make_llm_callable(llm: Any) -> Any:
+    """
+    Return an object satisfying txt_splitt's LLMCallable protocol.
+
+    ``QueuedLLMClient`` already satisfies the protocol (``call(prompt, temperature)``),
+    so it is returned as-is. Legacy ``LLMClient`` instances (``call([prompt], temperature=)``)
+    are wrapped with ``_LLMCallableAdapter``.
+    """
+    if isinstance(llm, QueuedLLMClient):
+        return llm
+    return _LLMCallableAdapter(llm)
 
 
 def _cache_namespace(base_namespace: str, llm_client: Any) -> str:
@@ -150,9 +164,14 @@ def split_article(
             topics=[],
         )
 
-    llm_adapter = _LLMCallableAdapter(llm)
-    llm_with_retry = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
-    
+    llm_callable = _make_llm_callable(llm)
+    # For QueuedLLMClient, network retries are handled by the LLM worker;
+    # skip RetryingLLMCallable to avoid double-retry overhead.
+    if isinstance(llm, QueuedLLMClient):
+        llm_with_retry = llm_callable
+    else:
+        llm_with_retry = RetryingLLMCallable(llm_callable, max_retries=3, backoff_factor=1.0)
+
     cached_adapter = (
         CachingLLMCallable(
             llm_with_retry,

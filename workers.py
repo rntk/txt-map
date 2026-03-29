@@ -15,6 +15,7 @@ from lib.diff.semantic_diff import (
     stale_reasons,
 )
 from lib.llm import create_llm_client
+from lib.llm_queue import LLMQueueStore, QueuedLLMClient
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
@@ -70,10 +71,11 @@ TASK_HANDLERS = {
 
 
 class Worker:
-    def __init__(self, db, llm=None, cache_store=None):
+    def __init__(self, db, llm=None, cache_store=None, queue_store=None):
         self.db = db
         self.llm = llm
         self.cache_store = cache_store
+        self.queue_store = queue_store
         self.running = True
         self.worker_id = f"worker-{os.getpid()}"
         self.submissions_storage = SubmissionsStorage(db)
@@ -173,8 +175,25 @@ class Worker:
 
         try:
             logger.info(f"Processing {task_type} for submission {submission_id}")
-            llm = create_llm_client(db=self.db)
-            logger.info(f"Using LLM provider: {llm.provider_name}, model: {llm.model_name}")
+            llm_meta = create_llm_client(db=self.db)
+            logger.info(f"Using LLM provider: {llm_meta.provider_name}, model: {llm_meta.model_name}")
+
+            if self.queue_store is not None:
+                # Queued path: dispatch LLM calls through llm_queue so that
+                # llm_workers.py executes them (potentially in parallel).
+                llm = QueuedLLMClient(
+                    store=self.queue_store,
+                    model_id=llm_meta.model_id,
+                    max_context_tokens=llm_meta.max_context_tokens,
+                )
+            else:
+                # Synchronous fallback: no llm_worker infrastructure present.
+                # Calls are made directly (blocking) inside this process.
+                logger.warning(
+                    "No queue_store configured — falling back to synchronous LLM calls. "
+                    "Start llm_workers.py for parallel execution."
+                )
+                llm = llm_meta
 
             # Update submission task status to processing
             self.submissions_storage.update_task_status(
@@ -370,7 +389,9 @@ def main():
     SemanticDiffsStorage(db).prepare()
     cache_store = MongoLLMCacheStore(db)
     cache_store.prepare()
-    worker = Worker(db, llm, cache_store=cache_store)
+    queue_store = LLMQueueStore(db)
+    queue_store.prepare()
+    worker = Worker(db, llm, cache_store=cache_store, queue_store=queue_store)
 
     try:
         worker.run()

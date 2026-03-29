@@ -6,7 +6,8 @@ import re
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Tuple
 
-from lib.article_splitter import _LLMCallableAdapter
+from lib.article_splitter import _make_llm_callable
+from lib.llm_queue.client import QueuedLLMClient
 from lib.storage.submissions import SubmissionsStorage
 from txt_splitt import RetryConfig, RetryingLLMCallable
 from txt_splitt.cache import CachingLLMCallable
@@ -274,8 +275,12 @@ def _generate_insights(
         return []
     marked = marker.mark(text, sentence_list)
 
-    llm_adapter = _LLMCallableAdapter(llm)
-    llm_with_retry: Any = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
+    llm_adapted = _make_llm_callable(llm)
+    if isinstance(llm, QueuedLLMClient):
+        # Network retries handled by LLM worker; skip RetryingLLMCallable.
+        llm_with_retry: Any = llm_adapted
+    else:
+        llm_with_retry = RetryingLLMCallable(llm_adapted, max_retries=3, backoff_factor=1.0)
     if cache_store is not None:
         llm_callable = CachingLLMCallable(
             llm_with_retry,
