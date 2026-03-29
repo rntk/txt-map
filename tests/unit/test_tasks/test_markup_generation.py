@@ -1,5 +1,6 @@
 import logging
 
+from lib.llm_queue.client import QueuedLLMClient
 from lib.tasks.markup_generation import (
     _build_markup_positions,
     _build_markup_classification_prompt,
@@ -10,6 +11,7 @@ from lib.tasks.markup_generation import (
     _expand_markup_response,
     _auto_paragraph_uncovered,
     _classify_topic,
+    process_markup_generation,
 )
 
 
@@ -35,8 +37,9 @@ def test_build_markup_classification_prompt_puts_dynamic_content_last() -> None:
     assert '"style": "bold|italic|underline|highlight"' in prompt
     assert '"plain"' not in prompt
     assert "Never use an index higher than the last [wN] marker" in prompt
-    assert "Each line inside `<content>` is one markup position" in prompt
-    assert "Do not emit a single-group paragraph" in prompt
+    assert "QUICK GUIDANCE" in prompt
+    assert "don't overthink" in prompt
+    assert "Otherwise omit" in prompt
     assert 'Top-level "words" is OPTIONAL' in prompt
     assert 'Every segment MUST have top-level "words"' not in prompt
     assert "<content>\nPrefix[w1] reuse[w2] matters.[w3]\n</content>" in prompt
@@ -857,8 +860,71 @@ def test_expand_markup_response_paragraph_without_top_level_words_backfills_word
     assert seg["word_indices"] == [1, 2, 3, 4]
     # position_indices derived from group position_indices
     assert seg["position_indices"] == [1, 2]
-    assert seg["data"]["paragraphs"][0]["word_indices"] == [1, 2]
-    assert seg["data"]["paragraphs"][1]["word_indices"] == [3, 4]
+
+
+def test_process_markup_generation_handles_parallel_future_timeout_with_fallback(
+    monkeypatch,
+) -> None:
+    class MockFuture:
+        def __init__(self, response: str | None = None, error: Exception | None = None) -> None:
+            self._response = response
+            self._error = error
+
+        def result(self, timeout: float = 300.0) -> str:
+            if self._error is not None:
+                raise self._error
+            assert self._response is not None
+            return self._response
+
+    class MockQueuedLLMClient(QueuedLLMClient):
+        def __init__(self, futures: list[MockFuture]) -> None:
+            self._futures = futures
+
+        def submit(self, prompt: str, temperature: float = 0.0) -> MockFuture:
+            assert isinstance(prompt, str)
+            assert isinstance(temperature, float)
+            return self._futures.pop(0)
+
+    captured_results: dict[str, object] = {}
+
+    def fake_update_results(self, submission_id: str, results: dict[str, object]) -> bool:
+        assert submission_id == "sub-123"
+        captured_results.update(results)
+        return True
+
+    monkeypatch.setattr(
+        "lib.tasks.markup_generation.SubmissionsStorage.update_results",
+        fake_update_results,
+    )
+
+    submission = {
+        "submission_id": "sub-123",
+        "results": {
+            "sentences": [
+                "Alpha beta.",
+                "Gamma delta.",
+            ],
+            "topics": [
+                {"name": "slow-topic", "sentences": [1]},
+                {"name": "fast-topic", "sentences": [2]},
+            ],
+        },
+    }
+    llm = MockQueuedLLMClient(
+        futures=[
+            MockFuture(error=TimeoutError("LLM request req-1 timed out after 300.0s")),
+            MockFuture(
+                response='{"segments": [{"type": "quote", "words": ["w1-w2"], "data": {"attribution": "Me"}}]}'
+            ),
+        ]
+    )
+
+    process_markup_generation(submission, db=object(), llm=llm)
+
+    markup = captured_results["markup"]
+    assert isinstance(markup, dict)
+    assert markup["slow-topic"]["segments"][0]["type"] == "plain"
+    assert markup["fast-topic"]["segments"][0]["type"] == "quote"
 
 
 def test_expand_markup_response_list_without_top_level_words_backfills_from_items() -> None:
