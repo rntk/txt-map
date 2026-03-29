@@ -221,6 +221,52 @@ class TestEstimateTokens:
             mock_parse.return_value = mock_parsed
             self.llm = LLamaCPP("http://localhost:8989")
 
+
+class TestReasoningExtraction:
+    """Tests for LLamaCPP reasoning extraction."""
+
+    def setup_method(self) -> None:
+        with patch('lib.llm.llamacpp.urlparse') as mock_parse:
+            mock_parsed = MagicMock()
+            mock_parsed.netloc = "localhost:8989"
+            mock_parsed.scheme = "http"
+            mock_parse.return_value = mock_parsed
+            self.llm = LLamaCPP("http://localhost:8989")
+
+    def test_extracts_reasoning_from_structured_fields(self) -> None:
+        response_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "reasoning_content": "first trace",
+                        "thinking": "second trace",
+                        "content": "final answer",
+                    }
+                }
+            ]
+        }
+
+        reasoning, content = self.llm._extract_reasoning_and_content(response_payload)
+
+        assert reasoning == "first trace\n\nsecond trace"
+        assert content == "final answer"
+
+    def test_extracts_reasoning_from_think_tags_and_cleans_content(self) -> None:
+        response_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "<think>hidden reasoning</think>\nVisible answer",
+                    }
+                }
+            ]
+        }
+
+        reasoning, content = self.llm._extract_reasoning_and_content(response_payload)
+
+        assert reasoning == "hidden reasoning"
+        assert content == "Visible answer"
+
     def test_returns_len_text_div_4(self):
         """Returns len(text) // 4."""
         text = "Hello World"  # 11 characters

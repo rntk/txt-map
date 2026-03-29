@@ -1,11 +1,17 @@
 import json
-import os
 import logging
-from typing import List, Union, Optional, Dict, Any
-from urllib.parse import urlparse
+import os
+import re
 from http.client import HTTPConnection, HTTPSConnection
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 from lib.llm.base import LLMClient
+
+_THINK_TAG_RE = re.compile(
+    r"<think\b[^>]*>(.*?)</think>",
+    flags=re.DOTALL | re.IGNORECASE,
+)
 
 
 class LLamaCPP(LLMClient):
@@ -38,6 +44,36 @@ class LLamaCPP(LLMClient):
     def model_name(self) -> str:
         return self.__model
 
+    def _extract_reasoning_and_content(
+        self,
+        response_payload: dict[str, Any],
+    ) -> tuple[str | None, str | None]:
+        choices = response_payload.get("choices")
+        first_choice = choices[0] if isinstance(choices, list) and choices else {}
+        message = first_choice.get("message") if isinstance(first_choice, dict) else {}
+        if not isinstance(message, dict):
+            message = {}
+
+        raw_content = message.get("content")
+        content = raw_content if isinstance(raw_content, str) else ""
+
+        reasoning_parts: list[str] = []
+        for key in ("reasoning", "reasoning_content", "thinking"):
+            value = message.get(key)
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    reasoning_parts.append(stripped)
+
+        for think_match in _THINK_TAG_RE.findall(content):
+            stripped = think_match.strip()
+            if stripped:
+                reasoning_parts.append(stripped)
+
+        reasoning = "\n\n".join(reasoning_parts).strip() or None
+        cleaned_content = _THINK_TAG_RE.sub("", content).strip() or None
+        return reasoning, cleaned_content
+
     def _call_single(self, user_msgs: List[str], temperature: float) -> str:
         """Single attempt to call the LLM without retry logic."""
         conn = self.get_connection()
@@ -64,11 +100,13 @@ class LLamaCPP(LLMClient):
                 raise RuntimeError(f"LLM API error: {res.status} {res.reason}")
             resp = json.loads(resp_body)
 
-            content = resp.get("choices", [{}])[0].get("message", {}).get("content")
+            reasoning, content = self._extract_reasoning_and_content(resp)
             if content is None:
                 logging.error("LLM response missing 'choices[0].message.content'")
                 logging.error(f"Full response: {resp}")
                 raise RuntimeError("LLM returned empty response")
+            if reasoning:
+                logging.info(f"LLM reasoning: {reasoning}")
             logging.info(f"LLM response: {content}")
             return content
         except json.JSONDecodeError as e:
