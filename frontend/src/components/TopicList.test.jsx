@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import TopicList from './TopicList';
 
 // A minimal flat topic
@@ -16,6 +16,14 @@ const treeTopics = [
   makeTopic('Animals>Birds'),
   makeTopic('Plants'),
 ];
+
+const getSubtreeCheckbox = () => {
+  const checkboxes = screen.getAllByRole('checkbox');
+  return checkboxes.find((checkbox) => {
+    const label = checkbox.closest('label');
+    return label && label.textContent.includes('Animals');
+  });
+};
 
 describe('TopicList subtreeStateMap – hasSelected', () => {
   it('leaf checkbox is unchecked when topic is not selected', () => {
@@ -197,5 +205,61 @@ describe('TopicList general rendering', () => {
       <TopicList topics={[makeTopic('Alpha')]} readTopics={new Set(['Alpha'])} />
     );
     expect(screen.getByText('Unread All')).toBeDefined();
+  });
+});
+
+describe('TopicList subtree checkbox navigation', () => {
+  it('does not navigate when unchecking a selected subtree', () => {
+    const onToggleTopic = vi.fn();
+    const onNavigateTopic = vi.fn();
+
+    render(
+      <TopicList
+        topics={treeTopics}
+        selectedTopics={[{ name: 'Animals>Mammals' }, { name: 'Animals>Birds' }]}
+        onToggleTopic={onToggleTopic}
+        onNavigateTopic={onNavigateTopic}
+      />
+    );
+
+    const animalsCheckbox = getSubtreeCheckbox();
+
+    expect(animalsCheckbox).toBeDefined();
+
+    fireEvent.click(animalsCheckbox);
+
+    expect(onToggleTopic).toHaveBeenCalledTimes(2);
+    expect(onToggleTopic).toHaveBeenNthCalledWith(1, expect.objectContaining({ name: 'Animals>Mammals' }));
+    expect(onToggleTopic).toHaveBeenNthCalledWith(2, expect.objectContaining({ name: 'Animals>Birds' }));
+    expect(onNavigateTopic).not.toHaveBeenCalled();
+  });
+
+  it('navigates to the first leaf when checking an unselected subtree', () => {
+    const onToggleTopic = vi.fn();
+    const onNavigateTopic = vi.fn();
+
+    render(
+      <TopicList
+        topics={treeTopics}
+        selectedTopics={[]}
+        onToggleTopic={onToggleTopic}
+        onNavigateTopic={onNavigateTopic}
+      />
+    );
+
+    const animalsCheckbox = getSubtreeCheckbox();
+
+    expect(animalsCheckbox).toBeDefined();
+
+    fireEvent.click(animalsCheckbox);
+
+    expect(onToggleTopic).toHaveBeenCalledTimes(2);
+    expect(onToggleTopic).toHaveBeenNthCalledWith(1, expect.objectContaining({ name: 'Animals>Mammals' }));
+    expect(onToggleTopic).toHaveBeenNthCalledWith(2, expect.objectContaining({ name: 'Animals>Birds' }));
+    expect(onNavigateTopic).toHaveBeenCalledTimes(1);
+    expect(onNavigateTopic).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Animals>Mammals' }),
+      'focus'
+    );
   });
 });

@@ -76,6 +76,7 @@ function TopicList({
 
   const toggleAllInSubtree = useCallback((treeNode) => {
     const allSelected = isSubtreeSelected(treeNode);
+    const shouldNavigateToFirstLeaf = !allSelected;
 
     const traverse = (node) => {
       if (node.node.isLeaf && node.node.topic) {
@@ -103,7 +104,7 @@ function TopicList({
     };
 
     const firstLeaf = findFirstLeaf(treeNode);
-    if (onNavigateTopic && firstLeaf) {
+    if (shouldNavigateToFirstLeaf && onNavigateTopic && firstLeaf) {
       onNavigateTopic(firstLeaf, 'focus');
     }
   }, [safeSelectedTopics, onToggleTopic, onNavigateTopic, isSubtreeSelected]);
