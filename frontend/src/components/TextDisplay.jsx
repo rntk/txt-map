@@ -312,7 +312,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     const link = e.target.closest('a[href]');
     if (link) {
       e.preventDefault();
-      const token = link.closest('.word-token, .sentence-token');
+      // e.target may be a word-token span *inside* the link, so check it first;
+      // fall back to searching upward from the link (e.g. link inside a sentence-token).
+      const token = e.target.closest('.word-token, .sentence-token') || link.closest('.word-token, .sentence-token');
       let matchedTopics = [];
       if (token) {
         if (token.dataset.charStart !== undefined && token.dataset.charEnd !== undefined) {
