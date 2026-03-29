@@ -17,6 +17,7 @@ import logging
 import os
 import signal
 import time
+from pathlib import Path
 from types import FrameType
 from typing import Any
 
@@ -44,6 +45,7 @@ class LLMWorker:
         db: Database,
         *,
         poll_interval: float = 0.5,
+        heartbeat_file: str | None = None,
     ) -> None:
         self._db: Database = db
         self._poll_interval = poll_interval
@@ -51,9 +53,18 @@ class LLMWorker:
         self._cache_store = MongoLLMCacheStore(db)
         self._worker_id = f"llm-worker-{os.getpid()}"
         self._running = True
+        self._heartbeat_file = heartbeat_file
 
         signal.signal(signal.SIGINT, self._handle_stop)
         signal.signal(signal.SIGTERM, self._handle_stop)
+
+    def _record_heartbeat(self) -> None:
+        """Update the heartbeat file timestamp."""
+        if self._heartbeat_file:
+            try:
+                Path(self._heartbeat_file).touch()
+            except Exception:
+                logger.warning("Failed to record heartbeat at %s", self._heartbeat_file)
 
     def _handle_stop(self, signum: int, frame: FrameType | None) -> None:  # noqa: ARG002
         logger.info("Worker %s received signal %s, stopping…", self._worker_id, signum)
@@ -67,6 +78,7 @@ class LLMWorker:
         """Main poll loop."""
         logger.info("LLM worker %s started", self._worker_id)
         while self._running:
+            self._record_heartbeat()
             try:
                 request = self._queue_store.claim(self._worker_id)
                 if request:
@@ -129,6 +141,7 @@ class LLMWorker:
 def main() -> None:
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
     poll_interval = float(os.getenv("LLM_WORKER_POLL_INTERVAL", "0.5"))
+    heartbeat_file = os.getenv("LLM_WORKER_HEARTBEAT_FILE")
 
     logger.info("Connecting to MongoDB: %s", mongodb_url)
     client = MongoClient(mongodb_url)
@@ -145,7 +158,7 @@ def main() -> None:
     llm = create_llm_client(db=db)
     logger.info("Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name)
 
-    worker = LLMWorker(db, poll_interval=poll_interval)
+    worker = LLMWorker(db, poll_interval=poll_interval, heartbeat_file=heartbeat_file)
     try:
         worker.run()
     except KeyboardInterrupt:

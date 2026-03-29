@@ -14,7 +14,14 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     networks:
       - app-network
@@ -33,14 +40,22 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
       - LLM_WORKER_POLL_INTERVAL=${LLM_WORKER_POLL_INTERVAL:-0.5}
+      - LLM_WORKER_HEARTBEAT_FILE=/tmp/llm_worker_heartbeat
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "find", "/tmp/llm_worker_heartbeat", "-mmin", "-2"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     networks:
       - app-network
     command: [ "python", "llm_workers.py" ]
     deploy:
-      replicas: 2 # Each replica handles LLM calls concurrently; scale for higher throughput
+      replicas: 2
 
   worker:
     build: .
@@ -54,25 +69,40 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
+      - WORKER_HEARTBEAT_FILE=/tmp/worker_heartbeat
     depends_on:
-      - mongodb
-      - api
-      - llm_worker
+      mongodb:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      llm_worker:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "find", "/tmp/worker_heartbeat", "-mmin", "-2"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     networks:
       - app-network
     command: [ "python", "workers.py" ]
     deploy:
-      replicas: 2 # Scale up for more parallel task processing
+      replicas: 2
 
   mongodb:
     image: mongo:8
     ports:
-      - "27017:27017" # Standard MongoDB port
+      - "27017:27017"
     environment:
       - MONGO_INITDB_DATABASE=rss
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - app-network

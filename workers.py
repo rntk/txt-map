@@ -5,6 +5,7 @@ import time
 import signal
 import logging
 import os
+from pathlib import Path
 from datetime import datetime, UTC
 from pymongo import MongoClient
 
@@ -71,7 +72,7 @@ TASK_HANDLERS = {
 
 
 class Worker:
-    def __init__(self, db, llm=None, cache_store=None, queue_store=None):
+    def __init__(self, db, llm=None, cache_store=None, queue_store=None, heartbeat_file=None):
         self.db = db
         self.llm = llm
         self.cache_store = cache_store
@@ -80,6 +81,7 @@ class Worker:
         self.worker_id = f"worker-{os.getpid()}"
         self.submissions_storage = SubmissionsStorage(db)
         self.semantic_diffs_storage = SemanticDiffsStorage(db)
+        self.heartbeat_file = heartbeat_file
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -89,6 +91,14 @@ class Worker:
         """Handle shutdown signals gracefully"""
         logger.info(f"Received signal {signum}, shutting down gracefully...")
         self.running = False
+
+    def _record_heartbeat(self):
+        """Update the heartbeat file timestamp."""
+        if self.heartbeat_file:
+            try:
+                Path(self.heartbeat_file).touch()
+            except Exception:
+                logger.warning(f"Failed to record heartbeat at {self.heartbeat_file}")
 
     def _dependencies_met(self, task):
         """Check if all dependency tasks are completed"""
@@ -350,6 +360,7 @@ class Worker:
         logger.info(f"Worker {self.worker_id} started")
 
         while self.running:
+            self._record_heartbeat()
             try:
                 # Try to claim and process a task
                 task = self.claim_task()
@@ -375,6 +386,7 @@ def main():
     """Main entry point for the worker process"""
     # Get configuration from environment
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
+    heartbeat_file = os.getenv("WORKER_HEARTBEAT_FILE")
 
     logger.info(f"Connecting to MongoDB: {mongodb_url}")
 
@@ -391,7 +403,7 @@ def main():
     cache_store.prepare()
     queue_store = LLMQueueStore(db)
     queue_store.prepare()
-    worker = Worker(db, llm, cache_store=cache_store, queue_store=queue_store)
+    worker = Worker(db, llm, cache_store=cache_store, queue_store=queue_store, heartbeat_file=heartbeat_file)
 
     try:
         worker.run()
