@@ -444,16 +444,21 @@ def _expand_markup_response(
     # When the value is already a string (old cached response), keep as-is.
     _GROUNDED_SCALAR_KEYS = {"attribution", "name", "label", "description", "unit", "key"}
 
-    def _is_word_range_list(v: Any) -> bool:
-        """Return True if v is a non-empty list containing only supported index/range forms."""
-        if not isinstance(v, list) or len(v) == 0:
-            return False
+    _WORD_RANGE_RE = re.compile(r"^w?\d+(?:-w?\d+)?$", re.IGNORECASE)
 
-        for item in v:
-            if not isinstance(item, (int, str)):
-                return False
-
-        return len(_expand_ranges(v)) > 0
+    def _is_word_range(v: Any) -> bool:
+        """Return True if v is a word-range value: a single range string like "w35-w38",
+        or a non-empty list of range strings/ints — e.g. ["w1", "w3-w5"].
+        Handles both the list form (["w35-w38"]) and the bare-string form ("w35-w38")
+        that the LLM sometimes emits."""
+        if isinstance(v, str):
+            return bool(_WORD_RANGE_RE.match(v.strip()))
+        if isinstance(v, list) and len(v) > 0:
+            return all(
+                isinstance(item, int) or (isinstance(item, str) and _WORD_RANGE_RE.match(item.strip()))
+                for item in v
+            )
+        return False
 
     def _get_text(idx_list: Any) -> str:
         indices = _expand_ranges(idx_list)
@@ -488,27 +493,43 @@ def _expand_markup_response(
                     res[nk] = expanded[0] if expanded else None
                 else:
                     res[nk] = expanded
-            elif nk in _GROUNDED_SCALAR_KEYS and _is_word_range_list(v):
-                # v22+: field is a word range → expand and hydrate to text string
+            elif nk in _GROUNDED_SCALAR_KEYS and _is_word_range(v):
+                # v22+: field is a word range (string or list form) → expand and hydrate to text.
+                # Also preserve word indices so position derivation works downstream.
                 res[nk] = _get_text(v)
+                res[f"{nk}_word_indices"] = _expand_ranges(v)
             elif nk == "headers" and isinstance(v, list):
                 # v22+: headers may be [W, W, ...] (array of word ranges) or ["str", ...] (legacy)
                 hydrated: List[str] = []
+                headers_widx: List[List[int]] = []
+                any_grounded = False
                 for elem in v:
-                    if _is_word_range_list(elem):
+                    if _is_word_range(elem):
                         hydrated.append(_get_text(elem))
+                        headers_widx.append(_expand_ranges(elem))
+                        any_grounded = True
                     else:
                         hydrated.append(elem if isinstance(elem, str) else str(elem))
+                        headers_widx.append([])
                 res[nk] = hydrated
+                if any_grounded:
+                    res["headers_word_indices"] = headers_widx
             elif nk == "cells" and isinstance(v, list):
                 # v22+: cells may be [W, W, ...] (array of word ranges) or ["str", ...] (legacy)
                 hydrated = []
+                cells_widx: List[List[int]] = []
+                any_grounded = False
                 for elem in v:
-                    if _is_word_range_list(elem):
+                    if _is_word_range(elem):
                         hydrated.append(_get_text(elem))
+                        cells_widx.append(_expand_ranges(elem))
+                        any_grounded = True
                     else:
                         hydrated.append(elem if isinstance(elem, str) else str(elem))
+                        cells_widx.append([])
                 res[nk] = hydrated
+                if any_grounded:
+                    res["cells_word_indices"] = cells_widx
             else:
                 res[nk] = _walk(v, k, current_type)
 
@@ -555,6 +576,11 @@ def _expand_markup_response(
                     "position_indices",
                     _position_indices_from_words(seg_word_indices, word_to_position),
                 )
+            attr_widx = sdata.get("attribution_word_indices")
+            if attr_widx and "attribution_position_index" not in sdata:
+                pos = _position_index_from_words(attr_widx, word_to_position)
+                if pos is not None:
+                    sdata["attribution_position_index"] = pos
         elif stype == "definition":
             if seg_word_indices:
                 sdata.setdefault(
@@ -571,6 +597,11 @@ def _expand_markup_response(
                     item.setdefault("step_number", index)
         elif stype == "dialog":
             for speaker in sdata.get("speakers", []):
+                name_widx = speaker.get("name_word_indices")
+                if name_widx and "name_position_index" not in speaker:
+                    pos = _position_index_from_words(name_widx, word_to_position)
+                    if pos is not None:
+                        speaker["name_position_index"] = pos
                 for line in speaker.get("lines", []):
                     if line.get("position_index") is None:
                         position_index = _position_index_from_words(line.get("word_indices"), word_to_position)
@@ -582,13 +613,30 @@ def _expand_markup_response(
                     position_index = _position_index_from_words(event.get("word_indices"), word_to_position)
                     if position_index is not None:
                         event["position_index"] = position_index
+                desc_widx = event.get("description_word_indices")
+                if desc_widx and "description_position_index" not in event:
+                    pos = _position_index_from_words(desc_widx, word_to_position)
+                    if pos is not None:
+                        event["description_position_index"] = pos
         elif stype == "table":
+            headers_widx = sdata.get("headers_word_indices", [])
+            if headers_widx and "headers_position_indices" not in sdata:
+                sdata["headers_position_indices"] = [
+                    _position_index_from_words(widx, word_to_position)
+                    for widx in headers_widx
+                ]
             for row in sdata.get("rows", []):
                 if "position_indices" not in row:
                     row["position_indices"] = _position_indices_from_words(
                         row.get("word_indices"),
                         word_to_position,
                     )
+                cells_widx = row.get("cells_word_indices", [])
+                if cells_widx and "cells_position_indices" not in row:
+                    row["cells_position_indices"] = [
+                        _position_index_from_words(widx, word_to_position)
+                        for widx in cells_widx
+                    ]
         elif stype == "question_answer":
             for pair in sdata.get("pairs", []):
                 if pair.get("question_position_index") is None:
@@ -609,8 +657,18 @@ def _expand_markup_response(
                     position_index = _position_index_from_words(pair.get("word_indices"), word_to_position)
                     if position_index is not None:
                         pair["position_index"] = position_index
+                key_widx = pair.get("key_word_indices")
+                if key_widx and "key_position_index" not in pair:
+                    pos = _position_index_from_words(key_widx, word_to_position)
+                    if pos is not None:
+                        pair["key_position_index"] = pos
         elif stype == "comparison":
             for column in sdata.get("columns", []):
+                label_widx = column.get("label_word_indices")
+                if label_widx and "label_position_index" not in column:
+                    pos = _position_index_from_words(label_widx, word_to_position)
+                    if pos is not None:
+                        column["label_position_index"] = pos
                 for item in column.get("items", []):
                     if item.get("position_index") is None:
                         position_index = _position_index_from_words(item.get("word_indices"), word_to_position)
@@ -623,11 +681,27 @@ def _expand_markup_response(
                         paragraph.get("word_indices"),
                         word_to_position,
                     )
-        elif stype in ("callout", "data_trend") and seg_word_indices:
+        elif stype == "callout" and seg_word_indices:
             sdata.setdefault(
                 "position_indices",
                 _position_indices_from_words(seg_word_indices, word_to_position),
             )
+        elif stype == "data_trend" and seg_word_indices:
+            sdata.setdefault(
+                "position_indices",
+                _position_indices_from_words(seg_word_indices, word_to_position),
+            )
+            unit_widx = sdata.get("unit_word_indices")
+            if unit_widx and "unit_position_index" not in sdata:
+                pos = _position_index_from_words(unit_widx, word_to_position)
+                if pos is not None:
+                    sdata["unit_position_index"] = pos
+            for value in sdata.get("values", []):
+                label_widx = value.get("label_word_indices")
+                if label_widx and "label_position_index" not in value:
+                    pos = _position_index_from_words(label_widx, word_to_position)
+                    if pos is not None:
+                        value["label_position_index"] = pos
 
     # Hydrate missing indices from top-level for types where they are redundant.
     # Segments without meaningful data are marked for removal.
