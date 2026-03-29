@@ -1,3 +1,5 @@
+import logging
+
 from lib.tasks.markup_generation import (
     _build_markup_positions,
     _build_markup_classification_prompt,
@@ -33,6 +35,8 @@ def test_build_markup_classification_prompt_puts_dynamic_content_last() -> None:
     assert '"style": "bold|italic|underline|highlight"' in prompt
     assert '"plain"' not in prompt
     assert "Never use an index higher than the last [wN] marker" in prompt
+    assert "Each line inside `<content>` is one markup position" in prompt
+    assert "Do not emit a single-group paragraph" in prompt
     assert "<content>\nPrefix[w1] reuse[w2] matters.[w3]\n</content>" in prompt
     assert prompt.index("OUTPUT FORMAT") < prompt.rindex("<content>")
     assert prompt.index("DECISION RULES:") < prompt.rindex("<content>")
@@ -228,7 +232,8 @@ def test_validate_markup_response_rejects_duplicate_nested_paragraph_indices() -
         ]
     }
 
-    assert _validate_markup_response(response, [1, 2, 3]) is False
+    assert _validate_markup_response(response, [1, 2, 3]) is True
+    assert response["segments"] == []
 
 
 def test_validate_markup_response_rejects_mismatched_paragraph_coverage() -> None:
@@ -246,7 +251,8 @@ def test_validate_markup_response_rejects_mismatched_paragraph_coverage() -> Non
         ]
     }
 
-    assert _validate_markup_response(response, [1, 2, 3]) is False
+    assert _validate_markup_response(response, [1, 2, 3]) is True
+    assert response["segments"] == []
 
 
 def test_validate_markup_response_rejects_empty_paragraph_groups() -> None:
@@ -262,8 +268,8 @@ def test_validate_markup_response_rejects_empty_paragraph_groups() -> None:
         ]
     }
 
-    # Empty paragraphs list is no longer hydrated — segment should be omitted instead
-    assert _validate_markup_response(response, [1, 2]) is False
+    assert _validate_markup_response(response, [1, 2]) is True
+    assert response["segments"] == []
 
 
 def test_derive_indices_from_legacy_sentence_fields() -> None:
@@ -454,7 +460,11 @@ def test_validate_markup_response_rejects_degenerate_paragraph_single_group() ->
             }
         ]
     }
-    assert _validate_markup_response(response, [1, 2, 3, 4]) is False
+    assert _validate_markup_response(response, [1, 2, 3, 4]) is True
+    assert response["segments"][0]["data"]["paragraphs"] == [
+        {"position_indices": [1, 2]},
+        {"position_indices": [3, 4]},
+    ]
 
 
 def test_validate_markup_response_rejects_degenerate_paragraph_all_single_positions() -> None:
@@ -473,7 +483,68 @@ def test_validate_markup_response_rejects_degenerate_paragraph_all_single_positi
             }
         ]
     }
-    assert _validate_markup_response(response, [1, 2, 3]) is False
+    assert _validate_markup_response(response, [1, 2, 3]) is True
+    assert response["segments"] == []
+
+
+def test_validate_markup_response_drops_unrepairable_paragraph_segment_and_keeps_others(
+    caplog,
+) -> None:
+    response = {
+        "segments": [
+            {
+                "type": "title",
+                "position_indices": [1],
+                "data": {"level": 2, "title_position_index": 1},
+            },
+            {
+                "type": "paragraph",
+                "position_indices": [2, 3],
+                "data": {
+                    "paragraphs": [
+                        {"position_indices": [2, 3]},
+                    ]
+                },
+            },
+            {
+                "type": "quote",
+                "position_indices": [4],
+                "data": {"attribution": "Ada", "position_indices": [4]},
+            },
+        ]
+    }
+
+    with caplog.at_level(logging.INFO):
+        assert _validate_markup_response(response, [1, 2, 3, 4]) is True
+
+    assert [segment["type"] for segment in response["segments"]] == ["title", "quote"]
+    assert "Dropping invalid paragraph segment covering positions [2, 3]" in caplog.text
+
+
+def test_validate_markup_response_repairs_duplicate_nested_paragraph_indices_logs(caplog) -> None:
+    response = {
+        "segments": [
+            {
+                "type": "paragraph",
+                "position_indices": [1, 2, 3, 4],
+                "data": {
+                    "paragraphs": [
+                        {"position_indices": [1, 2]},
+                        {"position_indices": [2, 3]},
+                    ]
+                },
+            }
+        ]
+    }
+
+    with caplog.at_level(logging.INFO):
+        assert _validate_markup_response(response, [1, 2, 3, 4]) is True
+
+    assert response["segments"][0]["data"]["paragraphs"] == [
+        {"position_indices": [1, 2]},
+        {"position_indices": [3, 4]},
+    ]
+    assert "Repaired paragraph segment after issue" in caplog.text
 
 
 def test_expand_markup_response_hydrates_w_prefixed_word_indices() -> None:
@@ -624,3 +695,29 @@ def test_classify_topic_applies_auto_paragraph_to_uncovered_text() -> None:
     assert result["segments"][0]["type"] == "quote"
     assert result["segments"][1]["type"] == "paragraph"
     assert result["segments"][1]["position_indices"] == [2, 3, 4, 5, 6, 7]
+
+
+def test_classify_topic_retries_with_json_correction_prompt(caplog) -> None:
+    class MockLLM:
+        model_id = "test-model"
+
+        def __init__(self) -> None:
+            self.calls = []
+
+        def call(self, messages, temperature=0.0):
+            prompt = messages[0]
+            self.calls.append((prompt, temperature))
+            if "Fix the JSON syntax only" in prompt:
+                return '{"segments": [{"type": "quote", "words": ["w1-w2"], "data": {"attribution": "Me"}}]}'
+            return '{"segments": [{"type": "quote", "words": ["w1-w2"], "data": {"attribution": "Me"}}]'
+
+    llm = MockLLM()
+    topic = {"name": "Test", "sentences": [1]}
+    all_sentences = ["Q1 Q2. U1. U2. U3. U4. U5. U6."]
+
+    with caplog.at_level(logging.INFO):
+        result = _classify_topic(topic, all_sentences, llm, None, "test")
+
+    assert result["segments"][0]["type"] == "quote"
+    assert any("Fix the JSON syntax only" in prompt for prompt, _ in llm.calls)
+    assert "Retrying markup response with JSON correction prompt for topic 'Test'" in caplog.text
