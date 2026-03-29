@@ -16,7 +16,7 @@ describe('useTooltip', () => {
     expect(result.current.tooltip).toBeNull();
   });
 
-  it('showTooltip sets tooltip state', () => {
+  it('showTooltip sets tooltip state immediately', () => {
     const { result } = renderHook(() => useTooltip());
     const topics = [{ topic: 'Science', rangeCount: 2 }];
 
@@ -24,13 +24,19 @@ describe('useTooltip', () => {
       result.current.showTooltip(topics, 100, 200);
     });
 
-    expect(result.current.tooltip).toBeNull();
+    expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics, meta: null });
+  });
+
+  it('showTooltip sets tooltip with meta', () => {
+    const { result } = renderHook(() => useTooltip());
+    const topics = [{ topic: 'Art', rangeCount: 1 }];
+    const meta = { sentenceIdx: 2, totalSentences: 10, word: 'hello' };
 
     act(() => {
-      vi.advanceTimersByTime(500);
+      result.current.showTooltip(topics, 50, 80, meta);
     });
 
-    expect(result.current.tooltip).toEqual({ x: 100, y: 200, topics, meta: null });
+    expect(result.current.tooltip).toEqual({ x: 50, y: 80, topics, meta });
   });
 
   it('showTooltip does nothing when disabled', () => {
@@ -43,114 +49,17 @@ describe('useTooltip', () => {
     expect(result.current.tooltip).toBeNull();
   });
 
-  it('scheduleHide hides tooltip after delay', () => {
-    const { result } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(500);
-    });
-    expect(result.current.tooltip).not.toBeNull();
-
-    act(() => {
-      result.current.scheduleHide();
-    });
-    // Not hidden yet
-    expect(result.current.tooltip).not.toBeNull();
-
-    act(() => {
-      vi.runAllTimers();
-    });
-    expect(result.current.tooltip).toBeNull();
-  });
-
-  it('cancelHide prevents the scheduled hide', () => {
-    const { result } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(500);
-    });
-
-    act(() => {
-      result.current.scheduleHide();
-      result.current.cancelHide();
-    });
-
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    // Tooltip should still be visible because hide was cancelled
-    expect(result.current.tooltip).not.toBeNull();
-  });
-
-  it('showTooltip cancels a pending hide', () => {
+  it('showTooltip replaces an existing tooltip immediately', () => {
     const { result } = renderHook(() => useTooltip());
 
     act(() => {
       result.current.showTooltip([{ topic: 'A' }], 1, 2);
-      vi.advanceTimersByTime(500);
     });
-    act(() => {
-      result.current.scheduleHide();
-    });
-    // Move to a new target before timeout fires
     act(() => {
       result.current.showTooltip([{ topic: 'B' }], 3, 4);
     });
-    act(() => {
-      vi.runAllTimers();
-    });
 
-    // Tooltip should show the new target, not be hidden
     expect(result.current.tooltip).toEqual({ x: 3, y: 4, topics: [{ topic: 'B' }], meta: null });
-  });
-
-  it('scheduleHide cancels a pending show before the tooltip appears', () => {
-    const { result } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      result.current.scheduleHide();
-      vi.runAllTimers();
-    });
-
-    expect(result.current.tooltip).toBeNull();
-  });
-
-  it('updates the pending tooltip position before it becomes visible', () => {
-    const { result } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'Art' }], 10, 20, { word: 'first' });
-      result.current.updateTooltipPosition(30, 40, { word: 'second' });
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(result.current.tooltip).toEqual({
-      x: 30,
-      y: 40,
-      topics: [{ topic: 'Art' }],
-      meta: { word: 'second' },
-    });
-  });
-
-  it('updates the visible tooltip position immediately', () => {
-    const { result } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'Art' }], 10, 20);
-      vi.advanceTimersByTime(500);
-      result.current.updateTooltipPosition(50, 60);
-    });
-
-    expect(result.current.tooltip).toEqual({
-      x: 50,
-      y: 60,
-      topics: [{ topic: 'Art' }],
-      meta: null,
-    });
   });
 
   it('hideTooltip immediately sets tooltip to null', () => {
@@ -158,7 +67,6 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'History' }], 5, 6);
-      vi.advanceTimersByTime(500);
     });
     act(() => {
       result.current.hideTooltip();
@@ -178,21 +86,6 @@ describe('useTooltip', () => {
     expect(result.current.lastTargetRef.current).toBeNull();
   });
 
-  it('cleans up pending timeout on unmount', () => {
-    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
-    const { result, unmount } = renderHook(() => useTooltip());
-
-    act(() => {
-      result.current.showTooltip([{ topic: 'X' }], 0, 0);
-      result.current.scheduleHide();
-    });
-
-    unmount();
-
-    expect(clearTimeoutSpy).toHaveBeenCalled();
-    clearTimeoutSpy.mockRestore();
-  });
-
   it('hides an already visible tooltip when the hook is disabled', () => {
     const { result, rerender } = renderHook(({ enabled }) => useTooltip(enabled), {
       initialProps: { enabled: true },
@@ -200,7 +93,6 @@ describe('useTooltip', () => {
 
     act(() => {
       result.current.showTooltip([{ topic: 'X' }], 0, 0);
-      vi.advanceTimersByTime(500);
     });
     expect(result.current.tooltip).not.toBeNull();
 
@@ -209,3 +101,4 @@ describe('useTooltip', () => {
     expect(result.current.tooltip).toBeNull();
   });
 });
+

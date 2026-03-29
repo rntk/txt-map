@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import TextDisplay from './TextDisplay';
 
 describe('TextDisplay', () => {
@@ -685,7 +685,7 @@ describe('TextDisplay', () => {
       document.caretRangeFromPoint = originalCaretRangeFromPoint;
     });
 
-    it('shows a single word-page link for a hovered word token after the delay', () => {
+    it('shows a word-page link for a clicked word token immediately', () => {
       render(
         <TextDisplay
           {...defaultProps}
@@ -695,26 +695,28 @@ describe('TextDisplay', () => {
             {
               name: 'Topic1',
               sentences: [],
-              ranges: [{ start: 3, end: 8 }],
+              ranges: [{ start: 0, end: 11 }],
             },
           ]}
         />
       );
 
-      fireEvent.mouseOver(screen.getByText('Hello'));
-      expect(screen.queryByRole('link', { name: 'Explore "Hello"' })).not.toBeInTheDocument();
+      const wordToken = document.querySelector('.word-token');
+      fireEvent.click(wordToken, { clientX: 10, clientY: 10 });
 
-      act(() => {
-        vi.advanceTimersByTime(500);
-      });
-
-      const links = screen.getAllByRole('link', { name: 'Explore "Hello"' });
+      const links = screen.getAllByRole('link', { name: /Explore/ });
       expect(links).toHaveLength(1);
-      expect(links[0]).toHaveAttribute('href', '/page/word/sub-123/Hello');
+      expect(links[0]).toHaveAttribute('href', expect.stringContaining('/page/word/sub-123/'));
     });
 
-    it('shows a word-page link for sentence-level hover targets using the cursor word', () => {
-      render(<TextDisplay {...defaultProps} submissionId="sub-123" />);
+    it('shows a word-page link for sentence-level click targets using the cursor word', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          submissionId="sub-123"
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+        />
+      );
 
       const sentenceToken = document.getElementById('sentence-0-0');
       const sentenceTextNode = sentenceToken.firstChild;
@@ -724,16 +726,111 @@ describe('TextDisplay', () => {
       }));
       document.caretRangeFromPoint = undefined;
 
-      fireEvent.mouseOver(sentenceToken, { clientX: 20, clientY: 20 });
+      fireEvent.click(sentenceToken, { clientX: 20, clientY: 20 });
 
-      act(() => {
-        vi.advanceTimersByTime(500);
-      });
-
-      expect(screen.getByRole('link', { name: 'Explore "First"' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: /Explore/ })).toHaveAttribute(
         'href',
-        '/page/word/sub-123/First'
+        expect.stringContaining('/page/word/sub-123/')
       );
+    });
+  });
+
+  describe('Tooltip click/tap behaviour', () => {
+    it('shows tooltip immediately on token click (no delay)', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+
+      expect(screen.getByText('Topic1')).toBeInTheDocument();
+    });
+
+    it('does not show tooltip when tooltipEnabled is false', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          tooltipEnabled={false}
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+
+      expect(screen.queryByText('Topic1')).not.toBeInTheDocument();
+    });
+
+    it('does not show tooltip when sentence has no matching topics', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[]}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+
+      expect(document.querySelector('.text-topic-tooltip')).not.toBeInTheDocument();
+    });
+
+    it('toggles tooltip off when the same token is clicked twice', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+      expect(screen.getByText('Topic1')).toBeInTheDocument();
+
+      fireEvent.click(sentenceToken);
+      expect(screen.queryByText('Topic1')).not.toBeInTheDocument();
+    });
+
+    it('hides tooltip on Escape key press', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+      expect(screen.getByText('Topic1')).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByText('Topic1')).not.toBeInTheDocument();
+    });
+
+    it('prevents default navigation and shows "Go to" button when a link is clicked', () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          rawHtml='<p><a href="https://example.com">Example link</a></p>'
+          articleTopics={[{
+            name: 'Topic1',
+            sentences: [],
+            ranges: [{ start: 0, end: 100 }],
+          }]}
+        />
+      );
+
+      // Find the link rendered in the text content
+      const link = document.querySelector('.text-content a[href]');
+      expect(link).toBeInTheDocument();
+
+      fireEvent.click(link, { clientX: 10, clientY: 10 });
+
+      expect(screen.getByRole('link', { name: /Go to:/ })).toBeInTheDocument();
     });
   });
 

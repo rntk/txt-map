@@ -154,7 +154,12 @@ export default function WordPage() {
     return indices;
   }, [allTopics, readTopics]);
 
-  const treeEntriesWithReadState = treeEntries;
+  const treeEntriesWithReadState = useMemo(() => {
+    return treeEntries.map((entry) => ({
+      ...entry,
+      isRead: readSentenceIndices.has(entry.sentenceNumber),
+    }));
+  }, [treeEntries, readSentenceIndices]);
 
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {

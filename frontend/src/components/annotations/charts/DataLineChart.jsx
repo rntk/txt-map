@@ -15,6 +15,9 @@ export default function DataLineChart({ extraction, width = 340, height = 180 })
 
   const { values = [], visualization, label } = extraction || {};
   const config = visualization?.config || {};
+  const configUnit = config.unit;
+  const configXLabel = config.x_label;
+  const configYLabel = config.y_label;
 
   const chartData = useMemo(() => {
     return values
@@ -25,11 +28,11 @@ export default function DataLineChart({ extraction, width = 340, height = 180 })
           key: v.date || v.key || String(i + 1),
           rawValue: v.value || '',
           numeric: parsed ? parsed.numeric : null,
-          unit: parsed ? parsed.unit : (config.unit || ''),
+          unit: parsed ? parsed.unit : (configUnit || ''),
         };
       })
       .filter((d) => d.numeric !== null);
-  }, [values, config.unit]);
+  }, [values, configUnit]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -124,14 +127,14 @@ export default function DataLineChart({ extraction, width = 340, height = 180 })
       });
 
     // X label
-    if (config.x_label) {
+    if (configXLabel) {
       g.append('text')
         .attr('x', innerWidth / 2)
         .attr('y', innerHeight + 30)
         .attr('text-anchor', 'middle')
         .attr('font-size', 10)
         .attr('fill', '#999')
-        .text(config.x_label);
+        .text(configXLabel);
     }
 
     // Y axis
@@ -148,7 +151,7 @@ export default function DataLineChart({ extraction, width = 340, height = 180 })
     yAxisG.selectAll('text').attr('font-size', 10).attr('fill', '#666');
 
     // Y label
-    if (config.y_label || config.unit) {
+    if (configYLabel || configUnit) {
       g.append('text')
         .attr('transform', 'rotate(-90)')
         .attr('x', -innerHeight / 2)
@@ -156,9 +159,9 @@ export default function DataLineChart({ extraction, width = 340, height = 180 })
         .attr('text-anchor', 'middle')
         .attr('font-size', 10)
         .attr('fill', '#999')
-        .text(config.y_label || config.unit);
+        .text(configYLabel || configUnit);
     }
-  }, [chartData, width, height, config]);
+  }, [chartData, width, height, configXLabel, configYLabel, configUnit]);
 
   if (!chartData.length) return null;
 

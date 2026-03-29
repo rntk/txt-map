@@ -4,7 +4,6 @@ import { parseNumericValue } from '../../../utils/dataChartUtils';
 
 const MARGIN = { top: 10, right: 60, bottom: 28, left: 120 };
 const BAR_COLOR = '#7ba3cc';
-const BAR_COLOR_ACCENT = '#4a7fa8';
 
 /**
  * DataBarChart — horizontal bar chart for numeric comparison extractions.
@@ -16,6 +15,8 @@ export default function DataBarChart({ extraction, width = 340, height = 180 }) 
 
   const { values = [], visualization, label } = extraction || {};
   const config = visualization?.config || {};
+  const configUnit = config.unit;
+  const configXLabel = config.x_label;
 
   const chartData = useMemo(() => {
     return values
@@ -25,11 +26,11 @@ export default function DataBarChart({ extraction, width = 340, height = 180 }) 
           key: v.key || '',
           rawValue: v.value || '',
           numeric: parsed ? parsed.numeric : null,
-          unit: parsed ? parsed.unit : (config.unit || ''),
+          unit: parsed ? parsed.unit : (configUnit || ''),
         };
       })
       .filter((d) => d.numeric !== null);
-  }, [values, config.unit]);
+  }, [values, configUnit]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -112,16 +113,16 @@ export default function DataBarChart({ extraction, width = 340, height = 180 }) 
     xAxisG.selectAll('text').attr('font-size', 10).attr('fill', '#888');
 
     // X axis label
-    if (config.x_label || config.unit) {
+    if (configXLabel || configUnit) {
       g.append('text')
         .attr('x', innerWidth / 2)
         .attr('y', innerHeight + 22)
         .attr('text-anchor', 'middle')
         .attr('font-size', 10)
         .attr('fill', '#999')
-        .text(config.x_label || config.unit);
+        .text(configXLabel || configUnit);
     }
-  }, [chartData, width, height, config]);
+  }, [chartData, width, height, configXLabel, configUnit]);
 
   if (!chartData.length) return null;
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useContext } from 'react';
+import React, { useMemo, useCallback, useRef, useContext, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
@@ -174,9 +174,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }, [safeArticleTopics]);
 
   // --- Tooltip state ---
-  const { tooltip, lastTargetRef, showTooltip, scheduleHide, cancelHide, hideTooltip } = useTooltip(tooltipEnabled);
-  const isDraggingRef = useRef(false);
+  const { tooltip, lastTargetRef, showTooltip, hideTooltip } = useTooltip(tooltipEnabled);
   const tooltipContainerRef = useRef(null);
+  const textContentRef = useRef(null);
 
   const getTooltipPosition = useCallback((clientX, clientY) => {
     // Keep the tooltip close enough to the pointer so it feels anchored to the
@@ -273,13 +273,6 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     return { word: hoverWord };
   }, [getHoverWord, safeSentences.length]);
 
-  const handleTextMouseDown = useCallback(() => {
-    isDraggingRef.current = true;
-    hideTooltip();
-    // Reset drag state when mouse is released anywhere (including outside this element)
-    document.addEventListener('mouseup', () => { isDraggingRef.current = false; }, { once: true });
-  }, [hideTooltip]);
-
   // Handler for toggling read status from tooltip
   const handleToggleRead = useCallback((topic) => {
     if (onToggleRead) {
@@ -309,21 +302,42 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     }));
   }, [sentenceToTopicsMap]);
 
-  // Event delegation handler
-  const handleMouseOver = useCallback((e) => {
-    if (isDraggingRef.current) return;
+  // Click/tap event handler — tooltip is triggered on click, not hover
+  const handleTextClick = useCallback((e) => {
     if (!tooltipEnabled) return;
-    const token = e.target.closest('.word-token, .sentence-token');
-    if (!token) {
-      if (lastTargetRef.current) {
-        scheduleHide();
+
+    const { x, y } = getTooltipPosition(e.clientX, e.clientY);
+
+    // Check if user clicked on (or inside) a link
+    const link = e.target.closest('a[href]');
+    if (link) {
+      e.preventDefault();
+      const token = link.closest('.word-token, .sentence-token');
+      let matchedTopics = [];
+      if (token) {
+        if (token.dataset.charStart !== undefined && token.dataset.charEnd !== undefined) {
+          matchedTopics = findTopicsForChar(token.dataset.charStart, token.dataset.charEnd);
+        } else if (token.dataset.sentenceIndex !== undefined) {
+          matchedTopics = findTopicsForSentence(token.dataset.sentenceIndex);
+        }
       }
+      const meta = token
+        ? { ...buildTooltipMeta(token, e.clientX, e.clientY), linkHref: link.href, linkText: link.textContent?.trim() }
+        : { linkHref: link.href, linkText: link.textContent?.trim() };
+      lastTargetRef.current = link;
+      showTooltip(matchedTopics, x, y, meta);
       return;
     }
 
-    // Only update if we've moved to a different token
-    if (token === lastTargetRef.current) {
-      cancelHide();
+    const token = e.target.closest('.word-token, .sentence-token');
+    if (!token) {
+      hideTooltip();
+      return;
+    }
+
+    // Toggle: clicking the same token again hides the tooltip
+    if (token === lastTargetRef.current && tooltip) {
+      hideTooltip();
       return;
     }
 
@@ -334,33 +348,45 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       matchedTopics = findTopicsForSentence(token.dataset.sentenceIndex);
     }
 
+    // Only show if there are topics to display
+    if (matchedTopics.length === 0) {
+      hideTooltip();
+      return;
+    }
+
     lastTargetRef.current = token;
-
-    const { x, y } = getTooltipPosition(e.clientX, e.clientY);
-
     const meta = buildTooltipMeta(token, e.clientX, e.clientY);
-
     showTooltip(matchedTopics, x, y, meta);
   }, [
     buildTooltipMeta,
-    cancelHide,
     findTopicsForChar,
     findTopicsForSentence,
     getTooltipPosition,
+    hideTooltip,
     lastTargetRef,
-    scheduleHide,
     showTooltip,
+    tooltip,
     tooltipEnabled,
   ]);
 
-  const handleMouseOut = useCallback((e) => {
-    const token = e.target.closest('.word-token, .sentence-token');
-    if (!token) return;
-    if (tooltipContainerRef.current?.contains(e.relatedTarget)) {
-      return;
-    }
-    scheduleHide();
-  }, [scheduleHide]);
+  // Hide tooltip on outside click or Escape key
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!tooltip) return;
+      if (tooltipContainerRef.current?.contains(e.target)) return;
+      if (textContentRef.current?.contains(e.target)) return;
+      hideTooltip();
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') hideTooltip();
+    };
+    document.addEventListener('click', handleOutsideClick, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [hideTooltip, tooltip]);
 
   // Tooltip JSX - Use createPortal to move it to document.body
   const tooltipEl = tooltip ? createPortal(
@@ -368,15 +394,13 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       ref={tooltipContainerRef}
       className="text-topic-tooltip"
       style={{ left: tooltip.x, top: tooltip.y }}
-      onMouseEnter={cancelHide}
-      onMouseLeave={scheduleHide}
     >
       {tooltip.meta && tooltip.meta.sentenceIdx !== undefined && (
         <div className="text-topic-tooltip-meta">
           Sentence {tooltip.meta.sentenceIdx + 1} / {tooltip.meta.totalSentences}
         </div>
       )}
-      {tooltip.topics.length > 0 ? (
+      {tooltip.topics.length > 0 && (
         tooltip.topics.map(({ topic, rangeCount }, i) => {
           const isRead = readTopicsSet.has(topic.name);
           const isSelected = safeSelectedTopics.some(t => t.name === topic.name);
@@ -440,8 +464,18 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
             </div>
           );
         })
-      ) : (
-        <div style={{ fontSize: '12px', color: '#aaa' }}>No topics assigned to this sentence</div>
+      )}
+      {tooltip.meta?.linkHref && (
+        <div className="text-topic-tooltip-footer">
+          <a
+            className="text-topic-tooltip-btn text-topic-tooltip-link"
+            href={tooltip.meta.linkHref}
+            onClick={hideTooltip}
+            rel="noopener noreferrer"
+          >
+            Go to: {tooltip.meta.linkText || tooltip.meta.linkHref}
+          </a>
+        </div>
       )}
       {submissionId && tooltip.meta?.word && (
         <div className="text-topic-tooltip-footer">
@@ -477,11 +511,10 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     return (
       <div className="text-display">
         <div
+          ref={textContentRef}
           className="text-content"
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
-          onMouseDown={handleTextMouseDown}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
+          onClick={handleTextClick}
         />
         {tooltipEl}
       </div>
@@ -492,10 +525,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     return (
       <div className="text-display">
         <div
+          ref={textContentRef}
           className="text-content"
-          onMouseDown={handleTextMouseDown}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
+          onClick={handleTextClick}
         >
           {paragraphs.map((para, paraIdx) => (
             <p key={paraIdx} className="article-paragraph">
@@ -533,10 +565,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   return (
     <div className="text-display">
       <div
+        ref={textContentRef}
         className="text-content"
-        onMouseDown={handleTextMouseDown}
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
+        onClick={handleTextClick}
       >
         <p className="article-text">
           {safeSentences.map((sentence, index) => (

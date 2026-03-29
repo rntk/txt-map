@@ -42,7 +42,7 @@ function Breadcrumb({ path, onNavigate }) {
 
 const TILE_GRID_COLS = 2;
 
-function GridView({ topics, topicSummaries, sentences, onClose, readTopics, onToggleRead, markup }) {
+function GridView({ topics, topicSummaries, sentences, onClose, readTopics, _onToggleRead, _markup }) {
   const [currentPath, setCurrentPath] = useState([]);
 
   const safeReadTopics = useMemo(

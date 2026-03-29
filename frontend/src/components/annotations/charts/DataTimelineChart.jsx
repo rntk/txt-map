@@ -21,7 +21,7 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
 
   const { values = [], visualization, label } = extraction || {};
   const chartType = visualization?.chart_type || 'timeline'; // 'timeline' or 'gantt'
-  const config = visualization?.config || {};
+  const _config = visualization?.config || {};
 
   // Build chart items — try to parse dates, fall back to sequential positions
   const items = useMemo(() => {
@@ -232,7 +232,7 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
       yAxis.select('.domain').remove();
       yAxis.selectAll('text').attr('font-size', 11).attr('fill', '#444');
     }
-  }, [items, isGantt, hasDates, width, height, config]);
+  }, [items, isGantt, hasDates, width, height]);
 
   if (!items.length) return null;
 
