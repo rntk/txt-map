@@ -12,6 +12,16 @@
   margin-bottom: 0;
 }
 
+.markup-topic-block {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.markup-topic-block:focus-visible {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
 /* ─── Plain ───────────────────────────────────────────────────────────────── */
 
 .markup-plain__sentence {

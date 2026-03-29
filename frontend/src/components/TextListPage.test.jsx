@@ -47,4 +47,13 @@ describe('TextListPage layout', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/submissions?limit=100');
     });
   });
+
+  it('renders a link for the submission ID', async () => {
+    render(<TextListPage />);
+
+    const link = await screen.findByRole('link', { name: 'sub-123' });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveClass('text-list-id-link');
+    expect(link).toHaveAttribute('href', '/page/text/sub-123');
+  });
 });

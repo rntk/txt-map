@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import TextPage from './TextPage';
 import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
@@ -338,7 +338,22 @@ describe('TextPage raw text navigation', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Grouped by topics' }));
     fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
 
-    expect(screen.queryByRole('checkbox', { name: 'Grouped by topics' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Grouped by topics')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Show tooltips')).toBeInTheDocument();
     expect(container.querySelector('.markup-quote')).toBeInTheDocument();
+  });
+
+  it('shows a topic tooltip when markup text is clicked', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
+    fireEvent.click(screen.getByText('Alpha Beta Gamma'));
+
+    const tooltip = await waitFor(() => document.querySelector('.text-topic-tooltip'));
+    expect(tooltip).toBeInTheDocument();
+    expect(within(tooltip).getByText('Topic1')).toBeInTheDocument();
+    expect(within(tooltip).getByRole('button', { name: 'Mark Read' })).toBeInTheDocument();
+    expect(within(tooltip).getByRole('button', { name: 'View sentences' })).toBeInTheDocument();
   });
 });

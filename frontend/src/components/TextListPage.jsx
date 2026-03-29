@@ -138,7 +138,11 @@ function TextListPage() {
             <tbody>
               {submissions.map((submission) => (
                 <tr key={submission.submission_id}>
-                  <td className="task-mono">{submission.submission_id}</td>
+                  <td className="task-mono">
+                    <a className="text-list-id-link" href={`/page/text/${submission.submission_id}`}>
+                      {submission.submission_id}
+                    </a>
+                  </td>
                   <td>
                     <span className={statusClass(submission.overall_status)}>
                       {submission.overall_status || 'pending'}
