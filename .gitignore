@@ -9,3 +9,4 @@ frontend/build
 .env
 test_mongodb/data/
 test_mongodb/mongodb.log
+.nltk_data/

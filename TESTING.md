@@ -144,6 +144,8 @@ The tests mock NLTK dependencies, but if running locally:
 python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
 ```
 
+For Docker Compose runs, NLTK data is cached in `./.nltk_data` on the host and mounted into the containers via `NLTK_DATA=/app/.nltk_data`, so downloads only need to happen once.
+
 ### Permission denied when mounting volume
 Ensure the Docker user has read access to the project files:
 ```bash

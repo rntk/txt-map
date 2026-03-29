@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
 from pymongo import MongoClient
 
 from lib.storage.llm_cache import MongoLLMCacheStore
@@ -13,8 +14,13 @@ from lib.nlp import ensure_nltk_data
 
 
 @asynccontextmanager
-async def lifespan(app):
-    ensure_nltk_data()
+async def lifespan(app: FastAPI):
+    auto_download_nltk: bool = os.getenv("NLTK_AUTO_DOWNLOAD_ON_STARTUP", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    ensure_nltk_data(download_missing=auto_download_nltk)
 
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
     print(f"MONGODB_URL: {mongodb_url}")

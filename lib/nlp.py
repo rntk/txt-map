@@ -3,8 +3,10 @@ NLP utilities using NLTK for tokenisation, POS tagging, lemmatisation,
 and stop-word removal.
 """
 
+import os
 import re
 import collections
+from pathlib import Path
 from typing import List, Dict, Any
 
 import nltk
@@ -25,8 +27,14 @@ WN_ADV = "r"
 WN_NOUN = "n"
 
 
-def ensure_nltk_data() -> None:
-    """Download required NLTK corpora / models if not already present."""
+def ensure_nltk_data(download_missing: bool = True) -> None:
+    """Ensure required NLTK corpora / models are available."""
+    download_dir_raw: str | None = os.getenv("NLTK_DATA")
+    download_dir: str | None = None
+    if download_dir_raw:
+        download_dir = str(Path(download_dir_raw).expanduser())
+        nltk.data.path.insert(0, download_dir)
+
     needed = [
         ("tokenizers/punkt_tab", "punkt_tab"),
         ("corpora/stopwords", "stopwords"),
@@ -38,7 +46,12 @@ def ensure_nltk_data() -> None:
         try:
             nltk.data.find(data_path)
         except LookupError:
-            nltk.download(package, quiet=True)
+            if download_missing:
+                if download_dir is not None:
+                    Path(download_dir).mkdir(parents=True, exist_ok=True)
+                    nltk.download(package, quiet=True, download_dir=download_dir)
+                else:
+                    nltk.download(package, quiet=True)
 
 
 def _lemmatizer_instance() -> WordNetLemmatizer:

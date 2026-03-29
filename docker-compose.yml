@@ -1,18 +1,23 @@
 services:
   api:
     build: .
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
+      - NLTK_DATA=/app/.nltk_data
+      - NLTK_AUTO_DOWNLOAD_ON_STARTUP=1
       - LLAMACPP_URL=${LLAMACPP_URL:-}
       - TOKEN=${TOKEN:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
+    volumes:
+      - ./.nltk_data:/app/.nltk_data
     depends_on:
       mongodb:
         condition: service_healthy
@@ -29,10 +34,13 @@ services:
 
   llm_worker:
     build: .
+    user: "${UID:-1000}:${GID:-1000}"
     env_file:
       - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
+      - NLTK_DATA=/app/.nltk_data
+      - NLTK_AUTO_DOWNLOAD_ON_STARTUP=1
       - LLAMACPP_URL=${LLAMACPP_URL:-}
       - TOKEN=${TOKEN:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -41,6 +49,8 @@ services:
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
       - LLM_WORKER_POLL_INTERVAL=${LLM_WORKER_POLL_INTERVAL:-0.5}
       - LLM_WORKER_HEARTBEAT_FILE=/tmp/llm_worker_heartbeat
+    volumes:
+      - ./.nltk_data:/app/.nltk_data
     depends_on:
       mongodb:
         condition: service_healthy
@@ -59,10 +69,13 @@ services:
 
   worker:
     build: .
+    user: "${UID:-1000}:${GID:-1000}"
     env_file:
       - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017/
+      - NLTK_DATA=/app/.nltk_data
+      - NLTK_AUTO_DOWNLOAD_ON_STARTUP=1
       - LLAMACPP_URL=${LLAMACPP_URL:-}
       - TOKEN=${TOKEN:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -70,6 +83,8 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
       - WORKER_HEARTBEAT_FILE=/tmp/worker_heartbeat
+    volumes:
+      - ./.nltk_data:/app/.nltk_data
     depends_on:
       mongodb:
         condition: service_healthy
