@@ -17,7 +17,7 @@ from txt_splitt.sentences import SparseRegexSentenceSplitter
 
 logger = logging.getLogger(__name__)
 
-MARKUP_PROMPT_VERSION = "markup_v19"
+MARKUP_PROMPT_VERSION = "markup_v20"
 
 VALID_MARKUP_TYPES = {
     "dialog", "comparison", "list", "data_trend",
@@ -69,7 +69,12 @@ TYPES AND DATA SCHEMAS:
     {{"language": "<lang>", "items": [{{"words": W}}]}}
   emphasis — highlighted phrases
     {{"items": [{{"words": W, "highlights": [{{"words": W, "style": "bold|italic|underline|highlight"}}]}}]}}
-  paragraph — readable paragraph groups (MUST have 2+ groups each covering 2+ positions; omit otherwise)
+  paragraph — split long text into readable groups. Split when:
+  - The subject/focus shifts (new entity, new aspect)
+  - A transition word appears (However, Meanwhile, Additionally, On the other hand)
+  - After a concluding statement before a new point begins
+  - Aim for 2-5 positions per paragraph group for readability
+  - Long topics (8+ positions) SHOULD use paragraph splitting for uncovered text
     {{"paragraphs": [{{"words": W}}]}}
   title — heading
     {{"level": 2|3|4, "title_words": W}}
@@ -89,7 +94,7 @@ DECISION RULES:
 - Use "steps" ONLY when ALL of the following are true: (a) the content is an ordered procedure, (b) each item starts with an imperative/action verb (e.g., "Open", "Click", "Run", "Add"), (c) each item is one concise action — not a paragraph of explanation, (d) there are at least 2 distinct steps. If the text merely describes a process narratively or items lack action verbs, use "list" or "paragraph" instead.
 - Use "table" only when rows share columns. Use "comparison" for alternatives. Use "key_value" for label:value facts.
 - Use "callout" only for explicit warning, tip, note, or important-advice content.
-- Use "paragraph" ONLY when splitting into 2+ groups each covering 2+ positions. Otherwise omit.
+- Use "paragraph" ONLY when splitting into 2+ groups each covering 2+ positions. Otherwise omit. For topics with 8+ positions where no other structured type applies, USE paragraph to break text into readable groups of 3-5 positions each.
 - Use "title" only for a heading followed by body content, not for a repeated topic name.
 
 STRUCTURE RULES:
@@ -944,6 +949,54 @@ def _plain_fallback(position_indices: List[int]) -> List[Dict[str, Any]]:
     ]
 
 
+def _auto_paragraph_uncovered(
+    uncovered_indices: List[int],
+    max_group_size: int = 4,
+) -> List[Dict[str, Any]]:
+    """Split uncovered positions into paragraph groups deterministically."""
+    if not uncovered_indices:
+        return []
+
+    # Group consecutive uncovered indices
+    contiguous_blocks = []
+    if uncovered_indices:
+        current_block = [uncovered_indices[0]]
+        for idx in uncovered_indices[1:]:
+            if idx == current_block[-1] + 1:
+                current_block.append(idx)
+            else:
+                contiguous_blocks.append(current_block)
+                current_block = [idx]
+        contiguous_blocks.append(current_block)
+
+    segments = []
+    for block in contiguous_blocks:
+        # For small blocks, let them be rendered as plain (by not creating a segment)
+        # OR if it's large (e.g. 6+ positions), split it into paragraphs.
+        if len(block) < 6:
+            # We don't emit a segment, it will be plain by default
+            continue
+
+        # Split block into chunks of max_group_size
+        paragraph_groups = []
+        for i in range(0, len(block), max_group_size):
+            chunk = block[i : i + max_group_size]
+            if chunk:
+                paragraph_groups.append({"position_indices": chunk})
+
+        # Ensure we have at least 2 groups and at least one group has 2+ positions
+        if len(paragraph_groups) >= 2:
+            segments.append({
+                "type": "paragraph",
+                "position_indices": block,
+                "data": {
+                    "paragraphs": paragraph_groups
+                }
+            })
+    
+    return segments
+
+
 # ─── Per-topic classification ──────────────────────────────────────────────────
 
 def _classify_topic(
@@ -989,6 +1042,19 @@ def _classify_topic(
                 # Expand response (restore short keys, hydrate words, expand ranges)
                 expanded = _expand_markup_response(parsed, word_map, word_to_position)
                 if _validate_markup_response(expanded, valid_position_indices, valid_word_indices):
+                    # Add deterministic fallback for uncovered text
+                    covered_indices = set()
+                    for seg in expanded.get("segments", []):
+                        covered_indices.update(seg.get("position_indices", []))
+                    
+                    uncovered = sorted(set(valid_position_indices) - covered_indices)
+                    if uncovered:
+                        auto_segments = _auto_paragraph_uncovered(uncovered)
+                        if auto_segments:
+                            expanded["segments"].extend(auto_segments)
+                            # Re-sort segments by their first position index for consistency
+                            expanded["segments"].sort(key=lambda s: s.get("position_indices", [0])[0])
+
                     expanded["positions"] = positions
                     return expanded
             logger.warning(
@@ -1006,9 +1072,13 @@ def _classify_topic(
             time.sleep(1.0 * (attempt + 1))
 
     logger.warning("Markup falling back to plain for topic '%s'", topic_name)
+    segments = _auto_paragraph_uncovered(valid_position_indices)
+    if not segments:
+        segments = _plain_fallback(valid_position_indices)
+
     return {
         "positions": positions,
-        "segments": _plain_fallback(valid_position_indices),
+        "segments": segments,
     }
 
 

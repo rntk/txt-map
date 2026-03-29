@@ -6,6 +6,8 @@ from lib.tasks.markup_generation import (
     _validate_steps_data,
     _expand_ranges,
     _expand_markup_response,
+    _auto_paragraph_uncovered,
+    _classify_topic,
 )
 
 
@@ -554,3 +556,71 @@ def test_validate_markup_response_rejects_single_step() -> None:
         ]
     }
     assert _validate_markup_response(response, [1], [1, 2, 3]) is False
+
+
+def test_auto_paragraph_uncovered_splits_large_block() -> None:
+    uncovered = [1, 2, 3, 4, 5, 6, 7, 8]
+    segments = _auto_paragraph_uncovered(uncovered, max_group_size=4)
+    assert len(segments) == 1
+    seg = segments[0]
+    assert seg["type"] == "paragraph"
+    assert seg["position_indices"] == uncovered
+    assert len(seg["data"]["paragraphs"]) == 2
+    assert seg["data"]["paragraphs"][0]["position_indices"] == [1, 2, 3, 4]
+    assert seg["data"]["paragraphs"][1]["position_indices"] == [5, 6, 7, 8]
+
+
+def test_auto_paragraph_uncovered_ignores_small_block() -> None:
+    uncovered = [1, 2, 3, 4, 5]
+    segments = _auto_paragraph_uncovered(uncovered)
+    assert len(segments) == 0
+
+
+def test_classify_topic_applies_auto_paragraph_on_fallback() -> None:
+    class MockLLM:
+        model_id = "test-model"
+        def call(self, messages, temperature=0.0):
+            return "garbage"
+
+    topic = {"name": "Test", "sentences": [1]}
+    # Need 6+ positions for auto-paragraph. _split_markup_fragment splits by sentences.
+    # We can provide a long text that gets split into many positions.
+    all_sentences = ["One. Two. Three. Four. Five. Six. Seven. Eight."]
+    
+    # We need to mock _call_llm_cached or just let it fail and fallback
+    result = _classify_topic(topic, all_sentences, MockLLM(), None, "test")
+    
+    assert "segments" in result
+    # It should have fallback to auto-paragraph because LLM failed (returned garbage)
+    # and we have 8 positions.
+    assert len(result["segments"]) == 1
+    assert result["segments"][0]["type"] == "paragraph"
+    assert len(result["segments"][0]["data"]["paragraphs"]) >= 2
+
+
+def test_classify_topic_applies_auto_paragraph_to_uncovered_text() -> None:
+    class MockLLM:
+        model_id = "test-model"
+        def call(self, messages, temperature=0.0):
+            # Only cover first 2 positions with a quote
+            return '{"segments": [{"type": "quote", "words": ["w1-w2"], "data": {"attribution": "Me"}}]}'
+
+    topic = {"name": "Test", "sentences": [1]}
+    # 2 (covered) + 6 (uncovered) = 8 positions
+    all_sentences = ["Q1 Q2. U1. U2. U3. U4. U5. U6."]
+    
+    result = _classify_topic(topic, all_sentences, MockLLM(), None, "test")
+    
+    # Segments should be: [Quote (pos 1), Paragraph (pos 2-7)]
+    # Wait, positions are 1-indexed. 
+    # Sentence split: ["Q1 Q2.", "U1.", "U2.", "U3.", "U4.", "U5.", "U6."] -> 7 positions.
+    # Q1 Q2 [w1-w2] -> pos 1
+    # U1 [w3] -> pos 2
+    # ...
+    # U6 [w8] -> pos 7
+    # So pos 1 is covered by quote. pos 2-7 (6 positions) are uncovered.
+    
+    assert len(result["segments"]) == 2
+    assert result["segments"][0]["type"] == "quote"
+    assert result["segments"][1]["type"] == "paragraph"
+    assert result["segments"][1]["position_indices"] == [2, 3, 4, 5, 6, 7]
