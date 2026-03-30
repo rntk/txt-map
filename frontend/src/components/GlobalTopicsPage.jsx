@@ -14,6 +14,7 @@ const FULLSCREEN_TABS = [
   { key: 'mindmap', label: 'Mindmap' },
   { key: 'circular_packing', label: 'Circles' },
   { key: 'radar_chart', label: 'Radar Chart' },
+  { key: 'venn', label: 'Venn Diagram' },
   { key: 'grid_view', label: 'Grid View' },
   { key: 'dataset_structure', label: 'Dataset Structure' },
   { key: 'treemap', label: 'Treemap' },

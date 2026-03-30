@@ -35,7 +35,11 @@ function VisualizationPanels({
             <div className="visualization-panel-body" style={{ height: 'calc(100vh - 150px)', overflowY: 'auto' }}>
               <TopicsVennChart
                 topics={safeTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
                 readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
               />
             </div>
           </div>

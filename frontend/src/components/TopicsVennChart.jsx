@@ -1,8 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
+import TopicSentencesModal from './shared/TopicSentencesModal';
+import Breadcrumbs from './shared/Breadcrumbs';
 import { useTopicLevel } from '../hooks/useTopicLevel';
-import { getTopicParts } from '../utils/topicHierarchy';
+import { useScopeNavigation } from '../hooks/useScopeNavigation';
+import {
+  getTopicParts,
+  isWithinScope,
+  getScopeLabel,
+  hasDeeperChildren
+} from '../utils/topicHierarchy';
 import './TopicsVennChart.css';
 
 const PALETTE = [
@@ -40,9 +48,9 @@ function blendHex(hexA, hexB) {
   return `rgb(${Math.round((ra + rb) / 2)},${Math.round((ga + gb) / 2)},${Math.round((ba + bb) / 2)})`;
 }
 
-function VennComponentGroup({ sets, overlaps }) {
-  const svgRef = React.useRef(null);
-  const [zoomTransform, setZoomTransform] = React.useState(d3.zoomIdentity);
+function VennComponentGroup({ sets, overlaps, onNodeClick }) {
+  const svgRef = useRef(null);
+  const [zoomTransform, setZoomTransform] = useState(d3.zoomIdentity);
 
   const { nodes, links, width, height } = useMemo(() => {
     const simNodes = sets.map((s, i) => ({
@@ -94,7 +102,7 @@ function VennComponentGroup({ sets, overlaps }) {
     };
   }, [sets, overlaps]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     const zoom = d3.zoom()
@@ -141,7 +149,14 @@ function VennComponentGroup({ sets, overlaps }) {
               stroke={colorScale(n.name)}
               strokeWidth={2}
               opacity={0.72}
-            />
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onNodeClick(n);
+              }}
+            >
+              <title>{n.name}</title>
+            </circle>
           ))}
         </g>
 
@@ -218,8 +233,16 @@ function VennComponentGroup({ sets, overlaps }) {
           {links.map((link, i) => {
             const a = nodes[typeof link.source === 'object' ? link.source.index : link.source];
             const b = nodes[typeof link.target === 'object' ? link.target.index : link.target];
-            const midX = (a.x + b.x) / 2;
-            const midY = (a.y + b.y) / 2;
+            
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+            
+            // Midpoint of the overlap segment on the line between centers
+            const m = (Math.max(0, d - b.r) + Math.min(a.r, d)) / 2;
+            const midX = a.x + (dx * m) / d;
+            const midY = a.y + (dy * m) / d;
+
             const displayWords = link.sharedWords.slice(0, 3).join(', ') + (link.sharedWords.length > 3 ? '…' : '');
             return (
               <text
@@ -249,10 +272,15 @@ function VennComponentGroup({ sets, overlaps }) {
 
 export default function TopicsVennChart({
   topics,
+  sentences = [],
+  onShowInArticle,
   readTopics,
+  onToggleRead,
+  markup,
 }) {
-  const scopePath = []; 
+  const { scopePath, navigateTo, drillInto } = useScopeNavigation();
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
+  const [modalTopic, setModalTopic] = useState(null);
 
   const { components, overlapsCount } = useMemo(() => {
     if (!topics || topics.length === 0) return { components: [], overlapsCount: 0 };
@@ -262,13 +290,17 @@ export default function TopicsVennChart({
 
     topics.forEach(t => {
       const parts = getTopicParts(t);
-      if (parts.length <= selectedLevel) return;
-      const prefix = parts.slice(0, selectedLevel + 1).join(' > ');
+      if (!isWithinScope(parts, scopePath)) return;
+      
+      const relativeParts = parts.slice(scopePath.length);
+      if (relativeParts.length <= selectedLevel) return;
+      
+      const prefix = parts.slice(0, scopePath.length + selectedLevel + 1).join(' > ');
       
       if (!levelSets.has(prefix)) {
         levelSets.set(prefix, { 
           name: prefix, 
-          displayName: parts[selectedLevel], 
+          displayName: parts[scopePath.length + selectedLevel], 
           topics: [], 
           words: new Set() 
         });
@@ -276,8 +308,8 @@ export default function TopicsVennChart({
       const entry = levelSets.get(prefix);
       entry.topics.push(t);
       
-      const relevantParts = parts.slice(selectedLevel + 1);
-      relevantParts.forEach(part => {
+      const subParts = parts.slice(scopePath.length + selectedLevel + 1);
+      subParts.forEach(part => {
         extractWords(part).forEach(w => entry.words.add(w));
       });
     });
@@ -331,15 +363,44 @@ export default function TopicsVennChart({
     components.sort((a, b) => b.sets.length - a.sets.length);
 
     return { components, overlapsCount: overlaps.length };
-  }, [topics, selectedLevel, readTopics]);
+  }, [topics, scopePath, selectedLevel, readTopics]);
+
+  const handleNodeClick = (node) => {
+    const isDrillable = hasDeeperChildren(topics, node.name);
+    if (isDrillable) {
+      drillInto(node.name);
+      setSelectedLevel(0);
+    } else {
+      // Find one of the actual topic objects to get sentenceIndices/ranges
+      // Since 'node.topics' is an array of topics that share this prefix,
+      // we can use the one that exactly matches the name if it exists, or just the first one.
+      const exactTopic = node.topics.find(t => t.name === node.name) || node.topics[0];
+      if (exactTopic) {
+        setModalTopic({
+          name: node.name,
+          displayName: node.displayName,
+          fullPath: node.name,
+          sentenceIndices: Array.isArray(exactTopic.sentences) ? exactTopic.sentences : [],
+          ranges: Array.isArray(exactTopic.ranges) ? exactTopic.ranges : [],
+        });
+      }
+    }
+  };
 
   const overlappingComponents = useMemo(() => 
     components.filter(comp => comp.overlaps.length > 0),
     [components]
   );
 
+  const scopeLabel = getScopeLabel(scopePath);
+
   return (
     <div className="venn-chart">
+      <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
+        navigateTo(path);
+        setSelectedLevel(0);
+      }} />
+
       <TopicLevelSwitcher
         className="venn-chart-level-switcher"
         selectedLevel={selectedLevel}
@@ -348,7 +409,8 @@ export default function TopicsVennChart({
       />
 
       <p className="venn-chart__description">
-        Showing intersections between topics at level {selectedLevel}. Overlapping regions represent shared words from subtopics. Total overlaps: {overlapsCount}.
+        {scopePath.length > 0 ? `Inside ${scopeLabel} at relative level ${selectedLevel}. ` : `Showing intersections at level ${selectedLevel}. `}
+        Overlapping regions represent shared words from subtopics. Total overlaps: {overlapsCount}.
       </p>
 
       <div className="venn-chart-body">
@@ -358,10 +420,27 @@ export default function TopicsVennChart({
           <p className="venn-chart__empty">No overlapping topics found at this level.</p>
         ) : (
           overlappingComponents.map((comp, idx) => (
-            <VennComponentGroup key={idx} sets={comp.sets} overlaps={comp.overlaps} />
+            <VennComponentGroup 
+              key={`${scopePath.join('>')}-${selectedLevel}-${idx}`} 
+              sets={comp.sets} 
+              overlaps={comp.overlaps} 
+              onNodeClick={handleNodeClick}
+            />
           ))
         )}
       </div>
+
+      {modalTopic && (
+        <TopicSentencesModal
+          topic={modalTopic}
+          sentences={sentences}
+          onClose={() => setModalTopic(null)}
+          onShowInArticle={onShowInArticle}
+          readTopics={readTopics}
+          onToggleRead={onToggleRead}
+          markup={markup}
+        />
+      )}
     </div>
   );
 }

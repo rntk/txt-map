@@ -7,6 +7,7 @@ import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import TreemapChart from './TreemapChart';
+import TopicsVennChart from './TopicsVennChart';
 
 function GlobalVisualizationPanels({
   fullscreenGraph,
@@ -51,6 +52,14 @@ function GlobalVisualizationPanels({
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <RadarChart topics={chartTopics} sentences={chartSentences} />
+          </div>
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === 'venn' && (
+        <FullScreenGraph title="Venn Diagram" onClose={onClose}>
+          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <TopicsVennChart topics={allTopics} sentences={chartSentences} />
           </div>
         </FullScreenGraph>
       )}
