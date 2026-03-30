@@ -17,6 +17,11 @@ import TableMarkup from './TableMarkup';
 import QuestionAnswerMarkup from './QuestionAnswerMarkup';
 import CalloutMarkup from './CalloutMarkup';
 import KeyValueMarkup from './KeyValueMarkup';
+import SummaryMarkup from './SummaryMarkup';
+import ProConMarkup from './ProConMarkup';
+import AsideMarkup from './AsideMarkup';
+import RatingMarkup from './RatingMarkup';
+import AttributionBlockMarkup from './AttributionBlockMarkup';
 import { getSegmentIndices } from './markupUtils';
 
 export default function MarkupRenderer({ segments, sentences }) {
@@ -111,6 +116,16 @@ export default function MarkupRenderer({ segments, sentences }) {
             return <CalloutMarkup key={i} segment={segment} sentences={sentences} />;
           case 'key_value':
             return <KeyValueMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'summary':
+            return <SummaryMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'pro_con':
+            return <ProConMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'aside':
+            return <AsideMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'rating':
+            return <RatingMarkup key={i} segment={segment} sentences={sentences} />;
+          case 'attribution_block':
+            return <AttributionBlockMarkup key={i} segment={segment} sentences={sentences} />;
           default:
             return <PlainMarkup key={i} segment={segment} sentences={sentences} />;
         }

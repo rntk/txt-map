@@ -14,6 +14,7 @@ export default function StepsMarkup({ segment, sentences }) {
         return (
           <div key={i} className="markup-steps__item">
             <span className="markup-steps__number">{item.step_number ?? i + 1}</span>
+            <div className="markup-steps__connector" />
             <span className="markup-steps__text">
               <HighlightedText text={text} />
             </span>
