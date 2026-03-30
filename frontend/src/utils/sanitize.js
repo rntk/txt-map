@@ -203,3 +203,32 @@ export function sanitizeHTML(html) {
 
   return template.innerHTML;
 }
+
+const NAMED_ENTITY_MAP = {
+  '&nbsp;':   ' ',
+  '&amp;':    '&',
+  '&lt;':     '<',
+  '&gt;':     '>',
+  '&quot;':   '"',
+  '&apos;':   "'",
+};
+
+const NAMED_ENTITY_RE = /&(?:nbsp|amp|lt|gt|quot|apos);/g;
+const DECIMAL_ENTITY_RE = /&#(\d+);/g;
+const HEX_ENTITY_RE = /&#x([0-9a-fA-F]+);/g;
+
+/**
+ * Decode HTML entities in a plain text string without using the DOM.
+ * Handles the most common named entities plus all decimal and hex numeric entities.
+ * Returns the input unchanged if it contains no '&'.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function decodeHtmlEntities(text) {
+  if (typeof text !== 'string' || !text.includes('&')) return text;
+  return text
+    .replace(NAMED_ENTITY_RE, (match) => NAMED_ENTITY_MAP[match] ?? match)
+    .replace(DECIMAL_ENTITY_RE, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(HEX_ENTITY_RE, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
