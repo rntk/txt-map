@@ -1,0 +1,136 @@
+/**
+ * Design Tokens
+ * Standardized design system for consistent UI across components
+ * Based on Material Design 3, Atlassian Design, and modern best practices
+ */
+
+:root {
+  /* ─── Spacing Scale (8px base grid) ───────────────────────────────────── */
+  --space-0: 0;
+  --space-1: 4px;   /* tight */
+  --space-2: 8px;   /* compact */
+  --space-3: 12px;  /* snug */
+  --space-4: 16px;  /* default */
+  --space-5: 20px;  /* medium */
+  --space-6: 24px;  /* relaxed */
+  --space-7: 32px;  /* section */
+  --space-8: 40px;  /* large section */
+  --space-9: 48px;  /* major sections */
+  --space-10: 64px; /* hero sections */
+
+  /* ─── Border Radius ───────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ─── Shadows/Elevation ───────────────────────────────────────────────── */
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);   /* cards, flat elements */
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.08);   /* elevated cards */
+  --shadow-3: 0 4px 8px rgba(0, 0, 0, 0.12);   /* dialogs, modals */
+  --shadow-4: 0 8px 16px rgba(0, 0, 0, 0.14);  /* popovers, dropdowns */
+  --shadow-5: 0 12px 24px rgba(0, 0, 0, 0.16); /* modals, drawers */
+
+  /* ─── Typography Scale ────────────────────────────────────────────────── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 1.8;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* ─── Font Weights ────────────────────────────────────────────────────── */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+
+  /* ─── Semantic Colors ─────────────────────────────────────────────────── */
+  /* Primary */
+  --color-primary-50: #e3f2fd;
+  --color-primary-100: #bbdefb;
+  --color-primary-500: #1976d2;
+  --color-primary-600: #1565c0;
+  --color-primary-700: #0d47a1;
+
+  /* Semantic Status Colors */
+  --color-info: #1976d2;
+  --color-info-bg: #e8f4fd;
+  --color-info-border: #1976d2;
+
+  --color-success: #2e7d32;
+  --color-success-bg: #e8f5e9;
+  --color-success-border: #4caf50;
+
+  --color-warning: #f57c00;
+  --color-warning-bg: #fff8e1;
+  --color-warning-border: #ff9800;
+
+  --color-error: #d32f2f;
+  --color-error-bg: #fce4ec;
+  --color-error-border: #f44336;
+
+  --color-neutral: #607d8b;
+  --color-neutral-bg: #f5f7f8;
+  --color-neutral-border: #b0bec5;
+
+  /* ─── Neutral/Gray Scale ──────────────────────────────────────────────── */
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-200: #eeeeee;
+  --gray-300: #e0e0e0;
+  --gray-400: #bdbdbd;
+  --gray-500: #9e9e9e;
+  --gray-600: #757575;
+  --gray-700: #616161;
+  --gray-800: #424242;
+  --gray-900: #212121;
+
+  /* ─── Text Colors ─────────────────────────────────────────────────────── */
+  --text-primary: #1a1a2e;
+  --text-secondary: #555;
+  --text-tertiary: #888;
+  --text-disabled: #bdbdbd;
+  --text-inverse: #ffffff;
+
+  /* ─── Background Colors ───────────────────────────────────────────────── */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f0f0f0;
+  --bg-elevated: #ffffff;
+
+  /* ─── Border Colors ───────────────────────────────────────────────────── */
+  --border-light: #e8e8e8;
+  --border-medium: #e0e0e0;
+  --border-strong: #bdbdbd;
+
+  /* ─── Focus/Interaction ───────────────────────────────────────────────── */
+  --focus-ring: 0 0 0 3px rgba(25, 118, 210, 0.3);
+  --focus-ring-offset: 2px;
+
+  /* ─── Transitions ─────────────────────────────────────────────────────── */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}

@@ -2,6 +2,10 @@ import React from 'react';
 import { getNestedIndices, getTextByIndex } from './markupUtils';
 import HighlightedText from '../shared/HighlightedText';
 
+/**
+ * DefinitionMarkup - Displays term with its definition/explanation
+ * Uses semantic HTML with <dfn> and <dd> elements
+ */
 export default function DefinitionMarkup({ segment, sentences }) {
   const { term } = segment.data || {};
   const explanationIndices = getNestedIndices(
@@ -14,17 +18,23 @@ export default function DefinitionMarkup({ segment, sentences }) {
     .filter(Boolean)
     .join(' ');
 
+  if (!term && !explanationText) return null;
+
   return (
-    <div className="markup-segment">
+    <div
+      className="markup-segment markup-definition"
+      role="region"
+      aria-label={term ? `Definition of ${term}` : 'Definition'}
+    >
       {term && (
-        <div className="markup-definition__term">
+        <dfn className="markup-definition__term">
           <HighlightedText text={term} />
-        </div>
+        </dfn>
       )}
       {explanationText && (
-        <div className="markup-definition__explanation">
+        <dd className="markup-definition__explanation">
           <HighlightedText text={explanationText} />
-        </div>
+        </dd>
       )}
     </div>
   );

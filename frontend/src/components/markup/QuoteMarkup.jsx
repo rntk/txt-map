@@ -2,6 +2,10 @@ import React from 'react';
 import { getNestedIndices, getTextByIndex } from './markupUtils';
 import HighlightedText from '../shared/HighlightedText';
 
+/**
+ * QuoteMarkup - Displays blockquotes with proper semantic HTML and accessibility
+ * Uses semantic <blockquote> and <cite> elements per HTML5 spec
+ */
 export default function QuoteMarkup({ segment, sentences }) {
   const { attribution } = segment.data || {};
   const quoteIndices = getNestedIndices(segment.data, 'position_indices', 'sentence_indices');
@@ -14,16 +18,16 @@ export default function QuoteMarkup({ segment, sentences }) {
 
   return (
     <div className="markup-segment">
-      <blockquote className="markup-quote">
+      <blockquote className="markup-quote" cite={attribution || undefined}>
         <p className="markup-quote__text">
           <HighlightedText text={quoteText} />
         </p>
-        {attribution && (
-          <p className="markup-quote__attribution">
-            <HighlightedText text={attribution} />
-          </p>
-        )}
       </blockquote>
+      {attribution && (
+        <cite className="markup-quote__attribution">
+          <HighlightedText text={attribution} />
+        </cite>
+      )}
     </div>
   );
 }
