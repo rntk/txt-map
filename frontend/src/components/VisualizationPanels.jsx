@@ -12,6 +12,7 @@ import TopicsBarChart from './TopicsBarChart';
 import RadarChart from './RadarChart';
 import ArticleStructureChart from './ArticleStructureChart';
 import TreemapChart from './TreemapChart';
+import TopicsVennChart from './TopicsVennChart';
 
 function VisualizationPanels({
   fullscreenGraph,
@@ -28,6 +29,19 @@ function VisualizationPanels({
 }) {
   return (
     <>
+      {fullscreenGraph === 'venn_chart' && (
+        <FullScreenGraph title="Topics Venn" onClose={onClose}>
+          <div className="visualization-panel-shell">
+            <div className="visualization-panel-body" style={{ height: 'calc(100vh - 150px)', overflowY: 'auto' }}>
+              <TopicsVennChart
+                topics={safeTopics}
+                readTopics={readTopics}
+              />
+            </div>
+          </div>
+        </FullScreenGraph>
+      )}
+
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
           <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
@@ -190,9 +204,6 @@ function VisualizationPanels({
       {fullscreenGraph === 'treemap' && (
         <FullScreenGraph title="Treemap" onClose={onClose}>
           <div className="visualization-panel-shell">
-            <p className="visualization-panel-intro">
-              Treemap visualization: top-level topics contain their subtopics. Rectangle size reflects sentence count.
-            </p>
             <div className="visualization-panel-body">
               <TreemapChart
                 topics={safeTopics}

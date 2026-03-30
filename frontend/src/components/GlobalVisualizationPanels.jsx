@@ -75,9 +75,6 @@ function GlobalVisualizationPanels({
       {fullscreenGraph === 'treemap' && (
         <FullScreenGraph title="Treemap" onClose={onClose}>
           <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <p style={{ marginBottom: '12px' }}>
-              Treemap visualization: top-level topics contain their subtopics. Rectangle size reflects sentence count.
-            </p>
             <div style={{ flex: 1 }}>
               <TreemapChart topics={chartTopics} sentences={chartSentences} />
             </div>

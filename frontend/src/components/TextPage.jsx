@@ -38,6 +38,7 @@ const FULLSCREEN_TABS = [
   { key: 'prefix_tree', label: 'Prefix Tree' },
   { key: 'tags_cloud', label: 'Tags Cloud' },
   { key: 'circular_packing', label: 'Circles' },
+  { key: 'venn_chart', label: 'Venn Diagram' },
   { key: 'radar_chart', label: 'Radar Chart' },
   { key: 'grid_view', label: 'Grid View' },
   { key: 'article_structure', label: 'Article Structure' },
