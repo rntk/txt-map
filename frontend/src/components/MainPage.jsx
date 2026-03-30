@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import GlobalReadProgress from './GlobalReadProgress';
 import '../styles/MainPage.css';
 
@@ -48,6 +48,146 @@ function getUploadDescription(status, errorMessage) {
 
   return 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD, FB2, EPUB.';
 }
+
+const EXTENSION_BROWSERS = [
+  {
+    id: 'firefox',
+    label: 'Firefox',
+    devUrl: 'about:debugging#/runtime/this-firefox',
+    steps: [
+      'Open Firefox and navigate to the URL above',
+      'Click "Load Temporary Add-on…"',
+      'Select the manifest.json from the downloaded extension folder',
+    ],
+  },
+  {
+    id: 'chrome',
+    label: 'Chrome / Edge',
+    devUrl: 'chrome://extensions/',
+    steps: [
+      'Open Chrome/Edge and navigate to the URL above',
+      'Enable "Developer mode" (toggle in top-right)',
+      'Click "Load unpacked" and select the downloaded extension folder',
+    ],
+  },
+];
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(
+    (event) => {
+      event.stopPropagation();
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      });
+    },
+    [text],
+  );
+
+  return (
+    <button type="button" className="main-page-copy-btn" onClick={handleCopy}>
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  );
+}
+
+function ExtensionCard() {
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('firefox');
+
+  const activeBrowser = EXTENSION_BROWSERS.find((b) => b.id === activeTab);
+
+  const handleCardClick = () => {
+    if (!expanded) setExpanded(true);
+  };
+
+  const handleClose = (event) => {
+    event.stopPropagation();
+    setExpanded(false);
+  };
+
+  const handleTabClick = useCallback((event, id) => {
+    event.stopPropagation();
+    setActiveTab(id);
+  }, []);
+
+  const cardClassName = [
+    'main-page-card',
+    'main-page-card--extension',
+    expanded ? 'main-page-card--extension-expanded' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!expanded) {
+    return (
+      <button type="button" className={cardClassName} onClick={handleCardClick}>
+        <span className="main-page-card__eyebrow">Install</span>
+        <span className="main-page-card__title">Browser Extension</span>
+        <span className="main-page-card__description">
+          Add the extension to Firefox or Chrome to submit any webpage block directly to the API.
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className={cardClassName} role="region" aria-label="Browser Extension Install">
+      <div className="main-page-extension-header">
+        <span className="main-page-card__eyebrow">Install</span>
+        <button type="button" className="main-page-extension-close" onClick={handleClose}>
+          ✕
+        </button>
+      </div>
+      <span className="main-page-card__title">Browser Extension</span>
+
+      <div className="main-page-extension-tabs">
+        {EXTENSION_BROWSERS.map((browser) => (
+          <button
+            key={browser.id}
+            type="button"
+            className={[
+              'main-page-extension-tab',
+              activeTab === browser.id ? 'main-page-extension-tab--active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            onClick={(e) => handleTabClick(e, browser.id)}
+          >
+            {browser.label}
+          </button>
+        ))}
+      </div>
+
+      {activeBrowser && (
+        <div className="main-page-extension-body">
+          <p className="main-page-extension-note">
+            Paste this URL in your browser address bar:
+          </p>
+          <div className="main-page-extension-url-row">
+            <code className="main-page-extension-url">{activeBrowser.devUrl}</code>
+            <CopyButton text={activeBrowser.devUrl} />
+          </div>
+          <ol className="main-page-extension-steps">
+            {activeBrowser.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          <a
+            href="/api/extension/download"
+            className="main-page-extension-download"
+            onClick={(e) => e.stopPropagation()}
+          >
+            ↓ Download extension ZIP
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function UploadCard() {
   const inputRef = useRef(null);
@@ -172,6 +312,7 @@ function MainPage() {
           </a>
         ))}
         <UploadCard />
+        <ExtensionCard />
       </div>
     </div>
   );

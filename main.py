@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler
+from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler, extension_handler
 from lifespan import lifespan
 
 app = FastAPI(
@@ -37,6 +37,7 @@ app.include_router(task_queue_handler.router, prefix="/api")
 app.include_router(diff_handler.router, prefix="/api")
 app.include_router(llm_cache_handler.router, prefix="/api")
 app.include_router(settings_handler.router, prefix="/api")
+app.include_router(extension_handler.router, prefix="/api")
 
 
 FRONTEND_INDEX = "frontend/build/index.html"
