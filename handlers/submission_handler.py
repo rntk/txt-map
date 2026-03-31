@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple, Set
 import re
+import requests as http_requests
 
 from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
@@ -13,6 +14,10 @@ from handlers.dependencies import get_submissions_storage, get_task_queue_storag
 class SubmitRequest(BaseModel):
     html: str
     source_url: Optional[str] = ""
+
+
+class FetchUrlRequest(BaseModel):
+    url: str
 
 
 class RefreshRequest(BaseModel):
@@ -151,6 +156,66 @@ async def post_upload(
         html_content=html_content,
         text_content=text_content,
         source_url=filename,
+    )
+
+    _queue_all_tasks(task_queue_storage, submission["submission_id"])
+
+    return {
+        "submission_id": submission["submission_id"],
+        "redirect_url": f"/page/text/{submission['submission_id']}"
+    }
+
+
+@router.post("/fetch-url")
+def post_fetch_url(
+    request: FetchUrlRequest,
+    submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
+    task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
+) -> Dict[str, str]:
+    """
+    Fetch a URL, detect its content type, extract content (HTML, PDF, etc.),
+    and create a submission just like a file upload.
+    """
+    url = request.url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+
+    try:
+        response = http_requests.get(
+            url,
+            timeout=15,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; TextAnalyzer/1.0)"},
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+    except http_requests.exceptions.Timeout:
+        raise HTTPException(status_code=502, detail="Request timed out while fetching the URL.")
+    except http_requests.exceptions.ConnectionError as e:
+        raise HTTPException(status_code=502, detail=f"Could not connect to URL: {e}")
+    except http_requests.exceptions.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Remote server returned an error: {e}")
+    except http_requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {e}")
+
+    content_type = response.headers.get("Content-Type", "").lower().split(";")[0].strip()
+    data = response.content
+
+    if content_type == "application/pdf":
+        html_content, text_content = _extract_content_from_upload("document.pdf", data)
+    elif content_type.startswith("text/") or content_type in ("application/xhtml+xml",) or not content_type:
+        decoded = data.decode("utf-8", errors="replace")
+        html_content = decoded
+        text_content = decoded
+    else:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type '{content_type}'. Supported: HTML pages and PDFs."
+        )
+
+    submission = submissions_storage.create(
+        html_content=html_content,
+        text_content=text_content,
+        source_url=url,
     )
 
     _queue_all_tasks(task_queue_storage, submission["submission_id"])

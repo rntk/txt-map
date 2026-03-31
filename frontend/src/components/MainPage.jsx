@@ -289,6 +289,89 @@ function UploadCard() {
   );
 }
 
+function UrlCard() {
+  const [url, setUrl] = useState('');
+  const [status, setStatus] = useState('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const trimmed = url.trim();
+    if (!trimmed) return;
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setStatus('error');
+      setErrorMsg('URL must start with http:// or https://');
+      return;
+    }
+
+    setStatus('loading');
+    setErrorMsg('');
+
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Server error ${res.status}`);
+      }
+      const { redirect_url } = await res.json();
+      window.location.href = redirect_url;
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg(err.message || 'Failed to fetch URL');
+    }
+  };
+
+  const cardClassName = [
+    'main-page-card',
+    'main-page-card--url',
+    status === 'loading' ? 'main-page-card--uploading' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div className={cardClassName}>
+      <span className="main-page-card__eyebrow">Fetch</span>
+      <span className="main-page-card__title">Load from URL</span>
+      <span className="main-page-card__description">
+        Paste any URL to fetch and analyse the page or document (HTML, PDF).
+      </span>
+      <form className="main-page-url-form" onSubmit={handleSubmit}>
+        <input
+          className="main-page-url-input"
+          type="url"
+          placeholder="https://example.com/article"
+          value={url}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            if (status !== 'idle') {
+              setStatus('idle');
+              setErrorMsg('');
+            }
+          }}
+          disabled={status === 'loading'}
+          aria-label="URL to fetch"
+        />
+        <button
+          type="submit"
+          className="main-page-url-submit"
+          disabled={status === 'loading' || !url.trim()}
+        >
+          {status === 'loading' ? 'Loading…' : 'Load'}
+        </button>
+      </form>
+      {status === 'error' && (
+        <span className="main-page-url-error">{errorMsg}</span>
+      )}
+    </div>
+  );
+}
+
 function MainPage() {
   return (
     <div className="main-page">
@@ -312,6 +395,7 @@ function MainPage() {
           </a>
         ))}
         <UploadCard />
+        <UrlCard />
         <ExtensionCard />
       </div>
     </div>

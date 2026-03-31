@@ -227,3 +227,85 @@ def test_get_submission_read_progress(client, mock_storage, sample_submission):
     # Topic B has [3], total sentences 3
     assert response.json()["read_count"] == 1
     assert response.json()["total_count"] == 3
+
+
+# ── /api/fetch-url tests ──────────────────────────────────────────────────────
+
+def _make_mock_response(content: bytes, content_type: str, status_code: int = 200):
+    """Build a minimal mock for requests.Response."""
+    mock_resp = MagicMock()
+    mock_resp.content = content
+    mock_resp.headers = {"Content-Type": content_type}
+    mock_resp.status_code = status_code
+    mock_resp.raise_for_status = MagicMock()
+    return mock_resp
+
+
+def test_fetch_url_html(client, mock_storage, mock_task_queue):
+    """Fetching an HTML URL creates a submission and returns redirect_url."""
+    submission_id = str(uuid.uuid4())
+    mock_storage.create.return_value = {"submission_id": submission_id}
+
+    html_bytes = b"<html><body><p>Hello</p></body></html>"
+    mock_resp = _make_mock_response(html_bytes, "text/html; charset=utf-8")
+
+    with patch("handlers.submission_handler.http_requests.get", return_value=mock_resp):
+        response = client.post("/api/fetch-url", json={"url": "https://example.com/article"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["submission_id"] == submission_id
+    assert data["redirect_url"] == f"/page/text/{submission_id}"
+    assert mock_storage.create.called
+    call_kwargs = mock_storage.create.call_args.kwargs
+    assert call_kwargs["source_url"] == "https://example.com/article"
+    assert mock_task_queue.create.call_count == 7
+
+
+def test_fetch_url_pdf(client, mock_storage, mock_task_queue):
+    """Fetching a URL that returns a PDF processes it through PDF extraction."""
+    submission_id = str(uuid.uuid4())
+    mock_storage.create.return_value = {"submission_id": submission_id}
+
+    fake_pdf_bytes = b"%PDF-1.4 fake"
+    mock_resp = _make_mock_response(fake_pdf_bytes, "application/pdf")
+
+    fake_html = "<p>PDF content</p>"
+    fake_text = "PDF content"
+
+    with patch("handlers.submission_handler.http_requests.get", return_value=mock_resp), \
+         patch("handlers.submission_handler._extract_content_from_upload", return_value=(fake_html, fake_text)) as mock_extract:
+        response = client.post("/api/fetch-url", json={"url": "https://example.com/doc.pdf"})
+
+    assert response.status_code == 200
+    mock_extract.assert_called_once_with("document.pdf", fake_pdf_bytes)
+    call_kwargs = mock_storage.create.call_args.kwargs
+    assert call_kwargs["html_content"] == fake_html
+    assert call_kwargs["text_content"] == fake_text
+
+
+def test_fetch_url_invalid_scheme(client):
+    """Non-http(s) URLs are rejected with 400."""
+    response = client.post("/api/fetch-url", json={"url": "ftp://example.com/file"})
+    assert response.status_code == 400
+    assert "http" in response.json()["detail"].lower()
+
+
+def test_fetch_url_network_error(client):
+    """Network-level errors are surfaced as 502."""
+    import requests as _requests
+    with patch("handlers.submission_handler.http_requests.get",
+               side_effect=_requests.exceptions.ConnectionError("unreachable")):
+        response = client.post("/api/fetch-url", json={"url": "https://unreachable.example.com"})
+
+    assert response.status_code == 502
+
+
+def test_fetch_url_unsupported_content_type(client):
+    """Binary/unsupported content types are rejected with 415."""
+    mock_resp = _make_mock_response(b"\x50\x4b\x03\x04", "application/zip")
+
+    with patch("handlers.submission_handler.http_requests.get", return_value=mock_resp):
+        response = client.post("/api/fetch-url", json={"url": "https://example.com/archive.zip"})
+
+    assert response.status_code == 415
