@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useEffect } from 'react';
 import RawTextDisplay from './shared/RawTextDisplay';
 
 /**
@@ -10,6 +10,17 @@ import RawTextDisplay from './shared/RawTextDisplay';
  * @property {Array} fadeRanges
  */
 function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRanges }) {
+  const downloadUrl = useMemo(() => {
+    const blob = new Blob([rawText], { type: 'text/plain' });
+    return URL.createObjectURL(blob);
+  }, [rawText]);
+
+  useEffect(() => {
+    return () => {
+      URL.revokeObjectURL(downloadUrl);
+    };
+  }, [downloadUrl]);
+
   return (
     <div className="summary-content">
       <div className="raw-text-meta" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -24,7 +35,7 @@ function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRa
         <a
           className="action-btn"
           style={{ padding: '2px 8px', fontSize: '11px', textDecoration: 'none', verticalAlign: 'middle' }}
-          href={URL.createObjectURL(new Blob([rawText], { type: 'text/plain' }))}
+          href={downloadUrl}
           download={`${sourceUrl || submissionId}.txt`}
         >
           Download

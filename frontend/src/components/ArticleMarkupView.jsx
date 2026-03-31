@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import MarkupRenderer from './markup/MarkupRenderer';
 import {
