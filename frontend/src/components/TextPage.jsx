@@ -19,6 +19,7 @@ import { useTopicNavigation } from '../hooks/useTopicNavigation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { getTopicSelectionKey } from '../utils/chartConstants';
 import { useTextPageData } from '../hooks/useTextPageData';
+import { getTopicHighlightColor } from '../utils/topicColorUtils';
 import '../styles/App.css';
 
 const FULLSCREEN_TABS = [
@@ -54,6 +55,11 @@ function TextPage() {
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
   const [fullscreenGraph, setFullscreenGraph] = useState(null);
+  const [highlightAllTopics, setHighlightAllTopics] = useState(false);
+
+  const toggleHighlightAll = useCallback(() => {
+    setHighlightAllTopics(prev => !prev);
+  }, []);
 
   const closeFullscreenGraph = useCallback(() => {
     setFullscreenGraph(null);
@@ -222,6 +228,23 @@ function TextPage() {
   const safeTopics = _safeTopics;
   const rawText = _rawText;
 
+  // Colored ranges for raw text view (character-position based, one per topic)
+  const rawTextColoredRanges = useMemo(() => {
+    if (!highlightAllTopics) return [];
+    const ranges = [];
+    safeTopics.forEach(topic => {
+      const color = getTopicHighlightColor(topic.name);
+      (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
+        const start = Number(range.start);
+        const end = Number(range.end);
+        if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+          ranges.push({ start, end, color });
+        }
+      });
+    });
+    return ranges;
+  }, [highlightAllTopics, safeTopics]);
+
   if (loading) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -310,6 +333,8 @@ function TextPage() {
                 onNavigateTopic={navigateTopicSentence}
                 onToggleReadAll={toggleReadAll}
                 onOpenVisualization={handleOpenVisualization}
+                highlightAllTopics={highlightAllTopics}
+                onToggleHighlightAll={toggleHighlightAll}
               />
             </div>
             <div className="right-column">
@@ -360,6 +385,7 @@ function TextPage() {
                       onNavigateTopic={navigateTopicSentence}
                       onShowSentences={handleShowTopicSentences}
                       tooltipEnabled={tooltipEnabled}
+                      coloredHighlightMode={highlightAllTopics}
                     />
                   ) : groupedByTopics ? (
                     <GroupedByTopicsView
@@ -376,6 +402,7 @@ function TextPage() {
                       sourceUrl={submission.source_url}
                       highlightRanges={rawTextHighlightRanges}
                       fadeRanges={rawTextFadeRanges}
+                      coloredRanges={rawTextColoredRanges}
                     />
                   ) : (
                     articles.map((article, index) => (
@@ -404,6 +431,7 @@ function TextPage() {
                           onShowSentences={handleShowTopicSentences}
                           tooltipEnabled={tooltipEnabled}
                           submissionId={submissionId}
+                          coloredHighlightMode={highlightAllTopics}
                         />
                       )
                     ))

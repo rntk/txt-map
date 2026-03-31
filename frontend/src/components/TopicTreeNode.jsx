@@ -1,4 +1,5 @@
 import React from 'react';
+import { getTopicHighlightColor } from '../utils/topicColorUtils';
 
 const styles = {
   treeNode: {
@@ -109,6 +110,7 @@ function TopicTreeNode({
   onNavigateTopic,
   isPanelSelection,
   onOpenVisualization,
+  highlightAllTopics = false,
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
@@ -138,6 +140,7 @@ function TopicTreeNode({
     onNavigateTopic,
     isPanelSelection,
     onOpenVisualization,
+    highlightAllTopics,
   };
 
   return (
@@ -190,7 +193,12 @@ function TopicTreeNode({
                   className="topic-tree-node-title"
                   style={{
                     ...styles.topicTitle,
-                    ...(isLeafRead ? { color: '#888' } : {})
+                    ...(isLeafRead ? { color: '#888' } : {}),
+                    ...(highlightAllTopics ? {
+                      backgroundColor: getTopicHighlightColor(topic.name),
+                      borderRadius: '3px',
+                      padding: '1px 5px',
+                    } : {}),
                   }}
                   onClick={() => {
                     onNavigateTopic && onNavigateTopic(topic, 'focus');

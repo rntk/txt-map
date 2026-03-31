@@ -1,14 +1,24 @@
 import React from 'react';
 import { buildRawTextSegments } from '../../utils/textHighlight';
 
-function RawTextDisplay({ rawText, articleIndex, highlightRanges, fadeRanges }) {
+/**
+ * @typedef {Object} RawTextDisplayProps
+ * @property {string} rawText
+ * @property {number} articleIndex
+ * @property {Array<{start: number, end: number}>} highlightRanges
+ * @property {Array<{start: number, end: number}>} fadeRanges
+ * @property {Array<{start: number, end: number, color: string}>} [coloredRanges]
+ */
+
+/** @param {RawTextDisplayProps} props */
+function RawTextDisplay({ rawText, articleIndex, highlightRanges, fadeRanges, coloredRanges = [] }) {
   if (!rawText) {
     return (
       <pre className="raw-text-content raw-text-content-page">No raw text available.</pre>
     );
   }
 
-  const segments = buildRawTextSegments(rawText, highlightRanges, fadeRanges);
+  const segments = buildRawTextSegments(rawText, highlightRanges, fadeRanges, coloredRanges);
 
   return (
     <pre className="raw-text-content raw-text-content-page">
@@ -16,7 +26,8 @@ function RawTextDisplay({ rawText, articleIndex, highlightRanges, fadeRanges }) 
         segment.state ? (
           <span
             key={`${segment.start}-${segment.end}-${segment.state}`}
-            className={`raw-text-token ${segment.state}`}
+            className={segment.state !== 'colored' ? `raw-text-token ${segment.state}` : 'raw-text-token'}
+            style={segment.color ? { backgroundColor: segment.color } : undefined}
             data-article-index={articleIndex}
             data-char-start={segment.start}
             data-char-end={segment.end}

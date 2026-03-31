@@ -7,6 +7,7 @@ import {
   resolveTopicMarkup,
 } from './markup/topicMarkupUtils';
 import { useTooltip } from '../hooks/useTooltip';
+import { getTopicHighlightColor } from '../utils/topicColorUtils';
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
@@ -121,17 +122,23 @@ function buildArticleMarkupBlocks(sentences, topics, markup) {
   return blocks;
 }
 
-function ArticleMarkupPlainBlock({ sentences, startSentenceIndex }) {
+function ArticleMarkupPlainBlock({ sentences, startSentenceIndex, sentenceColorMap }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
 
   return (
     <div className="markup-segment">
-      {safeSentences.map((sentence, index) => (
-        <div key={`${startSentenceIndex + index}-${sentence}`} className="markup-plain__sentence">
-          <span className="markup-plain__num">{startSentenceIndex + index}.</span>
-          <span>{sentence}</span>
-        </div>
-      ))}
+      {safeSentences.map((sentence, index) => {
+        const sentenceNum = startSentenceIndex + index;
+        const color = sentenceColorMap?.get(sentenceNum);
+        return (
+          <div key={`${sentenceNum}-${sentence}`} className="markup-plain__sentence">
+            <span className="markup-plain__num">{sentenceNum}.</span>
+            <span style={color ? { backgroundColor: color, borderRadius: '2px', padding: '0 2px' } : undefined}>
+              {sentence}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -164,6 +171,7 @@ function MarkupTopicBlock({
   onNavigateTopic,
   onShowSentences,
   tooltipEnabled,
+  coloredHighlightMode = false,
 }) {
   const readTopicsSet = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
@@ -322,6 +330,7 @@ function MarkupTopicBlock({
       <div
         ref={blockRef}
         className="markup-topic-block"
+        style={coloredHighlightMode ? { backgroundColor: getTopicHighlightColor(block.topic.name) } : undefined}
         onClick={handleBlockClick}
         onKeyDown={handleBlockKeyDown}
         role="button"
@@ -350,6 +359,7 @@ function MarkupTopicBlock({
  * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} onNavigateTopic
  * @property {(topic: Object) => void} onShowSentences
  * @property {boolean} tooltipEnabled
+ * @property {boolean} [coloredHighlightMode]
  */
 function ArticleMarkupView({
   safeSentences,
@@ -362,11 +372,27 @@ function ArticleMarkupView({
   onNavigateTopic,
   onShowSentences,
   tooltipEnabled,
+  coloredHighlightMode = false,
 }) {
   const articleMarkupBlocks = useMemo(
     () => buildArticleMarkupBlocks(safeSentences, safeTopics, markup),
     [safeSentences, safeTopics, markup]
   );
+
+  // Map sentence number (1-based) → color for plain blocks
+  const sentenceColorMap = useMemo(() => {
+    if (!coloredHighlightMode) return null;
+    const map = new Map();
+    (Array.isArray(safeTopics) ? safeTopics : []).forEach(topic => {
+      const color = getTopicHighlightColor(topic.name);
+      (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(sentenceNum => {
+        if (!map.has(sentenceNum)) {
+          map.set(sentenceNum, color);
+        }
+      });
+    });
+    return map;
+  }, [coloredHighlightMode, safeTopics]);
 
   return (
     <div className="summary-content">
@@ -383,12 +409,14 @@ function ArticleMarkupView({
               onNavigateTopic={onNavigateTopic}
               onShowSentences={onShowSentences}
               tooltipEnabled={tooltipEnabled}
+              coloredHighlightMode={coloredHighlightMode}
             />
           ) : (
             <ArticleMarkupPlainBlock
               key={block.key}
               sentences={block.sentences}
               startSentenceIndex={block.startSentenceIndex}
+              sentenceColorMap={sentenceColorMap}
             />
           )
         ))}

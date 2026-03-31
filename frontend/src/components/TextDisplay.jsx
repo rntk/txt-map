@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useRef, useContext, useEffect } from 'reac
 import { createPortal } from 'react-dom';
 import { sanitizeHTML } from '../utils/sanitize';
 import { buildHighlightedRawHtml } from '../utils/htmlHighlight';
+import { getTopicHighlightColor, getTopicCSSClass } from '../utils/topicColorUtils';
 import { useTooltip } from '../hooks/useTooltip';
 import { HighlightContext } from './shared/HighlightContext';
 import HighlightedText from './shared/HighlightedText';
@@ -30,12 +31,13 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {string} [submissionId]
  * @property {(topic: Object) => void} [onShowSentences]
  * @property {string[]} [highlightWords] - Words to highlight in the text
+ * @property {boolean} [coloredHighlightMode] - When true, all topics are highlighted with per-topic muted colors
  */
 
 /**
  * @param {TextDisplayProps} props
  */
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords, coloredHighlightMode = false }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -90,6 +92,54 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     return { highlightRanges: highlights, fadeRanges: fades };
   }, [safeArticleTopics, safeSelectedTopics, hoveredTopic, readTopicsSet]);
 
+  // Per-topic colored ranges for "Highlight All" mode (rawHtml path uses CSS classes)
+  const coloredRanges = useMemo(() => {
+    if (!coloredHighlightMode) return [];
+    const ranges = [];
+    safeArticleTopics.forEach(topic => {
+      const cssClass = getTopicCSSClass(topic.name);
+      (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
+        const start = Number(range.start);
+        const end = Number(range.end);
+        if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+          ranges.push({ start, end, cssClass });
+        }
+      });
+    });
+    return ranges;
+  }, [coloredHighlightMode, safeArticleTopics]);
+
+  // CSS stylesheet for topic highlight classes (used in rawHtml path)
+  const topicStyleSheet = useMemo(() => {
+    if (!coloredHighlightMode) return null;
+    const seen = new Set();
+    const lines = [];
+    safeArticleTopics.forEach(topic => {
+      const cssClass = getTopicCSSClass(topic.name);
+      if (!seen.has(cssClass)) {
+        seen.add(cssClass);
+        lines.push(`.${cssClass} { background-color: ${getTopicHighlightColor(topic.name)}; }`);
+      }
+    });
+    return lines.join('\n');
+  }, [coloredHighlightMode, safeArticleTopics]);
+
+  // Per-sentence color map for sentence/paragraph rendering in "Highlight All" mode
+  const sentenceColorMap = useMemo(() => {
+    if (!coloredHighlightMode) return null;
+    const map = new Map();
+    safeArticleTopics.forEach(topic => {
+      const color = getTopicHighlightColor(topic.name);
+      (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(num => {
+        const idx = num - 1;
+        if (!map.has(idx)) {
+          map.set(idx, color);
+        }
+      });
+    });
+    return map;
+  }, [coloredHighlightMode, safeArticleTopics]);
+
   // Sentence-index-based sets for non-rawHtml fallback paths
   const fadedIndices = useMemo(() => {
     const set = new Set();
@@ -124,8 +174,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     safeArticleTopics,
     articleIndex,
     highlightRanges,
-    fadeRanges
-  ), [rawHtml, safeArticleTopics, articleIndex, highlightRanges, fadeRanges]);
+    fadeRanges,
+    coloredRanges
+  ), [rawHtml, safeArticleTopics, articleIndex, highlightRanges, fadeRanges, coloredRanges]);
 
   const sentenceToTopicsEnding = useMemo(() => {
     const map = new Map();
@@ -512,6 +563,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   if (highlightedRawHtml) {
     return (
       <div className="text-display">
+        {topicStyleSheet && <style>{topicStyleSheet}</style>}
         <div
           ref={textContentRef}
           className="text-content"
@@ -539,7 +591,8 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                     id={`sentence-${articleIndex}-${index}`}
                     data-article-index={articleIndex}
                     data-sentence-index={index}
-                    className={`sentence-token ${highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
+                    className={`sentence-token ${!coloredHighlightMode && highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
+                    style={coloredHighlightMode && sentenceColorMap?.has(index) ? { backgroundColor: sentenceColorMap.get(index) } : undefined}
                     dangerouslySetInnerHTML={{ __html: sanitizeHTML(text) + ' ' }}
                   />
                   {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
@@ -578,7 +631,8 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                 id={`sentence-${articleIndex}-${index}`}
                 data-article-index={articleIndex}
                 data-sentence-index={index}
-                className={`sentence-token ${highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
+                className={`sentence-token ${!coloredHighlightMode && highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
+                style={coloredHighlightMode && sentenceColorMap?.has(index) ? { backgroundColor: sentenceColorMap.get(index) } : undefined}
               >
                 {effectiveHighlightWords ? (
                   <HighlightedText text={sentence} words={effectiveHighlightWords} />

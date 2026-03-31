@@ -50,13 +50,16 @@ export function buildTopicStateRanges(topics, selectedTopics, hoveredTopic, read
   return { highlightRanges, fadeRanges };
 }
 
-export function buildRawTextSegments(rawText, highlightRanges, fadeRanges) {
+export function buildRawTextSegments(rawText, highlightRanges, fadeRanges, coloredRanges = []) {
   if (!rawText) {
     return [];
   }
 
+  const useColoredMode = coloredRanges.length > 0;
+  const activeRanges = useColoredMode ? coloredRanges : [...highlightRanges, ...fadeRanges];
+
   const boundaries = new Set([0, rawText.length]);
-  [...highlightRanges, ...fadeRanges].forEach((range) => {
+  activeRanges.forEach((range) => {
     boundaries.add(range.start);
     boundaries.add(range.end);
   });
@@ -66,6 +69,7 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges) {
     .sort((a, b) => a - b);
 
   const overlapsRange = (start, end, ranges) => ranges.some((range) => start < range.end && end > range.start);
+  const findColoredRange = (start, end) => coloredRanges.find((r) => start < r.end && end > r.start) || null;
   const segments = [];
 
   for (let i = 0; i < sortedBoundaries.length - 1; i += 1) {
@@ -77,10 +81,20 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges) {
     }
 
     let state = null;
-    if (overlapsRange(start, end, highlightRanges)) {
-      state = 'highlighted';
-    } else if (overlapsRange(start, end, fadeRanges)) {
-      state = 'faded';
+    let color = null;
+
+    if (useColoredMode) {
+      const match = findColoredRange(start, end);
+      if (match) {
+        state = 'colored';
+        color = match.color;
+      }
+    } else {
+      if (overlapsRange(start, end, highlightRanges)) {
+        state = 'highlighted';
+      } else if (overlapsRange(start, end, fadeRanges)) {
+        state = 'faded';
+      }
     }
 
     const text = rawText.slice(start, end);
@@ -89,13 +103,13 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges) {
     }
 
     const previous = segments[segments.length - 1];
-    if (previous && previous.state === state && previous.end === start) {
+    if (previous && previous.state === state && previous.color === color && previous.end === start) {
       previous.text += text;
       previous.end = end;
       continue;
     }
 
-    segments.push({ start, end, text, state });
+    segments.push({ start, end, text, state, color });
   }
 
   return segments;

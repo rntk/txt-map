@@ -45,9 +45,8 @@ function SummaryTimeline({
                     </div>
                     <div className="timeline-dot" />
                     <div className="timeline-cards-group timeline-cards-group--insight">
-                      <div className="timeline-card timeline-card--insight-meta">
-                        <span className="timeline-label">Insight {index + 1}</span>
-                        {insightTopics.length > 0 ? (
+                      {insightTopics.length > 0 ? (
+                        <div className="timeline-card timeline-card--insight-meta">
                           <div className="timeline-topic-links">
                             {insightTopics.map((topicName) => (
                               <button
@@ -60,8 +59,8 @@ function SummaryTimeline({
                               </button>
                             ))}
                           </div>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
                       {sourceSentenceIndices.length > 0 ? (() => {
                         const groups = [];
                         let currentGroup = [];

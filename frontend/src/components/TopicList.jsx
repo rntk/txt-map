@@ -16,6 +16,8 @@ function TopicList({
   onNavigateTopic,
   onToggleReadAll = () => { },
   onOpenVisualization,
+  highlightAllTopics = false,
+  onToggleHighlightAll = () => { },
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -252,6 +254,7 @@ function TopicList({
     onNavigateTopic,
     isPanelSelection,
     onOpenVisualization,
+    highlightAllTopics,
   };
 
   const buttonStyle = {
@@ -268,13 +271,18 @@ function TopicList({
   return (
     <>
       {topicTree.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center', flex: '0 0 auto' }}>
-          <button onClick={toggleExpandAll} style={buttonStyle}>
-            {allExpanded ? 'Fold All' : 'Unfold All'}
-          </button>
-          <button onClick={onToggleReadAll} style={allRead ? buttonActiveStyle : buttonStyle}>
-            {allRead ? 'Unread All' : 'Read All'}
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button onClick={toggleExpandAll} style={buttonStyle}>
+              {allExpanded ? 'Fold All' : 'Unfold All'}
+            </button>
+            <button onClick={onToggleReadAll} style={allRead ? buttonActiveStyle : buttonStyle}>
+              {allRead ? 'Unread All' : 'Read All'}
+            </button>
+            <button onClick={onToggleHighlightAll} style={highlightAllTopics ? buttonActiveStyle : buttonStyle}>
+              {highlightAllTopics ? 'Clear Colors' : 'Color Topics'}
+            </button>
+          </div>
           <input
             type="text"
             placeholder="Filter topics..."
@@ -286,8 +294,6 @@ function TopicList({
               border: '1px solid #ddd',
               borderRadius: '3px',
               outline: 'none',
-              flex: 1,
-              minWidth: 0,
             }}
           />
         </div>

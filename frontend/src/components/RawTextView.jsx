@@ -8,8 +8,9 @@ import RawTextDisplay from './shared/RawTextDisplay';
  * @property {string|undefined} sourceUrl
  * @property {Array} highlightRanges
  * @property {Array} fadeRanges
+ * @property {Array<{start: number, end: number, color: string}>} [coloredRanges]
  */
-function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRanges }) {
+function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRanges, coloredRanges = [] }) {
   const downloadUrl = useMemo(() => {
     const blob = new Blob([rawText], { type: 'text/plain' });
     return URL.createObjectURL(blob);
@@ -46,6 +47,7 @@ function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRa
         articleIndex={0}
         highlightRanges={highlightRanges}
         fadeRanges={fadeRanges}
+        coloredRanges={coloredRanges}
       />
     </div>
   );
