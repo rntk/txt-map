@@ -1,31 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import TopicList from './TopicList';
 import TextDisplay from './TextDisplay';
 import ReadProgress from './ReadProgress';
 import GroupedByTopicsView from './GroupedByTopicsView';
 import TopicSentencesModal from './shared/TopicSentencesModal';
-import DropdownMenu from './shared/DropdownMenu';
-import StatusIndicator from './shared/StatusIndicator';
-import RawTextDisplay from './shared/RawTextDisplay';
-import RefreshButton from './shared/RefreshButton';
 import TextPageActionsPortal from './TextPageActionsPortal';
 import VisualizationPanels from './VisualizationPanels';
 import SummaryTimeline from './SummaryTimeline';
-import SummarySourceMenu from './SummarySourceMenu';
 import TopicSentencePanel from './TopicSentencePanel';
-import MarkupRenderer from './markup/MarkupRenderer';
-import {
-  buildEnrichedRangeGroupsWithFallbacks,
-  buildGroupMarkup,
-  resolveTopicMarkup,
-} from './markup/topicMarkupUtils';
+import TextPageToolbar from './TextPageToolbar';
+import ArticleTabHeader from './ArticleTabHeader';
+import ArticleSummaryView from './ArticleSummaryView';
+import ArticleMarkupView from './ArticleMarkupView';
+import RawTextView from './RawTextView';
+import WordSelectionPopup from './WordSelectionPopup';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { getTopicSelectionKey } from '../utils/chartConstants';
 import { useTextPageData } from '../hooks/useTextPageData';
-import { useTooltip } from '../hooks/useTooltip';
 import '../styles/App.css';
 
 const FULLSCREEN_TABS = [
@@ -45,342 +38,9 @@ const FULLSCREEN_TABS = [
   { key: 'treemap', label: 'Treemap' },
 ];
 
-const TOOLTIP_WIDTH = 260;
-const TOOLTIP_HEIGHT_ESTIMATE = 100;
-const TOOLTIP_VIEWPORT_MARGIN = 10;
-
-function hasNonPlainMarkup(topicMarkup) {
-  return Boolean(
-    topicMarkup
-    && Array.isArray(topicMarkup.segments)
-    && topicMarkup.segments.some(segment => segment?.type !== 'plain')
-  );
-}
-
-function buildArticleMarkupBlocks(sentences, topics, markup) {
-  const safeSentences = Array.isArray(sentences) ? sentences : [];
-  const safeTopics = Array.isArray(topics) ? topics : [];
-  const totalSentences = safeSentences.length;
-
-  if (totalSentences === 0) {
-    return [];
-  }
-
-  const candidateBlocks = [];
-
-  safeTopics.forEach((topic, topicIndex) => {
-    const topicMarkup = resolveTopicMarkup(markup, topic);
-    if (!hasNonPlainMarkup(topicMarkup)) {
-      return;
-    }
-
-    const rangeGroups = buildEnrichedRangeGroupsWithFallbacks(
-      Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],
-      Array.isArray(topic?.sentences) ? topic.sentences : [],
-      Array.isArray(topic?.ranges) ? topic.ranges : []
-    );
-
-    rangeGroups.forEach((rangeGroup, rangeIndex) => {
-      if (!Number.isInteger(rangeGroup?.firstSourceSentenceIndex) || !Number.isInteger(rangeGroup?.lastSourceSentenceIndex)) {
-        return;
-      }
-
-      const groupMarkup = buildGroupMarkup(topicMarkup, rangeGroup);
-      if (!hasNonPlainMarkup(groupMarkup)) {
-        return;
-      }
-
-      candidateBlocks.push({
-        kind: 'markup',
-        key: `${topic?.name || 'topic'}-${topicIndex}-${rangeIndex}-${rangeGroup.firstSourceSentenceIndex}-${rangeGroup.lastSourceSentenceIndex}`,
-        topic,
-        rangeCount: rangeGroups.length,
-        startSentenceIndex: rangeGroup.firstSourceSentenceIndex,
-        endSentenceIndex: rangeGroup.lastSourceSentenceIndex,
-        sentences: groupMarkup.positions.map((position) => position.text || ''),
-        segments: groupMarkup.segments,
-      });
-    });
-  });
-
-  candidateBlocks.sort((left, right) => {
-    if (left.startSentenceIndex !== right.startSentenceIndex) {
-      return left.startSentenceIndex - right.startSentenceIndex;
-    }
-    return left.endSentenceIndex - right.endSentenceIndex;
-  });
-
-  const blocks = [];
-  let cursor = 1;
-
-  const pushPlainBlock = (startSentenceIndex, endSentenceIndex) => {
-    if (startSentenceIndex > endSentenceIndex) {
-      return;
-    }
-
-    blocks.push({
-      kind: 'plain',
-      key: `plain-${startSentenceIndex}-${endSentenceIndex}`,
-      startSentenceIndex,
-      endSentenceIndex,
-      sentences: safeSentences.slice(startSentenceIndex - 1, endSentenceIndex),
-    });
-  };
-
-  candidateBlocks.forEach((block) => {
-    const startSentenceIndex = Math.max(1, block.startSentenceIndex);
-    const endSentenceIndex = Math.min(totalSentences, block.endSentenceIndex);
-
-    if (startSentenceIndex > endSentenceIndex) {
-      return;
-    }
-
-    if (startSentenceIndex < cursor) {
-      return;
-    }
-
-    if (cursor < startSentenceIndex) {
-      pushPlainBlock(cursor, startSentenceIndex - 1);
-    }
-
-    blocks.push({
-      ...block,
-      startSentenceIndex,
-      endSentenceIndex,
-    });
-    cursor = endSentenceIndex + 1;
-  });
-
-  if (cursor <= totalSentences) {
-    pushPlainBlock(cursor, totalSentences);
-  }
-
-  return blocks;
-}
-
-function ArticleMarkupPlainBlock({ sentences, startSentenceIndex }) {
-  const safeSentences = Array.isArray(sentences) ? sentences : [];
-
-  return (
-    <div className="markup-segment">
-      {safeSentences.map((sentence, index) => (
-        <div key={`${startSentenceIndex + index}-${sentence}`} className="markup-plain__sentence">
-          <span className="markup-plain__num">{startSentenceIndex + index}.</span>
-          <span>{sentence}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * @typedef {Object} MarkupTopicBlockProps
- * @property {{
- *   key: string,
- *   topic: { name: string, sentences?: number[] },
- *   rangeCount: number,
- *   startSentenceIndex: number,
- *   endSentenceIndex: number,
- *   sentences: string[],
- *   segments: Array,
- * }} block
- * @property {Array<{ name: string }>} selectedTopics
- * @property {Set<string>|string[]} readTopics
- * @property {(topic: Object) => void} onToggleRead
- * @property {(topic: Object) => void} onToggleTopic
- * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} onNavigateTopic
- * @property {(topic: Object) => void} onShowSentences
- * @property {boolean} tooltipEnabled
- */
-function MarkupTopicBlock({
-  block,
-  selectedTopics,
-  readTopics,
-  onToggleRead,
-  onToggleTopic,
-  onNavigateTopic,
-  onShowSentences,
-  tooltipEnabled,
-}) {
-  const readTopicsSet = useMemo(
-    () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
-    [readTopics]
-  );
-  const safeSelectedTopics = useMemo(
-    () => (Array.isArray(selectedTopics) ? selectedTopics : []),
-    [selectedTopics]
-  );
-  const { tooltip, lastTargetRef, showTooltip, hideTooltip } = useTooltip(tooltipEnabled);
-  const tooltipContainerRef = useRef(null);
-  const blockRef = useRef(null);
-
-  const getTooltipPosition = useCallback((clientX, clientY) => {
-    let x = clientX - 10;
-    let y = clientY - 10;
-
-    const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
-    const maxY = window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
-
-    x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
-    y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
-
-    return { x, y };
-  }, []);
-
-  const openTooltip = useCallback((target, clientX, clientY) => {
-    if (!block?.topic) {
-      hideTooltip();
-      return;
-    }
-
-    if (target === lastTargetRef.current && tooltip) {
-      hideTooltip();
-      return;
-    }
-
-    lastTargetRef.current = target;
-    const { x, y } = getTooltipPosition(clientX, clientY);
-    showTooltip([{ topic: block.topic, rangeCount: block.rangeCount }], x, y);
-  }, [block, getTooltipPosition, hideTooltip, lastTargetRef, showTooltip, tooltip]);
-
-  const handleBlockClick = useCallback((event) => {
-    if (!tooltipEnabled || !blockRef.current) {
-      return;
-    }
-
-    openTooltip(blockRef.current, event.clientX, event.clientY);
-  }, [blockRef, openTooltip, tooltipEnabled]);
-
-  const handleBlockKeyDown = useCallback((event) => {
-    if (!tooltipEnabled || !blockRef.current) {
-      return;
-    }
-
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    event.preventDefault();
-    const rect = blockRef.current.getBoundingClientRect();
-    openTooltip(blockRef.current, rect.left + 24, rect.top + 24);
-  }, [blockRef, openTooltip, tooltipEnabled]);
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (!tooltip) return;
-      if (tooltipContainerRef.current?.contains(event.target)) return;
-      if (blockRef.current?.contains(event.target)) return;
-      hideTooltip();
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        hideTooltip();
-      }
-    };
-
-    document.addEventListener('click', handleOutsideClick, true);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('click', handleOutsideClick, true);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [hideTooltip, tooltip]);
-
-  const tooltipEl = tooltip ? createPortal(
-    <div
-      ref={tooltipContainerRef}
-      className="text-topic-tooltip"
-      style={{ left: tooltip.x, top: tooltip.y }}
-    >
-      {tooltip.topics.map(({ topic, rangeCount }) => {
-        const isRead = readTopicsSet.has(topic.name);
-        const isSelected = safeSelectedTopics.some((selectedTopic) => selectedTopic.name === topic.name);
-
-        return (
-          <div key={topic.name} className="text-topic-tooltip-topic">
-            <div className="text-topic-tooltip-name">{topic.name}</div>
-            {rangeCount > 1 && (
-              <div className="text-topic-tooltip-warning">
-                This topic has {rangeCount} separate ranges. Some may not be visible.
-              </div>
-            )}
-            <div className="text-topic-tooltip-actions">
-              <label className="text-topic-tooltip-toggle">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggleTopic(topic)}
-                  className="text-topic-tooltip-toggle-input"
-                />
-                Highlight
-              </label>
-              <button
-                className="text-topic-tooltip-btn"
-                onClick={() => onToggleRead(topic)}
-              >
-                {isRead ? 'Mark Unread' : 'Mark Read'}
-              </button>
-              <button
-                className="text-topic-tooltip-btn"
-                onClick={() => onNavigateTopic(topic, 'prev')}
-                title="Scroll to previous occurrence"
-              >
-                ‹ Prev
-              </button>
-              <button
-                className="text-topic-tooltip-btn"
-                onClick={() => onNavigateTopic(topic, 'next')}
-                title="Scroll to next occurrence"
-              >
-                Next ›
-              </button>
-              <button
-                className="text-topic-tooltip-btn"
-                onClick={() => {
-                  onShowSentences(topic);
-                  hideTooltip();
-                }}
-                title="Open sentences modal for this topic"
-              >
-                View sentences
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>,
-    document.body
-  ) : null;
-
-  return (
-    <>
-      <div
-        ref={blockRef}
-        className="markup-topic-block"
-        onClick={handleBlockClick}
-        onKeyDown={handleBlockKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={`Show topic actions for ${block.topic.name}`}
-      >
-        <MarkupRenderer
-          segments={block.segments}
-          sentences={block.sentences}
-        />
-      </div>
-      {tooltipEl}
-    </>
-  );
-}
-
-
 function TextPage() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [hoveredTopic, setHoveredTopic] = useState(null);
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('article');
   const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
@@ -550,44 +210,9 @@ function TextPage() {
     }
   }, [fullscreenGraph, navigateTopicSentence]);
 
-  const highlightedBulletIndices = useMemo(() => {
-    if (!selectedTopics.length || !articleBulletMatches.length) return new Set();
-    const selectedNames = new Set(selectedTopics.map(t => t.name));
-    const result = new Set();
-    articleBulletMatches.forEach((matches, idx) => {
-      if (matches.some(m => selectedNames.has(m.topic.name))) result.add(idx);
-    });
-    return result;
-  }, [selectedTopics, articleBulletMatches]);
-
   const handleOpenVisualization = useCallback(() => {
     handleTabClick('topics');
   }, [handleTabClick]);
-
-  const [bulletSourceMenu, setBulletSourceMenu] = useState(null);
-
-  const handleBulletSourceClick = useCallback((e, index) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setBulletSourceMenu({ bulletIndex: index, x: rect.left, y: rect.bottom + 4 });
-  }, []);
-
-  const handleTextSourceClick = useCallback((e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setBulletSourceMenu({ bulletIndex: -1, x: rect.left, y: rect.bottom + 4 });
-  }, []);
-
-  const handleBulletTopicSelect = useCallback((topic, sentenceIndices) => {
-    setBulletSourceMenu(null);
-    setSummaryModalTopic({
-      name: topic.name,
-      displayName: topic.name,
-      fullPath: topic.name,
-      sentenceIndices,
-      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
-    });
-  }, []);
 
   const results = submission?.results || {};
   const safeSentences = useMemo(
@@ -596,61 +221,6 @@ function TextPage() {
   );
   const safeTopics = _safeTopics;
   const rawText = _rawText;
-  const articleMarkupBlocks = useMemo(
-    () => buildArticleMarkupBlocks(safeSentences, safeTopics, submission?.results?.markup),
-    [safeSentences, safeTopics, submission?.results?.markup]
-  );
-
-  const runRefresh = async (tasks, successMessage) => {
-    setActionMessage('');
-    setActionLoading(true);
-    try {
-      const response = await fetch(
-        `/api/submission/${submissionId}/refresh`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tasks })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      setActionMessage(successMessage);
-      fetchSubmission();
-    } catch (err) {
-      setActionMessage(`Action failed: ${err.message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this submission and all its queued tasks? This cannot be undone.')) {
-      return;
-    }
-    setActionMessage('');
-    setActionLoading(true);
-    try {
-      const response = await fetch(
-        `/api/submission/${submissionId}`,
-        { method: 'DELETE' }
-      );
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      setActionMessage('Submission deleted.');
-      window.location.href = '/page/topics';
-    } catch (err) {
-      setActionMessage(`Delete failed: ${err.message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -682,38 +252,11 @@ function TextPage() {
     <div className="app">
       <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
         <TextPageActionsPortal>
-          <DropdownMenu buttonContent={<span>Status</span>}>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Task Status</div>
-            <StatusIndicator tasks={status.tasks} />
-          </DropdownMenu>
-
-          <DropdownMenu buttonContent={<><span style={{ fontSize: '14px', lineHeight: 1 }}>☰</span> Menu</>}>
-            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>Recalculate</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insights_generation'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
-              <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
-            </div>
-
-            <hr style={{ margin: '4px 0', border: 'none', borderTop: '1px solid #eee' }} />
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <RefreshButton submissionId={submissionId} onRefresh={fetchSubmission} compact={false} />
-              <button
-                className="action-btn danger"
-                onClick={handleDelete}
-                disabled={actionLoading}
-                style={{ padding: '6px 10px', fontSize: '12px', textAlign: 'center' }}
-              >
-                Delete
-              </button>
-            </div>
-            {actionMessage && <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '4px', borderRadius: '4px' }}>{actionMessage}</div>}
-          </DropdownMenu>
+          <TextPageToolbar
+            submissionId={submissionId}
+            status={status}
+            onRefresh={fetchSubmission}
+          />
         </TextPageActionsPortal>
 
         {articles.length > 0 && (
@@ -783,226 +326,90 @@ function TextPage() {
                   />
                 )}
               </div>
-          <div className="article-section">
-            <div className="article-header-sticky">
-              <div className="global-menu-links">
-                <button
-                  className={`global-menu-link${activeTab === 'article' ? ' active' : ''}`}
-                  onClick={() => handleTabClick('article')}
-                >
-                  Article
-                </button>
-                <button
-                  className={`global-menu-link${activeTab === 'article_summary' ? ' active' : ''}`}
-                  onClick={() => handleTabClick('article_summary')}
-                >
-                  Summary
-                </button>
-                <button
-                  className={`global-menu-link${activeTab === 'raw_text' ? ' active' : ''}`}
-                  onClick={() => handleTabClick('raw_text')}
-                >
-                  Raw Text
-                </button>
-                <button
-                  className={`global-menu-link${activeTab === 'markup' ? ' active' : ''}`}
-                  onClick={() => handleTabClick('markup')}
-                >
-                  Markup
-                </button>
-              </div>
-              {(activeTab === 'article' || activeTab === 'raw_text') && (
-                <>
-                  <label className="grouped-topics-toggle">
-                    <input
-                      type="checkbox"
-                      checked={groupedByTopics}
-                      onChange={() => setGroupedByTopics(prev => !prev)}
-                    />
-                    Grouped by topics
-                  </label>
-                </>
-              )}
-              {(activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup') && (
-                <>
-                  <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
-                    <input
-                      type="checkbox"
-                      checked={tooltipEnabled}
-                      onChange={() => setTooltipEnabled(prev => !prev)}
-                    />
-                    Show tooltips
-                  </label>
-                </>
-              )}
-              {submission.source_url && (
-                <div style={{ fontSize: '11px', color: '#666' }}>
-                  Source: <a href={submission.source_url} target="_blank" rel="noopener noreferrer">{submission.source_url}</a>
-                </div>
-              )}
-            </div>
-
-            <div className="article-body">
-              {activeTab === 'article_summary' ? (
-                <div className="summary-content">
-                  {articleSummaryText || articleSummaryBullets.length > 0 ? (
-                    <>
-                      {articleSummaryText && (
-                        <div className="summary-text">
-                          <p>
-                            {articleSummaryText}
-                            {articleTextMatches.length > 0 && (
-                              <>
-                                {' '}
-                                <button
-                                  className="summary-source-link"
-                                  onClick={handleTextSourceClick}
-                                >
-                                  [source]
-                                </button>
-                              </>
-                            )}
-                          </p>
-                        </div>
-                      )}
-                      {articleSummaryBullets.length > 0 && (
-                        <div className="summary-text">
-                          <ul>
-                            {articleSummaryBullets.map((bullet, index) => {
-                              const isHighlighted = highlightedBulletIndices.has(index);
-                              const topicBadges = articleBulletMatches[index] || [];
-                              return (
-                                <li
-                                  key={`${index}-${bullet}`}
-                                  style={isHighlighted ? { background: '#fffde7', borderRadius: '3px', padding: '2px 4px', marginLeft: '-4px' } : undefined}
-                                >
-                                  {bullet}
-                                  {topicBadges.slice(0, 3).map(({ topic }) => (
-                                    <button
-                                      key={topic.name}
-                                      className="summary-topic-badge"
-                                      onClick={() => toggleTopic(topic)}
-                                      title={`Select topic: ${topic.name}`}
-                                    >
-                                      {topic.name.split('/').pop()}
-                                    </button>
-                                  ))}
-                                  {articleBulletMatches[index]?.length > 0 && (
-                                    <>
-                                      {' '}
-                                      <button
-                                        className="summary-source-link"
-                                        onClick={(e) => handleBulletSourceClick(e, index)}
-                                      >
-                                        [source]
-                                      </button>
-                                    </>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <p>No summary available. Processing may still be in progress...</p>
-                  )}
-                </div>
-              ) : activeTab === 'markup' ? (
-                <div className="summary-content">
-                  <div className="markup-content">
-                    {articleMarkupBlocks.map((block) => (
-                      block.kind === 'markup' ? (
-                        <MarkupTopicBlock
-                          key={block.key}
-                          block={block}
-                          selectedTopics={selectedTopics}
-                          readTopics={readTopics}
-                          onToggleRead={toggleRead}
-                          onToggleTopic={toggleTopic}
-                          onNavigateTopic={navigateTopicSentence}
-                          onShowSentences={handleShowTopicSentences}
-                          tooltipEnabled={tooltipEnabled}
-                        />
-                      ) : (
-                        <ArticleMarkupPlainBlock
-                          key={block.key}
-                          sentences={block.sentences}
-                          startSentenceIndex={block.startSentenceIndex}
-                        />
-                      )
-                    ))}
-                  </div>
-                </div>
-              ) : groupedByTopics ? (
-                <GroupedByTopicsView
-                  topics={safeTopics}
-                  rawHtml={articles[0]?.raw_html || ''}
-                  sentences={articles[0]?.sentences || []}
-                  isRawTextMode={activeTab === 'raw_text'}
-                  highlightedTopicName={highlightedGroupedTopic}
+              <div className="article-section">
+                <ArticleTabHeader
+                  activeTab={activeTab}
+                  onTabClick={handleTabClick}
+                  groupedByTopics={groupedByTopics}
+                  onToggleGrouped={() => setGroupedByTopics(prev => !prev)}
+                  tooltipEnabled={tooltipEnabled}
+                  onToggleTooltip={() => setTooltipEnabled(prev => !prev)}
+                  sourceUrl={submission.source_url}
                 />
-              ) : activeTab === 'raw_text' ? (
-                <div className="summary-content">
-                  <div className="raw-text-meta" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{rawText.length.toLocaleString()} characters</span>
-                    <button
-                      className="action-btn"
-                      style={{ padding: '2px 8px', fontSize: '11px' }}
-                      onClick={() => navigator.clipboard.writeText(rawText)}
-                    >
-                      Copy
-                    </button>
-                    <a
-                      className="action-btn"
-                      style={{ padding: '2px 8px', fontSize: '11px', textDecoration: 'none', verticalAlign: 'middle' }}
-                      href={URL.createObjectURL(new Blob([rawText], { type: 'text/plain' }))}
-                      download={`${submission.source_url || submissionId}.txt`}
-                    >
-                      Download
-                    </a>
-                  </div>
-                  <RawTextDisplay
-                    rawText={rawText}
-                    articleIndex={0}
-                    highlightRanges={rawTextHighlightRanges}
-                    fadeRanges={rawTextFadeRanges}
-                  />
-                </div>
-              ) : (
-                articles.map((article, index) => (
-                  article.sentences.length === 0 ? (
-                    <div
-                      key={index}
-                      className="article-section"
-                      dangerouslySetInnerHTML={{ __html: (() => { const m = article.raw_html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return m ? m[1] : article.raw_html; })() }}
-                    />
-                  ) : (
-                    <TextDisplay
-                      key={index}
-                      sentences={article.sentences}
+
+                <div className="article-body">
+                  {activeTab === 'article_summary' ? (
+                    <ArticleSummaryView
+                      articleSummaryText={articleSummaryText}
+                      articleSummaryBullets={articleSummaryBullets}
+                      articleBulletMatches={articleBulletMatches}
+                      articleTextMatches={articleTextMatches}
                       selectedTopics={selectedTopics}
-                      hoveredTopic={hoveredTopic}
+                      onToggleTopic={toggleTopic}
+                      onShowTopicSentences={handleShowTopicSentences}
+                    />
+                  ) : activeTab === 'markup' ? (
+                    <ArticleMarkupView
+                      safeSentences={safeSentences}
+                      safeTopics={safeTopics}
+                      markup={submission?.results?.markup}
+                      selectedTopics={selectedTopics}
                       readTopics={readTopics}
-                      articleTopics={article.topics}
-                      articleIndex={index}
-                      topicSummaries={article.topic_summaries}
-                      paragraphMap={article.paragraph_map}
-                      rawHtml={article.raw_html}
-                      markerWordIndices={article.marker_word_indices}
                       onToggleRead={toggleRead}
                       onToggleTopic={toggleTopic}
                       onNavigateTopic={navigateTopicSentence}
                       onShowSentences={handleShowTopicSentences}
                       tooltipEnabled={tooltipEnabled}
-                      submissionId={submissionId}
                     />
-                  )
-                ))
-              )}
-            </div>
-          </div>
+                  ) : groupedByTopics ? (
+                    <GroupedByTopicsView
+                      topics={safeTopics}
+                      rawHtml={articles[0]?.raw_html || ''}
+                      sentences={articles[0]?.sentences || []}
+                      isRawTextMode={activeTab === 'raw_text'}
+                      highlightedTopicName={highlightedGroupedTopic}
+                    />
+                  ) : activeTab === 'raw_text' ? (
+                    <RawTextView
+                      rawText={rawText}
+                      submissionId={submissionId}
+                      sourceUrl={submission.source_url}
+                      highlightRanges={rawTextHighlightRanges}
+                      fadeRanges={rawTextFadeRanges}
+                    />
+                  ) : (
+                    articles.map((article, index) => (
+                      article.sentences.length === 0 ? (
+                        <div
+                          key={index}
+                          className="article-section"
+                          dangerouslySetInnerHTML={{ __html: (() => { const m = article.raw_html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return m ? m[1] : article.raw_html; })() }}
+                        />
+                      ) : (
+                        <TextDisplay
+                          key={index}
+                          sentences={article.sentences}
+                          selectedTopics={selectedTopics}
+                          hoveredTopic={hoveredTopic}
+                          readTopics={readTopics}
+                          articleTopics={article.topics}
+                          articleIndex={index}
+                          topicSummaries={article.topic_summaries}
+                          paragraphMap={article.paragraph_map}
+                          rawHtml={article.raw_html}
+                          markerWordIndices={article.marker_word_indices}
+                          onToggleRead={toggleRead}
+                          onToggleTopic={toggleTopic}
+                          onNavigateTopic={navigateTopicSentence}
+                          onShowSentences={handleShowTopicSentences}
+                          tooltipEnabled={tooltipEnabled}
+                          submissionId={submissionId}
+                        />
+                      )
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1062,20 +469,6 @@ function TextPage() {
           </div>
         )}
 
-      {bulletSourceMenu && (
-        <SummarySourceMenu
-          matches={
-            bulletSourceMenu.bulletIndex === -1
-              ? articleTextMatches
-              : (articleBulletMatches[bulletSourceMenu.bulletIndex] || [])
-          }
-          onSelect={handleBulletTopicSelect}
-          onClose={() => setBulletSourceMenu(null)}
-          x={bulletSourceMenu.x}
-          y={bulletSourceMenu.y}
-        />
-      )}
-
       {!fullscreenGraph && summaryModalTopic && (
         <TopicSentencesModal
           topic={summaryModalTopic}
@@ -1087,29 +480,7 @@ function TextPage() {
         />
       )}
 
-      {selectionData && (
-        <div style={{
-          position: 'fixed',
-          left: selectionData.position.x,
-          top: selectionData.position.y,
-          transform: 'translate(-50%, -100%)',
-          zIndex: 1000,
-          background: '#1976d2',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-        }}>
-          <button 
-            style={{ color: '#fff', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-            onClick={(e) => {
-              e.stopPropagation();
-              window.location.href = `/page/word/${submissionId}/${encodeURIComponent(selectionData.word)}`;
-            }}
-          >
-            Explore Word: "{selectionData.word}"
-          </button>
-        </div>
-      )}
+      <WordSelectionPopup selectionData={selectionData} submissionId={submissionId} />
     </div>
   );
 }

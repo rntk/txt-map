@@ -140,6 +140,10 @@ function VisualizationPanels({
             submissionId={submissionId}
             topics={safeTopics}
             sentences={safeSentences}
+            readTopics={readTopics}
+            onToggleRead={onToggleRead}
+            markup={markup}
+            onShowInArticle={onShowInArticle}
           />
         </FullScreenGraph>
       )}

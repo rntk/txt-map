@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import TopicSentencesModal from './shared/TopicSentencesModal';
 
 // ── Word cloud renderer ────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ function getSentenceIndicesForPath(topics, navPath) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-function TopicsTagCloud({ submissionId, topics, sentences, forcedPathQuery }) {
+function TopicsTagCloud({ submissionId, topics, sentences, forcedPathQuery, readTopics, onToggleRead, markup, onShowInArticle }) {
   const [navPath, setNavPath] = useState([]);
   const [selectedKeyword, setSelectedKeyword] = useState(null);
 
@@ -410,39 +411,21 @@ function TopicsTagCloud({ submissionId, topics, sentences, forcedPathQuery }) {
         )}
       </div>
 
-      {/* Sentences for selected keyword */}
+      {/* Modal for selected keyword sentences */}
       {selectedKeyword && (
-        <div style={{ marginTop: '32px' }}>
-          <div style={{ marginBottom: '10px', fontSize: '14px', fontWeight: '600', color: '#444' }}>
-            Sentences containing "{selectedKeyword}"
-            <span style={{ fontSize: '12px', fontWeight: '400', color: '#888', marginLeft: '8px' }}>
-              {keywordSentences.length} match{keywordSentences.length !== 1 ? 'es' : ''}
-            </span>
-          </div>
-          <div style={{
-            background: '#fafafa',
-            borderRadius: '8px',
-            borderLeft: '3px solid #ffd740',
-            padding: '14px 16px',
-          }}>
-            {keywordSentences.length === 0 ? (
-              <div style={{ color: '#888', fontStyle: 'italic' }}>
-                No matching sentences in this topic scope.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {keywordSentences.map(({ index, text }) => (
-                  <div key={index} style={{ fontSize: '14px', lineHeight: 1.5, color: '#333' }}>
-                    <span style={{ color: '#888', marginRight: '8px', fontSize: '12px' }}>
-                      #{index}
-                    </span>
-                    {text}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <TopicSentencesModal
+          topic={{
+            name: selectedKeyword,
+            displayName: selectedKeyword,
+            sentenceIndices: keywordSentences.map(({ index }) => index),
+          }}
+          sentences={sentences}
+          onClose={() => setSelectedKeyword(null)}
+          readTopics={readTopics}
+          onToggleRead={onToggleRead}
+          markup={markup}
+          onShowInArticle={onShowInArticle}
+        />
       )}
     </div>
   );

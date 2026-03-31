@@ -311,6 +311,9 @@ export default function WordPage() {
                 topics={[]}
                 sentences={allSentences}
                 forcedPathQuery={`word=${encodeURIComponent(word)}`}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
               />
             </div>
           )}
