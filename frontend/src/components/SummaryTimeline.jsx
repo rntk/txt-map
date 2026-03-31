@@ -62,22 +62,35 @@ function SummaryTimeline({
                           </div>
                         ) : null}
                       </div>
-                      {sourceSentenceIndices.length > 0 ? (
-                        sourceSentenceIndices.map((sentenceIndex, sentenceOffset) => (
-                          <div key={`${insight.name}-${sentenceIndex}`} className="timeline-card">
-                            <span className="timeline-label">Sentence {sentenceIndex}</span>
-                            <p className="summary-paragraph-text">
-                              {insight.source_sentences?.[sentenceOffset] || sentences[sentenceIndex - 1] || ''}
-                            </p>
+                      {sourceSentenceIndices.length > 0 ? (() => {
+                        const groups = [];
+                        let currentGroup = [];
+                        sourceSentenceIndices.forEach((idx, i) => {
+                          if (i === 0 || idx === sourceSentenceIndices[i - 1] + 1) {
+                            currentGroup.push({ idx, offset: i });
+                          } else {
+                            groups.push(currentGroup);
+                            currentGroup = [{ idx, offset: i }];
+                          }
+                        });
+                        if (currentGroup.length > 0) groups.push(currentGroup);
+                        return groups.map((group, gi) => (
+                          <div key={`${insight.name}-group-${gi}`} className="timeline-card">
+                            {group.map(({ idx, offset }) => (
+                              <p key={idx} className="summary-paragraph-text">
+                                {insight.source_sentences?.[offset] || sentences[idx - 1] || ''}
+                              </p>
+                            ))}
                           </div>
-                        ))
-                      ) : (
-                        insight.source_sentences?.map((sentenceText, sentenceOffset) => (
-                          <div key={`${insight.name}-unmapped-${sentenceOffset}`} className="timeline-card">
-                            <span className="timeline-label">Source</span>
-                            <p className="summary-paragraph-text">{sentenceText}</p>
+                        ));
+                      })() : (
+                        insight.source_sentences?.length > 0 ? (
+                          <div className="timeline-card">
+                            {insight.source_sentences.map((sentenceText, i) => (
+                              <p key={i} className="summary-paragraph-text">{sentenceText}</p>
+                            ))}
                           </div>
-                        )) || (
+                        ) : (
                           <div className="timeline-card">
                             <p className="timeline-empty-text">No source sentences available.</p>
                           </div>
