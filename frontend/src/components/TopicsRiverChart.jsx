@@ -277,7 +277,7 @@ const TopicsRiverChart = ({
             width: '100%',
             backgroundColor: '#fafafa',
             borderRadius: '8px',
-            padding: '10px',
+            padding: '4px',
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column'
@@ -289,7 +289,7 @@ const TopicsRiverChart = ({
                 onChange={setSelectedLevel}
             />
 
-            <div style={{ height: '520px', width: '100%' }}>
+            <div style={{ height: '450px', width: '100%' }}>
                 <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>
             </div>
 

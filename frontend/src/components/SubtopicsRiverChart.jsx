@@ -315,7 +315,7 @@ const SubtopicsRiverChart = ({
             marginTop: '30px',
             backgroundColor: '#fafafa',
             borderRadius: '8px',
-            padding: '20px',
+            padding: '10px',
             boxSizing: 'border-box'
         }}>
             <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px', padding: '10px', backgroundColor: '#fff' }}>

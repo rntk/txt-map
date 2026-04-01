@@ -11,8 +11,8 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
       style={{
         display: 'flex',
         overflowX: 'auto',
-        gap: '20px',
-        padding: '20px',
+        gap: '10px',
+        padding: '10px',
         height: 'calc(100vh - 200px)', // adjust based on available space
         backgroundColor: '#fafafa',
         alignItems: 'stretch',

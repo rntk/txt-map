@@ -368,16 +368,6 @@ function RadarChart({ topics, sentences = [] }) {
 
     return (
         <div ref={containerRef} className="radar-chart">
-            {/* Header */}
-            <div className="radar-chart-header">
-                <h2 className="radar-chart-title">
-                    Topic Distribution Radar
-                </h2>
-                <p className="radar-chart-subtitle">
-                    Character count by topic at level {selectedLevel} (Total: {totalAllChars.toLocaleString()} chars)
-                </p>
-            </div>
-
             {/* Level Selector */}
             <TopicLevelSwitcher
                 className="radar-chart-level-switcher"

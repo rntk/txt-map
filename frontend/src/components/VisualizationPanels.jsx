@@ -48,7 +48,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
-          <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
+          <div className="topics-bar-chart-container">
             <TopicsBarChart
               topics={allTopics}
               sentences={safeSentences}
@@ -63,7 +63,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'topics_river' && (
         <FullScreenGraph title="Topics River" onClose={onClose}>
-          <div className="topics-river-container" style={{ padding: '20px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
+          <div className="topics-river-container" style={{ padding: '2px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ marginBottom: '60px' }}>
               <h2>Topics River</h2>
               <p>Visualization of topic density across the article.</p>
@@ -101,7 +101,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'marimekko' && (
         <FullScreenGraph title="Marimekko" onClose={onClose}>
-          <div className="marimekko-container" style={{ padding: '20px' }}>
+          <div className="marimekko-container">
             <MarimekkoChartTab
               topics={safeTopics}
               sentences={safeSentences}
@@ -151,9 +151,6 @@ function VisualizationPanels({
       {fullscreenGraph === 'circular_packing' && (
         <FullScreenGraph title="Topic Circles" onClose={onClose}>
           <div className="visualization-panel-shell">
-            <p className="visualization-panel-intro">
-              Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
-            </p>
             <div className="visualization-panel-body">
               <CircularPackingChart
                 topics={safeTopics}
@@ -170,7 +167,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'radar_chart' && (
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <RadarChart
               topics={safeTopics}
               sentences={safeSentences}
@@ -196,7 +193,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'article_structure' && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             <ArticleStructureChart
               topics={safeTopics}
               sentences={safeSentences}

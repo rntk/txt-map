@@ -17,7 +17,7 @@
     background: var(--shell-surface-strong, #ffffff);
     width: 90vw;
     max-width: 1430px;
-    height: 90vh;
+    height: 98vh;
     border-radius: 1rem;
     border: 1px solid var(--shell-border, rgba(29, 30, 27, 0.08));
     box-shadow: var(--shell-shadow-strong, 0 24px 60px rgba(22, 22, 20, 0.1));
@@ -28,7 +28,7 @@
 }
 
 .topic-sentences-modal__header {
-    padding: 0.75rem 1.25rem;
+    padding: 0.35rem 0.6rem;
     background: rgba(248, 248, 245, 0.9);
     border-bottom: 1px solid var(--shell-border, rgba(29, 30, 27, 0.08));
     display: flex;
@@ -67,7 +67,7 @@
 }
 
 .topic-sentences-modal__body {
-    padding: 20px 28px;
+    padding: 10px 14px;
     overflow-y: auto;
 }
 
@@ -286,7 +286,7 @@
 }
 
 .topic-sentences-modal__header-extra {
-    padding: 10px 1.25rem;
+    padding: 5px 0.6rem;
     background: rgba(248, 248, 245, 0.9);
     border-bottom: 1px solid var(--shell-border, #eee);
     font-size: 1.15rem;
@@ -303,7 +303,7 @@
 
 @media (max-width: 720px) {
     .topic-sentences-modal__body {
-        padding: 16px;
+        padding: 10px;
     }
 
     .topic-sentences-modal__enriched-range-header {

@@ -259,7 +259,7 @@ function TopicList({
 
   const buttonStyle = {
     fontSize: '11px',
-    padding: '1px 6px',
+    padding: '3px 8px',
     border: '1px solid #ddd',
     borderRadius: '3px',
     background: '#f9f9f9',
@@ -271,8 +271,8 @@ function TopicList({
   return (
     <>
       {topicTree.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px', flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button onClick={toggleExpandAll} style={buttonStyle}>
               {allExpanded ? 'Fold All' : 'Unfold All'}
             </button>
@@ -290,7 +290,7 @@ function TopicList({
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               fontSize: '12px',
-              padding: '3px 6px',
+              padding: '6px 10px',
               border: '1px solid #ddd',
               borderRadius: '3px',
               outline: 'none',

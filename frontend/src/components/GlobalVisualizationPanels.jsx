@@ -21,7 +21,7 @@ function GlobalVisualizationPanels({
     <>
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
-          <div className="topics-bar-chart-container" style={{ padding: '20px' }}>
+          <div className="topics-bar-chart-container">
             <TopicsBarChart topics={allTopics} sentences={chartSentences} />
           </div>
         </FullScreenGraph>
@@ -37,10 +37,7 @@ function GlobalVisualizationPanels({
 
       {fullscreenGraph === 'circular_packing' && (
         <FullScreenGraph title="Topic Circles" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <p style={{ marginBottom: '12px' }}>
-              Hierarchical circle packing: top-level topics contain their subtopics. Circle size reflects sentence count.
-            </p>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>
               <CircularPackingChart topics={chartTopics} sentences={chartSentences} />
             </div>
@@ -50,7 +47,7 @@ function GlobalVisualizationPanels({
 
       {fullscreenGraph === 'radar_chart' && (
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <RadarChart topics={chartTopics} sentences={chartSentences} />
           </div>
         </FullScreenGraph>
@@ -58,7 +55,7 @@ function GlobalVisualizationPanels({
 
       {fullscreenGraph === 'venn' && (
         <FullScreenGraph title="Venn Diagram" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <TopicsVennChart topics={allTopics} sentences={chartSentences} />
           </div>
         </FullScreenGraph>
@@ -75,7 +72,7 @@ function GlobalVisualizationPanels({
 
       {fullscreenGraph === 'dataset_structure' && (
         <FullScreenGraph title="Dataset Structure" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <ArticleStructureChart topics={chartTopics} sentences={chartSentences} />
           </div>
         </FullScreenGraph>
@@ -83,7 +80,7 @@ function GlobalVisualizationPanels({
 
       {fullscreenGraph === 'treemap' && (
         <FullScreenGraph title="Treemap" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>
               <TreemapChart topics={chartTopics} sentences={chartSentences} />
             </div>

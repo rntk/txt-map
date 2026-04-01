@@ -10,8 +10,8 @@ const styles = {
   nodeContent: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '2px',
-    padding: '6px 0px',
+    gap: '8px',
+    padding: '10px 0px',
     borderBottom: '1px solid #f0f0f0',
   },
   guideLine: {
@@ -32,9 +32,9 @@ const styles = {
   titleRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '6px',
     flexWrap: 'wrap',
-    marginBottom: '2px',
+    marginBottom: '6px',
   },
   topicTitle: {
     cursor: 'pointer',
@@ -52,14 +52,14 @@ const styles = {
   buttonsRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '2px',
+    gap: '6px',
     flexWrap: 'wrap',
-    marginTop: '1px',
-    marginBottom: '1px',
+    marginTop: '4px',
+    marginBottom: '4px',
   },
   button: {
     fontSize: '11px',
-    padding: '1px 4px',
+    padding: '3px 8px',
     border: '1px solid #ddd',
     borderRadius: '3px',
     background: '#f9f9f9',
@@ -74,7 +74,7 @@ const styles = {
   summaryRow: {
     fontSize: '11px',
     color: '#666',
-    marginTop: '1px',
+    marginTop: '6px',
     fontStyle: 'italic',
   },
   checkbox: {

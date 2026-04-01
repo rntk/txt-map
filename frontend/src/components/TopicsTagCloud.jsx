@@ -307,7 +307,7 @@ function TopicsTagCloud({ submissionId, topics, sentences, forcedPathQuery, read
   const handleBreadcrumbClick = (index) => setNavPath(navPath.slice(0, index + 1));
 
   return (
-    <div className="topics-tag-cloud-root" style={{ padding: '20px' }}>
+    <div className="topics-tag-cloud-root" style={{ padding: '2px' }}>
       {/* Breadcrumb + back button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {!isRoot && (

@@ -19,8 +19,8 @@ import { useContainerSize } from '../hooks/useContainerSize';
 export { buildScopedChartData, getScopedMaxLevel };
 
 const MIN_BLOCK_WIDTH = 120;
-const MARGIN = { top: 36, right: 24, bottom: 50, left: 68 };
-const HEIGHT_RATIO = 0.9; // Use 90% of available container height
+const MARGIN = { top: 20, right: 16, bottom: 32, left: 50 };
+const HEIGHT_RATIO = 0.95; // Use 95% of available container height
 
 function rollingAverage(data, windowSize) {
     const half = Math.floor(windowSize / 2);
@@ -154,13 +154,6 @@ function ArticleStructureChart({
 
     return (
         <div ref={containerRef} className="article-structure-chart">
-            <div className="article-structure-header">
-                <h2 className="article-structure-title">Article Structure</h2>
-                <p className="article-structure-subtitle">
-                    Colored bands show topics by order of appearance. Click a topic to drill into its subtopics.
-                </p>
-            </div>
-
             <div className="article-structure-controls">
                 <Breadcrumbs scopePath={scopePath} onNavigate={navigateTo} />
 
