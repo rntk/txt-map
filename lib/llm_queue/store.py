@@ -1,8 +1,8 @@
 """MongoDB operations for the LLM request queue."""
 
 import uuid
-from datetime import datetime, UTC
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any, Optional, Sequence
 
 from pymongo.database import Database
 
@@ -119,13 +119,17 @@ class LLMQueueStore:
         result = self._col.delete_one({"request_id": request_id})
         return result.deleted_count > 0
 
-    def cleanup_old(self, max_age_hours: int = 24) -> int:
-        """Delete completed/failed requests older than max_age_hours."""
-        from datetime import timedelta
+    def cleanup_old(
+        self,
+        max_age_hours: int = 24,
+        statuses: Optional[Sequence[str]] = None,
+    ) -> int:
+        """Delete old requests for the given terminal statuses."""
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        statuses_to_delete = list(statuses) if statuses is not None else ["completed", "failed"]
         result = self._col.delete_many(
             {
-                "status": {"$in": ["completed", "failed"]},
+                "status": {"$in": statuses_to_delete},
                 "completed_at": {"$lt": cutoff},
             }
         )

@@ -36,6 +36,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+COMPLETED_TASK_RETENTION_HOURS: int = 48
+
 
 class LLMWorker:
     """Consumes pending requests from the LLM queue and executes them."""
@@ -151,6 +153,16 @@ def main() -> None:
     AppSettingsStorage(db).prepare()
     queue_store = LLMQueueStore(db)
     queue_store.prepare()
+    deleted_count = queue_store.cleanup_old(
+        max_age_hours=COMPLETED_TASK_RETENTION_HOURS,
+        statuses=["completed"],
+    )
+    if deleted_count:
+        logger.info(
+            "Removed %s completed LLM queue requests older than %s hours",
+            deleted_count,
+            COMPLETED_TASK_RETENTION_HOURS,
+        )
     cache_store = MongoLLMCacheStore(db)
     cache_store.prepare()
 
