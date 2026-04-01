@@ -74,13 +74,13 @@ function TextPageToolbar({ submissionId, status, onRefresh }) {
       <DropdownMenu buttonContent={<><span style={{ fontSize: '14px', lineHeight: 1 }}>☰</span> Menu</>}>
         <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>Recalculate</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insights_generation'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
-          <button className="action-btn" style={{ padding: '4px 8px', fontSize: '11px', textAlign: 'left' }} onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insights_generation'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
+          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
         </div>
 
         <hr style={{ margin: '4px 0', border: 'none', borderTop: '1px solid #eee' }} />
@@ -88,10 +88,9 @@ function TextPageToolbar({ submissionId, status, onRefresh }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <RefreshButton submissionId={submissionId} onRefresh={onRefresh} compact={false} />
           <button
-            className="action-btn danger"
+            className="action-btn danger action-btn-toolbar large centered"
             onClick={handleDelete}
             disabled={actionLoading}
-            style={{ padding: '6px 10px', fontSize: '12px', textAlign: 'center' }}
           >
             Delete
           </button>

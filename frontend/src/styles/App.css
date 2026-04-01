@@ -179,6 +179,21 @@ body {
   color: #c62828;
 }
 
+.action-btn-toolbar {
+  padding: 4px 8px;
+  font-size: 11px;
+  text-align: left;
+}
+
+.action-btn-toolbar.centered {
+  text-align: center;
+}
+
+.action-btn-toolbar.large {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
 
 .tab-bar {
   display: flex;
