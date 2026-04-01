@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { buildTopicTree, getSubtreeStats as getSubtreeStatsUtil } from '../utils/topicTree';
 import TopicTreeNode from './TopicTreeNode';
 import { getTopicSelectionKey } from '../utils/chartConstants';
+import { getTopicCSSClass, getTopicHighlightColor } from '../utils/topicColorUtils';
 import './TopicNavigation.css';
 
 /**
@@ -21,6 +22,8 @@ import './TopicNavigation.css';
  * @typedef {Object} TopicListProps
  * @property {Array<TopicListTopic>} [topics]
  * @property {Array<TopicListTopic>} [selectedTopics]
+ * @property {Array<InsightListItem>} [insights]
+ * @property {'topics' | 'insights'} [sidebarTab]
  * @property {(topic: TopicListTopic) => void} [onToggleTopic]
  * @property {(topic: TopicListTopic) => void} [onHoverTopic]
  * @property {Set<string> | Iterable<string>} [readTopics]
@@ -33,6 +36,21 @@ import './TopicNavigation.css';
  * @property {() => void} [onOpenVisualization]
  * @property {boolean} [highlightAllTopics]
  * @property {() => void} [onToggleHighlightAll]
+ * @property {(tab: 'topics' | 'insights') => void} [onSidebarTabChange]
+ * @property {string | null} [activeInsightId]
+ * @property {(insight: InsightListItem) => void} [onSelectInsight]
+ * @property {boolean} [highlightInsightTopics]
+ * @property {() => void} [onToggleHighlightInsightTopics]
+ */
+
+/**
+ * @typedef {Object} InsightListItem
+ * @property {string} id
+ * @property {string} name
+ * @property {number} [firstSentenceIndex]
+ * @property {Array<number>} [sourceSentenceIndices]
+ * @property {Array<string>} [sourceSentences]
+ * @property {Array<string>} [topicNames]
  */
 
 /**
@@ -44,6 +62,8 @@ import './TopicNavigation.css';
 function TopicList({
   topics = [],
   selectedTopics = [],
+  insights = [],
+  sidebarTab = 'topics',
   onToggleTopic = () => {},
   onHoverTopic: _onHoverTopic = () => {},
   readTopics = new Set(),
@@ -56,9 +76,15 @@ function TopicList({
   onOpenVisualization,
   highlightAllTopics = false,
   onToggleHighlightAll = () => {},
+  onSidebarTabChange = () => {},
+  activeInsightId = null,
+  onSelectInsight = () => {},
+  highlightInsightTopics = false,
+  onToggleHighlightInsightTopics = () => {},
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [insightSearchQuery, setInsightSearchQuery] = useState('');
 
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -68,6 +94,12 @@ function TopicList({
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
     [readTopics]
   );
+  const safeInsights = useMemo(
+    () => (Array.isArray(insights) ? insights : []),
+    [insights]
+  );
+  const hasInsights = safeInsights.length > 0;
+  const currentSidebarTab = hasInsights ? sidebarTab : 'topics';
 
   const topicTree = useMemo(() => buildTopicTree(topics), [topics]);
   const getSubtreeStats = useCallback((treeNode) => getSubtreeStatsUtil(treeNode), []);
@@ -257,6 +289,41 @@ function TopicList({
     return topicTree.map(filterNode).filter(Boolean);
   }, [topicTree, searchQuery]);
 
+  const filteredInsights = useMemo(() => {
+    if (!insightSearchQuery.trim()) {
+      return safeInsights;
+    }
+
+    const query = insightSearchQuery.trim().toLowerCase();
+    return safeInsights.filter((insight) => {
+      const haystacks = [
+        insight.name,
+        ...(Array.isArray(insight.topicNames) ? insight.topicNames : []),
+        ...(Array.isArray(insight.sourceSentences) ? insight.sourceSentences : []),
+      ];
+      return haystacks.some((value) => String(value || '').toLowerCase().includes(query));
+    });
+  }, [insightSearchQuery, safeInsights]);
+  const insightTopicStyleSheet = useMemo(() => {
+    if (!highlightInsightTopics) {
+      return '';
+    }
+
+    const seen = new Set();
+    const lines = [];
+    safeInsights.forEach((insight) => {
+      (Array.isArray(insight.topicNames) ? insight.topicNames : []).forEach((topicName) => {
+        const cssClass = getTopicCSSClass(topicName);
+        if (seen.has(cssClass)) {
+          return;
+        }
+        seen.add(cssClass);
+        lines.push(`.${cssClass} { --topic-highlight-color: ${getTopicHighlightColor(topicName)}; }`);
+      });
+    });
+    return lines.join('\n');
+  }, [highlightInsightTopics, safeInsights]);
+
   const [allExpanded, setAllExpanded] = useState(false);
 
   const toggleExpandAll = useCallback(() => {
@@ -305,7 +372,32 @@ function TopicList({
 
   return (
     <>
-      {topicTree.length > 0 && (
+      {hasInsights && (
+        <div className="topic-nav-panel">
+          <div className="topic-nav-sidebar-tabs" role="tablist" aria-label="Sidebar navigation tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentSidebarTab === 'topics'}
+              className={`topic-nav-sidebar-tab${currentSidebarTab === 'topics' ? ' topic-nav-sidebar-tab--active' : ''}`}
+              onClick={() => onSidebarTabChange('topics')}
+            >
+              Topics
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentSidebarTab === 'insights'}
+              className={`topic-nav-sidebar-tab${currentSidebarTab === 'insights' ? ' topic-nav-sidebar-tab--active' : ''}`}
+              onClick={() => onSidebarTabChange('insights')}
+            >
+              Insights
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentSidebarTab === 'topics' && topicTree.length > 0 && (
         <div className="topic-nav-panel">
           <div className="topic-nav-toolbar">
             <div className="topic-nav-toolbar__group">
@@ -338,8 +430,33 @@ function TopicList({
         </div>
       )}
 
+      {currentSidebarTab === 'insights' && hasInsights && (
+        <div className="topic-nav-panel">
+          <div className="topic-nav-toolbar">
+            <div className="topic-nav-toolbar__group">
+              <button
+                type="button"
+                onClick={onToggleHighlightInsightTopics}
+                className={`topic-nav-button${highlightInsightTopics ? ' topic-nav-button--active' : ''}`}
+              >
+                {highlightInsightTopics ? 'Clear Colors' : 'Color Insight Topics'}
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Filter insights..."
+              value={insightSearchQuery}
+              onChange={(event) => setInsightSearchQuery(event.target.value)}
+              className="topic-nav-filter"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="topic-nav-results">
-        {topicTree.length === 0 ? (
+        {insightTopicStyleSheet ? <style>{insightTopicStyleSheet}</style> : null}
+        {currentSidebarTab === 'topics' ? (
+          topicTree.length === 0 ? (
           <div className="topic-nav-empty">No topics yet.</div>
         ) : filteredTree.length === 0 ? (
           <div className="topic-nav-empty">No matching topics.</div>
@@ -348,6 +465,53 @@ function TopicList({
             {filteredTree.map((treeNode) => (
               <TopicTreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} {...nodeProps} />
             ))}
+          </ul>
+          )
+        ) : !hasInsights ? (
+          <div className="topic-nav-empty">No insights yet.</div>
+        ) : filteredInsights.length === 0 ? (
+          <div className="topic-nav-empty">No matching insights.</div>
+        ) : (
+          <ul className="topic-nav-list topic-nav-list--insights">
+            {filteredInsights.map((insight) => {
+              const topicNames = Array.isArray(insight.topicNames) ? insight.topicNames : [];
+              const sentenceCount = Array.isArray(insight.sourceSentenceIndices) && insight.sourceSentenceIndices.length > 0
+                ? insight.sourceSentenceIndices.length
+                : Array.isArray(insight.sourceSentences)
+                  ? insight.sourceSentences.length
+                  : 0;
+
+              return (
+                <li key={insight.id} className="topic-nav-insight">
+                  <button
+                    type="button"
+                    className={`topic-nav-insight__card${activeInsightId === insight.id ? ' topic-nav-insight__card--active' : ''}`}
+                    onClick={() => onSelectInsight(insight)}
+                  >
+                    <div className="topic-nav-insight__header">
+                      <span className="topic-nav-insight__title">{insight.name}</span>
+                      <span className="topic-nav-insight__meta">
+                        {sentenceCount} sent.
+                      </span>
+                    </div>
+                    {topicNames.length > 0 ? (
+                      <div className="topic-nav-insight__topics">
+                        {topicNames.map((topicName) => (
+                          <span
+                            key={topicName}
+                            className={`topic-nav-insight__topic${highlightInsightTopics ? ` ${getTopicCSSClass(topicName)}` : ''}`}
+                          >
+                            {topicName.split('>').pop().trim()}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="topic-nav-insight__empty">No linked topics</div>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

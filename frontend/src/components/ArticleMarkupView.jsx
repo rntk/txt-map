@@ -366,6 +366,7 @@ function MarkupTopicBlock({
  * @property {(topic: Object) => void} onShowSentences
  * @property {boolean} tooltipEnabled
  * @property {boolean} [coloredHighlightMode]
+ * @property {Set<string>|string[]} [coloredTopicNames]
  */
 function ArticleMarkupView({
   safeSentences,
@@ -379,7 +380,12 @@ function ArticleMarkupView({
   onShowSentences,
   tooltipEnabled,
   coloredHighlightMode = false,
+  coloredTopicNames = null,
 }) {
+  const safeColoredTopicNames = useMemo(
+    () => (coloredTopicNames instanceof Set ? coloredTopicNames : coloredTopicNames ? new Set(coloredTopicNames) : null),
+    [coloredTopicNames]
+  );
   const articleMarkupBlocks = useMemo(
     () => buildArticleMarkupBlocks(safeSentences, safeTopics, markup),
     [safeSentences, safeTopics, markup]
@@ -390,6 +396,9 @@ function ArticleMarkupView({
     if (!coloredHighlightMode) return null;
     const map = new Map();
     (Array.isArray(safeTopics) ? safeTopics : []).forEach(topic => {
+      if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
+        return;
+      }
       const color = getTopicHighlightColor(topic.name);
       (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(sentenceNum => {
         if (!map.has(sentenceNum)) {
@@ -398,13 +407,14 @@ function ArticleMarkupView({
       });
     });
     return map;
-  }, [coloredHighlightMode, safeTopics]);
+  }, [coloredHighlightMode, safeColoredTopicNames, safeTopics]);
 
   return (
     <div className="summary-content reading-markup">
       <div className="markup-content reading-markup__content">
         {articleMarkupBlocks.map((block) => (
           block.kind === 'markup' ? (
+            (!safeColoredTopicNames || safeColoredTopicNames.has(block.topic.name)) ? (
             <MarkupTopicBlock
               key={block.key}
               block={block}
@@ -417,6 +427,7 @@ function ArticleMarkupView({
               tooltipEnabled={tooltipEnabled}
               coloredHighlightMode={coloredHighlightMode}
             />
+            ) : null
           ) : (
             <ArticleMarkupPlainBlock
               key={block.key}

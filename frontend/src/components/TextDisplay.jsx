@@ -33,12 +33,15 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {(topic: Object) => void} [onShowSentences]
  * @property {string[]} [highlightWords] - Words to highlight in the text
  * @property {boolean} [coloredHighlightMode] - When true, all topics are highlighted with per-topic muted colors
+ * @property {Array<number>} [activeInsightSentenceIndices]
+ * @property {Array<{start: number, end: number}>} [activeInsightRanges]
+ * @property {Set<string> | string[]} [coloredTopicNames]
  */
 
 /**
  * @param {TextDisplayProps} props
  */
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords, coloredHighlightMode = false }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords, coloredHighlightMode = false, activeInsightSentenceIndices = [], activeInsightRanges = [], coloredTopicNames = null }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -51,7 +54,26 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   const readTopicsSet = useMemo(() => 
     readTopics instanceof Set ? readTopics : new Set(readTopics || [])
   , [readTopics]);
+  const safeColoredTopicNames = useMemo(
+    () => (coloredTopicNames instanceof Set ? coloredTopicNames : coloredTopicNames ? new Set(coloredTopicNames) : null),
+    [coloredTopicNames]
+  );
   const safeParagraphMap = paragraphMap && typeof paragraphMap === 'object' ? paragraphMap : null;
+  const activeInsightSentenceIndexSet = useMemo(
+    () => new Set((Array.isArray(activeInsightSentenceIndices) ? activeInsightSentenceIndices : [])
+      .filter((value) => Number.isInteger(value))
+      .map((value) => value - 1)),
+    [activeInsightSentenceIndices]
+  );
+  const safeActiveInsightRanges = useMemo(
+    () => (Array.isArray(activeInsightRanges) ? activeInsightRanges
+      .map((range) => ({
+        start: Number(range?.start),
+        end: Number(range?.end),
+      }))
+      .filter((range) => Number.isFinite(range.start) && Number.isFinite(range.end) && range.end > range.start) : []),
+    [activeInsightRanges]
+  );
 
   // Get highlight words from prop or context
   const contextHighlightWords = useContext(HighlightContext);
@@ -98,6 +120,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     if (!coloredHighlightMode) return [];
     const ranges = [];
     safeArticleTopics.forEach(topic => {
+      if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
+        return;
+      }
       const cssClass = getTopicCSSClass(topic.name);
       (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
         const start = Number(range.start);
@@ -108,7 +133,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       });
     });
     return ranges;
-  }, [coloredHighlightMode, safeArticleTopics]);
+  }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
 
   // CSS stylesheet for topic highlight classes (used in rawHtml path)
   const topicStyleSheet = useMemo(() => {
@@ -116,6 +141,9 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     const seen = new Set();
     const lines = [];
     safeArticleTopics.forEach(topic => {
+      if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
+        return;
+      }
       const cssClass = getTopicCSSClass(topic.name);
       if (!seen.has(cssClass)) {
         seen.add(cssClass);
@@ -123,13 +151,16 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       }
     });
     return lines.join('\n');
-  }, [coloredHighlightMode, safeArticleTopics]);
+  }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
 
   // Per-sentence color map for sentence/paragraph rendering in "Highlight All" mode
   const sentenceColorMap = useMemo(() => {
     if (!coloredHighlightMode) return null;
     const map = new Map();
     safeArticleTopics.forEach(topic => {
+      if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
+        return;
+      }
       const color = getTopicHighlightColor(topic.name);
       (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(num => {
         const idx = num - 1;
@@ -139,7 +170,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
       });
     });
     return map;
-  }, [coloredHighlightMode, safeArticleTopics]);
+  }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
 
   // Sentence-index-based sets for non-rawHtml fallback paths
   const fadedIndices = useMemo(() => {
@@ -167,17 +198,23 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
         relatedTopic.sentences.forEach(num => set.add(num - 1));
       }
     }
+    activeInsightSentenceIndexSet.forEach((index) => set.add(index));
     return set;
-  }, [safeSelectedTopics, hoveredTopic, safeArticleTopics]);
+  }, [safeSelectedTopics, hoveredTopic, safeArticleTopics, activeInsightSentenceIndexSet]);
+
+  const effectiveHighlightRanges = useMemo(
+    () => [...highlightRanges, ...safeActiveInsightRanges],
+    [highlightRanges, safeActiveInsightRanges]
+  );
 
   const highlightedRawHtml = useMemo(() => buildHighlightedRawHtml(
     rawHtml,
     safeArticleTopics,
     articleIndex,
-    highlightRanges,
+    effectiveHighlightRanges,
     fadeRanges,
     coloredRanges
-  ), [rawHtml, safeArticleTopics, articleIndex, highlightRanges, fadeRanges, coloredRanges]);
+  ), [rawHtml, safeArticleTopics, articleIndex, effectiveHighlightRanges, fadeRanges, coloredRanges]);
 
   const sentenceToTopicsEnding = useMemo(() => {
     const map = new Map();
@@ -600,7 +637,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                     id={`sentence-${articleIndex}-${index}`}
                     data-article-index={articleIndex}
                     data-sentence-index={index}
-                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}`}
+                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}${activeInsightSentenceIndexSet.has(index) ? ' reading-article__sentence--insight-active' : ''}`}
                     style={getColoredSentenceStyle(index)}
                     dangerouslySetInnerHTML={{ __html: sanitizeHTML(text) + ' ' }}
                   />
@@ -640,7 +677,7 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                 id={`sentence-${articleIndex}-${index}`}
                 data-article-index={articleIndex}
                 data-sentence-index={index}
-                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}`}
+                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}${activeInsightSentenceIndexSet.has(index) ? ' reading-article__sentence--insight-active' : ''}`}
                 style={getColoredSentenceStyle(index)}
               >
                 {effectiveHighlightWords ? (

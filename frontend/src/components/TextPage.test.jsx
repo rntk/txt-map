@@ -281,6 +281,275 @@ describe('TextPage raw text navigation', () => {
     expect(screen.getAllByText('Alpha Beta Gamma').length).toBeGreaterThan(0);
   });
 
+  it('renders the sidebar insights tab and highlights insight sentences when clicked', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('button', { name: /Important connection/i }));
+
+    await waitFor(() => {
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+    expect(screen.getByText('Important connection')).toBeInTheDocument();
+    expect(screen.getByText('Alpha Beta Gamma').closest('.reading-article__sentence')).toHaveClass('reading-article__sentence--insight-active');
+  });
+
+  it('colors only insight-linked topics from the sidebar insights pane', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          text_content: 'Alpha Beta Gamma Delta',
+          results: {
+            ...mockSubmission.results,
+            sentences: ['Alpha Beta Gamma Delta'],
+            topics: [
+              {
+                name: 'Topic1',
+                sentences: [1],
+                ranges: [{ start: 6, end: 10, sentence_start: 1, sentence_end: 1 }],
+              },
+              {
+                name: 'Topic2',
+                sentences: [1],
+                ranges: [{ start: 17, end: 22, sentence_start: 1, sentence_end: 1 }],
+              },
+            ],
+            insights: [
+              {
+                name: 'Important connection',
+                topics: ['Topic1'],
+                source_sentence_indices: [1],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    const { container } = render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Color Insight Topics' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.raw-text-token')).toHaveLength(1);
+    });
+
+    expect(container.querySelector('.raw-text-token')).toHaveTextContent('Beta');
+  });
+
+  it('scrolls to insights that only provide source_sentences without source_sentence_indices', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          results: {
+            ...mockSubmission.results,
+            sentences: ['First sentence.', 'Second sentence.', 'Third sentence.'],
+            topics: [
+              {
+                name: 'Topic1',
+                sentences: [3],
+                ranges: [{ start: 0, end: 0, sentence_start: 3, sentence_end: 3 }],
+              },
+            ],
+            insights: [
+              {
+                name: 'Later insight',
+                source_sentences: ['Third sentence.'],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('button', { name: /Later insight/i }));
+
+    await waitFor(() => {
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+    expect(screen.getByText('Third sentence.').closest('.reading-article__sentence')).toHaveClass('reading-article__sentence--insight-active');
+  });
+
+  it('falls back to raw-html text matching for insight scrolling when no sentence span anchor exists', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          html_content: '<p>Intro.</p><p>Later sentence inside raw html.</p><p>Outro.</p>',
+          results: {
+            ...mockSubmission.results,
+            sentences: ['Intro.', 'Later sentence inside raw html.', 'Outro.'],
+            topics: [],
+            insights: [
+              {
+                name: 'Later insight',
+                source_sentences: ['Later sentence inside raw html.'],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('button', { name: /Later insight/i }));
+
+    await waitFor(() => {
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+  });
+
+  it('shows sidebar insights in article order based on resolved sentence positions', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          results: {
+            ...mockSubmission.results,
+            sentences: ['First sentence.', 'Second sentence.', 'Third sentence.'],
+            topics: [],
+            insights: [
+              {
+                name: 'Third insight',
+                source_sentences: ['Third sentence.'],
+              },
+              {
+                name: 'First insight',
+                source_sentences: ['First sentence.'],
+              },
+              {
+                name: 'Second insight',
+                source_sentences: ['Second sentence.'],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+
+    const insightTitles = Array.from(document.querySelectorAll('.topic-nav-insight__title'));
+
+    expect(insightTitles.map((element) => element.textContent)).toEqual([
+      'First insight',
+      'Second insight',
+      'Third insight',
+    ]);
+  });
+
+  it('orders and scrolls insights when source_sentences only partially match canonical article sentences', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          results: {
+            ...mockSubmission.results,
+            sentences: [
+              'First sentence has a long canonical form for matching.',
+              'Second sentence has another long canonical form for matching.',
+              'Third sentence has a long canonical form for matching.',
+            ],
+            topics: [
+              {
+                name: 'Topic1',
+                sentences: [3],
+                ranges: [{ start: 0, end: 0, sentence_start: 3, sentence_end: 3 }],
+              },
+            ],
+            insights: [
+              {
+                name: 'Third insight',
+                source_sentences: ['Third sentence has a long canonical form'],
+              },
+              {
+                name: 'Second insight',
+                source_sentences: ['Second sentence has another long canonical form'],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+
+    const insightTitles = Array.from(document.querySelectorAll('.topic-nav-insight__title'));
+    expect(insightTitles.map((element) => element.textContent)).toEqual([
+      'Second insight',
+      'Third insight',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: /Third insight/i }));
+
+    await waitFor(() => {
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+  });
+
   it('renders the Markup tab in article order without duplicating the original source sentence', async () => {
     global.fetch = vi.fn(async (url) => {
       if (String(url).includes('/api/submission/test-submission-id/status')) {

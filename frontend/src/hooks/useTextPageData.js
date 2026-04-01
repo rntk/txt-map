@@ -35,8 +35,198 @@ function mapInsightSentenceIndicesToTopics(insight, topics) {
     return [...new Set(topicMatches.map((match) => match.topicName))];
 }
 
+function normalizeSentenceText(text) {
+    return String(text || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function alignInsightSourceSentences(sourceSentences, resultsSentences) {
+    if (!Array.isArray(sourceSentences) || sourceSentences.length === 0 || !Array.isArray(resultsSentences) || resultsSentences.length === 0) {
+        return [];
+    }
+
+    const normalizedIndexMap = new Map();
+    resultsSentences.forEach((sentence, index) => {
+        const normalized = normalizeSentenceText(sentence);
+        if (!normalized) {
+            return;
+        }
+        if (!normalizedIndexMap.has(normalized)) {
+            normalizedIndexMap.set(normalized, []);
+        }
+        normalizedIndexMap.get(normalized).push(index + 1);
+    });
+
+    const occurrenceCursor = new Map();
+    const alignedIndices = [];
+
+    sourceSentences.forEach((sourceSentence) => {
+        const normalized = normalizeSentenceText(sourceSentence);
+        const candidateIndices = normalizedIndexMap.get(normalized) || [];
+        const candidatePosition = occurrenceCursor.get(normalized) || 0;
+        if (candidatePosition >= candidateIndices.length) {
+            return;
+        }
+        alignedIndices.push(candidateIndices[candidatePosition]);
+        occurrenceCursor.set(normalized, candidatePosition + 1);
+    });
+
+    return alignedIndices;
+}
+
+function findMatchingResultSentenceIndices(sourceSentence, resultsSentences) {
+    const normalizedSourceSentence = normalizeSentenceText(sourceSentence);
+    if (!normalizedSourceSentence || !Array.isArray(resultsSentences) || resultsSentences.length === 0) {
+        return [];
+    }
+
+    const matches = [];
+    resultsSentences.forEach((resultSentence, index) => {
+        const normalizedResultSentence = normalizeSentenceText(resultSentence);
+        if (!normalizedResultSentence) {
+            return;
+        }
+
+        if (normalizedResultSentence === normalizedSourceSentence) {
+            matches.push(index + 1);
+            return;
+        }
+
+        if (
+            normalizedSourceSentence.length >= 24
+            && (
+                normalizedSourceSentence.includes(normalizedResultSentence)
+                || normalizedResultSentence.includes(normalizedSourceSentence)
+            )
+        ) {
+            matches.push(index + 1);
+        }
+    });
+
+    return matches;
+}
+
+function getInsightRangeSentenceIndices(insight, resultsSentences) {
+    const safeResultsSentences = Array.isArray(resultsSentences) ? resultsSentences : [];
+    const maxSentenceIndex = safeResultsSentences.length;
+    const indices = [];
+
+    (Array.isArray(insight?.ranges) ? insight.ranges : []).forEach((range) => {
+        const start = Number(range?.start);
+        const end = Number(range?.end);
+        if (!Number.isInteger(start) || !Number.isInteger(end) || start > end) {
+            return;
+        }
+
+        for (let sentenceIndex = start + 1; sentenceIndex <= end + 1; sentenceIndex += 1) {
+            if (sentenceIndex >= 1 && (maxSentenceIndex === 0 || sentenceIndex <= maxSentenceIndex)) {
+                indices.push(sentenceIndex);
+            }
+        }
+    });
+
+    return [...new Set(indices)];
+}
+
+function resolveInsightSentenceIndices(insight, resultsSentences) {
+    const explicitSentenceIndices = Array.isArray(insight?.source_sentence_indices)
+        ? insight.source_sentence_indices.filter((value) => Number.isInteger(value))
+        : [];
+    if (explicitSentenceIndices.length > 0) {
+        return explicitSentenceIndices;
+    }
+
+    const sourceSentences = Array.isArray(insight?.source_sentences)
+        ? insight.source_sentences.filter((sentence) => typeof sentence === 'string' && sentence.trim())
+        : [];
+    const exactAlignedIndices = alignInsightSourceSentences(sourceSentences, resultsSentences);
+    if (exactAlignedIndices.length > 0) {
+        return exactAlignedIndices;
+    }
+
+    const fuzzyAlignedIndices = [];
+    const usedIndices = new Set();
+    let lastMatchedIndex = 0;
+
+    sourceSentences.forEach((sourceSentence) => {
+        const candidateIndices = findMatchingResultSentenceIndices(sourceSentence, resultsSentences);
+        if (candidateIndices.length === 0) {
+            return;
+        }
+
+        const nextMonotonicMatch = candidateIndices.find((index) => index > lastMatchedIndex && !usedIndices.has(index));
+        const nextUnusedMatch = candidateIndices.find((index) => !usedIndices.has(index));
+        const chosenIndex = nextMonotonicMatch || nextUnusedMatch || candidateIndices[0];
+
+        fuzzyAlignedIndices.push(chosenIndex);
+        usedIndices.add(chosenIndex);
+        lastMatchedIndex = chosenIndex;
+    });
+
+    if (fuzzyAlignedIndices.length > 0) {
+        return fuzzyAlignedIndices;
+    }
+
+    return getInsightRangeSentenceIndices(insight, resultsSentences);
+}
+
+function buildInsightMatchingRanges(sourceSentenceIndices, topicRefs) {
+    if (!Array.isArray(sourceSentenceIndices) || sourceSentenceIndices.length === 0) {
+        return [];
+    }
+
+    const sentenceIndexSet = new Set(
+        sourceSentenceIndices.filter((value) => Number.isInteger(value))
+    );
+    const ranges = [];
+
+    (Array.isArray(topicRefs) ? topicRefs : []).forEach((topic) => {
+        (Array.isArray(topic?.ranges) ? topic.ranges : []).forEach((range) => {
+            const sentenceStart = Number(range?.sentence_start);
+            const sentenceEnd = Number(range?.sentence_end);
+            const start = Number(range?.start);
+            const end = Number(range?.end);
+
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+                return;
+            }
+
+            if (Number.isFinite(sentenceStart) && Number.isFinite(sentenceEnd)) {
+                for (let index = sentenceStart; index <= sentenceEnd; index += 1) {
+                    if (sentenceIndexSet.has(index)) {
+                        ranges.push({
+                            start,
+                            end,
+                            sentence_start: sentenceStart,
+                            sentence_end: sentenceEnd,
+                            topicName: topic.name,
+                        });
+                        return;
+                    }
+                }
+                return;
+            }
+
+            const topicSentences = Array.isArray(topic?.sentences) ? topic.sentences : [];
+            if (topicSentences.some((value) => sentenceIndexSet.has(value))) {
+                ranges.push({
+                    start,
+                    end,
+                    topicName: topic.name,
+                });
+            }
+        });
+    });
+
+    ranges.sort((left, right) => left.start - right.start);
+    return ranges;
+}
+
 export function useTextPageData(submission, selectedTopics, hoveredTopic, readTopics) {
     const results = useMemo(() => (submission?.results || {}), [submission]);
+    const resultSentences = useMemo(
+        () => (Array.isArray(results.sentences) ? results.sentences : []),
+        [results.sentences]
+    );
     const safeTopics = useMemo(
         () => (Array.isArray(results.topics) ? results.topics : []),
         [results.topics]
@@ -45,9 +235,70 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
         const rawInsights = Array.isArray(results.insights) ? results.insights : [];
         return rawInsights.map((insight) => ({
             ...insight,
-            topics: mapInsightSentenceIndicesToTopics(insight, safeTopics),
+            topics: (() => {
+                const explicitTopics = Array.isArray(insight?.topics)
+                    ? insight.topics.filter((topicName) => typeof topicName === 'string' && topicName.trim())
+                    : [];
+                if (explicitTopics.length > 0) {
+                    return [...new Set(explicitTopics)];
+                }
+
+                const alignedSentenceIndices = resolveInsightSentenceIndices(insight, resultSentences);
+
+                return mapInsightSentenceIndicesToTopics(
+                    { ...insight, source_sentence_indices: alignedSentenceIndices },
+                    safeTopics
+                );
+            })(),
         }));
-    }, [results.insights, safeTopics]);
+    }, [resultSentences, results.insights, safeTopics]);
+    const insightNavItems = useMemo(() => {
+        return insights
+            .map((insight, index) => {
+                const sourceSentences = Array.isArray(insight?.source_sentences)
+                    ? insight.source_sentences.filter((sentence) => typeof sentence === 'string')
+                    : [];
+                const sourceSentenceIndices = resolveInsightSentenceIndices(insight, resultSentences);
+                const topicNames = Array.isArray(insight?.topics)
+                    ? insight.topics.filter((topicName) => typeof topicName === 'string' && topicName.trim())
+                    : [];
+                const topicRefs = topicNames
+                    .map((topicName) => safeTopics.find((topic) => topic.name === topicName))
+                    .filter(Boolean);
+                const matchingRanges = buildInsightMatchingRanges(sourceSentenceIndices, topicRefs);
+                const firstSentenceIndex = sourceSentenceIndices.length > 0
+                    ? Math.min(...sourceSentenceIndices)
+                    : Number.MAX_SAFE_INTEGER;
+                const displayName = typeof insight?.name === 'string' && insight.name.trim()
+                    ? insight.name.trim()
+                    : `Insight ${index + 1}`;
+
+                return {
+                    id: `${displayName}-${index}`,
+                    index,
+                    name: displayName,
+                    sourceSentenceIndices,
+                    sourceSentences,
+                    topicNames,
+                    topicRefs,
+                    matchingRanges,
+                    firstSentenceIndex,
+                };
+            })
+            .sort((left, right) => {
+                if (left.firstSentenceIndex !== right.firstSentenceIndex) {
+                    return left.firstSentenceIndex - right.firstSentenceIndex;
+                }
+                return left.index - right.index;
+            });
+    }, [insights, resultSentences, safeTopics]);
+    const insightTopicNameSet = useMemo(() => {
+        const names = new Set();
+        insightNavItems.forEach((insight) => {
+            insight.topicNames.forEach((name) => names.add(name));
+        });
+        return names;
+    }, [insightNavItems]);
     const rawText = submission?.text_content || '';
     const articleSummary = results.article_summary && typeof results.article_summary === 'object'
         ? results.article_summary
@@ -150,6 +401,8 @@ export function useTextPageData(submission, selectedTopics, hoveredTopic, readTo
         highlightedSummaryParas,
         articles,
         insights,
+        insightNavItems,
+        insightTopicNameSet,
         summaryTimelineItems,
         articleBulletMatches,
         articleTextMatches,

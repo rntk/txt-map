@@ -5,6 +5,13 @@ import TopicList from './TopicList';
 
 // A minimal flat topic
 const makeTopic = (name, totalSentences = 1) => ({ name, totalSentences, ranges: [] });
+const makeInsight = (id, name, topicNames = [], sourceSentenceIndices = [1]) => ({
+  id,
+  name,
+  topicNames,
+  sourceSentenceIndices,
+  sourceSentences: [],
+});
 
 // Topics that form a two-level tree:
 //   Animals (intermediate)
@@ -229,6 +236,59 @@ describe('TopicList general rendering', () => {
     const topicTitle = screen.getByText('Art');
     expect(topicTitle).toHaveClass('topic-tree-node__title--highlighted');
     expect(topicTitle.style.getPropertyValue('--topic-highlight-color')).not.toBe('');
+  });
+
+  it('renders sidebar tabs only when insights are provided', () => {
+    const { rerender } = render(<TopicList topics={[makeTopic('Art')]} />);
+    expect(screen.queryByRole('tab', { name: 'Insights' })).toBeNull();
+
+    rerender(
+      <TopicList
+        topics={[makeTopic('Art')]}
+        insights={[makeInsight('insight-1', 'Signal', ['Art'])]}
+      />
+    );
+
+    expect(screen.getByRole('tab', { name: 'Topics' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Insights' })).toBeInTheDocument();
+  });
+
+  it('renders a flat insights list and calls onSelectInsight for the clicked row', () => {
+    const onSelectInsight = vi.fn();
+    const insight = makeInsight('insight-1', 'Signal', ['Art']);
+
+    render(
+      <TopicList
+        topics={[makeTopic('Art')]}
+        insights={[insight]}
+        sidebarTab="insights"
+        onSelectInsight={onSelectInsight}
+      />
+    );
+
+    expect(screen.getByPlaceholderText('Filter insights...')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Signal/ }));
+
+    expect(onSelectInsight).toHaveBeenCalledWith(expect.objectContaining({ id: 'insight-1', name: 'Signal' }));
+  });
+
+  it('falls back to sourceSentences for the insight sentence count when indices are missing', () => {
+    render(
+      <TopicList
+        topics={[makeTopic('Art')]}
+        insights={[{
+          id: 'insight-1',
+          name: 'Signal',
+          topicNames: ['Art'],
+          sourceSentenceIndices: [],
+          sourceSentences: ['One.', 'Two.'],
+        }]}
+        sidebarTab="insights"
+      />
+    );
+
+    expect(screen.getByText('2 sent.')).toBeInTheDocument();
+    expect(screen.queryByText('0 sent.')).toBeNull();
   });
 });
 

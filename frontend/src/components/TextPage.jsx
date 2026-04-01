@@ -43,6 +43,7 @@ function TextPage() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [activeTab, setActiveTab] = useState('article');
+  const [sidebarTab, setSidebarTab] = useState('topics');
   const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
   const [highlightedGroupedTopic, setHighlightedGroupedTopic] = useState(null);
@@ -56,9 +57,23 @@ function TextPage() {
   const [panelTopic, setPanelTopic] = useState(null);
   const [fullscreenGraph, setFullscreenGraph] = useState(null);
   const [highlightAllTopics, setHighlightAllTopics] = useState(false);
+  const [highlightInsightTopics, setHighlightInsightTopics] = useState(false);
+  const [activeInsightId, setActiveInsightId] = useState(null);
+  const [activeInsightSentenceIndices, setActiveInsightSentenceIndices] = useState([]);
+  const [activeInsightRanges, setActiveInsightRanges] = useState([]);
 
   const toggleHighlightAll = useCallback(() => {
     setHighlightAllTopics(prev => !prev);
+  }, []);
+
+  const toggleHighlightInsightTopics = useCallback(() => {
+    setHighlightInsightTopics(prev => !prev);
+  }, []);
+
+  const clearActiveInsight = useCallback(() => {
+    setActiveInsightId(null);
+    setActiveInsightSentenceIndices([]);
+    setActiveInsightRanges([]);
   }, []);
 
   const closeFullscreenGraph = useCallback(() => {
@@ -93,6 +108,8 @@ function TextPage() {
     articleSummaryBullets,
     topicSummaryParaMap: _topicSummaryParaMap,
     allTopics,
+    insightNavItems,
+    insightTopicNameSet,
     rawTextHighlightRanges,
     rawTextFadeRanges,
     highlightedSummaryParas,
@@ -130,6 +147,7 @@ function TextPage() {
   });
 
   const toggleTopic = useCallback((topic) => {
+    clearActiveInsight();
     setSelectedTopics(prev => {
       const isCurrentlySelected = prev.some(t => t.name === topic.name);
       if (isCurrentlySelected) {
@@ -139,7 +157,7 @@ function TextPage() {
         ? prev.filter(t => t.name !== topic.name)
         : [...prev, topic];
     });
-  }, []);
+  }, [clearActiveInsight]);
 
   const handleHoverTopic = useCallback((topic) => {
     setHoveredTopic(topic);
@@ -227,12 +245,21 @@ function TextPage() {
   );
   const safeTopics = _safeTopics;
   const rawText = _rawText;
+  const coloredTopicNames = useMemo(() => {
+    if (sidebarTab === 'insights' && highlightInsightTopics) {
+      return insightTopicNameSet;
+    }
+    return null;
+  }, [highlightInsightTopics, insightTopicNameSet, sidebarTab]);
 
   // Colored ranges for raw text view (character-position based, one per topic)
   const rawTextColoredRanges = useMemo(() => {
-    if (!highlightAllTopics) return [];
+    if (!highlightAllTopics && !highlightInsightTopics) return [];
     const ranges = [];
     safeTopics.forEach(topic => {
+      if (coloredTopicNames && !coloredTopicNames.has(topic.name)) {
+        return;
+      }
       const color = getTopicHighlightColor(topic.name);
       (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
         const start = Number(range.start);
@@ -243,7 +270,146 @@ function TextPage() {
       });
     });
     return ranges;
-  }, [highlightAllTopics, safeTopics]);
+  }, [coloredTopicNames, highlightAllTopics, highlightInsightTopics, safeTopics]);
+
+  const activeInsight = useMemo(
+    () => insightNavItems.find((insight) => insight.id === activeInsightId) || null,
+    [activeInsightId, insightNavItems]
+  );
+
+  const scrollToInsight = useCallback((insight) => {
+    if (!insight) {
+      return false;
+    }
+
+    const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+    const ranges = Array.isArray(insight.matchingRanges) ? insight.matchingRanges : [];
+    const sortedRanges = [...ranges].sort((left, right) => left.start - right.start);
+
+    if (sortedRanges.length > 0) {
+      const firstRange = sortedRanges[0];
+      const exactMatch = document.querySelector(`[data-char-start="${firstRange.start}"]`);
+      const rangeMatch = exactMatch || Array.from(document.querySelectorAll('[data-char-start]'))
+        .map((element) => ({
+          element,
+          charStart: Number(element.getAttribute('data-char-start')),
+        }))
+        .filter((entry) => Number.isFinite(entry.charStart))
+        .sort((left, right) => left.charStart - right.charStart)
+        .find((entry) => entry.charStart >= firstRange.start)?.element;
+
+      if (rangeMatch) {
+        rangeMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return true;
+      }
+    }
+
+    const sentenceIndices = Array.isArray(insight.sourceSentenceIndices)
+      ? insight.sourceSentenceIndices
+      : [];
+    if (sentenceIndices.length > 0) {
+      for (const sentenceIndex of sentenceIndices) {
+        const targetSentenceIndex = sentenceIndex - 1;
+        const sentenceEl = document.getElementById(`sentence-0-${targetSentenceIndex}`)
+          || document.querySelector(`[data-sentence-index="${targetSentenceIndex}"]`);
+
+        if (sentenceEl) {
+          sentenceEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return true;
+        }
+      }
+    }
+
+    const sourceSentences = Array.isArray(insight.sourceSentences)
+      ? insight.sourceSentences
+      : [];
+    const fallbackTexts = [
+      ...sourceSentences,
+      ...sentenceIndices
+        .map((sentenceIndex) => safeSentences[sentenceIndex - 1])
+        .filter((sentence) => typeof sentence === 'string' && sentence.trim()),
+    ];
+
+    const articleRoot = document.querySelector('.reading-article__content');
+    if (!articleRoot) {
+      return false;
+    }
+
+    const blockCandidates = Array.from(
+      articleRoot.querySelectorAll('.reading-article__sentence, p, li, blockquote, section, article, div')
+    );
+
+    const matchedBlock = fallbackTexts
+      .map((text) => normalizeText(text))
+      .filter(Boolean)
+      .map((targetText) => blockCandidates.find((element) => {
+        const text = normalizeText(element.textContent);
+        return text.includes(targetText) || targetText.includes(text);
+      }))
+      .find(Boolean);
+
+    if (matchedBlock instanceof HTMLElement) {
+      matchedBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    }
+
+    return false;
+  }, [safeSentences]);
+
+  const handleSidebarTabChange = useCallback((tab) => {
+    setSidebarTab(tab);
+    if (tab === 'topics') {
+      clearActiveInsight();
+      setHighlightInsightTopics(false);
+    } else {
+      setHighlightAllTopics(false);
+    }
+  }, [clearActiveInsight]);
+
+  const handleSelectInsight = useCallback((insight) => {
+    if (!insight) {
+      return;
+    }
+
+    setGroupedByTopics(false);
+    closeFullscreenGraph();
+    setSidebarTab('insights');
+    setActiveTab('article');
+    setActiveInsightId(insight.id);
+    setActiveInsightSentenceIndices(Array.isArray(insight.sourceSentenceIndices) ? insight.sourceSentenceIndices : []);
+    setActiveInsightRanges(Array.isArray(insight.matchingRanges) ? insight.matchingRanges : []);
+  }, [closeFullscreenGraph]);
+
+  useEffect(() => {
+    if (!activeInsight || activeTab !== 'article' || groupedByTopics || fullscreenGraph) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let attemptCount = 0;
+    let timeoutId = null;
+
+    const attemptScroll = () => {
+      if (cancelled) {
+        return;
+      }
+      attemptCount += 1;
+      if (scrollToInsight(activeInsight) || attemptCount >= 8) {
+        return;
+      }
+      timeoutId = window.setTimeout(attemptScroll, 120);
+    };
+
+    timeoutId = window.setTimeout(attemptScroll, 0);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [activeInsight, activeTab, fullscreenGraph, groupedByTopics, scrollToInsight]);
 
   if (loading) {
     return (
@@ -314,11 +480,15 @@ function TextPage() {
           <div className="container reading-page__content reading-page__workspace">
             <div className="left-column">
               <div className="reading-page__sidebar-header">
-                <h1>Topics ({safeTopics.length})</h1>
-                <ReadProgress percentage={readPercentage} size={60} label="Topics read" />
+                <h1>{sidebarTab === 'insights' ? `Insights (${insightNavItems.length})` : `Topics (${safeTopics.length})`}</h1>
+                {sidebarTab === 'topics' && (
+                  <ReadProgress percentage={readPercentage} size={60} label="Topics read" />
+                )}
               </div>
               <TopicList
                 topics={allTopics}
+                insights={insightNavItems}
+                sidebarTab={sidebarTab}
                 selectedTopics={selectedTopics}
                 hoveredTopic={hoveredTopic}
                 onToggleTopic={toggleTopic}
@@ -333,6 +503,11 @@ function TextPage() {
                 onOpenVisualization={handleOpenVisualization}
                 highlightAllTopics={highlightAllTopics}
                 onToggleHighlightAll={toggleHighlightAll}
+                onSidebarTabChange={handleSidebarTabChange}
+                activeInsightId={activeInsightId}
+                onSelectInsight={handleSelectInsight}
+                highlightInsightTopics={highlightInsightTopics}
+                onToggleHighlightInsightTopics={toggleHighlightInsightTopics}
               />
             </div>
             <div className="right-column">
@@ -379,7 +554,8 @@ function TextPage() {
                       onNavigateTopic={navigateTopicSentence}
                       onShowSentences={handleShowTopicSentences}
                       tooltipEnabled={tooltipEnabled}
-                      coloredHighlightMode={highlightAllTopics}
+                      coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
+                      coloredTopicNames={coloredTopicNames}
                     />
                   ) : groupedByTopics ? (
                     <GroupedByTopicsView
@@ -425,7 +601,10 @@ function TextPage() {
                           onShowSentences={handleShowTopicSentences}
                           tooltipEnabled={tooltipEnabled}
                           submissionId={submissionId}
-                          coloredHighlightMode={highlightAllTopics}
+                          coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
+                          activeInsightSentenceIndices={activeInsightSentenceIndices}
+                          activeInsightRanges={activeInsightRanges}
+                          coloredTopicNames={coloredTopicNames}
                         />
                       )
                     ))
