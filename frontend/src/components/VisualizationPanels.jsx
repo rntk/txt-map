@@ -14,6 +14,24 @@ import ArticleStructureChart from './ArticleStructureChart';
 import TreemapChart from './TreemapChart';
 import TopicsVennChart from './TopicsVennChart';
 
+/**
+ * @typedef {Object} VisualizationPanelsProps
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | null} fullscreenGraph
+ * @property {() => void} [onClose]
+ * @property {Array<unknown>} safeTopics
+ * @property {string[]} safeSentences
+ * @property {{ [key: string]: unknown }} results
+ * @property {string | number} submissionId
+ * @property {Array<unknown>} allTopics
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
+/**
+ * @param {VisualizationPanelsProps} props
+ */
 function VisualizationPanels({
   fullscreenGraph,
   onClose,
@@ -31,8 +49,8 @@ function VisualizationPanels({
     <>
       {fullscreenGraph === 'venn_chart' && (
         <FullScreenGraph title="Topics Venn" onClose={onClose}>
-          <div className="visualization-panel-shell">
-            <div className="visualization-panel-body" style={{ height: 'calc(100vh - 150px)', overflowY: 'auto' }}>
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body chart-surface__panel-body--scroll">
               <TopicsVennChart
                 topics={safeTopics}
                 sentences={safeSentences}
@@ -48,25 +66,27 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'topics' && (
         <FullScreenGraph title="Topics" onClose={onClose}>
-          <div className="topics-bar-chart-container">
-            <TopicsBarChart
-              topics={allTopics}
-              sentences={safeSentences}
-              onShowInArticle={onShowInArticle}
-              readTopics={readTopics}
-              onToggleRead={onToggleRead}
-              markup={markup}
-            />
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body">
+              <TopicsBarChart
+                topics={allTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
+            </div>
           </div>
         </FullScreenGraph>
       )}
 
       {fullscreenGraph === 'topics_river' && (
         <FullScreenGraph title="Topics River" onClose={onClose}>
-          <div className="topics-river-container" style={{ padding: '2px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}>
-            <div style={{ marginBottom: '60px' }}>
-              <h2>Topics River</h2>
-              <p>Visualization of topic density across the article.</p>
+          <div className="chart-surface chart-surface--embedded chart-scroll-area">
+            <section className="chart-section">
+              <h2 className="chart-section__title">Topics River</h2>
+              <p className="chart-section__copy">Visualization of topic density across the article.</p>
               <TopicsRiverChart
                 topics={safeTopics}
                 sentences={safeSentences}
@@ -76,10 +96,10 @@ function VisualizationPanels({
                 onToggleRead={onToggleRead}
                 markup={markup}
               />
-            </div>
-            <div className="subtopics-river-section">
-              <h2>Subtopics River</h2>
-              <p>Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
+            </section>
+            <section className="chart-section">
+              <h2 className="chart-section__title">Subtopics River</h2>
+              <p className="chart-section__copy">Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
               {results.subtopics ? (
                 <SubtopicsRiverChart
                   topics={safeTopics}
@@ -92,9 +112,9 @@ function VisualizationPanels({
                   markup={markup}
                 />
               ) : (
-                <p style={{ fontStyle: 'italic', color: '#666' }}>No subtopics data available.</p>
+                <p className="chart-empty-state chart-empty-state--compact">No subtopics data available.</p>
               )}
-            </div>
+            </section>
           </div>
         </FullScreenGraph>
       )}
@@ -150,8 +170,8 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'circular_packing' && (
         <FullScreenGraph title="Topic Circles" onClose={onClose}>
-          <div className="visualization-panel-shell">
-            <div className="visualization-panel-body">
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body">
               <CircularPackingChart
                 topics={safeTopics}
                 sentences={safeSentences}
@@ -167,7 +187,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'radar_chart' && (
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
-          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="chart-surface__panel-body chart-surface__panel-body--padded">
             <RadarChart
               topics={safeTopics}
               sentences={safeSentences}
@@ -193,7 +213,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'article_structure' && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
-          <div style={{ padding: '2px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div className="chart-surface__panel-body chart-surface__panel-body--padded">
             <ArticleStructureChart
               topics={safeTopics}
               sentences={safeSentences}
@@ -208,8 +228,8 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'treemap' && (
         <FullScreenGraph title="Treemap" onClose={onClose}>
-          <div className="visualization-panel-shell">
-            <div className="visualization-panel-body">
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body">
               <TreemapChart
                 topics={safeTopics}
                 sentences={safeSentences}

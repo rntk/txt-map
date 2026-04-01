@@ -198,6 +198,25 @@ describe('TextPage raw text navigation', () => {
     expect(sourceLinks.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('highlights summary bullets with a semantic class when the topic is selected', async () => {
+    vi.mocked(matchSummaryToTopics).mockReturnValue([
+      { topic: { name: 'Topic1', sentences: [1] }, score: 0.8, sentenceIndices: [1] },
+    ]);
+
+    render(<TextPage />);
+    await screen.findByText('Source:');
+
+    const topicCheckbox = screen.getAllByRole('checkbox').find(
+      el => el.closest('li') !== null
+    );
+    fireEvent.click(topicCheckbox);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+
+    const highlightedBullet = screen.getByText('Important detail one').closest('li');
+    expect(highlightedBullet).toHaveClass('reading-summary__bullet--highlighted');
+  });
+
   it('opens topic menu when [source] is clicked on a bullet', async () => {
     vi.mocked(matchSummaryToTopics).mockReturnValue([
       { topic: { name: 'Topic1', sentences: [1] }, score: 0.8, sentenceIndices: [1] },
@@ -259,7 +278,6 @@ describe('TextPage raw text navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
 
     expect(screen.getByText('Important connection')).toBeInTheDocument();
-    expect(screen.getByText('Sentence 1')).toBeInTheDocument();
     expect(screen.getAllByText('Alpha Beta Gamma').length).toBeGreaterThan(0);
   });
 

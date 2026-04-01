@@ -6,15 +6,28 @@ import { readErrorMessage } from '../utils/requestUtils';
 const DIFF_POLLING_STATES = ['waiting_prerequisites', 'queued', 'processing'];
 const RECALCULABLE_STATES = ['missing', 'failed', 'stale'];
 
+/**
+ * @param {string} key
+ * @returns {string}
+ */
 function getInitialSubmissionId(key) {
   const params = new URLSearchParams(window.location.search);
   return params.get(key) || '';
 }
 
+/**
+ * @param {{ source_url?: string; submission_id: string; created_at?: string | number }} submission
+ * @returns {string}
+ */
 function getSubmissionOptionLabel(submission) {
   return `${submission.source_url || '(no source)'} [${submission.submission_id.slice(0, 8)}] ${formatDate(submission.created_at)}`;
 }
 
+/**
+ * @param {string} leftId
+ * @param {string} rightId
+ * @returns {boolean}
+ */
 function isDiffPairSelected(leftId, rightId) {
   return Boolean(leftId && rightId && leftId !== rightId);
 }
@@ -40,6 +53,9 @@ function DiffPage() {
   const canFetchDiff = isDiffPairSelected(leftId, rightId);
   const canDeleteDiff = Boolean(leftId && rightId && leftId !== rightId && !jobLoading && !deleteLoading);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchSubmissions = useCallback(async () => {
     setLoadingSubmissions(true);
     setSubmissionsError('');
@@ -57,6 +73,9 @@ function DiffPage() {
     }
   }, []);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchDiff = useCallback(async () => {
     if (!canFetchDiff) {
       setDiffState(null);
@@ -113,6 +132,10 @@ function DiffPage() {
     return () => clearInterval(timer);
   }, [canFetchDiff, diffState, fetchDiff]);
 
+  /**
+   * @param {boolean} [force=false]
+   * @returns {Promise<void>}
+   */
   const runCalculation = useCallback(async (force = false) => {
     if (!canFetchDiff) {
       return;
@@ -142,6 +165,9 @@ function DiffPage() {
     }
   }, [canFetchDiff, fetchDiff, leftId, rightId]);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const deleteDiffData = useCallback(async () => {
     if (!canFetchDiff) {
       return;
@@ -215,6 +241,10 @@ function DiffPage() {
     }
   }, [activeIndex, filteredRows]);
 
+  /**
+   * @param {number} delta
+   * @returns {void}
+   */
   const navigate = useCallback(function navigate(delta) {
     if (!filteredRows.length) {
       return;
@@ -226,6 +256,10 @@ function DiffPage() {
     });
   }, [filteredRows.length]);
 
+  /**
+   * @param {number | null | undefined} sentenceIndex
+   * @returns {void}
+   */
   const jumpToRightSentence = useCallback((sentenceIndex) => {
     if (sentenceIndex == null) {
       return;
@@ -246,6 +280,10 @@ function DiffPage() {
     setPendingJumpRowId(targetInAll.id);
   }, [filteredRows, rows]);
 
+  /**
+   * @param {number | null | undefined} sentenceIndex
+   * @returns {void}
+   */
   const jumpToLeftSentence = useCallback((sentenceIndex) => {
     if (sentenceIndex == null) {
       return;
@@ -273,7 +311,7 @@ function DiffPage() {
           <h1>Semantic Diff</h1>
           <p className="diff-page-subtitle">Topic-aware comparison between two documents.</p>
         </div>
-        <button className="text-list-refresh" onClick={fetchSubmissions} disabled={loadingSubmissions}>
+        <button type="button" className="text-list-refresh" onClick={fetchSubmissions} disabled={loadingSubmissions}>
           Refresh docs
         </button>
       </div>
@@ -339,15 +377,16 @@ function DiffPage() {
             <div className="diff-actions">
               {RECALCULABLE_STATES.includes(diffState.state) && (
                 <>
-                  <button className="text-list-primary" onClick={() => runCalculation(false)} disabled={jobLoading || deleteLoading}>
+                  <button type="button" className="text-list-primary" onClick={() => runCalculation(false)} disabled={jobLoading || deleteLoading}>
                     {jobLoading ? '...' : 'Calculate diff'}
                   </button>
-                  <button className="action-btn" onClick={() => runCalculation(true)} disabled={jobLoading || deleteLoading}>
+                  <button type="button" className="action-btn" onClick={() => runCalculation(true)} disabled={jobLoading || deleteLoading}>
                     {jobLoading ? '...' : 'Recalculate'}
                   </button>
                 </>
               )}
               <button
+                type="button"
                 className="action-btn danger"
                 onClick={deleteDiffData}
                 disabled={!canDeleteDiff}

@@ -20,7 +20,7 @@ import { useTextSelection } from '../hooks/useTextSelection';
 import { getTopicSelectionKey } from '../utils/chartConstants';
 import { useTextPageData } from '../hooks/useTextPageData';
 import { getTopicHighlightColor } from '../utils/topicColorUtils';
-import '../styles/App.css';
+import '../styles/text-reading.css';
 
 const FULLSCREEN_TABS = [
   { key: 'topic_summary_timeline', label: 'Topic Summaries' },
@@ -247,24 +247,24 @@ function TextPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2>Loading submission...</h2>
+      <div className="reading-state">
+        <h2 className="reading-state__title">Loading submission...</h2>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2 style={{ color: 'red' }}>Error: {error}</h2>
+      <div className="reading-state">
+        <h2 className="reading-state__title reading-state__title--error">Error: {error}</h2>
       </div>
     );
   }
 
   if (!submission) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2>No submission data</h2>
+      <div className="reading-state">
+        <h2 className="reading-state__title">No submission data</h2>
       </div>
     );
   }
@@ -272,8 +272,8 @@ function TextPage() {
   const { status } = submission;
   const isProcessing = status.overall === 'processing' || status.overall === 'pending';
   return (
-    <div className="app">
-      <div style={{ flex: '0 0 auto', padding: '5px 5px 0' }}>
+    <div className="app reading-page">
+      <div className="reading-page__toolbar-stack">
         <TextPageActionsPortal>
           <TextPageToolbar
             submissionId={submissionId}
@@ -284,12 +284,16 @@ function TextPage() {
 
         {articles.length > 0 && (
           <div className="tab-bar">
-            <div className="tab-group">
-              <span className="tab-group-label">Visualizations</span>
-              <div className="tabs">
+            <div className="tab-group reading-tabs__group">
+              <span className="tab-group-label reading-tabs__label">Visualizations</span>
+              <div className="tabs reading-tabs__list">
                 {FULLSCREEN_TABS.map(tab => (
-                  <button key={tab.key} className={activeTab === tab.key ? 'active' : ''}
-                    onClick={() => handleTabClick(tab.key)}>
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={`reading-tab${activeTab === tab.key ? ' reading-tab--active active' : ''}`}
+                    onClick={() => handleTabClick(tab.key)}
+                  >
                     {tab.label}
                   </button>
                 ))}
@@ -299,13 +303,7 @@ function TextPage() {
         )}
 
         {isProcessing && (
-          <div style={{
-            padding: '8px 15px',
-            background: '#fff3cd',
-            borderRadius: '5px',
-            margin: '0 0 8px 0',
-            textAlign: 'center'
-          }}>
+          <div className="reading-page__status-banner reading-page__status-banner--processing">
             <strong>Processing in progress...</strong> Results will appear as tasks complete.
           </div>
         )}
@@ -313,9 +311,9 @@ function TextPage() {
 
       {articles.length > 0 ? (
           <>
-          <div className="container" style={{ padding: '0 2px 2px' }}>
+          <div className="container reading-page__content reading-page__workspace">
             <div className="left-column">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="reading-page__sidebar-header">
                 <h1>Topics ({safeTopics.length})</h1>
                 <ReadProgress percentage={readPercentage} size={60} label="Topics read" />
               </div>
@@ -338,11 +336,7 @@ function TextPage() {
               />
             </div>
             <div className="right-column">
-              <div style={{
-                transition: 'opacity 0.25s ease',
-                opacity: showPanel && panelTopic ? 1 : 0,
-                pointerEvents: showPanel && panelTopic ? 'auto' : 'none',
-              }}>
+              <div className={`reading-page__panel-shell${showPanel && panelTopic ? ' reading-page__panel-shell--visible' : ' reading-page__panel-shell--hidden'}`}>
                 {panelTopic && (
                   <TopicSentencePanel
                     panelTopic={panelTopic}
@@ -492,8 +486,8 @@ function TextPage() {
             markup={submission?.results?.markup}
           />
         </>) : (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-            <p>No results yet. Processing is in progress...</p>
+          <div className="reading-state">
+            <p className="reading-state__message">No results yet. Processing is in progress...</p>
           </div>
         )}
 

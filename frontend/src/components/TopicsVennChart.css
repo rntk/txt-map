@@ -29,7 +29,16 @@
 
 .venn-chart__svg {
   margin: 4px;
+  width: 100%;
+  max-width: var(--venn-max-width, 100%);
+  height: auto;
+  max-height: var(--venn-max-height, none);
   overflow: visible;
+  cursor: move;
+}
+
+.venn-chart__node {
+  cursor: pointer;
 }
 
 .venn-chart .topic-level-switcher {

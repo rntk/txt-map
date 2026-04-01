@@ -4,6 +4,16 @@ import HighlightedText from '../shared/HighlightedText';
 
 const COLUMN_COLORS = ['#e8f5e9', '#fce4ec', '#e3f2fd', '#fff3e0', '#f3e5f5'];
 
+/**
+ * @typedef {Object} ComparisonMarkupProps
+ * @property {{ data?: { columns?: Array<{ label: string, items?: Array<{ text?: string }> }>, left_label?: string, right_label?: string, left_items?: string[], right_items?: string[] } }} segment
+ * @property {string[]} sentences
+ */
+
+/**
+ * @param {ComparisonMarkupProps} props
+ * @returns {React.ReactElement}
+ */
 export default function ComparisonMarkup({ segment, sentences }) {
   const data = segment.data || {};
 
@@ -19,7 +29,7 @@ export default function ComparisonMarkup({ segment, sentences }) {
     },
   ];
 
-  const gridStyle = { gridTemplateColumns: `repeat(${columns.length}, 1fr)` };
+  const gridStyle = { gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` };
 
   return (
     <div className="markup-segment markup-comparison">
@@ -28,7 +38,7 @@ export default function ComparisonMarkup({ segment, sentences }) {
           <div
             key={i}
             className="markup-comparison__header"
-            style={{ background: COLUMN_COLORS[i % COLUMN_COLORS.length] }}
+            style={{ '--markup-comparison-header-bg': COLUMN_COLORS[i % COLUMN_COLORS.length] }}
           >
             <HighlightedText text={col.label} />
           </div>

@@ -8,7 +8,21 @@ import SummaryTimeline from './SummaryTimeline';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 import WordTree, { buildWordTreeEntries } from './WordTree';
 import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
+import './WordPage.css';
 
+/**
+ * @typedef {Object} WordPageTab
+ * @property {string} key
+ * @property {string} label
+ */
+
+/**
+ * @typedef {Object} WordPageTopic
+ * @property {string} name
+ * @property {number[]} [sentences]
+ */
+
+/** @type {readonly WordPageTab[]} */
 const VIS_TABS = [
   { key: 'sentences', label: 'Sentences' },
   { key: 'tree', label: 'Tree' },
@@ -18,11 +32,18 @@ const VIS_TABS = [
   { key: 'tags', label: 'Tags Cloud' }
 ];
 
+/**
+ * @returns {React.JSX.Element}
+ */
 export default function WordPage() {
   const pathParts = window.location.pathname.split('/');
   const submissionId = pathParts[3];
   const word = decodeURIComponent(pathParts[4] || '');
 
+  /**
+   * @param {string} path
+   * @returns {void}
+   */
   const navigate = (path) => { window.location.href = path; };
 
   const [activeTab, setActiveTab] = useState('sentences');
@@ -127,8 +148,16 @@ export default function WordPage() {
     };
   }, [submission, word]);
 
+  /**
+   * @param {string} key
+   * @returns {void}
+   */
   const handleTabClick = (key) => setActiveTab(key);
 
+  /**
+   * @param {WordPageTopic} topic
+   * @returns {void}
+   */
   const toggleTopic = useCallback((topic) => {
     setSelectedTopics(prev => {
       const exists = prev.some(t => t.name === topic.name);
@@ -161,6 +190,12 @@ export default function WordPage() {
     }));
   }, [treeEntries, readSentenceIndices]);
 
+  /**
+   * @param {{ source_sentences?: number[]; summary_sentence?: string }} mapping
+   * @param {{ sentences: string[] }} article
+   * @param {string | null | undefined} topicName
+   * @returns {void}
+   */
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
       setSummaryModalTopic({
@@ -185,10 +220,14 @@ export default function WordPage() {
   if (!submission) return <div className="word-page-no-submission">No submission found.</div>;
 
   return (
-    <div className="app word-page">
+    <div className="page-stack word-page">
       <div className="word-page-header">
         <div className="word-page-header-row">
-          <button onClick={() => navigate(`/page/text/${submissionId}`)} className="action-btn">
+          <button
+            type="button"
+            onClick={() => navigate(`/page/text/${submissionId}`)}
+            className="action-btn"
+          >
             ← Back to Article
           </button>
           <h2 className="word-page-title">Sentences matching: <span className="word-page-word-highlight">"{word}"</span></h2>
@@ -204,9 +243,10 @@ export default function WordPage() {
           )}
           <div className="tab-bar word-page-tab-bar">
             <div className="tabs">
-              {VIS_TABS.map(tab => (
+              {VIS_TABS.map((tab) => (
                 <button
                   key={tab.key}
+                  type="button"
                   className={activeTab === tab.key ? 'active' : ''}
                   onClick={() => handleTabClick(tab.key)}
                 >

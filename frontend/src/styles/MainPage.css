@@ -115,6 +115,11 @@
   box-shadow: 0 22px 44px rgba(20, 20, 18, 0.08);
 }
 
+.main-page-card:focus-visible {
+  outline: 2px solid rgba(29, 30, 27, 0.24);
+  outline-offset: 2px;
+}
+
 .main-page-card__eyebrow {
   display: inline-flex;
   align-items: center;
@@ -202,6 +207,15 @@
 
 .main-page-extension-close:hover {
   background: rgba(31, 32, 29, 0.08);
+}
+
+.main-page-extension-close:focus-visible,
+.main-page-extension-tab:focus-visible,
+.main-page-copy-btn:focus-visible,
+.main-page-extension-download:focus-visible,
+.main-page-url-submit:focus-visible {
+  outline: 2px solid rgba(29, 30, 27, 0.24);
+  outline-offset: 2px;
 }
 
 .main-page-extension-tabs {
@@ -342,6 +356,11 @@
 .main-page-url-input:focus {
   border-color: rgba(29, 30, 27, 0.3);
   box-shadow: 0 0 0 2px rgba(29, 30, 27, 0.08);
+}
+
+.main-page-url-input:focus-visible {
+  border-color: rgba(29, 30, 27, 0.34);
+  box-shadow: 0 0 0 2px rgba(29, 30, 27, 0.1);
 }
 
 .main-page-url-input:disabled {

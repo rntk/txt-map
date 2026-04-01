@@ -28,12 +28,25 @@ const BASE_COLORS = [
 ];
 
 /**
+ * @typedef {Object} TopicsBarChartProps
+ * @property {Array<{ fullPath?: string, displayName?: string, totalChars?: number, sentenceIndices?: number[], childLabels?: string[], isDrillable?: boolean, ranges?: Array<unknown> }>} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
+/**
  * TopicsBarChart
  * - Creates one bar for the current scope and relative topic level
  * - Bar width is based on sentence character count
  * - Infographic style: bars sorted smallest-to-largest (top to bottom),
  *   value inside bar, label to the right
  * - Click a drillable topic to navigate into its subtopics
+ */
+/**
+ * @param {TopicsBarChartProps} props
  */
 function TopicsBarChart({
     topics,
@@ -111,14 +124,14 @@ function TopicsBarChart({
 
     if (!topics || topics.length === 0) {
         return (
-            <div className="topics-bar-chart-empty-state">
+            <div className="topics-bar-chart-empty-state chart-empty-state chart-empty-state--panel">
                 No topic data available.
             </div>
         );
     }
 
     return (
-        <div className="topics-bar-chart">
+        <div className="topics-bar-chart chart-surface chart-surface--topics">
             <div className="topics-bar-chart__header">
                 <h2 className="topics-bar-chart__title">Topics Overview</h2>
                 <p className="topics-bar-chart__subtitle">
@@ -175,9 +188,8 @@ function TopicsBarChart({
                                         <div
                                             className={`topics-bar-chart__bar${isHovered ? ' topics-bar-chart__bar--hovered' : ''}${isRead ? ' topics-bar-chart__bar--read' : ''}`}
                                             style={{
-                                                width: `${barWidthPercent}%`,
-                                                backgroundColor: color,
-                                                borderColor: isHovered ? '#333' : '#777',
+                                                '--topics-bar-width': `${barWidthPercent}%`,
+                                                '--topics-bar-color': color,
                                             }}
                                         >
                                             <span className="topics-bar-chart__bar-value">
@@ -210,12 +222,12 @@ function TopicsBarChart({
                         })}
                     </div>
 
-                    <div className="topics-bar-chart__legend">
+                    <div className="topics-bar-chart__legend chart-legend">
                         {chartData.map(item => (
-                            <div key={item.fullPath} className="topics-bar-chart__legend-item">
+                            <div key={item.fullPath} className="topics-bar-chart__legend-item chart-legend-item">
                                 <div
-                                    className="topics-bar-chart__legend-swatch"
-                                    style={{ backgroundColor: colorScale[item.fullPath] }}
+                                    className="topics-bar-chart__legend-swatch chart-legend-swatch chart-legend-swatch--square"
+                                    style={{ '--chart-legend-swatch': colorScale[item.fullPath] }}
                                 />
                                 <span className="topics-bar-chart__legend-label">{item.displayName}</span>
                             </div>

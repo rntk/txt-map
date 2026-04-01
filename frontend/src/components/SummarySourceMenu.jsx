@@ -1,6 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './SummarySourceMenu.css';
 
+/**
+ * @typedef {Object} SummarySourceMenuMatch
+ * @property {{ name?: string }} topic
+ * @property {number} score
+ * @property {number[]} sentenceIndices
+ *
+ * @typedef {Object} SummarySourceMenuProps
+ * @property {SummarySourceMenuMatch[]} matches
+ * @property {(topic: { name?: string }, sentenceIndices: number[]) => void} onSelect
+ * @property {() => void} onClose
+ * @property {number} x
+ * @property {number} y
+ */
+
+/**
+ * Position the source picker menu at the requested point and keep it in view.
+ *
+ * @param {SummarySourceMenuProps} props
+ * @returns {React.ReactElement | null}
+ */
 function SummarySourceMenu({ matches, onSelect, onClose, x, y }) {
   const menuRef = useRef(null);
   const [adjustedPos, setAdjustedPos] = useState({ left: x, top: y });
@@ -50,7 +70,10 @@ function SummarySourceMenu({ matches, onSelect, onClose, x, y }) {
     <div
       className="summary-source-menu"
       ref={menuRef}
-      style={{ left: adjustedPos.left, top: adjustedPos.top }}
+      style={{
+        '--summary-source-menu-left': `${adjustedPos.left}px`,
+        '--summary-source-menu-top': `${adjustedPos.top}px`,
+      }}
       role="menu"
     >
       <div className="summary-source-menu__title">Select topic:</div>

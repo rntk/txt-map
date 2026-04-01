@@ -24,6 +24,16 @@ const STOP_WORDS = new Set([
   'the', 'and', 'or', 'of', 'in', 'to', 'a', 'an', 'is', 'for', 'with', 'on', 'as', 'by', 'at', 'it', 'from', 'that', 'this', 'are', 'be', 'not', 'have', 'has', 'was', 'were', 'but', 'which', 'all', 'can', 'so', 'we', 'will'
 ]);
 
+/**
+ * @typedef {Object} TopicsVennChartProps
+ * @property {Array<{ name?: string, sentences?: number[], displayName?: string, fullPath?: string, ranges?: Array<unknown> }>} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
 function extractWords(text) {
   return (text || '').toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -119,8 +129,8 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
     <svg 
       ref={svgRef}
       viewBox={`0 0 ${width} ${height}`} 
-      style={{ width: '100%', maxWidth: width, height: 'auto', maxHeight: height, cursor: 'move' }}
-      className="venn-chart__svg"
+      className="venn-chart__svg chart-svg"
+      style={{ '--venn-max-width': `${width}px`, '--venn-max-height': `${height}px` }}
     >
       <defs>
         <pattern id="read-pattern-venn" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
@@ -149,7 +159,7 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
               stroke={colorScale(n.name)}
               strokeWidth={2}
               opacity={0.72}
-              style={{ cursor: 'pointer' }}
+              className="venn-chart__node"
               onClick={(e) => {
                 e.stopPropagation();
                 onNodeClick(n);
@@ -395,7 +405,7 @@ export default function TopicsVennChart({
   const scopeLabel = getScopeLabel(scopePath);
 
   return (
-    <div className="venn-chart">
+    <div className="venn-chart chart-surface chart-surface--venn">
       <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
         navigateTo(path);
         setSelectedLevel(0);
@@ -408,16 +418,16 @@ export default function TopicsVennChart({
         onChange={setSelectedLevel}
       />
 
-      <p className="venn-chart__description">
+      <p className="venn-chart__description chart-section__copy">
         {scopePath.length > 0 ? `Inside ${scopeLabel} at relative level ${selectedLevel}. ` : `Showing intersections at level ${selectedLevel}. `}
         Overlapping regions represent shared words from subtopics. Total overlaps: {overlapsCount}.
       </p>
 
       <div className="venn-chart-body">
         {components.length === 0 ? (
-          <p className="venn-chart__empty">No topics available at this level.</p>
+          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">No topics available at this level.</p>
         ) : overlappingComponents.length === 0 ? (
-          <p className="venn-chart__empty">No overlapping topics found at this level.</p>
+          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">No overlapping topics found at this level.</p>
         ) : (
           overlappingComponents.map((comp, idx) => (
             <VennComponentGroup 

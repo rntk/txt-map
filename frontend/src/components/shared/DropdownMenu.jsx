@@ -1,47 +1,58 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import './sharedControls.css';
 
+/**
+ * @typedef {Object} DropdownMenuProps
+ * @property {React.ReactNode} buttonContent
+ * @property {React.ReactNode} children
+ */
+
+/**
+ * @param {DropdownMenuProps} props
+ */
 function DropdownMenu({ buttonContent, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} className="shared-control-dropdown">
       <button
-        className="action-btn"
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px', background: isOpen ? '#e0e0e0' : undefined, color: isOpen ? '#333' : undefined }}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className={`shared-control-trigger${isOpen ? ' shared-control-trigger--active' : ''}`}
       >
         {buttonContent}
       </button>
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          marginTop: '4px',
-          background: 'white',
-          border: '1px solid #ddd',
-          borderRadius: '4px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          padding: '8px',
-          zIndex: 'var(--z-dropdown)',
-          minWidth: '200px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          color: '#333',
-        }}>
+        <div className="shared-control-popover shared-control-popover--menu" role="menu">
           {children}
         </div>
       )}

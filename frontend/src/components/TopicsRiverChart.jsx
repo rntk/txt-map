@@ -8,6 +8,20 @@ import { buildScopedChartData } from '../utils/topicHierarchy';
 import { useTopicLevel } from '../hooks/useTopicLevel';
 import './TopicsBarChart.css';
 
+/**
+ * @typedef {Object} TopicsRiverChartProps
+ * @property {Array<{ name?: string, fullPath?: string, displayName?: string, sentenceIndices?: number[], ranges?: Array<unknown> }>} topics
+ * @property {string[]} [sentences]
+ * @property {number} [articleLength]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
+/**
+ * @param {TopicsRiverChartProps} props
+ */
 const TopicsRiverChart = ({
     topics,
     sentences = [],
@@ -129,17 +143,8 @@ const TopicsRiverChart = ({
 
         const tooltip = d3.select("body").selectAll(".river-tooltip").data([0])
             .join("div")
-            .attr("class", "river-tooltip")
-            .style("position", "absolute")
-            .style("background", "rgba(255, 255, 255, 0.95)")
-            .style("border", "1px solid #ccc")
-            .style("border-radius", "4px")
-            .style("padding", "8px 12px")
-            .style("font-size", "12px")
-            .style("pointer-events", "none")
-            .style("opacity", 0)
-            .style("box-shadow", "0 2px 4px rgba(0,0,0,0.1)")
-            .style("z-index", "1000");
+            .attr("class", "river-tooltip chart-tooltip")
+            .style("opacity", 0);
 
         g.selectAll(".stream-layer")
             .data(stackedData)
@@ -273,15 +278,7 @@ const TopicsRiverChart = ({
     }, [effectiveLength, scopedData, keys, colorScale]);
 
     return (
-        <div ref={containerRef} className="topics-river-chart" style={{
-            width: '100%',
-            backgroundColor: '#fafafa',
-            borderRadius: '8px',
-            padding: '4px',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column'
-        }}>
+        <div ref={containerRef} className="topics-river-chart chart-surface chart-surface--river">
             <TopicLevelSwitcher
                 className="topics-river-chart__level-switcher"
                 selectedLevel={selectedLevel}
@@ -289,8 +286,8 @@ const TopicsRiverChart = ({
                 onChange={setSelectedLevel}
             />
 
-            <div style={{ height: '450px', width: '100%' }}>
-                <svg ref={svgRef} style={{ display: 'block', width: '100%', height: '100%' }}></svg>
+            <div className="topics-river-chart__canvas">
+                <svg ref={svgRef} className="topics-river-chart__svg chart-svg chart-svg--full-width"></svg>
             </div>
 
             <RiverLegend

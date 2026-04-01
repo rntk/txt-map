@@ -2,12 +2,45 @@ import React, { useState, useCallback } from 'react';
 import DropdownMenu from './shared/DropdownMenu';
 import StatusIndicator from './shared/StatusIndicator';
 import RefreshButton from './shared/RefreshButton';
+import './shared/sharedControls.css';
+
+/**
+ * @typedef {Object} TextPageToolbarTaskInfo
+ * @property {string} [status]
+ * @property {string} [started_at]
+ * @property {string} [completed_at]
+ * @property {string} [error]
+ */
+
+/**
+ * @typedef {Object.<string, TextPageToolbarTaskInfo>} TextPageToolbarTasks
+ */
+
+/**
+ * @typedef {Object} TextPageToolbarStatus
+ * @property {string} overall
+ * @property {TextPageToolbarTasks} tasks
+ */
 
 /**
  * @typedef {Object} TextPageToolbarProps
  * @property {string} submissionId
- * @property {{ overall: string, tasks: Object }} status
+ * @property {TextPageToolbarStatus} status
  * @property {() => void} onRefresh
+ */
+
+const RECALCULATE_ACTIONS = [
+  { label: 'All', tasks: ['all'], message: 'Recalculation queued for all tasks.' },
+  { label: 'Topics', tasks: ['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insights_generation'], message: 'Topic-related tasks queued.' },
+  { label: 'Summary', tasks: ['summarization'], message: 'Summarization queued.' },
+  { label: 'Mindmap', tasks: ['mindmap'], message: 'Mindmap queued.' },
+  { label: 'Prefix Tree', tasks: ['prefix_tree'], message: 'Prefix tree queued.' },
+  { label: 'Insights', tasks: ['insights_generation'], message: 'Insights queued.' },
+  { label: 'Markup', tasks: ['markup_generation'], message: 'Markup generation queued.' },
+];
+
+/**
+ * @param {TextPageToolbarProps} props
  */
 function TextPageToolbar({ submissionId, status, onRefresh }) {
   const [actionMessage, setActionMessage] = useState('');
@@ -67,35 +100,42 @@ function TextPageToolbar({ submissionId, status, onRefresh }) {
   return (
     <>
       <DropdownMenu buttonContent={<span>Status</span>}>
-        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Task Status</div>
+        <h3 className="shared-control-popover__title">Task Status</h3>
         <StatusIndicator tasks={status.tasks} />
       </DropdownMenu>
 
-      <DropdownMenu buttonContent={<><span style={{ fontSize: '14px', lineHeight: 1 }}>☰</span> Menu</>}>
-        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>Recalculate</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['all'], 'Recalculation queued for all tasks.')} disabled={actionLoading}>All</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['split_topic_generation', 'subtopics_generation', 'summarization', 'mindmap', 'insights_generation'], 'Topic-related tasks queued.')} disabled={actionLoading}>Topics</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['summarization'], 'Summarization queued.')} disabled={actionLoading}>Summary</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['mindmap'], 'Mindmap queued.')} disabled={actionLoading}>Mindmap</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['prefix_tree'], 'Prefix tree queued.')} disabled={actionLoading}>Prefix Tree</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['insights_generation'], 'Insights queued.')} disabled={actionLoading}>Insights</button>
-          <button className="action-btn action-btn-toolbar" onClick={() => runRefresh(['markup_generation'], 'Markup generation queued.')} disabled={actionLoading}>Markup</button>
+      <DropdownMenu
+        buttonContent={<><span className="shared-control-trigger__icon">☰</span> Menu</>}
+      >
+        <h3 className="shared-control-popover__title">Recalculate</h3>
+        <div className="shared-control-stack">
+          {RECALCULATE_ACTIONS.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className="shared-control-button shared-control-button--toolbar"
+              onClick={() => runRefresh(action.tasks, action.message)}
+              disabled={actionLoading}
+            >
+              {action.label}
+            </button>
+          ))}
         </div>
 
-        <hr style={{ margin: '4px 0', border: 'none', borderTop: '1px solid #eee' }} />
+        <hr className="shared-control-divider" />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="shared-control-stack shared-control-stack--stretch">
           <RefreshButton submissionId={submissionId} onRefresh={onRefresh} compact={false} />
           <button
-            className="action-btn danger action-btn-toolbar large centered"
+            type="button"
+            className="shared-control-button shared-control-button--toolbar shared-control-button--toolbar-centered shared-control-button--danger"
             onClick={handleDelete}
             disabled={actionLoading}
           >
             Delete
           </button>
         </div>
-        {actionMessage && <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '4px', borderRadius: '4px' }}>{actionMessage}</div>}
+        {actionMessage && <div className="shared-control-message">{actionMessage}</div>}
       </DropdownMenu>
     </>
   );

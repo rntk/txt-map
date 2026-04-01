@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import RawTextDisplay from './shared/RawTextDisplay';
+import '../styles/text-reading.css';
 
 /**
  * @typedef {Object} RawTextViewProps
@@ -23,24 +24,25 @@ function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRa
   }, [downloadUrl]);
 
   return (
-    <div className="summary-content">
-      <div className="raw-text-meta" style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div className="summary-content reading-raw-text">
+      <div className="raw-text-meta reading-raw-text__meta">
         <span>{rawText.length.toLocaleString()} characters</span>
-        <button
-          className="action-btn"
-          style={{ padding: '2px 8px', fontSize: '11px' }}
-          onClick={() => navigator.clipboard.writeText(rawText)}
-        >
-          Copy
-        </button>
-        <a
-          className="action-btn"
-          style={{ padding: '2px 8px', fontSize: '11px', textDecoration: 'none', verticalAlign: 'middle' }}
-          href={downloadUrl}
-          download={`${sourceUrl || submissionId}.txt`}
-        >
-          Download
-        </a>
+        <div className="reading-raw-text__actions">
+          <button
+            type="button"
+            className="action-btn action-btn-toolbar reading-raw-text__action"
+            onClick={() => navigator.clipboard.writeText(rawText)}
+          >
+            Copy
+          </button>
+          <a
+            className="action-btn action-btn-toolbar reading-raw-text__action reading-raw-text__download"
+            href={downloadUrl}
+            download={`${sourceUrl || submissionId}.txt`}
+          >
+            Download
+          </a>
+        </div>
       </div>
       <RawTextDisplay
         rawText={rawText}

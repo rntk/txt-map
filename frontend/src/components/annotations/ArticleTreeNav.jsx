@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import './ArticleTreeNav.css';
 
 const PRIORITY_COLORS = {
   must_read: '#1a73e8',
@@ -11,6 +12,20 @@ const PRIORITY_COLORS = {
  * Sticky left-panel navigation tree showing all topics in article order.
  * Topics are indented by hierarchy depth (parsed from "Parent > Child" names).
  * The active topic (currently visible card) is highlighted.
+ */
+/**
+ * @typedef {Object} ArticleTreeNavProps
+ * @property {Array<{ name: string, sentences?: number[] }>} orderedTopics
+ * @property {Record<string, { reading_priority?: string }>} topicAnnotations
+ * @property {Set<string> | Iterable<string> | null | undefined} readTopics
+ * @property {string | null} activeTopic
+ * @property {(topicName: string) => void} onTopicClick
+ * @property {number} totalSentences
+ */
+
+/**
+ * @param {ArticleTreeNavProps} props
+ * @returns {React.ReactElement}
  */
 export default function ArticleTreeNav({
   orderedTopics,
@@ -80,13 +95,15 @@ export default function ArticleTreeNav({
                 key={topic.name}
                 type="button"
                 className={`article-tree-node${isActive ? ' article-tree-node--active' : ''}${isParentActive ? ' article-tree-node--parent-active' : ''}${isRead ? ' article-tree-node--read' : ''}`}
-                style={{ paddingLeft: `${10 + depth * 13}px` }}
+                style={{
+                  '--article-tree-node-indent': `${10 + depth * 13}px`,
+                  '--article-tree-node-dot-color': PRIORITY_COLORS[priority],
+                }}
                 onClick={() => onTopicClick(topic.name)}
                 title={topic.name.replace(/\s*>\s*/g, ' › ')}
               >
                 <span
                   className="article-tree-node__dot"
-                  style={{ background: PRIORITY_COLORS[priority] }}
                 />
                 <span className="article-tree-node__label">{displayName}</span>
                 {posPercent !== null && depth === 0 && (

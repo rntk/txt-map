@@ -5,6 +5,7 @@ import GlobalTopicsTimelineView from './GlobalTopicsTimelineView';
 import GlobalTopicsCompareView from './GlobalTopicsCompareView';
 import GlobalVisualizationPanels from './GlobalVisualizationPanels';
 import { useGlobalChartData } from '../hooks/useGlobalChartData';
+import '../styles/GlobalTopics.css';
 
 const EMPTY_READ_TOPICS = new Set();
 const NOOP = () => {};
@@ -107,10 +108,10 @@ function GlobalTopicsPage() {
   };
 
   return (
-    <div className="container" style={{ padding: '0 2px 2px' }}>
-      <div className="left-column">
+    <div className="container global-topics-page">
+      <div className="left-column global-topics-sidebar">
         {loading ? (
-          <div style={{ color: '#888', fontSize: '13px' }}>Loading topics...</div>
+          <div className="global-topics-status global-topics-status--loading">Loading topics...</div>
         ) : (
           <TopicList
             topics={topics}
@@ -123,36 +124,47 @@ function GlobalTopicsPage() {
           />
         )}
       </div>
-      <div className="right-column">
-        <div className="article-header-sticky">
-          <div className="global-menu-links">
+      <div className="right-column global-topics-workspace">
+        <div className="article-header-sticky global-topics-toolbar">
+          <div className="global-menu-links global-topics-view-switcher" role="tablist" aria-label="Global topics views">
             <button
-              className={`global-menu-link${activeView === 'classic' ? ' active' : ''}`}
+              type="button"
+              className={`global-menu-link global-topics-view-switcher__button${activeView === 'classic' ? ' active global-topics-view-switcher__button--active' : ''}`}
+              aria-pressed={activeView === 'classic'}
               onClick={() => setActiveView('classic')}
             >
               Classic
             </button>
             <button
-              className={`global-menu-link${activeView === 'timeline' ? ' active' : ''}`}
+              type="button"
+              className={`global-menu-link global-topics-view-switcher__button${activeView === 'timeline' ? ' active global-topics-view-switcher__button--active' : ''}`}
+              aria-pressed={activeView === 'timeline'}
               onClick={() => setActiveView('timeline')}
             >
               Timeline
             </button>
             <button
-              className={`global-menu-link${activeView === 'compare' ? ' active' : ''}`}
+              type="button"
+              className={`global-menu-link global-topics-view-switcher__button${activeView === 'compare' ? ' active global-topics-view-switcher__button--active' : ''}`}
+              aria-pressed={activeView === 'compare'}
               onClick={() => setActiveView('compare')}
             >
               Compare
             </button>
           </div>
           {topics.length > 0 && (
-            <div className="tab-bar">
+            <div className="tab-bar global-topics-toolbar__tabs">
               <div className="tab-group">
                 <span className="tab-group-label">Visualizations</span>
                 <div className="tabs">
-                  {FULLSCREEN_TABS.map(tab => (
-                    <button key={tab.key} className={fullscreenGraph === tab.key ? 'active' : ''}
-                      onClick={() => handleTabClick(tab.key)}>
+                  {FULLSCREEN_TABS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      className={fullscreenGraph === tab.key ? 'active' : ''}
+                      aria-pressed={fullscreenGraph === tab.key}
+                      onClick={() => handleTabClick(tab.key)}
+                    >
                       {tab.label}
                     </button>
                   ))}
@@ -162,15 +174,15 @@ function GlobalTopicsPage() {
           )}
         </div>
         {selectedTopics.length === 0 && (
-          <div style={{ color: '#888', fontSize: '13px', padding: '12px' }}>
+          <div className="global-topics-empty-state">
             Select one or more topics to see sentences from all sources.
           </div>
         )}
         {sentencesLoading && (
-          <div style={{ color: '#888', fontSize: '13px', padding: '12px' }}>Loading sentences...</div>
+          <div className="global-topics-status">Loading sentences...</div>
         )}
         {!sentencesLoading && groups.length === 0 && selectedTopics.length > 0 && (
-          <div style={{ color: '#888', fontSize: '13px', padding: '12px' }}>No sentences found.</div>
+          <div className="global-topics-empty-state">No sentences found.</div>
         )}
         {!sentencesLoading && activeView === 'classic' && (
           <GlobalTopicsClassicView groups={groups} groupRefs={groupRefs} />

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import SummarySourceMenu from './SummarySourceMenu';
+import '../styles/text-reading.css';
 
 /**
  * @typedef {Object} ArticleSummaryViewProps
@@ -57,17 +58,18 @@ function ArticleSummaryView({
 
   return (
     <>
-      <div className="summary-content">
+      <div className="summary-content reading-summary">
         {articleSummaryText || articleSummaryBullets.length > 0 ? (
           <>
             {articleSummaryText && (
-              <div className="summary-text">
+              <div className="summary-text reading-summary__text">
                 <p>
                   {articleSummaryText}
                   {articleTextMatches.length > 0 && (
                     <>
                       {' '}
                       <button
+                        type="button"
                         className="summary-source-link"
                         onClick={handleTextSourceClick}
                       >
@@ -79,20 +81,21 @@ function ArticleSummaryView({
               </div>
             )}
             {articleSummaryBullets.length > 0 && (
-              <div className="summary-text">
-                <ul>
+              <div className="summary-text reading-summary__text">
+                <ul className="reading-summary__list">
                   {articleSummaryBullets.map((bullet, index) => {
                     const isHighlighted = highlightedBulletIndices.has(index);
                     const topicBadges = articleBulletMatches[index] || [];
                     return (
                       <li
                         key={`${index}-${bullet}`}
-                        style={isHighlighted ? { background: '#fffde7', borderRadius: '3px', padding: '2px 4px', marginLeft: '-4px' } : undefined}
+                        className={`reading-summary__bullet${isHighlighted ? ' reading-summary__bullet--highlighted' : ''}`}
                       >
                         {bullet}
                         {topicBadges.slice(0, 3).map(({ topic }) => (
                           <button
                             key={topic.name}
+                            type="button"
                             className="summary-topic-badge"
                             onClick={() => onToggleTopic(topic)}
                             title={`Select topic: ${topic.name}`}
@@ -104,6 +107,7 @@ function ArticleSummaryView({
                           <>
                             {' '}
                             <button
+                              type="button"
                               className="summary-source-link"
                               onClick={(e) => handleBulletSourceClick(e, index)}
                             >

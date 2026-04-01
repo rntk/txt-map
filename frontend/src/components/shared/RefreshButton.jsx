@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
+import './sharedControls.css';
 import './RefreshButton.css';
 
+/**
+ * @typedef {Object} RefreshButtonProps
+ * @property {string} submissionId
+ * @property {() => void} [onRefresh]
+ * @property {boolean} [compact]
+ */
+
+/**
+ * @param {RefreshButtonProps} props
+ */
 function RefreshButton({ submissionId, onRefresh, compact = false }) {
   const [loading, setLoading] = useState(false);
 
@@ -28,16 +39,18 @@ function RefreshButton({ submissionId, onRefresh, compact = false }) {
     }
   };
 
-  const sizeClass = compact ? 'refresh-btn--compact' : 'refresh-btn--normal';
+  const sizeClass = compact ? 'refresh-button--compact' : 'refresh-button--normal';
+  const iconClassName = loading ? 'refresh-button__icon refresh-button__icon--loading' : 'refresh-button__icon';
 
   return (
     <button
+      type="button"
       onClick={handleRefresh}
       disabled={loading}
-      className={`action-btn refresh-btn ${sizeClass}`}
+      className={`shared-control-button refresh-button ${sizeClass}`}
       title="Refresh all data for this submission"
     >
-      {loading ? '...' : '\uD83D\uDD04 Refresh'}
+      {loading ? <span className={iconClassName}>...</span> : <><span className="refresh-button__icon">↻</span><span>Refresh</span></>}
     </button>
   );
 }

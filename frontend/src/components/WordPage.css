@@ -1,0 +1,104 @@
+.word-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.word-page-header {
+  flex: 0 0 auto;
+  padding: 0.25rem;
+}
+
+.word-page-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.word-page-title {
+  margin: 0;
+  color: var(--shell-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.word-page-word-highlight {
+  color: var(--shell-accent);
+}
+
+.word-page-tooltip-toggle {
+  margin-left: auto;
+}
+
+.word-page-tab-bar {
+  margin-left: auto;
+}
+
+.word-page-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.word-page-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--shell-shadow-soft);
+  overflow-y: auto;
+}
+
+.word-page-loading,
+.word-page-error,
+.word-page-no-submission {
+  padding: 1rem;
+}
+
+.word-page-no-occurrences {
+  margin: 0;
+  color: var(--shell-muted);
+}
+
+.word-page-sentences-list,
+.word-page-tree-container,
+.word-page-chart-container,
+.word-page-timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.word-page-sentence-card {
+  padding: 0.85rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 1rem;
+  background: rgba(248, 248, 245, 0.94);
+}
+
+.word-page-sentence-header {
+  margin-bottom: 0.6rem;
+  color: var(--shell-muted-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .word-page-tooltip-toggle {
+    margin-left: 0;
+  }
+
+  .word-page-content {
+    padding: 0.65rem;
+  }
+}

@@ -1,0 +1,126 @@
+/**
+ * Foundation layers:
+ * 1. design-tokens.css for canonical values
+ * 2. foundation.css for base/reset/layout primitives
+ * 3. feature CSS files for component-specific selectors
+ *
+ * Inline `style={}` is allowed only for runtime-only geometry or coordinates.
+ * Prefer semantic classes and CSS custom properties for all static styling.
+ */
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--shell-bg);
+  color: var(--shell-ink);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.surface-card {
+  border: 1px solid var(--shell-border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(244, 244, 240, 0.94)),
+    var(--shell-surface-strong);
+  box-shadow: var(--shell-shadow-soft);
+}
+
+.surface-card--muted {
+  background: var(--shell-surface);
+}
+
+.section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.section-heading__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: rgba(31, 32, 29, 0.06);
+  color: var(--shell-muted-strong);
+  font-size: 0.6rem;
+  font-weight: var(--font-extrabold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.section-heading__title {
+  margin: 0;
+  color: var(--shell-ink);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.section-heading__body {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.page-state {
+  padding: var(--space-5);
+  border: 1px dashed var(--shell-border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.56);
+  color: var(--shell-muted);
+  text-align: center;
+}
+
+.page-state--error {
+  color: var(--color-error);
+  border-color: rgba(211, 47, 47, 0.18);
+  background: rgba(252, 228, 236, 0.65);
+}
+
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.visually-muted {
+  color: var(--shell-muted);
+}

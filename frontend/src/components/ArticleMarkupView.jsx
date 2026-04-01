@@ -8,6 +8,7 @@ import {
 } from './markup/topicMarkupUtils';
 import { useTooltip } from '../hooks/useTooltip';
 import { getTopicHighlightColor } from '../utils/topicColorUtils';
+import '../styles/text-reading.css';
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
@@ -130,10 +131,15 @@ function ArticleMarkupPlainBlock({ sentences, startSentenceIndex, sentenceColorM
       {safeSentences.map((sentence, index) => {
         const sentenceNum = startSentenceIndex + index;
         const color = sentenceColorMap?.get(sentenceNum);
+        const sentenceStyle = color ? { '--topic-highlight-color': color } : undefined;
+
         return (
-          <div key={`${sentenceNum}-${sentence}`} className="markup-plain__sentence">
-            <span className="markup-plain__num">{sentenceNum}.</span>
-            <span style={color ? { backgroundColor: color, borderRadius: '2px', padding: '0 2px' } : undefined}>
+          <div key={`${sentenceNum}-${sentence}`} className="markup-plain__sentence reading-markup__plain-sentence">
+            <span className="markup-plain__num reading-markup__plain-sentence-num">{sentenceNum}.</span>
+            <span
+              className={`markup-plain__sentence-text reading-markup__plain-sentence-text${color ? ' markup-plain__sentence-text--colored reading-markup__plain-sentence-text--colored' : ''}`}
+              style={sentenceStyle}
+            >
               {sentence}
             </span>
           </div>
@@ -329,8 +335,8 @@ function MarkupTopicBlock({
     <>
       <div
         ref={blockRef}
-        className="markup-topic-block"
-        style={coloredHighlightMode ? { backgroundColor: getTopicHighlightColor(block.topic.name) } : undefined}
+        className={`markup-topic-block${coloredHighlightMode ? ' reading-markup__topic-block--colored' : ''}`}
+        style={coloredHighlightMode ? { '--topic-highlight-color': getTopicHighlightColor(block.topic.name) } : undefined}
         onClick={handleBlockClick}
         onKeyDown={handleBlockKeyDown}
         role="button"
@@ -395,8 +401,8 @@ function ArticleMarkupView({
   }, [coloredHighlightMode, safeTopics]);
 
   return (
-    <div className="summary-content">
-      <div className="markup-content">
+    <div className="summary-content reading-markup">
+      <div className="markup-content reading-markup__content">
         {articleMarkupBlocks.map((block) => (
           block.kind === 'markup' ? (
             <MarkupTopicBlock

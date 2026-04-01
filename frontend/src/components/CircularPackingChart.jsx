@@ -26,6 +26,16 @@ const CIRCLE_ENLARGE_FACTOR = 1.6;
 
 export { buildScopedHierarchy } from '../utils/topicHierarchy';
 
+/**
+ * @typedef {Object} CircularPackingChartProps
+ * @property {import('../utils/topicHierarchy').TopicHierarchyInput[]} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: { fullPath?: string, displayName?: string }) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
 // Wrap label into lines that fit within maxWidth pixels at given fontSize
 function wrapLines(label, maxWidth, fontSize) {
   const maxCharsPerLine = Math.max(1, Math.floor(maxWidth / (fontSize * CHAR_ASPECT)));
@@ -88,13 +98,6 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
 }
 
 /**
- * @typedef {Object} CircularPackingChartProps
- * @property {import('../utils/topicHierarchy').TopicHierarchyInput[]} topics
- * @property {string[]} [sentences]
- * @property {(topic: { fullPath?: string, displayName?: string }) => void} [onShowInArticle]
- */
-
-/**
  * @param {CircularPackingChartProps} props
  */
 export default function CircularPackingChart({
@@ -132,19 +135,19 @@ export default function CircularPackingChart({
       .call(zoomRef.current.transform, d3.zoomIdentity);
   };
 
-  useEffect(() => {
-    if (!svgRef.current || !containerRef.current || !hasHierarchyData) return undefined;
+    useEffect(() => {
+        if (!svgRef.current || !containerRef.current || !hasHierarchyData) return undefined;
 
     const containerWidth = containerRef.current.clientWidth || 800;
     const size = Math.max(320, containerWidth);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    svg
-      .attr('width', size)
-      .attr('height', size)
-      .attr('viewBox', `0 0 ${size} ${size}`)
-      .style('cursor', 'grab');
+        svg
+          .attr('width', size)
+          .attr('height', size)
+          .attr('viewBox', `0 0 ${size} ${size}`)
+          .attr('class', 'circular-packing-svg chart-svg chart-svg--centered');
 
     const root = d3.hierarchy(hierarchyData)
       .sum((d) => d.value || 0)
@@ -238,18 +241,8 @@ export default function CircularPackingChart({
 
     const tooltip = d3.select(containerRef.current)
       .append('div')
-      .attr('class', 'circular-packing-tooltip')
-      .style('position', 'absolute')
-      .style('background', 'rgba(0,0,0,0.78)')
-      .style('color', 'white')
-      .style('padding', '6px 10px')
-      .style('border-radius', '4px')
-      .style('font-size', '12px')
-      .style('pointer-events', 'none')
-      .style('opacity', 0)
-      .style('z-index', 100)
-      .style('max-width', '240px')
-      .style('white-space', 'pre-wrap');
+      .attr('class', 'circular-packing-tooltip chart-tooltip')
+      .style('opacity', 0);
 
     circles
       .on('mouseover', (event, node) => {
@@ -363,12 +356,12 @@ export default function CircularPackingChart({
     ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`
     : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`;
 
-  if (!topics || topics.length === 0) {
-    return <p style={{ color: '#666', fontStyle: 'italic' }}>No topics available.</p>;
+    if (!topics || topics.length === 0) {
+    return <p className="chart-empty-state chart-empty-state--panel">No topics available.</p>;
   }
 
   return (
-    <div ref={containerRef} className="circular-packing-chart">
+    <div ref={containerRef} className="circular-packing-chart chart-surface chart-surface--circular">
       <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
         navigateTo(path);
         setSelectedLevel(0);
@@ -386,18 +379,18 @@ export default function CircularPackingChart({
         }}
       />
 
-      <p className="circular-packing-subtitle">
+      <p className="circular-packing-subtitle chart-section__copy">
         {subtitle}
       </p>
 
       {!hasHierarchyData ? (
-        <div className="circular-packing-body">
-          <p className="circular-packing-no-data">
+        <div className="circular-packing-body chart-surface__body">
+          <p className="circular-packing-no-data chart-empty-state chart-empty-state--panel">
             {`No topics available inside ${scopeLabel} at relative level ${selectedLevel}. Try a different level.`}
           </p>
         </div>
       ) : (
-        <div className="circular-packing-body">
+        <div className="circular-packing-body chart-surface__body">
           <button
             type="button"
             onClick={resetZoom}
@@ -406,7 +399,7 @@ export default function CircularPackingChart({
           >
             Reset zoom
           </button>
-          <svg ref={svgRef} className="circular-packing-svg" style={{ display: 'block', margin: '0 auto' }} />
+          <svg ref={svgRef} className="circular-packing-svg chart-svg chart-svg--centered" />
         </div>
       )}
 

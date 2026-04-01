@@ -2,25 +2,64 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { buildTopicTree, getSubtreeStats as getSubtreeStatsUtil } from '../utils/topicTree';
 import TopicTreeNode from './TopicTreeNode';
 import { getTopicSelectionKey } from '../utils/chartConstants';
+import './TopicNavigation.css';
 
+/**
+ * @typedef {Object} TopicListTopic
+ * @property {string} name
+ * @property {number} [totalSentences]
+ * @property {Array<unknown>} [ranges]
+ */
+
+/**
+ * @typedef {Object} TopicTreeNodeEntry
+ * @property {{ name: string, fullPath: string, isLeaf: boolean, topic: TopicListTopic | null }} node
+ * @property {Map<string, TopicTreeNodeEntry>} children
+ */
+
+/**
+ * @typedef {Object} TopicListProps
+ * @property {Array<TopicListTopic>} [topics]
+ * @property {Array<TopicListTopic>} [selectedTopics]
+ * @property {(topic: TopicListTopic) => void} [onToggleTopic]
+ * @property {(topic: TopicListTopic) => void} [onHoverTopic]
+ * @property {Set<string> | Iterable<string>} [readTopics]
+ * @property {(topic: TopicListTopic) => void} [onToggleRead]
+ * @property {boolean} [showPanel]
+ * @property {TopicListTopic | null} [panelTopic]
+ * @property {(topic: TopicListTopic | Array<TopicListTopic>) => void} [onToggleShowPanel]
+ * @property {(topic: TopicListTopic, mode: 'focus' | 'prev' | 'next') => void} [onNavigateTopic]
+ * @property {() => void} [onToggleReadAll]
+ * @property {() => void} [onOpenVisualization]
+ * @property {boolean} [highlightAllTopics]
+ * @property {() => void} [onToggleHighlightAll]
+ */
+
+/**
+ * Render the topic sidebar list using shared topic-navigation chrome.
+ *
+ * @param {TopicListProps} props
+ * @returns {React.ReactElement}
+ */
 function TopicList({
   topics = [],
   selectedTopics = [],
-  onToggleTopic = () => { },
-  onHoverTopic: _onHoverTopic = () => { },
+  onToggleTopic = () => {},
+  onHoverTopic: _onHoverTopic = () => {},
   readTopics = new Set(),
-  onToggleRead = () => { },
+  onToggleRead = () => {},
   showPanel = false,
   panelTopic = null,
-  onToggleShowPanel = () => { },
+  onToggleShowPanel = () => {},
   onNavigateTopic,
-  onToggleReadAll = () => { },
+  onToggleReadAll = () => {},
   onOpenVisualization,
   highlightAllTopics = false,
-  onToggleHighlightAll = () => { },
+  onToggleHighlightAll = () => {},
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
     [selectedTopics]
@@ -31,16 +70,16 @@ function TopicList({
   );
 
   const topicTree = useMemo(() => buildTopicTree(topics), [topics]);
-
   const getSubtreeStats = useCallback((treeNode) => getSubtreeStatsUtil(treeNode), []);
 
   const selectedNamesSet = useMemo(
-    () => new Set(safeSelectedTopics.map(t => t.name)),
+    () => new Set(safeSelectedTopics.map((topic) => topic.name)),
     [safeSelectedTopics]
   );
 
   const subtreeStateMap = useMemo(() => {
     const map = new Map();
+
     const compute = (node) => {
       if (node.node.isLeaf && node.node.topic) {
         const name = node.node.topic.name;
@@ -50,31 +89,39 @@ function TopicList({
         map.set(node.node.fullPath, entry);
         return entry;
       }
+
       let hasSelected = false;
       let allRead = true;
       let hasLeaves = false;
-      node.children.forEach(child => {
+
+      node.children.forEach((child) => {
         const childEntry = compute(child);
         if (childEntry.hasSelected) hasSelected = true;
         if (!childEntry.allRead || !childEntry.hasLeaves) allRead = false;
         if (childEntry.hasLeaves) hasLeaves = true;
       });
+
       const entry = { hasSelected, allRead: hasLeaves && allRead, hasLeaves };
       map.set(node.node.fullPath, entry);
       return entry;
     };
-    topicTree.forEach(root => compute(root));
+
+    topicTree.forEach((root) => compute(root));
     return map;
   }, [topicTree, selectedNamesSet, safeReadTopics]);
 
-  const isSubtreeSelected = useCallback((treeNode) => {
-    return subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false;
-  }, [subtreeStateMap]);
+  const isSubtreeSelected = useCallback(
+    (treeNode) => subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false,
+    [subtreeStateMap]
+  );
 
-  const isSubtreeRead = useCallback((treeNode) => {
-    const entry = subtreeStateMap.get(treeNode.node.fullPath);
-    return entry ? entry.hasLeaves && entry.allRead : false;
-  }, [subtreeStateMap]);
+  const isSubtreeRead = useCallback(
+    (treeNode) => {
+      const entry = subtreeStateMap.get(treeNode.node.fullPath);
+      return entry ? entry.hasLeaves && entry.allRead : false;
+    },
+    [subtreeStateMap]
+  );
 
   const toggleAllInSubtree = useCallback((treeNode) => {
     const allSelected = isSubtreeSelected(treeNode);
@@ -82,14 +129,14 @@ function TopicList({
 
     const traverse = (node) => {
       if (node.node.isLeaf && node.node.topic) {
-        const isSelected = safeSelectedTopics.some(t => t.name === node.node.topic.name);
+        const isSelected = safeSelectedTopics.some((topic) => topic.name === node.node.topic.name);
         if (allSelected && isSelected) {
           onToggleTopic(node.node.topic);
         } else if (!allSelected && !isSelected) {
           onToggleTopic(node.node.topic);
         }
       }
-      node.children.forEach(child => traverse(child));
+      node.children.forEach((child) => traverse(child));
     };
 
     traverse(treeNode);
@@ -114,15 +161,14 @@ function TopicList({
   const toggleReadInSubtree = useCallback((treeNode) => {
     const allRead = isSubtreeRead(treeNode);
 
-    // Check if any leaf in the subtree has split ranges
     const hasSplitRanges = (() => {
       let found = false;
       const check = (node) => {
         if (node.node.isLeaf && node.node.topic) {
-          const r = node.node.topic.ranges;
-          if (Array.isArray(r) && r.length > 1) found = true;
+          const ranges = node.node.topic.ranges;
+          if (Array.isArray(ranges) && ranges.length > 1) found = true;
         }
-        if (!found) node.children.forEach(child => check(child));
+        if (!found) node.children.forEach((child) => check(child));
       };
       check(treeNode);
       return found;
@@ -145,7 +191,7 @@ function TopicList({
           onToggleRead(node.node.topic);
         }
       }
-      node.children.forEach(child => traverse(child));
+      node.children.forEach((child) => traverse(child));
     };
 
     traverse(treeNode);
@@ -168,14 +214,14 @@ function TopicList({
   }, [safeReadTopics, onToggleRead, onNavigateTopic, isSubtreeRead]);
 
   const toggleNode = (path) => {
-    setExpandedNodes(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
       } else {
-        newSet.add(path);
+        next.add(path);
       }
-      return newSet;
+      return next;
     });
   };
 
@@ -184,10 +230,10 @@ function TopicList({
     const traverse = (treeNode) => {
       if (treeNode.children.size > 0) {
         paths.add(treeNode.node.fullPath);
-        treeNode.children.forEach(child => traverse(child));
+        treeNode.children.forEach((child) => traverse(child));
       }
     };
-    topicTree.forEach(root => traverse(root));
+    topicTree.forEach((root) => traverse(root));
     return paths;
   }, [topicTree]);
 
@@ -214,10 +260,10 @@ function TopicList({
   const [allExpanded, setAllExpanded] = useState(false);
 
   const toggleExpandAll = useCallback(() => {
-    setAllExpanded(prev => {
-      const newState = !prev;
-      setExpandedNodes(newState ? getAllNonLeafPaths() : new Set());
-      return newState;
+    setAllExpanded((prev) => {
+      const nextState = !prev;
+      setExpandedNodes(nextState ? getAllNonLeafPaths() : new Set());
+      return nextState;
     });
   }, [getAllNonLeafPaths]);
 
@@ -227,15 +273,15 @@ function TopicList({
       if (treeNode.node.isLeaf && treeNode.node.topic) {
         leaves.push(treeNode.node.topic.name);
       }
-      treeNode.children.forEach(child => collect(child));
+      treeNode.children.forEach((child) => collect(child));
     };
-    topicTree.forEach(root => collect(root));
-    return leaves.length > 0 && leaves.every(name => safeReadTopics.has(name));
+    topicTree.forEach((root) => collect(root));
+    return leaves.length > 0 && leaves.every((name) => safeReadTopics.has(name));
   }, [topicTree, safeReadTopics]);
 
-  const isPanelSelection = (topic) => {
-    return showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic);
-  };
+  const isPanelSelection = (topic) => (
+    showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic)
+  );
 
   const nodeProps = {
     searchQuery,
@@ -257,62 +303,52 @@ function TopicList({
     highlightAllTopics,
   };
 
-  const buttonStyle = {
-    fontSize: '11px',
-    padding: '3px 8px',
-    border: '1px solid #ddd',
-    borderRadius: '3px',
-    background: '#f9f9f9',
-    cursor: 'pointer',
-    color: '#555',
-  };
-  const buttonActiveStyle = { ...buttonStyle, background: '#e8f4e8', borderColor: '#a8d8a8', color: '#2d6a2d' };
-
   return (
     <>
       {topicTree.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <button onClick={toggleExpandAll} style={buttonStyle}>
-              {allExpanded ? 'Fold All' : 'Unfold All'}
-            </button>
-            <button onClick={onToggleReadAll} style={allRead ? buttonActiveStyle : buttonStyle}>
-              {allRead ? 'Unread All' : 'Read All'}
-            </button>
-            <button onClick={onToggleHighlightAll} style={highlightAllTopics ? buttonActiveStyle : buttonStyle}>
-              {highlightAllTopics ? 'Clear Colors' : 'Color Topics'}
-            </button>
+        <div className="topic-nav-panel">
+          <div className="topic-nav-toolbar">
+            <div className="topic-nav-toolbar__group">
+              <button type="button" onClick={toggleExpandAll} className="topic-nav-button">
+                {allExpanded ? 'Fold All' : 'Unfold All'}
+              </button>
+              <button
+                type="button"
+                onClick={onToggleReadAll}
+                className={`topic-nav-button${allRead ? ' topic-nav-button--active' : ''}`}
+              >
+                {allRead ? 'Unread All' : 'Read All'}
+              </button>
+              <button
+                type="button"
+                onClick={onToggleHighlightAll}
+                className={`topic-nav-button${highlightAllTopics ? ' topic-nav-button--active' : ''}`}
+              >
+                {highlightAllTopics ? 'Clear Colors' : 'Color Topics'}
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Filter topics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="topic-nav-filter"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Filter topics..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              fontSize: '12px',
-              padding: '6px 10px',
-              border: '1px solid #ddd',
-              borderRadius: '3px',
-              outline: 'none',
-              width: '100%',
-              boxSizing: 'border-box'
-            }}
-          />
         </div>
       )}
-      <div style={{ fontSize: '13px', lineHeight: '1.4', paddingBottom: '6px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '2px' }}>
+
+      <div className="topic-nav-results">
         {topicTree.length === 0 ? (
-          <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
+          <div className="topic-nav-empty">No topics yet.</div>
+        ) : filteredTree.length === 0 ? (
+          <div className="topic-nav-empty">No matching topics.</div>
         ) : (
-          filteredTree.length === 0 ? (
-            <div style={{ color: '#888', fontSize: '13px' }}>No matching topics.</div>
-          ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {filteredTree.map((treeNode) => (
-                <TopicTreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} {...nodeProps} />
-              ))}
-            </ul>
-          )
+          <ul className="topic-nav-list">
+            {filteredTree.map((treeNode) => (
+              <TopicTreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} {...nodeProps} />
+            ))}
+          </ul>
         )}
       </div>
     </>

@@ -121,7 +121,7 @@
   width: 20px;
   height: 20px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+  background: var(--markup-dialog-avatar-background, linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700)));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,6 +180,7 @@
   letter-spacing: var(--tracking-wider);
   text-align: center;
   color: var(--text-secondary);
+  background: var(--markup-comparison-header-bg, var(--bg-secondary));
 }
 
 .markup-comparison__body {

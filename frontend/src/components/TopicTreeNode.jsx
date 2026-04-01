@@ -1,94 +1,42 @@
 import React from 'react';
 import { getTopicHighlightColor } from '../utils/topicColorUtils';
+import './TopicNavigation.css';
 
-const styles = {
-  treeNode: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 0,
-  },
-  nodeContent: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '8px',
-    padding: '10px 0px',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  guideLine: {
-    width: '2px',
-    borderLeft: '1px dotted #ccc',
-    marginLeft: '0px',
-    flexShrink: 0,
-  },
-  expandIcon: {
-    cursor: 'pointer',
-    width: '12px',
-    textAlign: 'center',
-    fontSize: '10px',
-    color: '#666',
-    flexShrink: 0,
-    paddingTop: '2px',
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap',
-    marginBottom: '6px',
-  },
-  topicTitle: {
-    cursor: 'pointer',
-  },
-  topicTitleHover: {
-    textDecoration: 'underline',
-  },
-  topicTitleClickable: {
-    cursor: 'pointer',
-  },
-  stats: {
-    fontSize: '11px',
-    color: '#888',
-  },
-  buttonsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap',
-    marginTop: '4px',
-    marginBottom: '4px',
-  },
-  button: {
-    fontSize: '11px',
-    padding: '3px 8px',
-    border: '1px solid #ddd',
-    borderRadius: '3px',
-    background: '#f9f9f9',
-    cursor: 'pointer',
-    color: '#555',
-  },
-  buttonActive: {
-    background: '#e8f4e8',
-    borderColor: '#a8d8a8',
-    color: '#2d6a2d',
-  },
-  summaryRow: {
-    fontSize: '11px',
-    color: '#666',
-    marginTop: '6px',
-    fontStyle: 'italic',
-  },
-  checkbox: {
-    margin: 0,
-    cursor: 'pointer',
-  },
-  childrenList: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 0,
-    paddingLeft: '16px',
-  },
-};
+/**
+ * @typedef {Object} TopicTreeNodeModel
+ * @property {{ name: string, fullPath: string, isLeaf: boolean, topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string } | null }} node
+ * @property {Map<string, TopicTreeNodeModel>} children
+ */
 
+/**
+ * @typedef {Object} TopicTreeNodeProps
+ * @property {TopicTreeNodeModel} treeNode
+ * @property {number} [depth]
+ * @property {string} searchQuery
+ * @property {Set<string>} expandedNodes
+ * @property {(treeNode: TopicTreeNodeModel) => { totalTopics: number, totalSentences: number }} getSubtreeStats
+ * @property {(treeNode: TopicTreeNodeModel) => boolean} isSubtreeSelected
+ * @property {(treeNode: TopicTreeNodeModel) => boolean} isSubtreeRead
+ * @property {Array<{ name: string }>} safeSelectedTopics
+ * @property {Set<string>} safeReadTopics
+ * @property {(path: string) => void} toggleNode
+ * @property {(treeNode: TopicTreeNodeModel) => void} toggleAllInSubtree
+ * @property {(treeNode: TopicTreeNodeModel) => void} toggleReadInSubtree
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} onToggleTopic
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} onToggleRead
+ * @property {(topics: Array<{ name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }>) => void} onToggleShowPanel
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }, mode: 'focus' | 'prev' | 'next') => void} [onNavigateTopic]
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => boolean} isPanelSelection
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onOpenVisualization]
+ * @property {boolean} [highlightAllTopics]
+ */
+
+/**
+ * Render a topic tree node with semantic classes and only runtime color vars.
+ *
+ * @param {TopicTreeNodeProps} props
+ * @returns {React.ReactElement}
+ */
 function TopicTreeNode({
   treeNode,
   depth = 0,
@@ -118,8 +66,8 @@ function TopicTreeNode({
   const isNodeRead = isSubtreeRead(treeNode);
 
   const topic = node.topic;
-  const isLeafSelected = topic && safeSelectedTopics.some(t => t.name === topic.name);
-  const isLeafRead = topic && safeReadTopics.has(topic.name);
+  const isLeafSelected = Boolean(topic && safeSelectedTopics.some((t) => t.name === topic.name));
+  const isLeafRead = Boolean(topic && safeReadTopics.has(topic.name));
 
   const childProps = {
     searchQuery,
@@ -141,46 +89,48 @@ function TopicTreeNode({
     highlightAllTopics,
   };
 
-  return (
-    <li style={styles.treeNode}>
-      <div style={{
-        ...styles.nodeContent,
-        backgroundColor: depth === 0 ? '#fbfbfb' : 'transparent',
-      }}>
-        {/* Guide line for hierarchy */}
-        <div style={styles.guideLine} />
+  const titleClassName = [
+    'topic-tree-node__title',
+    node.isLeaf ? 'topic-tree-node__title--leaf' : 'topic-tree-node__title--branch',
+    depth === 0 ? 'topic-tree-node__title--root' : 'topic-tree-node__title--nested',
+    isNodeRead || isLeafRead ? 'topic-tree-node__title--read' : '',
+    highlightAllTopics && topic ? 'topic-tree-node__title--highlighted' : '',
+  ].filter(Boolean).join(' ');
 
-        {/* Expand icon */}
+  const titleStyle = highlightAllTopics && topic
+    ? { '--topic-highlight-color': getTopicHighlightColor(topic.name) }
+    : undefined;
+
+  return (
+    <li className="topic-tree-node">
+      <div className={`topic-tree-node__row${depth === 0 ? ' topic-tree-node__row--root' : ''}`}>
+        <div className="topic-tree-node__guide" />
+
         {hasChildren ? (
-          <span
-            style={styles.expandIcon}
+          <button
+            type="button"
+            className="topic-tree-node__expand"
             onClick={() => toggleNode(node.fullPath)}
+            aria-label={isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
           >
             {isExpanded ? '▼' : '▶'}
-          </span>
+          </button>
         ) : (
-          <div style={{ width: '2px' }} />
+          <div className="topic-tree-node__expand-spacer" />
         )}
 
-        {/* Main content area */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Row 1: Title + Stats */}
-          <div style={styles.titleRow}>
+        <div className="topic-tree-node__main">
+          <div className="topic-tree-node__title-row">
             {!node.isLeaf && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <label className="topic-tree-node__label">
                 <input
                   type="checkbox"
                   checked={isNodeSelected}
                   onChange={() => toggleAllInSubtree(treeNode)}
-                  style={styles.checkbox}
+                  className="topic-tree-node__checkbox"
                 />
                 <span
-                  style={{
-                    ...styles.topicTitle,
-                    fontWeight: depth === 0 ? '600' : '500',
-                    fontSize: depth === 0 ? '13px' : '12px',
-                    ...(isNodeRead ? { color: '#888' } : {})
-                  }}
+                  className={titleClassName}
                   onClick={() => toggleNode(node.fullPath)}
                 >
                   {node.name}
@@ -194,23 +144,13 @@ function TopicTreeNode({
                   type="checkbox"
                   checked={isLeafSelected}
                   onChange={() => onToggleTopic(topic)}
-                  style={styles.checkbox}
+                  className="topic-tree-node__checkbox"
                 />
                 <span
-                  className="topic-tree-node-title"
-                  style={{
-                    ...styles.topicTitle,
-                    fontWeight: depth === 0 ? '600' : '500',
-                    fontSize: depth === 0 ? '13px' : '12px',
-                    ...(isLeafRead ? { color: '#888' } : {}),
-                    ...(highlightAllTopics ? {
-                      backgroundColor: getTopicHighlightColor(topic.name),
-                      borderRadius: '3px',
-                      padding: '1px 5px',
-                    } : {}),
-                  }}
+                  className={titleClassName}
+                  style={titleStyle}
                   onClick={() => {
-                    onNavigateTopic && onNavigateTopic(topic, 'focus');
+                    onNavigateTopic?.(topic, 'focus');
                   }}
                 >
                   {node.name}
@@ -218,19 +158,19 @@ function TopicTreeNode({
               </>
             )}
 
-            <span style={styles.stats}>
+            <span className="topic-tree-node__stats">
               {node.isLeaf && topic
                 ? `(${topic.totalSentences} sent.)`
-                : `(${totalTopics} topics, ${totalSentences} sent.)`
-              }
+                : `(${totalTopics} topics, ${totalSentences} sent.)`}
             </span>
           </div>
 
-          {/* Row 2: Buttons */}
-          <div style={styles.buttonsRow}>
+          <div className="topic-tree-node__actions">
             {node.isLeaf && topic ? (
               <>
                 <button
+                  type="button"
+                  className={`topic-nav-button${isLeafRead ? ' topic-nav-button--active' : ''}`}
                   onClick={() => {
                     const ranges = topic.ranges;
                     if (Array.isArray(ranges) && ranges.length > 1 && !isLeafRead) {
@@ -241,37 +181,37 @@ function TopicTreeNode({
                     }
                     onToggleRead(topic);
                   }}
-                  style={{
-                    ...styles.button,
-                    ...(isLeafRead ? styles.buttonActive : {})
-                  }}
                 >
                   {isLeafRead ? 'Mark Unread' : 'Mark Read'}
                 </button>
                 <button
+                  type="button"
+                  className="topic-nav-button"
                   onClick={() => onToggleShowPanel(topic)}
-                  style={styles.button}
                 >
                   {isPanelSelection(topic) ? 'Hide' : 'Show'}
                 </button>
                 <button
-                  onClick={() => onNavigateTopic && onNavigateTopic(topic, 'prev')}
-                  style={styles.button}
+                  type="button"
+                  className="topic-nav-button"
+                  onClick={() => onNavigateTopic?.(topic, 'prev')}
                   title="Scroll to previous sentence for this topic"
                 >
                   Prev
                 </button>
                 <button
-                  onClick={() => onNavigateTopic && onNavigateTopic(topic, 'next')}
-                  style={styles.button}
+                  type="button"
+                  className="topic-nav-button"
+                  onClick={() => onNavigateTopic?.(topic, 'next')}
                   title="Scroll to next sentence for this topic"
                 >
                   Next
                 </button>
                 {onOpenVisualization && (
                   <button
+                    type="button"
+                    className="topic-nav-button"
                     onClick={() => onOpenVisualization(topic)}
-                    style={styles.button}
                     title="Open Topics chart"
                   >
                     Chart
@@ -281,29 +221,28 @@ function TopicTreeNode({
             ) : (
               <>
                 <button
+                  type="button"
+                  className={`topic-nav-button${isNodeRead ? ' topic-nav-button--active' : ''}`}
                   onClick={() => toggleReadInSubtree(treeNode)}
-                  style={{
-                    ...styles.button,
-                    ...(isNodeRead ? styles.buttonActive : {})
-                  }}
                 >
                   {isNodeRead ? 'Mark Unread' : 'Mark Read'}
                 </button>
                 <button
+                  type="button"
+                  className="topic-nav-button"
                   onClick={() => {
                     const leaves = [];
                     const collectLeaves = (n) => {
                       if (n.node.isLeaf && n.node.topic) {
                         leaves.push(n.node.topic);
                       }
-                      n.children.forEach(c => collectLeaves(c));
+                      n.children.forEach((child) => collectLeaves(child));
                     };
                     collectLeaves(treeNode);
                     if (leaves.length > 0) {
                       onToggleShowPanel(leaves);
                     }
                   }}
-                  style={styles.button}
                 >
                   Show
                 </button>
@@ -311,18 +250,16 @@ function TopicTreeNode({
             )}
           </div>
 
-          {/* Row 3: Summary (leaf nodes only) */}
           {node.isLeaf && topic && topic.summary && (
-            <div style={styles.summaryRow}>
+            <div className="topic-tree-node__summary">
               {topic.summary}
             </div>
           )}
         </div>
       </div>
 
-      {/* Children */}
       {hasChildren && isExpanded && (
-        <ul style={styles.childrenList}>
+        <ul className="topic-tree-node__children">
           {Array.from(children.values())
             .sort((a, b) => a.node.name.localeCompare(b.node.name))
             .map((childNode) => (

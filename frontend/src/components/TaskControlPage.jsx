@@ -3,6 +3,21 @@ import { formatDate } from '../utils/chartConstants';
 import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
 import '../styles/App.css';
 
+/**
+ * @typedef {Object} TaskFilterState
+ * @property {string} submissionId
+ * @property {string} status
+ * @property {string} limit
+ */
+
+/**
+ * @typedef {Object} NewTaskState
+ * @property {string} submissionId
+ * @property {string} taskType
+ * @property {string} priority
+ */
+
+/** @type {readonly string[]} */
 const TASK_TYPES = [
   'split_topic_generation',
   'subtopics_generation',
@@ -27,18 +42,31 @@ function TaskControlPage() {
   });
   const [actionMessage, setActionMessage] = useState('');
 
+  /**
+   * @param {string} field
+   * @param {string} value
+   * @returns {void}
+   */
   const updateFilters = useCallback(function updateFilters(field, value) {
     setFilters(function applyFilterUpdate(previousFilters) {
       return { ...previousFilters, [field]: value };
     });
   }, []);
 
+  /**
+   * @param {string} field
+   * @param {string} value
+   * @returns {void}
+   */
   const updateNewTask = useCallback(function updateNewTask(field, value) {
     setNewTask(function applyTaskUpdate(previousTask) {
       return { ...previousTask, [field]: value };
     });
   }, []);
 
+  /**
+   * @returns {string}
+   */
   const buildQuery = useCallback(() => {
     return buildQueryString(function configureParams(params) {
       appendStringParam(params, 'submission_id', filters.submissionId);
@@ -47,6 +75,9 @@ function TaskControlPage() {
     });
   }, [filters.submissionId, filters.status, filters.limit]);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -69,6 +100,10 @@ function TaskControlPage() {
     fetchTasks();
   }, [fetchTasks]);
 
+  /**
+   * @param {string | number} taskId
+   * @returns {Promise<void>}
+   */
   const handleDelete = async (taskId) => {
     setActionMessage('');
     try {
@@ -85,6 +120,10 @@ function TaskControlPage() {
     }
   };
 
+  /**
+   * @param {string | number} taskId
+   * @returns {Promise<void>}
+   */
   const handleRepeat = async (taskId) => {
     setActionMessage('');
     try {
@@ -101,6 +140,10 @@ function TaskControlPage() {
     }
   };
 
+  /**
+   * @param {React.FormEvent<HTMLFormElement>} event
+   * @returns {Promise<void>}
+   */
   const handleAdd = async (event) => {
     event.preventDefault();
     setActionMessage('');
@@ -136,6 +179,10 @@ function TaskControlPage() {
     }
   };
 
+  /**
+   * @param {React.FormEvent<HTMLFormElement>} event
+   * @returns {void}
+   */
   const handleFilterSubmit = (event) => {
     event.preventDefault();
     fetchTasks();
@@ -148,7 +195,7 @@ function TaskControlPage() {
           <h1>Task Control</h1>
           <p className="task-page-subtitle">Manage queue tasks: delete, repeat, or add new ones.</p>
         </div>
-        <button className="task-refresh" onClick={fetchTasks}>Refresh</button>
+        <button type="button" className="task-refresh" onClick={fetchTasks}>Refresh</button>
       </div>
 
       <div className="task-panels">

@@ -1,70 +1,71 @@
 import React from 'react';
 
 /**
- * Shared Legend component for River Charts
+ * @typedef {Object} RiverLegendItem
+ * @property {string} [name]
  */
-const RiverLegend = ({
+
+/**
+ * @typedef {Object} RiverLegendProps
+ * @property {RiverLegendItem[] | string[]} items
+ * @property {string | null} [activeItem]
+ * @property {(itemName: string | null) => void} [setActiveItem]
+ * @property {(name: string) => string} colorScale
+ * @property {string} [nameKey]
+ * @property {'default' | 'pill'} [variant]
+ */
+
+/**
+ * Shared legend for river charts.
+ * @param {RiverLegendProps} props
+ * @returns {React.ReactElement | null}
+ */
+function RiverLegend({
     items,
     activeItem,
     setActiveItem,
     colorScale,
     nameKey = 'name',
-    variant = 'default' // 'default' or 'pill'
-}) => {
+    variant = 'default',
+}) {
     if (!items || items.length === 0) return null;
 
     return (
-        <div className={`river-legend river-legend-${variant}`} style={{
-            marginTop: '15px',
-            borderTop: '1px solid #eee',
-            paddingTop: '15px',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            justifyContent: 'center'
-        }}>
-            {items.map(item => {
-                const name = item[nameKey] || item;
+        <div className={`chart-legend river-legend river-legend--${variant}`}>
+            {items.map((item) => {
+                const name = typeof item === 'string' ? item : item[nameKey] || '';
                 const isActive = activeItem === name;
-                const isDimmed = activeItem && activeItem !== name;
+                const isDimmed = Boolean(activeItem) && activeItem !== name;
+                const itemClassName = [
+                    'chart-legend-item',
+                    'chart-legend-item--interactive',
+                    'river-legend__item',
+                    variant === 'pill' ? 'river-legend__item--pill' : 'river-legend__item--default',
+                    isActive ? 'chart-legend-item--active' : '',
+                    isDimmed ? 'chart-legend-item--dimmed' : '',
+                ].filter(Boolean).join(' ');
 
                 return (
-                    <div
+                    <button
                         key={name}
-                        onMouseEnter={() => setActiveItem(name)}
-                        onMouseLeave={() => setActiveItem(null)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: variant === 'pill' ? '6px 12px' : '4px 8px',
-                            backgroundColor: isActive ? (variant === 'pill' ? '#eee' : '#f0f0f0') : (variant === 'pill' ? 'white' : 'transparent'),
-                            border: variant === 'pill' ? '1px solid #ddd' : 'none',
-                            borderRadius: variant === 'pill' ? '20px' : '4px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            opacity: isDimmed ? 0.4 : 1,
-                            boxShadow: isActive && variant === 'pill' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                        }}
+                        type="button"
+                        className={itemClassName}
+                        onMouseEnter={() => setActiveItem?.(name)}
+                        onMouseLeave={() => setActiveItem?.(null)}
                     >
-                        <div style={{
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: colorScale(name),
-                            borderRadius: variant === 'pill' ? '50%' : '2px',
-                            marginRight: '8px'
-                        }}></div>
-                        <span style={{
-                            fontSize: '12px',
-                            fontWeight: variant === 'pill' ? '500' : 'normal',
-                            color: '#333'
-                        }}>
+                        <span
+                            className={`chart-legend-swatch${variant === 'pill' ? ' chart-legend-swatch--square' : ''}`}
+                            style={{ '--chart-legend-swatch': colorScale(name) }}
+                            aria-hidden="true"
+                        />
+                        <span className={`chart-legend-label${variant === 'pill' ? ' river-legend__label--pill' : ''}`}>
                             {name}
                         </span>
-                    </div>
+                    </button>
                 );
             })}
         </div>
     );
-};
+}
 
 export default RiverLegend;

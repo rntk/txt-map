@@ -206,6 +206,30 @@ describe('TopicList general rendering', () => {
     );
     expect(screen.getByText('Unread All')).toBeDefined();
   });
+
+  it('marks read controls as active when a leaf topic is read', () => {
+    render(
+      <TopicList
+        topics={[makeTopic('Science')]}
+        readTopics={new Set(['Science'])}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Mark Unread' })).toHaveClass('topic-nav-button--active');
+  });
+
+  it('applies the highlight class and runtime color variable when topic coloring is enabled', () => {
+    render(
+      <TopicList
+        topics={[makeTopic('Art')]}
+        highlightAllTopics
+      />
+    );
+
+    const topicTitle = screen.getByText('Art');
+    expect(topicTitle).toHaveClass('topic-tree-node__title--highlighted');
+    expect(topicTitle.style.getPropertyValue('--topic-highlight-color')).not.toBe('');
+  });
 });
 
 describe('TopicList subtree checkbox navigation', () => {

@@ -22,6 +22,16 @@ const MIN_BLOCK_WIDTH = 120;
 const MARGIN = { top: 20, right: 16, bottom: 32, left: 50 };
 const HEIGHT_RATIO = 0.95; // Use 95% of available container height
 
+/**
+ * @typedef {Object} ArticleStructureChartProps
+ * @property {Array<{ name?: string, fullPath?: string, displayName?: string, sentenceCount?: number, sentenceIndices?: number[], ranges?: Array<unknown> }>} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
 function rollingAverage(data, windowSize) {
     const half = Math.floor(windowSize / 2);
     return data.map((_, i) => {
@@ -32,6 +42,9 @@ function rollingAverage(data, windowSize) {
     });
 }
 
+/**
+ * @param {ArticleStructureChartProps} props
+ */
 function ArticleStructureChart({
     topics,
     sentences = [],
@@ -149,12 +162,12 @@ function ArticleStructureChart({
     };
 
     if (!topics || topics.length === 0) {
-        return <div className="article-structure-empty">No topic data available.</div>;
+        return <div className="chart-empty-state chart-empty-state--panel">No topic data available.</div>;
     }
 
     return (
-        <div ref={containerRef} className="article-structure-chart">
-            <div className="article-structure-controls">
+        <div ref={containerRef} className="article-structure-chart chart-surface chart-surface--article-structure">
+            <div className="article-structure-controls chart-surface__controls">
                 <Breadcrumbs scopePath={scopePath} onNavigate={navigateTo} />
 
                 <TopicLevelSwitcher
@@ -163,17 +176,17 @@ function ArticleStructureChart({
                     onChange={setSelectedLevel}
                 />
 
-                <p className="article-structure-scope-copy">{subtitle}</p>
+                <p className="article-structure-scope-copy chart-section__copy">{subtitle}</p>
             </div>
 
             {chartData.length === 0 ? (
-                <p className="article-structure-no-data">
+                <p className="article-structure-no-data chart-empty-state chart-empty-state--panel">
                     No topics found inside {scopeLabel} at relative level {selectedLevel}. Try a different level or use the breadcrumbs.
                 </p>
             ) : (
                 <div className="article-structure-scroll-container">
                     <svg
-                        className="article-structure-main"
+                        className="article-structure-main chart-svg"
                         width={svgWidth}
                         height={svgHeight}
                     >
@@ -207,7 +220,6 @@ function ArticleStructureChart({
                                 className={`article-structure-band${block.isDrillable ? ' drillable' : ''}`}
                                 data-testid={`article-structure-block-${sanitizePathForTestId(block.fullPath)}`}
                                 aria-label={block.fullPath}
-                                style={{ cursor: block.isDrillable ? 'pointer' : 'default' }}
                                 onClick={() => handleBlockClick(block)}
                                 onMouseEnter={e => {
                                     setHoveredTopic(block.fullPath);
@@ -233,7 +245,7 @@ function ArticleStructureChart({
                                     height={Math.max(0, plotHeight - 2)}
                                     fill="url(#read-pattern-article-structure)"
                                     pointerEvents="none"
-                                    style={{ opacity: 0.6 }}
+                                    opacity={0.6}
                                 />
                             );
                         })}
@@ -247,7 +259,7 @@ function ArticleStructureChart({
                                 y2={MARGIN.top + plotHeight}
                                 stroke="#fff"
                                 strokeWidth="2"
-                                style={{ pointerEvents: 'none' }}
+                                pointerEvents="none"
                             />
                         ))}
 
@@ -275,7 +287,7 @@ function ArticleStructureChart({
                                         fontSize={fontSize}
                                         fontWeight="800"
                                         fill={colorScale[block.fullPath]}
-                                        style={{ pointerEvents: 'none', userSelect: 'none' }}
+                                        className="article-structure-label"
                                     >
                                         {label}
                                     </text>
@@ -293,7 +305,6 @@ function ArticleStructureChart({
                                                     ranges: Array.isArray(block.ranges) ? block.ranges : [],
                                                 });
                                             }}
-                                            style={{ cursor: 'pointer' }}
                                             aria-label={`View sentences for ${block.displayName}`}
                                         >
                                             <rect x="-8" y="-4" width="16" height="18" rx="3" fill="rgba(255,255,255,0.7)" />
@@ -396,15 +407,18 @@ function ArticleStructureChart({
             )}
 
             {chartData.length > 0 && (
-                <div className="article-structure-legend">
+                <div className="article-structure-legend chart-legend">
                     {chartData.map(item => (
                         <div
                             key={item.fullPath}
-                            className={`article-structure-legend-item${hoveredTopic === item.fullPath ? ' hovered' : ''}`}
+                            className={`article-structure-legend-item chart-legend-item${hoveredTopic === item.fullPath ? ' hovered' : ''}`}
                             onMouseEnter={() => setHoveredTopic(item.fullPath)}
                             onMouseLeave={() => setHoveredTopic(null)}
                         >
-                            <div className="article-structure-legend-color" style={{ backgroundColor: colorScale[item.fullPath] }} />
+                            <div
+                                className="article-structure-legend-color chart-legend-swatch chart-legend-swatch--square"
+                                style={{ '--chart-legend-swatch': colorScale[item.fullPath] }}
+                            />
                             <span className="article-structure-legend-name">{item.displayName}</span>
                             <span className="article-structure-legend-value">({item.totalChars.toLocaleString()} chars)</span>
                         </div>

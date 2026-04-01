@@ -1,0 +1,326 @@
+/* Reading-surface foundation.
+ * Inline styles should be reserved for runtime positioning and CSS custom
+ * properties that cannot be expressed cleanly as static classes.
+ */
+
+.reading-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.reading-page__toolbar-stack {
+  flex: 0 0 auto;
+  padding: 5px 5px 0;
+}
+
+.reading-page__content {
+  padding: 0 2px 2px;
+}
+
+.reading-page__workspace {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.reading-page__sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reading-page__panel-shell {
+  transition: opacity 0.25s ease;
+}
+
+.reading-page__panel-shell--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reading-page__panel-shell--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reading-state {
+  padding: 20px;
+  text-align: center;
+}
+
+.reading-state__title {
+  margin: 0;
+}
+
+.reading-state__title--error {
+  color: #b42318;
+}
+
+.reading-state__message {
+  margin: 0;
+  color: #666;
+}
+
+.reading-page__status-banner {
+  margin: 0 0 8px;
+  padding: 8px 15px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.reading-page__status-banner--processing {
+  background: #fff3cd;
+  border: 1px solid #f0d58a;
+}
+
+.reading-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-tabs__group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-tabs__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.reading-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.reading-tab {
+  padding: 4px 10px;
+  border: none;
+  background: #f8f9fa;
+  color: #555;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.reading-tab:hover {
+  background: #e9ecef;
+}
+
+.reading-tab--active {
+  background: #007bff;
+  color: #fff;
+}
+
+.reading-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #555;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+
+.reading-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.reading-source-note {
+  color: #666;
+  font-size: 11px;
+}
+
+.reading-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-summary__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-summary__text {
+  line-height: 1.65;
+  color: #333;
+}
+
+.reading-summary__list {
+  margin: 8px 0 0 18px;
+  padding-left: 0;
+}
+
+.reading-summary__bullet {
+  margin-bottom: 6px;
+  border-radius: 3px;
+}
+
+.reading-summary__bullet--highlighted {
+  background: #fffde7;
+  margin-left: -4px;
+  padding: 2px 4px;
+}
+
+.reading-raw-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-raw-text__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.reading-raw-text__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-raw-text__action {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.reading-raw-text__download {
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.reading-article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-article__paragraph {
+  margin-bottom: 1em;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.reading-article__sentence,
+.reading-markup__sentence-text,
+.reading-markup__plain-sentence-text {
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.reading-article__sentence--colored,
+.reading-markup__sentence-text--colored,
+.reading-markup__plain-sentence-text--colored {
+  background-color: var(--topic-highlight-color);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.reading-markup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-markup__content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reading-markup__topic-block--colored {
+  background-color: var(--topic-highlight-color);
+}
+
+.reading-markup__plain-sentence {
+  display: inline;
+}
+
+.reading-markup__plain-sentence-num {
+  margin-right: 4px;
+  color: #555;
+  font-weight: 600;
+}
+
+.article-tab-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  border-bottom: 1px solid #dfe3e8;
+  background: #fff;
+}
+
+.article-tab-header__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.article-tab-header__tab {
+  padding: 4px 10px;
+  border: none;
+  background: #f8f9fa;
+  color: #555;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.article-tab-header__tab:hover {
+  background: #e9ecef;
+}
+
+.article-tab-header__tab--active {
+  background: #007bff;
+  color: #fff;
+}
+
+.article-tab-header__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.article-tab-header__source {
+  color: #666;
+  font-size: 11px;
+}
+
+.article-tab-header__source a {
+  color: inherit;
+}

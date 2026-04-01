@@ -36,6 +36,16 @@ function getSpeakerColor(name) {
  * DialogMarkup - Displays conversation between speakers
  * Features avatars, color-coded bubbles, and accessibility attributes
  */
+/**
+ * @typedef {Object} DialogMarkupProps
+ * @property {{ data?: { speakers?: Array<{ name?: string, lines?: Array<{ text?: string, position_index?: number, sentence_index?: number }> }> } }} segment
+ * @property {string[]} sentences
+ */
+
+/**
+ * @param {DialogMarkupProps} props
+ * @returns {React.ReactElement | null}
+ */
 export default function DialogMarkup({ segment, sentences }) {
   const speakers = segment.data?.speakers || [];
   if (speakers.length === 0) return null;
@@ -81,7 +91,7 @@ export default function DialogMarkup({ segment, sentences }) {
             <span className="markup-dialog__speaker">
               <span
                 className="markup-dialog__speaker-avatar"
-                style={{ background: avatarColor }}
+                style={{ '--markup-dialog-avatar-background': avatarColor }}
                 aria-hidden="true"
               >
                 {avatarInitial}

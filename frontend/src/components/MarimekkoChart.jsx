@@ -43,6 +43,32 @@ function getColWeight(col) {
     return Math.sqrt(raw);
 }
 
+/**
+ * @typedef {Object} MarimekkoChartColumnRow
+ * @property {string} displayName
+ * @property {number} sentenceCount
+ * @property {number[]} [sentenceIndices]
+ * @property {boolean} [isDrillable]
+ */
+
+/**
+ * @typedef {Object} MarimekkoChartColumn
+ * @property {string} displayName
+ * @property {number} sentenceCount
+ * @property {number} [totalChars]
+ * @property {MarimekkoChartColumnRow[]} rows
+ */
+
+/**
+ * @typedef {Object} MarimekkoChartProps
+ * @property {MarimekkoChartColumn[]} columns
+ * @property {number} containerWidth
+ * @property {(row: MarimekkoChartColumnRow) => void} [onBarClick]
+ */
+
+/**
+ * @param {MarimekkoChartProps} props
+ */
 function MarimekkoChart({ columns, containerWidth, onBarClick }) {
     const layout = useMemo(() => {
         if (!columns || columns.length === 0) return null;
@@ -82,7 +108,7 @@ function MarimekkoChart({ columns, containerWidth, onBarClick }) {
     }, [columns, containerWidth]);
 
     if (!columns || columns.length === 0) {
-        return <div style={{ color: '#888', padding: '20px' }}>No data to display.</div>;
+        return <div className="chart-empty-state chart-empty-state--panel">No data to display.</div>;
     }
 
     if (!layout) return null;
@@ -114,7 +140,7 @@ function MarimekkoChart({ columns, containerWidth, onBarClick }) {
                     fill={fillColor}
                     stroke="#fff"
                     strokeWidth={1}
-                    style={{ cursor: isClickable ? 'pointer' : 'default' }}
+                    className={isClickable ? 'marimekko-chart__bar marimekko-chart__bar--interactive' : 'marimekko-chart__bar'}
                     onClick={isClickable ? () => onBarClick(row) : undefined}
                 >
                     <title>{`${row.displayName}\nSentences: ${row.sentenceCount}`}</title>
@@ -136,11 +162,8 @@ function MarimekkoChart({ columns, containerWidth, onBarClick }) {
                         y={y + rowHeight / 2 + fontSize * 0.35}
                         fontSize={fontSize}
                         fill="#222"
-                        style={{
-                            cursor: isClickable ? 'pointer' : 'default',
-                            pointerEvents: isClickable ? 'auto' : 'none',
-                            userSelect: 'none',
-                        }}
+                        className={`marimekko-chart__label${isClickable ? ' marimekko-chart__label--interactive' : ''}`}
+                        style={{ pointerEvents: isClickable ? 'auto' : 'none' }}
                         onClick={isClickable ? () => onBarClick(row) : undefined}
                     >
                         {labelText}
@@ -168,7 +191,7 @@ function MarimekkoChart({ columns, containerWidth, onBarClick }) {
                 fill="#333"
                 textAnchor="start"
                 transform={`rotate(40, ${labelX}, ${labelY})`}
-                style={{ userSelect: 'none' }}
+                className="marimekko-chart__bottom-label"
             >
                 {`${colLabel} (${col.sentenceCount})`}
             </text>
@@ -178,7 +201,7 @@ function MarimekkoChart({ columns, containerWidth, onBarClick }) {
     });
 
     return (
-        <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
+        <svg width={svgWidth} height={svgHeight} className="marimekko-chart__svg chart-svg">
             {elements}
         </svg>
     );

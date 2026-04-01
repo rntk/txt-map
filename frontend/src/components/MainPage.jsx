@@ -2,6 +2,27 @@ import React, { useCallback, useRef, useState } from 'react';
 import GlobalReadProgress from './GlobalReadProgress';
 import '../styles/MainPage.css';
 
+/**
+ * @typedef {Object} MenuItem
+ * @property {string} title
+ * @property {string} description
+ * @property {string} link
+ */
+
+/**
+ * @typedef {Object} ExtensionBrowser
+ * @property {string} id
+ * @property {string} label
+ * @property {string} devUrl
+ * @property {string[]} steps
+ */
+
+/**
+ * @typedef {Object} CopyButtonProps
+ * @property {string} text
+ */
+
+/** @type {readonly MenuItem[]} */
 const menuItems = [
   {
     title: 'Texts List',
@@ -30,6 +51,7 @@ const menuItems = [
   }
 ];
 
+/** @type {readonly string[]} */
 const ACCEPTED_EXTENSIONS = ['.html', '.htm', '.txt', '.md', '.pdf', '.fb2', '.epub'];
 const ACCEPTED_MIME = [
   '.html', '.htm', '.txt', '.md', '.pdf', '.fb2', '.epub',
@@ -37,6 +59,11 @@ const ACCEPTED_MIME = [
   'application/x-fictionbook+xml', 'application/epub+zip',
 ].join(',');
 
+/**
+ * @param {string} status
+ * @param {string} errorMessage
+ * @returns {string}
+ */
 function getUploadDescription(status, errorMessage) {
   if (status === 'uploading') {
     return 'Uploading...';
@@ -49,6 +76,7 @@ function getUploadDescription(status, errorMessage) {
   return 'Drop a file here or click to browse. Supported: HTML, PDF, TXT, MD, FB2, EPUB.';
 }
 
+/** @type {readonly ExtensionBrowser[]} */
 const EXTENSION_BROWSERS = [
   {
     id: 'firefox',
@@ -72,6 +100,10 @@ const EXTENSION_BROWSERS = [
   },
 ];
 
+/**
+ * @param {CopyButtonProps} props
+ * @returns {React.JSX.Element}
+ */
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
 
@@ -93,6 +125,9 @@ function CopyButton({ text }) {
   );
 }
 
+/**
+ * @returns {React.JSX.Element}
+ */
 function ExtensionCard() {
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('firefox');
@@ -189,6 +224,9 @@ function ExtensionCard() {
 }
 
 
+/**
+ * @returns {React.JSX.Element}
+ */
 function UploadCard() {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -289,6 +327,9 @@ function UploadCard() {
   );
 }
 
+/**
+ * @returns {React.JSX.Element}
+ */
 function UrlCard() {
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState('idle');

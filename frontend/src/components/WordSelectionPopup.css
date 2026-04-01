@@ -1,0 +1,27 @@
+.word-selection-popup {
+  position: fixed;
+  top: var(--word-selection-popup-top, 0px);
+  left: var(--word-selection-popup-left, 0px);
+  z-index: var(--z-dropdown);
+  transform: translate(-50%, -100%);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--shell-accent);
+  box-shadow: var(--shadow-4);
+}
+
+.word-selection-popup__button {
+  border: 0;
+  background: transparent;
+  color: var(--shell-accent-contrast);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  line-height: 1.2;
+}
+
+.word-selection-popup__button:focus-visible {
+  box-shadow: none;
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 2px;
+}

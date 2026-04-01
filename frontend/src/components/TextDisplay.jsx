@@ -6,6 +6,7 @@ import { getTopicHighlightColor, getTopicCSSClass } from '../utils/topicColorUti
 import { useTooltip } from '../hooks/useTooltip';
 import { HighlightContext } from './shared/HighlightContext';
 import HighlightedText from './shared/HighlightedText';
+import '../styles/text-reading.css';
 
 // Tooltip positioning constants
 const TOOLTIP_WIDTH = 260;
@@ -191,6 +192,14 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
     });
     return map;
   }, [safeArticleTopics]);
+
+  const getColoredSentenceStyle = useCallback((index) => {
+    if (!coloredHighlightMode || !sentenceColorMap?.has(index)) {
+      return undefined;
+    }
+
+    return { '--topic-highlight-color': sentenceColorMap.get(index) };
+  }, [coloredHighlightMode, sentenceColorMap]);
 
   // --- Reverse mapping: char position -> topic(s) ---
   const charToTopics = useMemo(() => {
@@ -562,11 +571,11 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   if (highlightedRawHtml) {
     return (
-      <div className="text-display">
+      <div className="text-display reading-article">
         {topicStyleSheet && <style>{topicStyleSheet}</style>}
         <div
           ref={textContentRef}
-          className="text-content"
+          className="text-content reading-article__content"
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
           onClick={handleTextClick}
         />
@@ -577,22 +586,22 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
 
   if (paragraphs) {
     return (
-      <div className="text-display">
+      <div className="text-display reading-article">
         <div
           ref={textContentRef}
-          className="text-content"
+          className="text-content reading-article__content"
           onClick={handleTextClick}
         >
           {paragraphs.map((para, paraIdx) => (
-            <p key={paraIdx} className="article-paragraph">
+            <p key={paraIdx} className="article-paragraph reading-article__paragraph">
               {para.map(({ text, index }) => (
                 <React.Fragment key={index}>
                   <span
                     id={`sentence-${articleIndex}-${index}`}
                     data-article-index={articleIndex}
                     data-sentence-index={index}
-                    className={`sentence-token ${!coloredHighlightMode && highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
-                    style={coloredHighlightMode && sentenceColorMap?.has(index) ? { backgroundColor: sentenceColorMap.get(index) } : undefined}
+                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}`}
+                    style={getColoredSentenceStyle(index)}
                     dangerouslySetInnerHTML={{ __html: sanitizeHTML(text) + ' ' }}
                   />
                   {sentenceToTopicsEnding.has(index) && topicSummaries && onShowTopicSummary && (
@@ -618,10 +627,10 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
   }
 
   return (
-    <div className="text-display">
+    <div className="text-display reading-article">
       <div
         ref={textContentRef}
-        className="text-content"
+        className="text-content reading-article__content"
         onClick={handleTextClick}
       >
         <p className="article-text">
@@ -631,8 +640,8 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                 id={`sentence-${articleIndex}-${index}`}
                 data-article-index={articleIndex}
                 data-sentence-index={index}
-                className={`sentence-token ${!coloredHighlightMode && highlightedIndices.has(index) ? 'highlighted' : fadedIndices.has(index) ? 'faded' : ''}`}
-                style={coloredHighlightMode && sentenceColorMap?.has(index) ? { backgroundColor: sentenceColorMap.get(index) } : undefined}
+                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? ' highlighted' : fadedIndices.has(index) ? ' faded' : ''}${coloredHighlightMode && sentenceColorMap?.has(index) ? ' reading-article__sentence--colored' : ''}`}
+                style={getColoredSentenceStyle(index)}
               >
                 {effectiveHighlightWords ? (
                   <HighlightedText text={sentence} words={effectiveHighlightWords} />

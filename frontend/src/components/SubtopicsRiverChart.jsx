@@ -4,6 +4,21 @@ import { calculateBins, smoothBins, estimateCharacterCounts, getRiverColorScale 
 import RiverLegend from './shared/RiverLegend';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 
+/**
+ * @typedef {Object} SubtopicsRiverChartProps
+ * @property {Array<{ name?: string, fullPath?: string, displayName?: string, sentences?: number[], totalChars?: number, ranges?: Array<unknown> }>} topics
+ * @property {Array<{ parent_topic?: string, name?: string }>} subtopics
+ * @property {string[]} [sentences]
+ * @property {number} [articleLength]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
+/**
+ * @param {SubtopicsRiverChartProps} props
+ */
 const SubtopicsRiverChart = ({
     topics,
     subtopics,
@@ -143,17 +158,8 @@ const SubtopicsRiverChart = ({
         // Create tooltip
         const tooltip = d3.select("body").selectAll(".river-tooltip").data([0])
             .join("div")
-            .attr("class", "river-tooltip")
-            .style("position", "absolute")
-            .style("background", "rgba(255, 255, 255, 0.95)")
-            .style("border", "1px solid #ccc")
-            .style("border-radius", "4px")
-            .style("padding", "8px 12px")
-            .style("font-size", "12px")
-            .style("pointer-events", "none")
-            .style("opacity", 0)
-            .style("box-shadow", "0 2px 4px rgba(0,0,0,0.1)")
-            .style("z-index", "1000");
+            .attr("class", "river-tooltip chart-tooltip")
+            .style("opacity", 0);
 
         g.selectAll(".sub-layer")
             .data(stackedData)
@@ -310,16 +316,9 @@ const SubtopicsRiverChart = ({
     }, [orderedSubtopics, effectiveLength, colorScale, topics]);
 
     return (
-        <div ref={containerRef} className="subtopics-river-chart" style={{
-            width: '100%',
-            marginTop: '30px',
-            backgroundColor: '#fafafa',
-            borderRadius: '8px',
-            padding: '10px',
-            boxSizing: 'border-box'
-        }}>
-            <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px', padding: '10px', backgroundColor: '#fff' }}>
-                <svg ref={svgRef} style={{ display: 'block', margin: '0 auto' }}></svg>
+        <div ref={containerRef} className="subtopics-river-chart chart-surface chart-surface--river">
+            <div className="subtopics-river-chart__canvas">
+                <svg ref={svgRef} className="subtopics-river-chart__svg chart-svg chart-svg--centered"></svg>
             </div>
 
             <RiverLegend

@@ -192,6 +192,8 @@
   min-height: 44px;
   padding: 4px 8px;
   opacity: 0.85;
+  width: var(--topics-bar-width);
+  background-color: var(--topics-bar-color);
   border: 1.5px solid #777;
   border-radius: 2px;
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -200,6 +202,7 @@
 .topics-bar-chart__bar--hovered {
   opacity: 1;
   transform: translateX(2px);
+  border-color: #333;
 }
 
 .topics-bar-chart__bar--read {
@@ -299,6 +302,7 @@
   height: 16px;
   border: 1px solid #777;
   border-radius: 1px;
+  background: var(--chart-legend-swatch, #999);
 }
 
 .topics-bar-chart__legend-label {

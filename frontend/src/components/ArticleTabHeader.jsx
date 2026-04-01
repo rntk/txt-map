@@ -1,4 +1,5 @@
 import React from 'react';
+import '../styles/text-reading.css';
 
 /**
  * @typedef {Object} ArticleTabHeaderProps
@@ -20,28 +21,32 @@ function ArticleTabHeader({
   sourceUrl,
 }) {
   return (
-    <div className="article-header-sticky">
-      <div className="global-menu-links">
+    <div className="article-header-sticky article-tab-header">
+      <div className="article-tab-header__tabs">
         <button
-          className={`global-menu-link${activeTab === 'article' ? ' active' : ''}`}
+          type="button"
+          className={`article-tab-header__tab${activeTab === 'article' ? ' article-tab-header__tab--active' : ''}`}
           onClick={() => onTabClick('article')}
         >
           Article
         </button>
         <button
-          className={`global-menu-link${activeTab === 'article_summary' ? ' active' : ''}`}
+          type="button"
+          className={`article-tab-header__tab${activeTab === 'article_summary' ? ' article-tab-header__tab--active' : ''}`}
           onClick={() => onTabClick('article_summary')}
         >
           Summary
         </button>
         <button
-          className={`global-menu-link${activeTab === 'raw_text' ? ' active' : ''}`}
+          type="button"
+          className={`article-tab-header__tab${activeTab === 'raw_text' ? ' article-tab-header__tab--active' : ''}`}
           onClick={() => onTabClick('raw_text')}
         >
           Raw Text
         </button>
         <button
-          className={`global-menu-link${activeTab === 'markup' ? ' active' : ''}`}
+          type="button"
+          className={`article-tab-header__tab${activeTab === 'markup' ? ' article-tab-header__tab--active' : ''}`}
           onClick={() => onTabClick('markup')}
         >
           Markup
@@ -49,7 +54,7 @@ function ArticleTabHeader({
       </div>
       {(activeTab === 'article' || activeTab === 'raw_text') && (
         <>
-          <label className="grouped-topics-toggle">
+          <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
             <input
               type="checkbox"
               checked={groupedByTopics}
@@ -61,7 +66,7 @@ function ArticleTabHeader({
       )}
       {(activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup') && (
         <>
-          <label className="grouped-topics-toggle" style={{ marginLeft: '12px' }}>
+          <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
             <input
               type="checkbox"
               checked={tooltipEnabled}
@@ -72,7 +77,7 @@ function ArticleTabHeader({
         </>
       )}
       {sourceUrl && (
-        <div style={{ fontSize: '11px', color: '#666' }}>
+        <div className="reading-source-note article-tab-header__source">
           Source: <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{sourceUrl}</a>
         </div>
       )}

@@ -2,6 +2,28 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
 import '../styles/App.css';
 
+/**
+ * @typedef {Object} CacheNamespace
+ * @property {string} namespace
+ * @property {number} count
+ */
+
+/**
+ * @typedef {Object} CacheEntry
+ * @property {string | number} id
+ * @property {string} [key]
+ * @property {string} [prompt_hash]
+ * @property {string} [namespace]
+ * @property {string} [model_id]
+ * @property {number} [temperature]
+ * @property {string | number} [created_at]
+ * @property {string | number} [stored_at]
+ */
+
+/**
+ * @param {string | number | null | undefined} value
+ * @returns {string}
+ */
 function formatCacheDate(value) {
   if (!value) {
     return '-';
@@ -27,12 +49,20 @@ function CachePage() {
   const [actionMessage, setActionMessage] = useState('');
   const [filters, setFilters] = useState({ namespace: '', limit: '50', skip: '0' });
 
+  /**
+   * @param {string} field
+   * @param {string} value
+   * @returns {void}
+   */
   const updateFilters = useCallback(function updateFilters(field, value) {
     setFilters(function applyFilterUpdate(previousFilters) {
       return { ...previousFilters, [field]: value };
     });
   }, []);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch('/api/llm-cache/stats');
@@ -45,6 +75,9 @@ function CachePage() {
     } catch {}
   }, []);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -74,11 +107,18 @@ function CachePage() {
     fetchEntries();
   }, [fetchStats, fetchEntries]);
 
+  /**
+   * @returns {void}
+   */
   const refreshCacheData = useCallback(function refreshCacheData() {
     fetchEntries();
     fetchStats();
   }, [fetchEntries, fetchStats]);
 
+  /**
+   * @param {string | number} entryId
+   * @returns {Promise<void>}
+   */
   const handleDeleteEntry = async (entryId) => {
     setActionMessage('');
     try {
@@ -94,6 +134,9 @@ function CachePage() {
     }
   };
 
+  /**
+   * @returns {Promise<void>}
+   */
   const handleClearNamespace = async () => {
     if (!filters.namespace) {
       return;
@@ -118,6 +161,9 @@ function CachePage() {
     }
   };
 
+  /**
+   * @returns {Promise<void>}
+   */
   const handleClearAll = async () => {
     if (!window.confirm('Delete ALL cache entries? This cannot be undone.')) {
       return;
@@ -146,7 +192,7 @@ function CachePage() {
           <h1>LLM Cache</h1>
           <p className="task-page-subtitle">Browse and manage cached LLM responses. Total: {total}</p>
         </div>
-        <button className="task-refresh" onClick={refreshCacheData}>Refresh</button>
+        <button type="button" className="task-refresh" onClick={refreshCacheData}>Refresh</button>
       </div>
 
       <div className="task-panels">
@@ -196,6 +242,7 @@ function CachePage() {
             Remove entries by namespace or clear the entire cache.
           </p>
           <button
+            type="button"
             className="task-danger task-danger--block task-danger--spaced"
             onClick={handleClearNamespace}
             disabled={!filters.namespace}
@@ -203,6 +250,7 @@ function CachePage() {
             Clear Namespace {filters.namespace ? `"${filters.namespace}"` : '(select above)'}
           </button>
           <button
+            type="button"
             className="task-danger task-danger--block"
             onClick={handleClearAll}
           >

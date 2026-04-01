@@ -20,6 +20,16 @@ const EXTEND_COUNT = 3;
  * @property {Array<unknown>} [ranges]
  * @property {string[]} [_sentences]
  * @property {string} [_summarySentence]
+ *
+ * @typedef {Object} TopicSentencesModalProps
+ * @property {TopicSentencesModalTopic | null | undefined} topic
+ * @property {string[] | null | undefined} sentences
+ * @property {() => void} onClose
+ * @property {React.ReactNode} [headerExtra]
+ * @property {(topic: TopicSentencesModalTopic) => void} [onShowInArticle]
+ * @property {Record<string, unknown>} [markup]
+ * @property {Set<string> | Iterable<string>} [readTopics]
+ * @property {(topic: TopicSentencesModalTopic) => void} [onToggleRead]
  */
 
 function groupConsecutive(sortedIndices) {
@@ -83,6 +93,10 @@ function normalizeTopic(topic) {
     };
 }
 
+/**
+ * @param {TopicSentencesModalProps} props
+ * @returns {React.ReactElement | null}
+ */
 function TopicSentencesModal({
     topic,
     sentences,
@@ -180,7 +194,7 @@ function TopicSentencesModal({
             >
                 <div className="topic-sentences-modal__header">
                     <h3>{normalizedTopic.displayName}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="topic-sentences-modal__header-actions">
                         {onToggleRead && (
                             <button
                                 type="button"
@@ -281,7 +295,7 @@ function TopicSentencesModal({
                                 {JSON.stringify(topicMarkup, null, 2)}
                             </pre>
                         ) : allIndices.length === 0 ? (
-                            <p>No sentences found for this topic.</p>
+                            <p className="topic-sentences-modal__empty">No sentences found for this topic.</p>
                         ) : (
                             rangeGroups.map((group, groupIdx) => {
                                 const firstIdx = group[0];

@@ -30,6 +30,16 @@ const TREEMAP_MAX_HEIGHT = 720;
 
 export { buildScopedHierarchy } from '../utils/topicHierarchy';
 
+/**
+ * @typedef {Object} TreemapChartProps
+ * @property {Array<{ name?: string, sentences?: number[], fullPath?: string, displayName?: string, topic?: { sentences?: number[], ranges?: Array<unknown> } }>} topics
+ * @property {string[]} [sentences]
+ * @property {(topic: unknown) => void} [onShowInArticle]
+ * @property {Set<string> | string[]} [readTopics]
+ * @property {(topic: unknown) => void} [onToggleRead]
+ * @property {unknown} [markup]
+ */
+
 function wrapLines(label, maxWidth, fontSize) {
   const maxCharsPerLine = Math.max(1, Math.floor(maxWidth / (fontSize * CHAR_ASPECT)));
   const words = label.split(/\s+/);
@@ -143,19 +153,6 @@ function getTreemapFillColor(nodeDatum, colorScale) {
 }
 
 /**
- * @typedef {Object} TopicHierarchyInput
- * @property {string} [name]
- * @property {number[]} [sentences]
- */
-
-/**
- * @typedef {Object} TreemapChartProps
- * @property {TopicHierarchyInput[]} topics
- * @property {string[]} [sentences]
- * @property {(topic: { fullPath?: string, displayName?: string }) => void} [onShowInArticle]
- */
-
-/**
  * @param {TreemapChartProps} props
  */
 export default function TreemapChart({
@@ -236,7 +233,8 @@ export default function TreemapChart({
     d3.select(containerRef.current).selectAll('.treemap-tooltip').remove();
     const tooltip = d3.select(containerRef.current)
       .append('div')
-      .attr('class', 'treemap-tooltip');
+      .attr('class', 'treemap-tooltip chart-tooltip')
+      .style('opacity', 0);
 
     nodes.forEach((node) => {
       const rectWidth = Math.max(0, node.x1 - node.x0);
@@ -266,8 +264,8 @@ export default function TreemapChart({
         .attr('stroke', fillStrokeColor)
         .attr('stroke-width', node.depth === 1 ? 2 : 1.2)
         .attr('rx', 4)
-        .style('opacity', node.depth === 1 ? 0.98 : 0.95)
-        .style('cursor', isInteractive ? 'pointer' : 'default');
+          .attr('opacity', node.depth === 1 ? 0.98 : 0.95)
+          .attr('class', `treemap-node__rect${isInteractive ? ' treemap-node__rect--interactive' : ''}`);
 
       rect.append('title').text(
         `${node.data.fullPath || node.data.name}\n${sentenceCount} sentence${sentenceCount !== 1 ? 's' : ''}`
@@ -333,7 +331,7 @@ export default function TreemapChart({
             .attr('fill', 'url(#read-pattern-treemap)')
             .attr('pointer-events', 'none')
             .attr('rx', 3)
-            .style('opacity', 0.7);
+            .attr('opacity', 0.7);
         }
 
         const fontSize = Math.min(16, Math.max(9, Math.min(rectWidth * 0.12, rectHeight * 0.28)));
@@ -385,7 +383,7 @@ export default function TreemapChart({
   }
 
   return (
-    <div ref={containerRef} className="treemap-chart">
+      <div ref={containerRef} className="treemap-chart chart-surface chart-surface--treemap">
       <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
         navigateTo(path);
         setSelectedLevel(0);
@@ -400,19 +398,19 @@ export default function TreemapChart({
         }}
       />
 
-      <p className="treemap-subtitle">
+      <p className="treemap-subtitle chart-section__copy">
         {subtitle}
       </p>
 
       {!hasHierarchyData ? (
-        <div className="treemap-body treemap-body--empty">
-          <p className="treemap-no-data">
+        <div className="treemap-body treemap-body--empty chart-surface__body">
+          <p className="treemap-no-data chart-empty-state chart-empty-state--panel">
             {`No topics available inside ${scopeLabel} at relative level ${selectedLevel}. Try a different level.`}
           </p>
         </div>
       ) : (
-        <div className="treemap-body">
-          <svg ref={svgRef} className="treemap-svg" />
+        <div className="treemap-body chart-surface__body">
+          <svg ref={svgRef} className="treemap-svg chart-svg" />
         </div>
       )}
 

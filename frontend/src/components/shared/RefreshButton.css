@@ -1,32 +1,16 @@
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  margin-left: 0;
+.refresh-button {
+  min-width: 0;
 }
 
-.refresh-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.refresh-button__icon {
+  font-size: 0.95em;
+  line-height: 1;
 }
 
-.refresh-btn--normal {
-  padding: 8px 16px;
-  font-size: 13px;
+.refresh-button--compact {
+  padding-inline: 0.8rem;
 }
 
-.refresh-btn--compact {
-  min-height: 2.2rem;
-  padding: 0.45rem 0.8rem;
-  font-size: 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--shell-muted-strong);
-  border: 1px solid rgba(29, 30, 27, 0.1);
-}
-
-.refresh-btn--extra-compact {
-  padding: 2px 6px;
-  font-size: 11px;
+.refresh-button--normal {
+  padding-inline: 1rem;
 }

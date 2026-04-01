@@ -1,6 +1,17 @@
 import React, { useEffect } from 'react';
 import '../styles/App.css';
 
+/**
+ * @typedef {Object} FullScreenGraphProps
+ * @property {React.ReactNode} children
+ * @property {() => void} [onClose]
+ * @property {React.ReactNode} title
+ * @property {React.ReactNode} [toolbar]
+ */
+
+/**
+ * @param {FullScreenGraphProps} props
+ */
 function FullScreenGraph({ children, onClose, title, toolbar }) {
   // Disable body scroll when mounted
   useEffect(() => {

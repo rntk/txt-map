@@ -13,6 +13,15 @@ import { useContainerSize } from '../hooks/useContainerSize';
  * - Values are total character count of sentences belonging to each topic
  * - Level selector allows viewing different hierarchy levels (0 = top level, 1 = subtopics, etc.)
  */
+/**
+ * @typedef {Object} RadarChartProps
+ * @property {Array<{ name?: string, displayName?: string, sentences?: number[], totalChars?: number }>} topics
+ * @property {string[]} [sentences]
+ */
+
+/**
+ * @param {RadarChartProps} props
+ */
 function RadarChart({ topics, sentences = [] }) {
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
     const [hoveredTopic, setHoveredTopic] = useState(null);
@@ -105,10 +114,6 @@ function RadarChart({ topics, sentences = [] }) {
     }, [chartData]);
 
     // Compute total chars
-    const totalAllChars = useMemo(() => {
-        return chartData.reduce((sum, item) => sum + item.totalChars, 0);
-    }, [chartData]);
-
     const resetZoom = useCallback(() => {
         if (!svgRef.current || !zoomRef.current) return;
         d3.select(svgRef.current)
@@ -360,14 +365,14 @@ function RadarChart({ topics, sentences = [] }) {
 
     if (!topics || topics.length === 0) {
         return (
-            <div className="radar-chart-empty">
+            <div className="radar-chart-empty chart-empty-state chart-empty-state--panel">
                 No topic data available.
             </div>
         );
     }
 
     return (
-        <div ref={containerRef} className="radar-chart">
+        <div ref={containerRef} className="radar-chart chart-surface chart-surface--radar">
             {/* Level Selector */}
             <TopicLevelSwitcher
                 className="radar-chart-level-switcher"
@@ -383,9 +388,9 @@ function RadarChart({ topics, sentences = [] }) {
             />
 
             {/* Chart */}
-            <div className="radar-chart-body">
+            <div className="radar-chart-body chart-surface__body">
                 {chartData.length === 0 ? (
-                    <p className="radar-chart-no-data">
+                    <p className="radar-chart-no-data chart-empty-state chart-empty-state--panel">
                         No data available at level {selectedLevel}. Try selecting a different level.
                     </p>
                 ) : (
@@ -417,17 +422,17 @@ function RadarChart({ topics, sentences = [] }) {
 
             {/* Legend */}
             {chartData.length > 0 && (
-                <div className="radar-chart-legend">
+                <div className="radar-chart-legend chart-legend">
                     {chartData.map((item) => (
                         <div
                             key={item.name}
-                            className={`radar-chart-legend-item${hoveredTopic === item ? ' hovered' : ''}`}
+                            className={`radar-chart-legend-item chart-legend-item${hoveredTopic === item ? ' hovered' : ''}`}
                             onMouseEnter={() => setHoveredTopic(item)}
                             onMouseLeave={() => setHoveredTopic(null)}
                         >
                             <div
-                                className="radar-chart-legend-color"
-                                style={{ backgroundColor: colorScale[item.name] || '#7ba3cc' }}
+                                className="radar-chart-legend-color chart-legend-swatch chart-legend-swatch--square"
+                                style={{ '--chart-legend-swatch': colorScale[item.name] || '#7ba3cc' }}
                             />
                             <span className="radar-chart-legend-name">
                                 {item.displayName}

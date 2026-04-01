@@ -1,4 +1,5 @@
 import React from 'react';
+import './WordSelectionPopup.css';
 
 /**
  * @typedef {Object} WordSelectionPopupProps
@@ -9,19 +10,15 @@ function WordSelectionPopup({ selectionData, submissionId }) {
   if (!selectionData) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      left: selectionData.position.x,
-      top: selectionData.position.y,
-      transform: 'translate(-50%, -100%)',
-      zIndex: 1000,
-      background: '#1976d2',
-      padding: '4px 8px',
-      borderRadius: '4px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-    }}>
+    <div
+      className="word-selection-popup"
+      style={{
+        '--word-selection-popup-left': `${selectionData.position.x}px`,
+        '--word-selection-popup-top': `${selectionData.position.y}px`,
+      }}
+    >
       <button
-        style={{ color: '#fff', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+        className="word-selection-popup__button"
         onClick={(e) => {
           e.stopPropagation();
           window.location.href = `/page/word/${submissionId}/${encodeURIComponent(selectionData.word)}`;

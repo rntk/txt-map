@@ -16,12 +16,12 @@ describe('RefreshButton', () => {
 
   it('applies compact class when compact prop is true', () => {
     render(<RefreshButton submissionId="abc123" compact />);
-    expect(screen.getByRole('button')).toHaveClass('refresh-btn--compact');
+    expect(screen.getByRole('button')).toHaveClass('refresh-button--compact');
   });
 
   it('applies normal class when compact prop is false', () => {
     render(<RefreshButton submissionId="abc123" compact={false} />);
-    expect(screen.getByRole('button')).toHaveClass('refresh-btn--normal');
+    expect(screen.getByRole('button')).toHaveClass('refresh-button--normal');
   });
 
   it('shows loading indicator and disables button while fetching', async () => {

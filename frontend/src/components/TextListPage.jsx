@@ -6,8 +6,20 @@ import { formatDate } from '../utils/chartConstants';
 import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
 import '../styles/App.css';
 
+/**
+ * @typedef {Object} SubmissionFilterState
+ * @property {string} submissionId
+ * @property {string} status
+ * @property {string} limit
+ */
+
+/** @type {readonly string[]} */
 const STATUS_OPTIONS = ['pending', 'processing', 'completed', 'failed'];
 
+/**
+ * @param {string | null | undefined} status
+ * @returns {string}
+ */
 function statusClass(status) {
   return `task-status task-status-${status || 'pending'}`;
 }
@@ -23,12 +35,20 @@ function TextListPage() {
     limit: '100'
   });
 
+  /**
+   * @param {string} field
+   * @param {string} value
+   * @returns {void}
+   */
   const updateFilters = useCallback(function updateFilters(field, value) {
     setFilters(function applyFilterUpdate(previousFilters) {
       return { ...previousFilters, [field]: value };
     });
   }, []);
 
+  /**
+   * @returns {string}
+   */
   const buildQuery = useCallback(() => {
     return buildQueryString(function configureParams(params) {
       appendStringParam(params, 'submission_id', filters.submissionId, { trim: true });
@@ -37,6 +57,9 @@ function TextListPage() {
     });
   }, [filters.submissionId, filters.status, filters.limit]);
 
+  /**
+   * @returns {Promise<void>}
+   */
   const fetchSubmissions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -59,6 +82,10 @@ function TextListPage() {
     fetchSubmissions();
   }, [fetchSubmissions]);
 
+  /**
+   * @param {React.FormEvent<HTMLFormElement>} event
+   * @returns {void}
+   */
   const handleFilterSubmit = (event) => {
     event.preventDefault();
     fetchSubmissions();
@@ -73,7 +100,7 @@ function TextListPage() {
         </div>
         <div className="page-header-actions page-header-actions--center">
           <GlobalReadProgress size={120} />
-          <button className="text-list-refresh" onClick={fetchSubmissions}>Refresh</button>
+          <button type="button" className="text-list-refresh" onClick={fetchSubmissions}>Refresh</button>
         </div>
       </div>
 
