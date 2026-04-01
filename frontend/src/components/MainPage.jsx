@@ -380,24 +380,39 @@ function MainPage() {
           <span className="main-page-intro__eyebrow">Workspace</span>
           <h2 className="main-page-intro__title">Choose a workflow</h2>
           <p className="main-page-intro__description">
-            The home page keeps the original straightforward layout: quick entry points plus upload.
+            Submit content for analysis or navigate to browse and manage your data.
           </p>
         </div>
         <GlobalReadProgress size={160} />
       </div>
 
-      <div className="main-page-grid">
-        {menuItems.map((item) => (
-          <a key={item.link} href={item.link} className="main-page-card">
-            <span className="main-page-card__eyebrow">Open</span>
-            <span className="main-page-card__title">{item.title}</span>
-            <span className="main-page-card__description">{item.description}</span>
-          </a>
-        ))}
-        <UploadCard />
-        <UrlCard />
-        <ExtensionCard />
-      </div>
+      <section className="main-page-section">
+        <div className="main-page-section__header">
+          <span className="main-page-section__eyebrow">Tools</span>
+          <h3 className="main-page-section__title">Submit Content</h3>
+        </div>
+        <div className="main-page-grid">
+          <UploadCard />
+          <UrlCard />
+          <ExtensionCard />
+        </div>
+      </section>
+
+      <section className="main-page-section">
+        <div className="main-page-section__header">
+          <span className="main-page-section__eyebrow">Navigation</span>
+          <h3 className="main-page-section__title">Browse & Manage</h3>
+        </div>
+        <div className="main-page-grid">
+          {menuItems.map((item) => (
+            <a key={item.link} href={item.link} className="main-page-card">
+              <span className="main-page-card__eyebrow">Open</span>
+              <span className="main-page-card__title">{item.title}</span>
+              <span className="main-page-card__description">{item.description}</span>
+            </a>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
