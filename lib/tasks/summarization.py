@@ -165,7 +165,7 @@ def summarize_by_sentence_groups(
 
     for idx, s in enumerate(sent_list):
         prompt = _SENTENCE_SUMMARY_PROMPT_TEMPLATE.replace("{sentence}", s)
-        resp = cached_llm.call(prompt, 0.0)
+        resp = cached_llm.call(prompt, 0.8)
 
         summary_text = resp.strip()
         if summary_text:
@@ -189,7 +189,7 @@ def _parallel_summarize_sentence_groups(
     Submits all prompts to the LLM queue at once, then gathers in order.
     """
     futures = [
-        llm.submit(_SENTENCE_SUMMARY_PROMPT_TEMPLATE.replace("{sentence}", s), 0.0)
+        llm.submit(_SENTENCE_SUMMARY_PROMPT_TEMPLATE.replace("{sentence}", s), 0.8)
         for s in sent_list
     ]
 
@@ -231,7 +231,7 @@ def _parallel_generate_article_summary(
         chunk_states.append({
             "chunk": chunk,
             "base_prompt": base_prompt,
-            "future": llm.submit(base_prompt, 0.0),
+            "future": llm.submit(base_prompt, 0.8),
         })
 
     # Gather results; do sequential business-logic retries on bad JSON.
@@ -254,7 +254,7 @@ def _parallel_generate_article_summary(
                 attempt - 1, max_attempts,
                 _response_preview(response_text),
             )
-            response_text = llm.call(retry_prompt, 0.0)
+            response_text = llm.call(retry_prompt, 0.8)
             last_response_text = response_text
             parsed_summary = parse_article_summary_response(response_text)
 
@@ -283,7 +283,7 @@ def _parallel_generate_article_summary(
     last_response_text = ""
     for attempt in range(1, max_attempts + 1):
         merge_prompt = base_merge_prompt if attempt == 1 else base_merge_prompt + _RETRY_SUFFIX
-        response_text = llm.call(merge_prompt, 0.0)
+        response_text = llm.call(merge_prompt, 0.8)
         last_response_text = response_text
         merged_summary = parse_article_summary_response(response_text)
         if _article_summary_has_required_content(merged_summary):
@@ -492,7 +492,7 @@ def generate_article_summary(
         for attempt in range(1, max_attempts + 1):
             prompt = base_prompt if attempt == 1 else base_prompt + _RETRY_SUFFIX
             llm_callable = cached_llm if attempt == 1 else _LLMAdapter(llm_client)
-            response_text = llm_callable.call(prompt, 0.0)
+            response_text = llm_callable.call(prompt, 0.8)
             last_response_text = response_text
             parsed_summary = parse_article_summary_response(response_text)
 
@@ -542,7 +542,7 @@ def generate_article_summary(
     for attempt in range(1, max_attempts + 1):
         merge_prompt = base_merge_prompt if attempt == 1 else base_merge_prompt + _RETRY_SUFFIX
         llm_callable = cached_llm if attempt == 1 else _LLMAdapter(llm_client)
-        merged_response = llm_callable.call(merge_prompt, 0.0)
+        merged_response = llm_callable.call(merge_prompt, 0.8)
         last_response_text = merged_response
         merged_summary = parse_article_summary_response(merged_response)
 
@@ -617,7 +617,7 @@ def process_summarization(
                     if topic_sentences_text:
                         topic_text = " ".join(topic_sentences_text)
                         prompt = _SENTENCE_SUMMARY_PROMPT_TEMPLATE.replace("{sentence}", topic_text)
-                        valid_topics_futures.append((topic["name"], llm.submit(prompt, 0.0)))
+                        valid_topics_futures.append((topic["name"], llm.submit(prompt, 0.8)))
             for topic_name, future in valid_topics_futures:
                 result = future.result().strip()
                 topic_summaries[topic_name] = result
