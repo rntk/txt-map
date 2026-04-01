@@ -4,6 +4,7 @@ import DiffPage from './components/DiffPage';
 import GlobalTopicsPage from './components/GlobalTopicsPage';
 import MainPage from './components/MainPage';
 import TaskControlPage from './components/TaskControlPage';
+import LlmTaskControlPage from './components/LlmTaskControlPage';
 import TextListPage from './components/TextListPage';
 import TextPage from './components/TextPage';
 import WordPage from './components/WordPage';
@@ -62,6 +63,7 @@ const navigationItems = [
   { title: 'Home', link: '/page/menu', badge: 'HM', description: 'Dashboard and uploads' },
   { title: 'Texts List', link: '/page/texts', badge: 'TX', description: 'Stored submissions' },
   { title: 'Task Control', link: '/page/tasks', badge: 'TK', description: 'Queue management' },
+  { title: 'LLM Tasks', link: '/page/llm-tasks', badge: 'LT', description: 'LLM queue management' },
   { title: 'Diff', link: '/page/diff', badge: 'DF', description: 'Semantic comparison' },
   { title: 'LLM Cache', link: '/page/cache', badge: 'LC', description: 'Cached generations' },
   { title: 'Global Topics', link: '/page/topics', badge: 'GT', description: 'Cross-source topics' },
@@ -72,6 +74,7 @@ const PAGE_COMPONENTS = {
   diff: DiffPage,
   menu: MainPage,
   tasks: TaskControlPage,
+  'llm-tasks': LlmTaskControlPage,
   text: TextPage,
   texts: TextListPage,
   topics: GlobalTopicsPage,

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler, extension_handler
+from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler, extension_handler, llm_queue_handler
 from lifespan import lifespan
 
 app = FastAPI(
@@ -34,6 +34,7 @@ if vite_assets_dir.is_dir():
 
 app.include_router(submission_handler.router, prefix="/api")
 app.include_router(task_queue_handler.router, prefix="/api")
+app.include_router(llm_queue_handler.router, prefix="/api")
 app.include_router(diff_handler.router, prefix="/api")
 app.include_router(llm_cache_handler.router, prefix="/api")
 app.include_router(settings_handler.router, prefix="/api")
@@ -48,6 +49,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/text/{submission_id}")
 @app.get("/page/word/{submission_id}/{word}")
 @app.get("/page/tasks")
+@app.get("/page/llm-tasks")
 @app.get("/page/texts")
 @app.get("/page/diff")
 @app.get("/page/cache")

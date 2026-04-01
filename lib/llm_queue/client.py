@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any, Optional
 
-from txt_splitt.cache import CacheEntry, _build_cache_key
+from txt_splitt.cache import _build_cache_key
 
 from lib.llm_queue.store import LLMQueueStore
 

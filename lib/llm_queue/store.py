@@ -110,6 +110,15 @@ class LLMQueueStore:
         by_id = {d["request_id"]: d for d in docs}
         return [by_id.get(rid) for rid in request_ids]
 
+    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> list[dict[str, Any]]:
+        """List LLM queue entries with optional filters, sorted by created_at desc."""
+        return list(self._col.find(filters or {}, {"_id": 0}).sort("created_at", -1).limit(limit))
+
+    def delete_by_id(self, request_id: str) -> bool:
+        """Delete an LLM request queue entry by its request_id. Returns True if deleted."""
+        result = self._col.delete_one({"request_id": request_id})
+        return result.deleted_count > 0
+
     def cleanup_old(self, max_age_hours: int = 24) -> int:
         """Delete completed/failed requests older than max_age_hours."""
         from datetime import timedelta
