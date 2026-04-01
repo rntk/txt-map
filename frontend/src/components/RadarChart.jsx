@@ -16,7 +16,7 @@ import { useContainerSize } from '../hooks/useContainerSize';
 function RadarChart({ topics, sentences = [] }) {
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
     const [hoveredTopic, setHoveredTopic] = useState(null);
-    const { containerRef, containerSize } = useContainerSize(600);
+    const { containerRef, containerWidth } = useContainerSize(600);
     const svgRef = useRef(null);
     const zoomRef = useRef(null);
 
@@ -134,7 +134,7 @@ function RadarChart({ topics, sentences = [] }) {
     useEffect(() => {
         if (!svgRef.current || chartData.length === 0) return;
 
-        const size = containerSize;
+        const size = containerWidth;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll('*').remove();
@@ -356,7 +356,7 @@ function RadarChart({ topics, sentences = [] }) {
         svg.call(zoom.transform, d3.zoomIdentity);
         svg.on('dblclick.zoom', null);
 
-    }, [chartData, colorScale, containerSize]);
+    }, [chartData, colorScale, containerWidth]);
 
     if (!topics || topics.length === 0) {
         return (

@@ -19,7 +19,7 @@ const MarimekkoChartTab = ({
 }) => {
     const { scopePath, navigateTo, drillInto } = useScopeNavigation();
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
-    const { containerRef, containerSize } = useContainerSize(900);
+    const { containerRef, containerWidth } = useContainerSize(900);
     const [modalTopic, setModalTopic] = useState(null);
 
     const safeTopics = useMemo(() => (Array.isArray(topics) ? topics : []), [topics]);
@@ -77,7 +77,7 @@ const MarimekkoChartTab = ({
                 {columns.length > 0 ? (
                     <MarimekkoChart
                         columns={columns}
-                        containerWidth={containerSize}
+                        containerWidth={containerWidth}
                         onBarClick={handleBarClick}
                     />
                 ) : (

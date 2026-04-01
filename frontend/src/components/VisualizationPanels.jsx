@@ -196,7 +196,7 @@ function VisualizationPanels({
 
       {fullscreenGraph === 'article_structure' && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
-          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             <ArticleStructureChart
               topics={safeTopics}
               sentences={safeSentences}

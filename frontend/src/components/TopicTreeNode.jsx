@@ -10,12 +10,12 @@ const styles = {
   nodeContent: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '4px',
-    padding: '10px 4px',
-    borderBottom: '1px solid #eee',
+    gap: '2px',
+    padding: '6px 0px',
+    borderBottom: '1px solid #f0f0f0',
   },
   guideLine: {
-    width: '6px',
+    width: '2px',
     borderLeft: '1px dotted #ccc',
     marginLeft: '0px',
     flexShrink: 0,
@@ -32,12 +32,11 @@ const styles = {
   titleRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '4px',
     flexWrap: 'wrap',
-    marginBottom: '3px',
+    marginBottom: '2px',
   },
   topicTitle: {
-    fontWeight: '500',
     cursor: 'pointer',
   },
   topicTitleHover: {
@@ -45,7 +44,6 @@ const styles = {
   },
   topicTitleClickable: {
     cursor: 'pointer',
-    fontWeight: '500',
   },
   stats: {
     fontSize: '11px',
@@ -54,14 +52,14 @@ const styles = {
   buttonsRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '2px',
     flexWrap: 'wrap',
     marginTop: '1px',
-    marginBottom: '3px',
+    marginBottom: '1px',
   },
   button: {
     fontSize: '11px',
-    padding: '1px 6px',
+    padding: '1px 4px',
     border: '1px solid #ddd',
     borderRadius: '3px',
     background: '#f9f9f9',
@@ -87,7 +85,7 @@ const styles = {
     listStyle: 'none',
     margin: 0,
     padding: 0,
-    paddingLeft: '4px',
+    paddingLeft: '16px',
   },
 };
 
@@ -145,20 +143,24 @@ function TopicTreeNode({
 
   return (
     <li style={styles.treeNode}>
-      <div style={styles.nodeContent}>
+      <div style={{
+        ...styles.nodeContent,
+        backgroundColor: depth === 0 ? '#fbfbfb' : 'transparent',
+      }}>
         {/* Guide line for hierarchy */}
         <div style={styles.guideLine} />
 
         {/* Expand icon */}
-        {hasChildren && (
+        {hasChildren ? (
           <span
             style={styles.expandIcon}
             onClick={() => toggleNode(node.fullPath)}
           >
             {isExpanded ? '▼' : '▶'}
           </span>
+        ) : (
+          <div style={{ width: '2px' }} />
         )}
-        {!hasChildren && <span style={{ ...styles.expandIcon, visibility: 'hidden' }}>▶</span>}
 
         {/* Main content area */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -173,7 +175,12 @@ function TopicTreeNode({
                   style={styles.checkbox}
                 />
                 <span
-                  style={{ ...styles.topicTitle, ...(isNodeRead ? { color: '#888' } : {}) }}
+                  style={{
+                    ...styles.topicTitle,
+                    fontWeight: depth === 0 ? '600' : '500',
+                    fontSize: depth === 0 ? '13px' : '12px',
+                    ...(isNodeRead ? { color: '#888' } : {})
+                  }}
                   onClick={() => toggleNode(node.fullPath)}
                 >
                   {node.name}
@@ -193,6 +200,8 @@ function TopicTreeNode({
                   className="topic-tree-node-title"
                   style={{
                     ...styles.topicTitle,
+                    fontWeight: depth === 0 ? '600' : '500',
+                    fontSize: depth === 0 ? '13px' : '12px',
                     ...(isLeafRead ? { color: '#888' } : {}),
                     ...(highlightAllTopics ? {
                       backgroundColor: getTopicHighlightColor(topic.name),

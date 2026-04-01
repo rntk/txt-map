@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 
-export function useContainerSize(defaultSize = 600) {
+export function useContainerSize(defaultWidth = 600, defaultHeight = 400) {
     const containerRef = useRef(null);
-    const [containerSize, setContainerSize] = useState(defaultSize);
+    const [containerWidth, setContainerWidth] = useState(defaultWidth);
+    const [containerHeight, setContainerHeight] = useState(defaultHeight);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -11,8 +12,9 @@ export function useContainerSize(defaultSize = 600) {
         const ro = new ResizeObserver(entries => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
-                const w = entries[0].contentRect.width;
-                if (w > 0) setContainerSize(w);
+                const { width, height } = entries[0].contentRect;
+                if (width > 0) setContainerWidth(width);
+                if (height > 0) setContainerHeight(height);
             }, 150);
         });
         ro.observe(el);
@@ -22,5 +24,5 @@ export function useContainerSize(defaultSize = 600) {
         };
     }, []);
 
-    return { containerRef, containerSize };
+    return { containerRef, containerWidth, containerHeight };
 }

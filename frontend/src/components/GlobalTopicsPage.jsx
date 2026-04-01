@@ -107,7 +107,7 @@ function GlobalTopicsPage() {
   };
 
   return (
-    <div className="container" style={{ padding: '0 5px 5px' }}>
+    <div className="container" style={{ padding: '0 2px 2px' }}>
       <div className="left-column">
         {loading ? (
           <div style={{ color: '#888', fontSize: '13px' }}>Loading topics...</div>

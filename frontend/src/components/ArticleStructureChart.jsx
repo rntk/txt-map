@@ -20,7 +20,7 @@ export { buildScopedChartData, getScopedMaxLevel };
 
 const MIN_BLOCK_WIDTH = 120;
 const MARGIN = { top: 36, right: 24, bottom: 50, left: 68 };
-const SVG_HEIGHT = 380;
+const HEIGHT_RATIO = 0.9; // Use 90% of available container height
 
 function rollingAverage(data, windowSize) {
     const half = Math.floor(windowSize / 2);
@@ -44,7 +44,7 @@ function ArticleStructureChart({
     const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
     const [hoveredTopic, setHoveredTopic] = useState(null);
     const [tooltip, setTooltip] = useState(null);
-    const { containerRef, containerSize: containerWidth } = useContainerSize(800);
+    const { containerRef, containerWidth, containerHeight } = useContainerSize(800, 400);
     const [modalTopic, setModalTopic] = useState(null);
 
     useEffect(() => {
@@ -100,7 +100,11 @@ function ArticleStructureChart({
         return { blocks, plotWidth };
     }, [chartData, containerWidth, sentences.length, topics]);
 
-    const plotHeight = SVG_HEIGHT - MARGIN.top - MARGIN.bottom;
+    // Use container height but cap it to a reasonable maximum based on viewport
+    const maxViewportHeight = typeof window !== 'undefined' ? window.innerHeight * 0.85 : 800;
+    const effectiveContainerHeight = Math.min(containerHeight, maxViewportHeight);
+    const svgHeight = Math.max(effectiveContainerHeight * HEIGHT_RATIO, 300);
+    const plotHeight = svgHeight - MARGIN.top - MARGIN.bottom;
     const svgWidth = layout.plotWidth + MARGIN.left + MARGIN.right;
 
     const { linePath, areaPath, yTicks, xTicks } = useMemo(() => {
@@ -178,7 +182,7 @@ function ArticleStructureChart({
                     <svg
                         className="article-structure-main"
                         width={svgWidth}
-                        height={SVG_HEIGHT}
+                        height={svgHeight}
                     >
                         <defs>
                             <pattern
@@ -368,7 +372,7 @@ function ArticleStructureChart({
                         ))}
                         <text
                             x={MARGIN.left + layout.plotWidth / 2}
-                            y={SVG_HEIGHT - 6}
+                            y={svgHeight - 6}
                             textAnchor="middle"
                             fontSize="10"
                             fill="#aaa"

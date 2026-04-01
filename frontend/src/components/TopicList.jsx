@@ -271,8 +271,8 @@ function TopicList({
   return (
     <>
       {topicTree.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px', flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <button onClick={toggleExpandAll} style={buttonStyle}>
               {allExpanded ? 'Fold All' : 'Unfold All'}
             </button>
@@ -290,15 +290,17 @@ function TopicList({
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               fontSize: '12px',
-              padding: '2px 6px',
+              padding: '3px 6px',
               border: '1px solid #ddd',
               borderRadius: '3px',
               outline: 'none',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           />
         </div>
       )}
-      <div style={{ fontSize: '13px', lineHeight: '1.4', paddingBottom: '6px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '5px', marginRight: '-5px' }}>
+      <div style={{ fontSize: '13px', lineHeight: '1.4', paddingBottom: '6px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '2px' }}>
         {topicTree.length === 0 ? (
           <div style={{ color: '#888', fontSize: '13px' }}>No topics yet.</div>
         ) : (

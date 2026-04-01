@@ -313,7 +313,7 @@ function TextPage() {
 
       {articles.length > 0 ? (
           <>
-          <div className="container" style={{ padding: '0 5px 5px' }}>
+          <div className="container" style={{ padding: '0 2px 2px' }}>
             <div className="left-column">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>Topics ({safeTopics.length})</h1>
