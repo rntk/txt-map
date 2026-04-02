@@ -29,6 +29,12 @@ import './TopicNavigation.css';
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => boolean} isPanelSelection
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onOpenVisualization]
  * @property {boolean} [highlightAllTopics]
+ * @property {string | null} [activeActionMenuPath]
+ * @property {string | null} [focusedActionRowPath]
+ * @property {(path: string) => void} [onToggleActionMenu]
+ * @property {(path: string) => void} [onCloseActionMenu]
+ * @property {(path: string) => void} [onActionRowFocus]
+ * @property {(path: string) => void} [onActionRowBlur]
  */
 
 /**
@@ -57,6 +63,12 @@ function TopicTreeNode({
   isPanelSelection,
   onOpenVisualization,
   highlightAllTopics = false,
+  activeActionMenuPath = null,
+  focusedActionRowPath = null,
+  onToggleActionMenu = () => {},
+  onCloseActionMenu = () => {},
+  onActionRowFocus = () => {},
+  onActionRowBlur = () => {},
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
@@ -87,6 +99,12 @@ function TopicTreeNode({
     isPanelSelection,
     onOpenVisualization,
     highlightAllTopics,
+    activeActionMenuPath,
+    focusedActionRowPath,
+    onToggleActionMenu,
+    onCloseActionMenu,
+    onActionRowFocus,
+    onActionRowBlur,
   };
 
   const titleClassName = [
@@ -100,10 +118,27 @@ function TopicTreeNode({
   const titleStyle = highlightAllTopics && topic
     ? { '--topic-highlight-color': getTopicHighlightColor(topic.name) }
     : undefined;
+  const isActionMenuOpen = activeActionMenuPath === node.fullPath;
+  const isActionRowFocused = focusedActionRowPath === node.fullPath;
+  const areActionsVisible = isActionMenuOpen || isActionRowFocused;
+  const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+
+  const handleAction = (callback) => {
+    callback();
+    onCloseActionMenu(node.fullPath);
+  };
 
   return (
     <li className="topic-tree-node">
-      <div className={`topic-tree-node__row${depth === 0 ? ' topic-tree-node__row--root' : ''}`}>
+      <div
+        className={`topic-tree-node__row${depth === 0 ? ' topic-tree-node__row--root' : ''}${isActionMenuOpen ? ' topic-tree-node__row--actions-open' : ''}`}
+        onFocusCapture={() => onActionRowFocus(node.fullPath)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            onActionRowBlur(node.fullPath);
+          }
+        }}
+      >
         <div className="topic-tree-node__guide" />
 
         {hasChildren ? (
@@ -120,66 +155,85 @@ function TopicTreeNode({
         )}
 
         <div className="topic-tree-node__main">
-          <div className="topic-tree-node__title-row">
-            {!node.isLeaf && (
-              <label className="topic-tree-node__label">
-                <input
-                  type="checkbox"
-                  checked={isNodeSelected}
-                  onChange={() => toggleAllInSubtree(treeNode)}
-                  className="topic-tree-node__checkbox"
-                />
-                <span
-                  className={titleClassName}
-                  onClick={() => toggleNode(node.fullPath)}
-                >
-                  {node.name}
-                </span>
-              </label>
-            )}
+          <div className="topic-tree-node__header">
+            <div className="topic-tree-node__title-row">
+              {!node.isLeaf && (
+                <label className="topic-tree-node__label">
+                  <input
+                    type="checkbox"
+                    checked={isNodeSelected}
+                    onChange={() => toggleAllInSubtree(treeNode)}
+                    className="topic-tree-node__checkbox"
+                  />
+                  <span
+                    className={titleClassName}
+                    onClick={() => toggleNode(node.fullPath)}
+                  >
+                    {node.name}
+                  </span>
+                </label>
+              )}
 
-            {node.isLeaf && topic && (
-              <>
-                <input
-                  type="checkbox"
-                  checked={isLeafSelected}
-                  onChange={() => onToggleTopic(topic)}
-                  className="topic-tree-node__checkbox"
-                />
-                <span
-                  className={titleClassName}
-                  style={titleStyle}
-                  onClick={() => {
-                    onNavigateTopic?.(topic, 'focus');
-                  }}
-                >
-                  {node.name}
-                </span>
-              </>
-            )}
+              {node.isLeaf && topic && (
+                <>
+                  <input
+                    type="checkbox"
+                    checked={isLeafSelected}
+                    onChange={() => onToggleTopic(topic)}
+                    className="topic-tree-node__checkbox"
+                  />
+                  <span
+                    className={titleClassName}
+                    style={titleStyle}
+                    onClick={() => {
+                      onNavigateTopic?.(topic, 'focus');
+                    }}
+                  >
+                    {node.name}
+                  </span>
+                </>
+              )}
 
-            <span className="topic-tree-node__stats">
-              {node.isLeaf && topic
-                ? `(${topic.totalSentences} sent.)`
-                : `(${totalTopics} topics, ${totalSentences} sent.)`}
-            </span>
+              <span className="topic-tree-node__stats">
+                {node.isLeaf && topic
+                  ? `(${topic.totalSentences} sent.)`
+                  : `(${totalTopics} topics, ${totalSentences} sent.)`}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className={`topic-tree-node__menu-trigger${isActionMenuOpen ? ' topic-tree-node__menu-trigger--active' : ''}`}
+              aria-label={`Show actions for ${node.name}`}
+              aria-controls={actionsId}
+              aria-expanded={isActionMenuOpen}
+              onClick={() => onToggleActionMenu(node.fullPath)}
+            >
+              <span aria-hidden="true">...</span>
+            </button>
           </div>
 
-          <div className="topic-tree-node__actions">
+          <div
+            id={actionsId}
+            className={`topic-tree-node__actions${areActionsVisible ? ' topic-tree-node__actions--visible' : ''}`}
+          >
             {node.isLeaf && topic ? (
               <>
                 <button
                   type="button"
                   className={`topic-nav-button${isLeafRead ? ' topic-nav-button--active' : ''}`}
+                  tabIndex={areActionsVisible ? 0 : -1}
                   onClick={() => {
-                    const ranges = topic.ranges;
-                    if (Array.isArray(ranges) && ranges.length > 1 && !isLeafRead) {
-                      const ok = window.confirm(
-                        `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
-                      );
-                      if (!ok) return;
-                    }
-                    onToggleRead(topic);
+                    handleAction(() => {
+                      const ranges = topic.ranges;
+                      if (Array.isArray(ranges) && ranges.length > 1 && !isLeafRead) {
+                        const ok = window.confirm(
+                          `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
+                        );
+                        if (!ok) return;
+                      }
+                      onToggleRead(topic);
+                    });
                   }}
                 >
                   {isLeafRead ? 'Mark Unread' : 'Mark Read'}
@@ -187,14 +241,16 @@ function TopicTreeNode({
                 <button
                   type="button"
                   className="topic-nav-button"
-                  onClick={() => onToggleShowPanel(topic)}
+                  tabIndex={areActionsVisible ? 0 : -1}
+                  onClick={() => handleAction(() => onToggleShowPanel(topic))}
                 >
                   {isPanelSelection(topic) ? 'Hide' : 'Show'}
                 </button>
                 <button
                   type="button"
                   className="topic-nav-button"
-                  onClick={() => onNavigateTopic?.(topic, 'prev')}
+                  tabIndex={areActionsVisible ? 0 : -1}
+                  onClick={() => handleAction(() => onNavigateTopic?.(topic, 'prev'))}
                   title="Scroll to previous sentence for this topic"
                 >
                   Prev
@@ -202,7 +258,8 @@ function TopicTreeNode({
                 <button
                   type="button"
                   className="topic-nav-button"
-                  onClick={() => onNavigateTopic?.(topic, 'next')}
+                  tabIndex={areActionsVisible ? 0 : -1}
+                  onClick={() => handleAction(() => onNavigateTopic?.(topic, 'next'))}
                   title="Scroll to next sentence for this topic"
                 >
                   Next
@@ -211,7 +268,8 @@ function TopicTreeNode({
                   <button
                     type="button"
                     className="topic-nav-button"
-                    onClick={() => onOpenVisualization(topic)}
+                    tabIndex={areActionsVisible ? 0 : -1}
+                    onClick={() => handleAction(() => onOpenVisualization(topic))}
                     title="Open Topics chart"
                   >
                     Chart
@@ -223,25 +281,29 @@ function TopicTreeNode({
                 <button
                   type="button"
                   className={`topic-nav-button${isNodeRead ? ' topic-nav-button--active' : ''}`}
-                  onClick={() => toggleReadInSubtree(treeNode)}
+                  tabIndex={areActionsVisible ? 0 : -1}
+                  onClick={() => handleAction(() => toggleReadInSubtree(treeNode))}
                 >
                   {isNodeRead ? 'Mark Unread' : 'Mark Read'}
                 </button>
                 <button
                   type="button"
                   className="topic-nav-button"
+                  tabIndex={areActionsVisible ? 0 : -1}
                   onClick={() => {
-                    const leaves = [];
-                    const collectLeaves = (n) => {
-                      if (n.node.isLeaf && n.node.topic) {
-                        leaves.push(n.node.topic);
+                    handleAction(() => {
+                      const leaves = [];
+                      const collectLeaves = (n) => {
+                        if (n.node.isLeaf && n.node.topic) {
+                          leaves.push(n.node.topic);
+                        }
+                        n.children.forEach((child) => collectLeaves(child));
+                      };
+                      collectLeaves(treeNode);
+                      if (leaves.length > 0) {
+                        onToggleShowPanel(leaves);
                       }
-                      n.children.forEach((child) => collectLeaves(child));
-                    };
-                    collectLeaves(treeNode);
-                    if (leaves.length > 0) {
-                      onToggleShowPanel(leaves);
-                    }
+                    });
                   }}
                 >
                   Show

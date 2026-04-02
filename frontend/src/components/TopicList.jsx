@@ -85,6 +85,8 @@ function TopicList({
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [insightSearchQuery, setInsightSearchQuery] = useState('');
+  const [activeActionMenuPath, setActiveActionMenuPath] = useState(null);
+  const [focusedActionRowPath, setFocusedActionRowPath] = useState(null);
 
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -350,6 +352,22 @@ function TopicList({
     showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic)
   );
 
+  const toggleActionMenu = useCallback((path) => {
+    setActiveActionMenuPath((prev) => (prev === path ? null : path));
+  }, []);
+
+  const closeActionMenu = useCallback((path) => {
+    setActiveActionMenuPath((prev) => (prev === path ? null : prev));
+  }, []);
+
+  const focusActionRow = useCallback((path) => {
+    setFocusedActionRowPath(path);
+  }, []);
+
+  const blurActionRow = useCallback((path) => {
+    setFocusedActionRowPath((prev) => (prev === path ? null : prev));
+  }, []);
+
   const nodeProps = {
     searchQuery,
     expandedNodes,
@@ -368,6 +386,12 @@ function TopicList({
     isPanelSelection,
     onOpenVisualization,
     highlightAllTopics,
+    activeActionMenuPath,
+    focusedActionRowPath,
+    onToggleActionMenu: toggleActionMenu,
+    onCloseActionMenu: closeActionMenu,
+    onActionRowFocus: focusActionRow,
+    onActionRowBlur: blurActionRow,
   };
 
   return (

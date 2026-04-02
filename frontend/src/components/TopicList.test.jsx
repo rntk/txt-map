@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import TopicList from './TopicList';
 
 // A minimal flat topic
@@ -31,6 +31,8 @@ const getSubtreeCheckbox = () => {
     return label && label.textContent.includes('Animals');
   });
 };
+
+const getRowForText = (text) => screen.getByText(text).closest('.topic-tree-node__row');
 
 describe('TopicList subtreeStateMap – hasSelected', () => {
   it('leaf checkbox is unchecked when topic is not selected', () => {
@@ -192,6 +194,13 @@ describe('TopicList general rendering', () => {
     expect(screen.getByText('Chemistry')).toBeDefined();
   });
 
+  it('renders an overflow trigger for leaf and parent topic rows', () => {
+    render(<TopicList topics={treeTopics} />);
+
+    expect(screen.getByRole('button', { name: 'Show actions for Animals' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show actions for Plants' })).toBeInTheDocument();
+  });
+
   it('renders filter input when topics are present', () => {
     render(<TopicList topics={[makeTopic('Art')]} />);
     expect(screen.getByPlaceholderText('Filter topics...')).toBeDefined();
@@ -212,6 +221,77 @@ describe('TopicList general rendering', () => {
       <TopicList topics={[makeTopic('Alpha')]} readTopics={new Set(['Alpha'])} />
     );
     expect(screen.getByText('Unread All')).toBeDefined();
+  });
+
+  it('keeps leaf actions non-tabbable until the overflow trigger is opened', () => {
+    render(<TopicList topics={[makeTopic('Science')]} />);
+
+    const row = getRowForText('Science');
+    const nextButton = within(row).getByRole('button', { name: 'Next' });
+    const trigger = within(row).getByRole('button', { name: 'Show actions for Science' });
+
+    expect(nextButton).toHaveAttribute('tabindex', '-1');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+
+    expect(nextButton).toHaveAttribute('tabindex', '0');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens only one manual action menu at a time', () => {
+    render(<TopicList topics={[makeTopic('Science'), makeTopic('History')]} />);
+
+    const scienceRow = getRowForText('Science');
+    const historyRow = getRowForText('History');
+    const scienceTrigger = within(scienceRow).getByRole('button', { name: 'Show actions for Science' });
+    const historyTrigger = within(historyRow).getByRole('button', { name: 'Show actions for History' });
+    const scienceNextButton = within(scienceRow).getByRole('button', { name: 'Next' });
+    const historyNextButton = within(historyRow).getByRole('button', { name: 'Next' });
+
+    fireEvent.click(scienceTrigger);
+    expect(scienceNextButton).toHaveAttribute('tabindex', '0');
+    expect(historyNextButton).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.click(historyTrigger);
+    expect(scienceNextButton).toHaveAttribute('tabindex', '-1');
+    expect(historyNextButton).toHaveAttribute('tabindex', '0');
+    expect(scienceTrigger).toHaveAttribute('aria-expanded', 'false');
+    expect(historyTrigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('closes a manually opened menu after using an action', () => {
+    const onNavigateTopic = vi.fn();
+
+    render(
+      <TopicList
+        topics={[makeTopic('Science')]}
+        onNavigateTopic={onNavigateTopic}
+      />
+    );
+
+    const row = getRowForText('Science');
+    const trigger = within(row).getByRole('button', { name: 'Show actions for Science' });
+    const nextButton = within(row).getByRole('button', { name: 'Next' });
+
+    fireEvent.click(trigger);
+    fireEvent.click(nextButton);
+
+    expect(onNavigateTopic).toHaveBeenCalledWith(expect.objectContaining({ name: 'Science' }), 'next');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(nextButton).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('reveals row actions when the overflow trigger receives keyboard focus', () => {
+    render(<TopicList topics={[makeTopic('Science')]} />);
+
+    const row = getRowForText('Science');
+    const trigger = within(row).getByRole('button', { name: 'Show actions for Science' });
+    const nextButton = within(row).getByRole('button', { name: 'Next' });
+
+    fireEvent.focus(trigger);
+
+    expect(nextButton).toHaveAttribute('tabindex', '0');
   });
 
   it('marks read controls as active when a leaf topic is read', () => {
