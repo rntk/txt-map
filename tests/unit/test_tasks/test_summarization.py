@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from lib.tasks.summarization import (
     ArticleSummaryGenerationError,
     ARTICLE_SUMMARY_MAX_ATTEMPTS,
+    _parallel_generate_article_summary,
     _ValidatedCachingLLMCallable,
     build_article_summary_chunks,
     generate_article_summary,
@@ -276,7 +277,7 @@ class TestArticleSummaryHelpers:
         cached_llm.call.assert_called_once()
         mock_llm.call.assert_called_once()
 
-    def test_generate_article_summary_raises_after_retries_exhausted(self, mock_llm):
+    def test_generate_article_summary_falls_back_after_retries_exhausted(self, mock_llm):
         cached_llm = MagicMock()
         cached_llm.call.return_value = 'not valid json'
         mock_llm.call = MagicMock(return_value='still not valid json')
@@ -286,10 +287,11 @@ class TestArticleSummaryHelpers:
                 {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
             ]
 
-            with pytest.raises(ArticleSummaryGenerationError, match="empty or invalid JSON"):
-                generate_article_summary(["S1"], cached_llm, mock_llm, max_attempts=3)
+            summary = generate_article_summary(["S1"], cached_llm, mock_llm, max_attempts=3)
 
-    def test_generate_article_summary_defaults_to_ten_attempts(self, mock_llm):
+        assert summary == {"text": "S1", "bullets": ["S1"]}
+
+    def test_generate_article_summary_defaults_to_ten_attempts_before_fallback(self, mock_llm):
         cached_llm = MagicMock()
         cached_llm.call.return_value = 'not valid json'
         mock_llm.call = MagicMock(return_value='still not valid json')
@@ -299,12 +301,50 @@ class TestArticleSummaryHelpers:
                 {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
             ]
 
-            with pytest.raises(ArticleSummaryGenerationError, match="empty or invalid JSON"):
-                generate_article_summary(["S1"], cached_llm, mock_llm)
+            summary = generate_article_summary(["S1"], cached_llm, mock_llm)
 
+        assert summary == {"text": "S1", "bullets": ["S1"]}
         assert ARTICLE_SUMMARY_MAX_ATTEMPTS == 10
         cached_llm.call.assert_called_once()
         assert mock_llm.call.call_count == ARTICLE_SUMMARY_MAX_ATTEMPTS - 1
+
+    def test_parallel_generate_article_summary_falls_back_after_invalid_chunk_response(self):
+        class DummyFuture:
+            def __init__(self, response: str) -> None:
+                self._response = response
+
+            def result(self, timeout: float = 300.0) -> str:
+                return self._response
+
+        llm = MagicMock()
+        llm.max_context_tokens = 1000
+        llm.estimate_tokens = MagicMock(return_value=1)
+        llm.submit = MagicMock(return_value=DummyFuture('{"types": []}'))
+        llm.call = MagicMock(return_value='{"types": []}')
+
+        summary = _parallel_generate_article_summary(
+            [
+                "Sentence one about Python programming.",
+                "Sentence two about data structures.",
+                "Sentence three about algorithms.",
+            ],
+            llm,
+            max_attempts=3,
+        )
+
+        assert summary == {
+            "text": (
+                "Sentence one about Python programming. "
+                "Sentence two about data structures. "
+                "Sentence three about algorithms."
+            ),
+            "bullets": [
+                "Sentence one about Python programming.",
+                "Sentence two about data structures.",
+                "Sentence three about algorithms.",
+            ],
+        }
+        assert llm.call.call_count == 9
 
 
 # =============================================================================

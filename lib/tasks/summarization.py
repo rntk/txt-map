@@ -259,11 +259,14 @@ def _parallel_generate_article_summary(
             parsed_summary = parse_article_summary_response(response_text)
 
         if not _article_summary_has_required_content(parsed_summary):
-            raise ArticleSummaryGenerationError(
-                "Article summary chunk generation returned empty or invalid JSON "
-                f"for sentences {chunk['start_sentence']}-{chunk['end_sentence']}. "
-                f"Last response preview: {_response_preview(last_response_text)}"
+            logger.warning(
+                "Article summary chunk generation returned invalid JSON for sentences %s-%s. "
+                "Using extractive fallback. Last response preview: %s",
+                chunk["start_sentence"],
+                chunk["end_sentence"],
+                _response_preview(last_response_text),
             )
+            parsed_summary = _build_extractive_article_summary(chunk["sentences"])
 
         chunk_summaries.append({
             "start_sentence": chunk["start_sentence"],
@@ -293,10 +296,12 @@ def _parallel_generate_article_summary(
             attempt, max_attempts, _response_preview(response_text),
         )
 
-    raise ArticleSummaryGenerationError(
-        "Article summary merge returned empty or invalid JSON. "
-        f"Last response preview: {_response_preview(last_response_text)}"
+    logger.warning(
+        "Article summary merge returned invalid JSON. Using merged fallback. "
+        "Last response preview: %s",
+        _response_preview(last_response_text),
     )
+    return _fallback_merge_article_summary(chunk_summaries)
 
 
 def _strip_markdown_code_fences(text: str) -> str:
@@ -333,6 +338,77 @@ def _normalize_article_summary(summary_data: Any) -> Dict[str, Any]:
     return {
         "text": text,
         "bullets": normalized_bullets,
+    }
+
+
+def _truncate_words(text: str, max_words: int) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "")).strip()
+    if not cleaned:
+        return ""
+    words = cleaned.split()
+    if len(words) <= max_words:
+        return cleaned
+    return " ".join(words[:max_words]).rstrip(",;:-")
+
+
+def _build_extractive_article_summary(sentences: List[str]) -> Dict[str, Any]:
+    cleaned_sentences: List[str] = []
+    seen_sentences: set[str] = set()
+    for sentence in sentences:
+        cleaned_sentence = re.sub(r"\s+", " ", sentence).strip()
+        if cleaned_sentence and cleaned_sentence not in seen_sentences:
+            cleaned_sentences.append(cleaned_sentence)
+            seen_sentences.add(cleaned_sentence)
+
+    if not cleaned_sentences:
+        return {"text": "", "bullets": []}
+
+    summary_text = _truncate_words(cleaned_sentences[0], 30)
+    bullets: List[str] = []
+    seen_bullets: set[str] = set()
+    for sentence in cleaned_sentences:
+        bullet = _truncate_words(sentence, 24)
+        if bullet and bullet not in seen_bullets:
+            bullets.append(bullet)
+            seen_bullets.add(bullet)
+        if len(bullets) >= 6:
+            break
+
+    return {
+        "text": summary_text,
+        "bullets": bullets,
+    }
+
+
+def _fallback_merge_article_summary(chunk_summaries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    merged_text_parts: List[str] = []
+    merged_bullets: List[str] = []
+    seen_bullets: set[str] = set()
+
+    for chunk in chunk_summaries:
+        summary = chunk.get("summary", {})
+        text = str(summary.get("text", "") or "").strip()
+        if text:
+            merged_text_parts.append(text)
+
+        for bullet in summary.get("bullets", []):
+            cleaned_bullet = str(bullet or "").strip()
+            if cleaned_bullet and cleaned_bullet not in seen_bullets:
+                merged_bullets.append(cleaned_bullet)
+                seen_bullets.add(cleaned_bullet)
+            if len(merged_bullets) >= 6:
+                break
+
+        if len(merged_bullets) >= 6:
+            break
+
+    merged_text = _truncate_words(" ".join(merged_text_parts), 30)
+    if not merged_text and merged_bullets:
+        merged_text = _truncate_words(merged_bullets[0], 30)
+
+    return {
+        "text": merged_text,
+        "bullets": merged_bullets,
     }
 
 
@@ -517,11 +593,14 @@ def generate_article_summary(
             )
 
         if not _article_summary_has_required_content(parsed_summary):
-            raise ArticleSummaryGenerationError(
-                "Article summary chunk generation returned empty or invalid JSON "
-                f"for sentences {chunk['start_sentence']}-{chunk['end_sentence']}. "
-                f"Last response preview: {_response_preview(last_response_text)}"
+            logger.warning(
+                "Article summary chunk generation returned invalid JSON for sentences %s-%s. "
+                "Using extractive fallback. Last response preview: %s",
+                chunk["start_sentence"],
+                chunk["end_sentence"],
+                _response_preview(last_response_text),
             )
+            parsed_summary = _build_extractive_article_summary(chunk["sentences"])
 
         chunk_summaries.append({
             "start_sentence": chunk["start_sentence"],
@@ -556,10 +635,12 @@ def generate_article_summary(
             _response_preview(merged_response),
         )
 
-    raise ArticleSummaryGenerationError(
-        "Article summary merge returned empty or invalid JSON. "
-        f"Last response preview: {_response_preview(last_response_text)}"
+    logger.warning(
+        "Article summary merge returned invalid JSON. Using merged fallback. "
+        "Last response preview: %s",
+        _response_preview(last_response_text),
     )
+    return _fallback_merge_article_summary(chunk_summaries)
 
 
 def process_summarization(
