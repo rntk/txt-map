@@ -1,10 +1,13 @@
+import re
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional
 import logging
 
 from lib.llm_queue.client import QueuedLLMClient
 from txt_splitt import RetryConfig, RetryingLLMCallable, Tracer, TracingLLMCallable
-from txt_splitt.cache import CachingLLMCallable
+from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
+from txt_splitt.errors import ParseError
 from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
 from txt_splitt.sentences import (
     AdjacentSameTopicJoiner,
@@ -19,12 +22,71 @@ from txt_splitt.sentences import (
 )
 
 logger = logging.getLogger(__name__)
+_PROMPT_CONTENT_PATTERN = re.compile(r"<content>\s*(.*?)\s*</content>", re.DOTALL)
+_PROMPT_MARKER_PATTERN = re.compile(r"^\{(\d+)\}", re.MULTILINE)
 
 
 @dataclass
 class ArticleSplitResult:
     sentences: List[str]
     topics: List[Dict]
+
+
+class _ValidatedCachingLLMCallable(CachingLLMCallable):
+    """Cache wrapper that only stores and serves responses accepted by a validator."""
+
+    def __init__(
+        self,
+        *args: Any,
+        validator: Callable[[str, str], bool],
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._validator = validator
+
+    def call(self, prompt: str, temperature: float) -> str:
+        if not self._should_cache(temperature):
+            self._annotate_cache_event(
+                hit=False,
+                cache_key=None,
+                bypass_reason="nonzero_temperature",
+            )
+            return self._inner.call(prompt, temperature)
+
+        cache_key = _build_cache_key(
+            namespace=self._namespace,
+            model_id=self._model_id,
+            prompt_version=self._prompt_version,
+            prompt=prompt,
+            temperature=temperature,
+        )
+        entry = self._store.get(cache_key)
+        if entry is not None and self._validator(prompt, entry.response):
+            self._annotate_cache_event(hit=True, cache_key=cache_key)
+            return entry.response
+
+        response = self._inner.call(prompt, temperature)
+        if self._validator(prompt, response):
+            self._store.set(
+                CacheEntry(
+                    key=cache_key,
+                    response=response,
+                    created_at=time.time(),
+                    namespace=self._namespace,
+                    model_id=self._model_id,
+                    prompt_version=self._prompt_version,
+                    temperature=temperature,
+                )
+            )
+            self._annotate_cache_event(hit=False, cache_key=cache_key)
+            return response
+
+        self._annotate_cache_event(
+            hit=False,
+            cache_key=cache_key,
+            bypass_reason="validation_failed",
+        )
+        return response
 
 
 class _LLMCallableAdapter:
@@ -62,6 +124,33 @@ def _make_llm_callable(llm: Any) -> Any:
 def _cache_namespace(base_namespace: str, llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
     return f"{base_namespace}:{model_id}"
+
+
+def _extract_prompt_marker_count(prompt: str) -> int:
+    content_match = _PROMPT_CONTENT_PATTERN.search(prompt)
+    content = content_match.group(1) if content_match else prompt
+    marker_ids = [int(marker) for marker in _PROMPT_MARKER_PATTERN.findall(content)]
+    if not marker_ids:
+        return 0
+    return max(marker_ids) + 1
+
+
+def _response_has_valid_topic_ranges(
+    prompt: str,
+    response: str,
+    parser_mode: Literal["text", "json", "auto"],
+) -> bool:
+    sentence_count = _extract_prompt_marker_count(prompt)
+    if sentence_count <= 0:
+        return False
+
+    try:
+        parser = TopicRangeParser(input_mode=parser_mode)
+        parsed_groups = parser.parse(response, sentence_count)
+    except (ParseError, ValueError):
+        return False
+
+    return bool(parsed_groups)
 
 
 def _groups_to_topics(groups: List[Any], sentence_objects: List[Any]) -> List[Dict[str, Any]]:
@@ -172,17 +261,6 @@ def split_article(
     else:
         llm_with_retry = RetryingLLMCallable(llm_callable, max_retries=3, backoff_factor=1.0)
 
-    cached_adapter = (
-        CachingLLMCallable(
-            llm_with_retry,
-            cache_store,
-            namespace=_cache_namespace("article-split", llm),
-        )
-        if cache_store is not None
-        else llm_with_retry
-    )
-    llm_callable = TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
-
     if retry_policy is None:
         retry_policy = RetryConfig(
             max_attempts=3,
@@ -195,6 +273,21 @@ def split_article(
 
     output_mode: Literal["text", "json"] = "json" if use_json else "text"
     parser_mode: Literal["text", "json", "auto"] = "json" if output_mode == "json" else "auto"
+    cached_adapter = (
+        _ValidatedCachingLLMCallable(
+            llm_with_retry,
+            cache_store,
+            namespace=_cache_namespace("article-split", llm),
+            validator=lambda prompt, response: _response_has_valid_topic_ranges(
+                prompt,
+                response,
+                parser_mode,
+            ),
+        )
+        if cache_store is not None
+        else llm_with_retry
+    )
+    llm_callable = TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
 
     pipeline = build_pipeline(
         splitter=splitter,

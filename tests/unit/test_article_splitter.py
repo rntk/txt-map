@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 # Import module under test
 from lib.article_splitter import (
     ArticleSplitResult,
+    _response_has_valid_topic_ranges,
+    _ValidatedCachingLLMCallable,
     _groups_to_topics,
     _LLMCallableAdapter,
     split_article,
@@ -70,6 +72,21 @@ class MockLLMClient:
         self.last_prompts = prompts
         self.last_temperature = temperature
         return self.response
+
+
+class MockCacheStore:
+    """In-memory cache store for cache wrapper tests."""
+
+    def __init__(self):
+        self.entries = {}
+        self.set_calls = 0
+
+    def get(self, key):
+        return self.entries.get(key)
+
+    def set(self, entry):
+        self.entries[entry.key] = entry
+        self.set_calls += 1
 
 
 class MockSparseRegexSentenceSplitter:
@@ -230,6 +247,107 @@ class TestArticleSplitResult:
         assert hasattr(result, 'topics')
         assert isinstance(result.sentences, list)
         assert isinstance(result.topics, list)
+
+
+class TestArticleSplitCacheValidation:
+    """Test validation-aware caching for article splitting."""
+
+    def test_response_validator_accepts_valid_topic_ranges(self):
+        """Validator accepts topic lines with marker ranges from prompt content."""
+        prompt = (
+            "Instructions...\n<content>\n"
+            "{10} Apple releases a product.\n"
+            "{11} The launch targets developers.\n"
+            "</content>\n"
+        )
+        response = "Technology>Apple>Launch: 10-11"
+
+        assert _response_has_valid_topic_ranges(prompt, response, "auto") is True
+
+    def test_response_validator_rejects_missing_ranges(self):
+        """Validator rejects prose responses with no parseable ranges."""
+        prompt = (
+            "Instructions...\n<content>\n"
+            "{3} First marker.\n"
+            "{4} Second marker.\n"
+            "</content>\n"
+        )
+        response = "The article discusses Apple and developer tooling."
+
+        assert _response_has_valid_topic_ranges(prompt, response, "auto") is False
+
+    def test_validated_cache_skips_invalid_cached_response_and_replaces_it(self):
+        """Invalid cached responses are bypassed and replaced by fresh valid ones."""
+        prompt = (
+            "Instructions...\n<content>\n"
+            "{5} First marker.\n"
+            "{6} Second marker.\n"
+            "</content>\n"
+        )
+        cache_store = MockCacheStore()
+        inner = MagicMock()
+        inner.call.return_value = "Technology>Example>Topic: 5-6"
+        wrapper = _ValidatedCachingLLMCallable(
+            inner,
+            cache_store,
+            namespace="article-split:test",
+            validator=lambda prompt_text, response_text: _response_has_valid_topic_ranges(
+                prompt_text,
+                response_text,
+                "auto",
+            ),
+        )
+
+        response = wrapper.call(prompt, 0.0)
+        assert response == "Technology>Example>Topic: 5-6"
+        assert inner.call.call_count == 1
+        assert cache_store.set_calls == 1
+
+        inner.call.reset_mock()
+        cached_key = next(iter(cache_store.entries))
+        invalid_entry = cache_store.entries[cached_key]
+        cache_store.entries[cached_key] = invalid_entry.__class__(
+            key=invalid_entry.key,
+            response="This is malformed output",
+            created_at=invalid_entry.created_at,
+            namespace=invalid_entry.namespace,
+            model_id=invalid_entry.model_id,
+            prompt_version=invalid_entry.prompt_version,
+            temperature=invalid_entry.temperature,
+        )
+
+        second_response = wrapper.call(prompt, 0.0)
+        assert second_response == "Technology>Example>Topic: 5-6"
+        assert inner.call.call_count == 1
+        assert cache_store.set_calls == 2
+
+    def test_validated_cache_does_not_store_invalid_fresh_response(self):
+        """Fresh invalid responses are returned but never stored in cache."""
+        prompt = (
+            "Instructions...\n<content>\n"
+            "{1} First marker.\n"
+            "{2} Second marker.\n"
+            "</content>\n"
+        )
+        cache_store = MockCacheStore()
+        inner = MagicMock()
+        inner.call.return_value = "No numeric ranges here"
+        wrapper = _ValidatedCachingLLMCallable(
+            inner,
+            cache_store,
+            namespace="article-split:test",
+            validator=lambda prompt_text, response_text: _response_has_valid_topic_ranges(
+                prompt_text,
+                response_text,
+                "auto",
+            ),
+        )
+
+        response = wrapper.call(prompt, 0.0)
+
+        assert response == "No numeric ranges here"
+        assert inner.call.call_count == 1
+        assert cache_store.entries == {}
 
 
 # =============================================================================

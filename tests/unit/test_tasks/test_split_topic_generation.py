@@ -3,6 +3,8 @@ Unit tests for the split_topic_generation task handler.
 
 Tests process_split_topic_generation function and its dependencies.
 """
+import logging
+from types import SimpleNamespace
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -273,6 +275,78 @@ class TestProcessSplitTopicGenerationTracer:
             # Should not contain tracer output (only completion message)
             assert "Trace:" not in captured.out
 
+    def test_logs_failure_diagnostics_from_tracer(
+        self, mock_db, mock_llm, mock_split_article_with_markers,
+        mock_submissions_storage, mock_split_result, sample_submission, caplog
+    ):
+        """Failure retries log tracer-derived diagnostics."""
+        failed_tracer = MagicMock()
+        failed_tracer.spans = [
+            SimpleNamespace(
+                name="pipeline.run",
+                attributes={},
+                children=[
+                    SimpleNamespace(
+                        name="html_clean",
+                        attributes={"clean_length": 321},
+                        children=[],
+                    ),
+                    SimpleNamespace(
+                        name="split",
+                        attributes={"item_count": 14},
+                        children=[],
+                    ),
+                    SimpleNamespace(
+                        name="mark",
+                        attributes={"tagged_text_length": 900},
+                        children=[],
+                    ),
+                    SimpleNamespace(
+                        name="llm.call",
+                        attributes={
+                            "cache_hit": True,
+                            "cache_namespace": "article-split:test",
+                            "cache_key": "cache-key",
+                            "prompt": "prompt body",
+                            "response": "bad response",
+                        },
+                        children=[],
+                    ),
+                ],
+            )
+        ]
+        failed_tracer.format.return_value = "trace body"
+
+        success_tracer = MagicMock()
+        success_tracer.spans = []
+        success_tracer.format.return_value = ""
+
+        mock_split_article_with_markers.side_effect = [
+            ValueError("No valid topic ranges found in response"),
+            mock_split_result,
+        ]
+        mock_storage_instance = MagicMock()
+        mock_submissions_storage.return_value = mock_storage_instance
+
+        with patch('lib.tasks.split_topic_generation.Tracer') as mock_tracer_class, patch(
+            'lib.tasks.split_topic_generation.time.sleep'
+        ):
+            mock_tracer_class.side_effect = [failed_tracer, success_tracer]
+            caplog.set_level(logging.WARNING)
+
+            process_split_topic_generation(
+                sample_submission,
+                mock_db,
+                mock_llm,
+                max_retries=1,
+            )
+
+        assert "Split topic diagnostics for submission" in caplog.text
+        assert "cache_hit=True" in caplog.text
+        assert "prompt_preview=prompt body" in caplog.text
+        assert "response_preview=bad response" in caplog.text
+        assert "Split topic trace for submission" in caplog.text
+
 
 # =============================================================================
 # Test: process_split_topic_generation - Completion Message
@@ -540,7 +614,7 @@ class TestProcessSplitTopicGenerationLLMUnavailable:
         }
 
         with pytest.raises(Exception, match="LLM service unavailable"):
-            process_split_topic_generation(submission, mock_db, mock_llm)
+            process_split_topic_generation(submission, mock_db, mock_llm, max_retries=0)
 
     def test_handles_llm_timeout(
         self, mock_db, mock_split_article_with_markers,
@@ -559,4 +633,4 @@ class TestProcessSplitTopicGenerationLLMUnavailable:
         }
 
         with pytest.raises(TimeoutError):
-            process_split_topic_generation(submission, mock_db, mock_llm)
+            process_split_topic_generation(submission, mock_db, mock_llm, max_retries=0)
