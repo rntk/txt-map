@@ -19,7 +19,7 @@ def summarize_by_sentence_groups(
         "Text:\n<text>{sentence}</text>\n\nSummary:"
     )
 
-    template_tokens = llm_client.estimate_tokens(prompt_template.replace("{sentence}", ""))
+    template_tokens = llm_client.estimate_tokens(prompt_template.format(sentence=""))
     max_text_tokens = llm_client.max_context_tokens - template_tokens - max_groups_tokens_buffer
     print(f"\n=== DEBUG: Summarization (per-group) - max_text_tokens: {max_text_tokens}, total groups: {len(sent_list)} ===")
 
@@ -30,7 +30,7 @@ def summarize_by_sentence_groups(
         # If a single group is too large, we still try to summarize it directly and rely on the model's ability
         # to handle long inputs up to max_text_tokens. For extremely long texts, the model/server may truncate.
         sentences_text = s
-        prompt = prompt_template.replace("{sentence}", sentences_text)
+        prompt = prompt_template.format(sentence=sentences_text)
         prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
         cached = cache_collection.find_one({"prompt_hash": prompt_hash})
         if cached:

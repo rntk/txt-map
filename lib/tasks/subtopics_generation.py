@@ -58,10 +58,9 @@ def _build_subtopic_prompt(
         f"{sentence_indices[i]}. {sentences[i]}" for i in range(len(sentences))
     ]
     sentences_text: str = "\n".join(numbered_sentences)
-    return (
-        _PROMPT_TEMPLATE
-        .replace("{topic_name}", topic_name)
-        .replace("{sentences_text}", sentences_text)
+    return _PROMPT_TEMPLATE.format(
+        topic_name=topic_name,
+        sentences_text=sentences_text,
     )
 
 

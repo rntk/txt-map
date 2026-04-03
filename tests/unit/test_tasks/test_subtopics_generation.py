@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 # Import module under test
 from lib.tasks.subtopics_generation import (
+    _build_subtopic_prompt,
     generate_subtopics_for_topic,
     process_subtopics_generation,
 )
@@ -211,6 +212,17 @@ class TestGenerateSubtopicsForTopicBasic:
             assert "sentences" in subtopic
             assert "parent_topic" in subtopic
             assert subtopic["parent_topic"] == "Test Topic"
+
+    def test_build_subtopic_prompt_uses_explicit_template_formatting(self):
+        """Prompt builder should preserve template structure and insert values explicitly."""
+        prompt = _build_subtopic_prompt(
+            'Topic with "quotes"',
+            ["First sentence.", "Second sentence."],
+            [4, 9],
+        )
+        assert 'topic "Topic with "quotes""' in prompt
+        assert "4. First sentence." in prompt
+        assert "9. Second sentence." in prompt
 
 
 # =============================================================================
