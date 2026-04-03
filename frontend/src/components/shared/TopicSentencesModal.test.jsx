@@ -1,9 +1,31 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TopicSentencesModal from './TopicSentencesModal';
 
 describe('TopicSentencesModal markup resolution', () => {
+  let scrollIntoViewMock;
+  let requestAnimationFrameMock;
+  let cancelAnimationFrameMock;
+
+  beforeEach(() => {
+    scrollIntoViewMock = vi.fn();
+    requestAnimationFrameMock = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    cancelAnimationFrameMock = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+  });
+
+  afterEach(() => {
+    requestAnimationFrameMock.mockRestore();
+    cancelAnimationFrameMock.mockRestore();
+  });
+
   it('resolves markup by fullPath when the topic only has a shortened displayName', () => {
     render(
       <TopicSentencesModal
@@ -41,6 +63,8 @@ describe('TopicSentencesModal markup resolution', () => {
     expect(screen.getByRole('heading', { name: 'Physics' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enriched' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Enriched' })).toHaveClass('topic-sentences-modal__tab--active');
+    expect(screen.getByLabelText('Topic article minimap')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Scroll to sentence 1' }).length).toBeGreaterThan(0);
     expect(screen.getAllByText((content, element) => element?.closest('.markup-quote__text')?.textContent?.includes('Quantum mechanics changed physics.')).length).toBeGreaterThan(0);
   });
 
@@ -304,5 +328,124 @@ describe('TopicSentencesModal markup resolution', () => {
     expect(screen.getByText('Sentence 10')).toBeInTheDocument();
     expect(container.querySelectorAll('.markup-data-trend__chart-wrapper')).toHaveLength(1);
     expect(screen.getByText('Late reading.')).toBeInTheDocument();
+  });
+
+  it('scrolls to an already rendered sentence when the modal minimap is clicked', async () => {
+    const { container } = render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [1, 2],
+        }}
+        sentences={[
+          'Quantum mechanics changed physics.',
+          'Researchers debated the implications.',
+          'A later discovery shifted the field.',
+        ]}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sentences' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Scroll to sentence 1' })[0]);
+
+    expect(screen.getByText('1.')).toBeInTheDocument();
+    expect(
+      screen.getAllByText((content, element) => element?.textContent?.includes('Quantum mechanics changed physics.') ?? false).length
+    ).toBeGreaterThan(0);
+    expect(container.querySelector('.grid-view-minimap-bar--active')).toBeInTheDocument();
+  });
+
+  it('auto-scrolls the minimap to the first topic sentence when the modal opens', async () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [10],
+        }}
+        sentences={[
+          'Sentence 1',
+          'Sentence 2',
+          'Sentence 3',
+          'Sentence 4',
+          'Sentence 5',
+          'Sentence 6',
+          'Sentence 7',
+          'Sentence 8',
+          'Sentence 9',
+          'Sentence 10',
+          'Sentence 11',
+          'Sentence 12',
+        ]}
+        onClose={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
+  });
+
+  it('switches to sentences and reveals context when a minimap click targets a hidden sentence', async () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: 'Physics',
+          fullPath: 'Science>Physics',
+          sentenceIndices: [10],
+        }}
+        sentences={[
+          'Sentence 1',
+          'Sentence 2',
+          'Sentence 3',
+          'Sentence 4',
+          'Sentence 5',
+          'Sentence 6',
+          'Sentence 7',
+          'Sentence 8',
+          'Sentence 9',
+          'Sentence 10',
+          'Sentence 11',
+          'Sentence 12',
+        ]}
+        onClose={vi.fn()}
+        markup={{
+          'Science>Physics': {
+            positions: [
+              {
+                index: 1,
+                text: 'Sentence 10',
+                source_sentence_index: 10,
+              },
+            ],
+            segments: [
+              {
+                type: 'quote',
+                position_indices: [1],
+                data: {
+                  attribution: 'Planck',
+                  position_indices: [1],
+                },
+              },
+            ],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Enriched' })).toHaveClass('topic-sentences-modal__tab--active');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Scroll to sentence 7' })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Sentences' })).toHaveClass('topic-sentences-modal__tab--active');
+    });
+    expect(screen.getByText('7.')).toBeInTheDocument();
+    expect(screen.getByText('Sentence 7')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
   });
 });
