@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import FullScreenGraph from './FullScreenGraph';
 import '../styles/App.css';
+import { getTopicHighlightColor } from '../utils/topicColorUtils';
 import {
   buildHierarchy,
   segmentIsLeaf,
@@ -88,6 +89,15 @@ function GridView({ topics, topicSummaries, sentences, onClose, readTopics, _onT
     const hasSubSegments = hierarchy.size > 0;
     if (!hasSubSegments) {
       const leafSummary = currentKey ? topicSummaries[currentKey] : null;
+      const minimapSentenceStates = allHighlightedIndices.map((sentenceIndex) => ({
+        isActive: true,
+        color: getTopicHighlightColor(currentKey || 'article-minimap'),
+        sentenceIndex,
+      }));
+      const minimapStateByIndex = sentences.map((_, index) => {
+        const match = minimapSentenceStates.find((state) => state.sentenceIndex === index + 1);
+        return match ? { isActive: true, color: match.color } : null;
+      });
 
       return (
         <div className="grid-view-container grid-view-container--leaf">
@@ -108,7 +118,10 @@ function GridView({ topics, topicSummaries, sentences, onClose, readTopics, _onT
                   {allHighlightedIndices.length} highlighted sentences in full article
                 </div>
               </div>
-              <ArticleMinimap sentences={sentences} highlightedIndices={allHighlightedIndices} />
+              <ArticleMinimap
+                sentences={sentences}
+                sentenceStates={minimapStateByIndex}
+              />
             </div>
           </div>
         </div>

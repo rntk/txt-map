@@ -172,6 +172,109 @@ describe('TextPage raw text navigation', () => {
     expect(screen.getByText(/Important detail two/)).toBeInTheDocument();
     expect(screen.queryByText('Grouped by topics')).not.toBeInTheDocument();
     expect(screen.queryByText('Show tooltips')).not.toBeInTheDocument();
+    expect(screen.queryByText('Show minimap')).not.toBeInTheDocument();
+  });
+
+  it('renders and hides the minimap based on the article header toggle and grouped mode', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    const minimapToggle = screen.getByLabelText('Show minimap');
+    fireEvent.click(minimapToggle);
+
+    expect(screen.getByLabelText('Article minimap panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Grouped by topics'));
+
+    expect(screen.queryByLabelText('Article minimap panel')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Show minimap')).toBeChecked();
+
+    fireEvent.click(screen.getByLabelText('Grouped by topics'));
+
+    expect(screen.getByLabelText('Article minimap panel')).toBeInTheDocument();
+  });
+
+  it('shows the minimap toggle on raw text and markup tabs', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
+    expect(screen.getByLabelText('Show minimap')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
+    expect(screen.getByLabelText('Show minimap')).toBeInTheDocument();
+  });
+
+  it('applies topic colors to minimap bars for selected topics', async () => {
+    const { container } = render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    const topicCheckbox = screen.getAllByRole('checkbox').find(
+      el => el.closest('li') !== null
+    );
+    fireEvent.click(topicCheckbox);
+    fireEvent.click(screen.getByLabelText('Show minimap'));
+
+    const activeBar = container.querySelector('.grid-view-minimap-bar--active');
+    expect(activeBar).toBeInTheDocument();
+    expect(activeBar.style.getPropertyValue('--minimap-bar-color')).not.toBe('');
+  });
+
+  it('scrolls the article when a minimap row is clicked', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByLabelText('Show minimap'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Scroll to sentence 1' })[0]);
+
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('returns to the article tab before scrolling when a minimap row is clicked from raw text', async () => {
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
+    fireEvent.click(screen.getByLabelText('Show minimap'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Scroll to sentence 1' })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Article' })).toHaveClass('article-tab-header__tab--active');
+    });
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('scrolls raw-html article content when a minimap row is clicked', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/api/submission/test-submission-id/status')) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: 'completed', tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          html_content: '<div><p>Alpha Beta Gamma</p></div>',
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    fireEvent.click(screen.getByLabelText('Show minimap'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Scroll to sentence 1' })[0]);
+
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
   it('shows no [source] links when matchSummaryToTopics returns no matches', async () => {

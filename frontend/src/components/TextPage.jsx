@@ -14,6 +14,7 @@ import ArticleSummaryView from './ArticleSummaryView';
 import ArticleMarkupView from './ArticleMarkupView';
 import RawTextView from './RawTextView';
 import WordSelectionPopup from './WordSelectionPopup';
+import ArticleMinimap from './grid/ArticleMinimap';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
 import { useTextSelection } from '../hooks/useTextSelection';
@@ -46,6 +47,7 @@ function TextPage() {
   const [sidebarTab, setSidebarTab] = useState('topics');
   const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const [showMinimap, setShowMinimap] = useState(false);
   const [highlightedGroupedTopic, setHighlightedGroupedTopic] = useState(null);
   useEffect(() => {
     if (highlightedGroupedTopic && !selectedTopics.some(t => t.name === highlightedGroupedTopic)) {
@@ -61,6 +63,8 @@ function TextPage() {
   const [activeInsightId, setActiveInsightId] = useState(null);
   const [activeInsightSentenceIndices, setActiveInsightSentenceIndices] = useState([]);
   const [activeInsightRanges, setActiveInsightRanges] = useState([]);
+  const pendingMinimapSentenceRef = useRef(null);
+  const rightColumnRef = useRef(null);
 
   const toggleHighlightAll = useCallback(() => {
     setHighlightAllTopics(prev => !prev);
@@ -276,6 +280,74 @@ function TextPage() {
     () => insightNavItems.find((insight) => insight.id === activeInsightId) || null,
     [activeInsightId, insightNavItems]
   );
+  const minimapVisible = useMemo(() => {
+    const supportedTab = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
+    return showMinimap && supportedTab && !groupedByTopics && articles.length > 0;
+  }, [activeTab, articles.length, groupedByTopics, showMinimap]);
+
+  const minimapSentenceStates = useMemo(() => {
+    const article = articles[0];
+    const articleSentences = Array.isArray(article?.sentences) ? article.sentences : [];
+    if (articleSentences.length === 0) {
+      return [];
+    }
+
+    const sentenceCount = articleSentences.length;
+    const states = Array.from({ length: sentenceCount }, () => null);
+    const selectedTopicNames = new Set(selectedTopics.map((topic) => topic.name));
+    const insightSentenceIndexSet = new Set(
+      activeInsightSentenceIndices
+        .filter((value) => Number.isInteger(value))
+        .map((value) => value - 1)
+    );
+    const shouldUseColorAllMode = highlightAllTopics || (sidebarTab === 'insights' && highlightInsightTopics);
+    const activeTopicNames = shouldUseColorAllMode
+      ? (coloredTopicNames instanceof Set ? coloredTopicNames : null)
+      : null;
+
+    safeTopics.forEach((topic) => {
+      const sentenceIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
+      const isExplicitlyActive = selectedTopicNames.has(topic.name)
+        || hoveredTopic?.name === topic.name;
+      const isColorModeActive = shouldUseColorAllMode
+        && (!activeTopicNames || activeTopicNames.has(topic.name));
+      const hasInsightSentence = sentenceIndices.some((sentenceIndex) => insightSentenceIndexSet.has(sentenceIndex - 1));
+      const isActive = isExplicitlyActive || isColorModeActive || hasInsightSentence;
+
+      if (!isActive) {
+        return;
+      }
+
+      const color = getTopicHighlightColor(topic.name);
+      sentenceIndices.forEach((sentenceIndex) => {
+        const index = sentenceIndex - 1;
+        if (index < 0 || index >= sentenceCount || states[index]) {
+          return;
+        }
+        states[index] = { isActive: true, color };
+      });
+    });
+
+    activeInsightSentenceIndices.forEach((sentenceIndex) => {
+      const index = sentenceIndex - 1;
+      if (index < 0 || index >= sentenceCount || states[index]) {
+        return;
+      }
+      states[index] = { isActive: true, color: 'rgba(255, 235, 153, 0.95)' };
+    });
+
+    return states;
+  }, [
+    activeInsightSentenceIndices,
+    articles,
+    coloredTopicNames,
+    highlightAllTopics,
+    highlightInsightTopics,
+    hoveredTopic,
+    safeTopics,
+    selectedTopics,
+    sidebarTab,
+  ]);
 
   const scrollToInsight = useCallback((insight) => {
     if (!insight) {
@@ -357,6 +429,84 @@ function TextPage() {
     return false;
   }, [safeSentences]);
 
+  const scrollToArticleSentence = useCallback((sentenceIndex) => {
+    const targetSentenceIndex = Number(sentenceIndex);
+    if (!Number.isInteger(targetSentenceIndex) || targetSentenceIndex < 0) {
+      return false;
+    }
+
+    const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const targetSentenceText = safeSentences[targetSentenceIndex];
+    const sentenceEl = document.getElementById(`sentence-0-${targetSentenceIndex}`)
+      || document.querySelector(`[data-sentence-index="${targetSentenceIndex}"]`);
+
+    const scrollContainer = rightColumnRef.current instanceof HTMLElement
+      ? rightColumnRef.current
+      : document.querySelector('.right-column');
+
+    const scrollElementIntoContainerView = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return false;
+      }
+
+      if (scrollContainer instanceof HTMLElement) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const targetRect = element.getBoundingClientRect();
+        const scrollTop = scrollContainer.scrollTop;
+        const nextTop = scrollTop + (targetRect.top - containerRect.top) - (scrollContainer.clientHeight / 2) + (targetRect.height / 2);
+
+        if (typeof scrollContainer.scrollTo === 'function') {
+          scrollContainer.scrollTo({
+            top: Math.max(0, nextTop),
+            behavior: 'smooth',
+          });
+        } else {
+          scrollContainer.scrollTop = Math.max(0, nextTop);
+        }
+      }
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    };
+
+    if (scrollElementIntoContainerView(sentenceEl)) {
+      return true;
+    }
+
+    const normalizedTargetSentence = normalizeText(targetSentenceText);
+    if (!normalizedTargetSentence) {
+      return false;
+    }
+
+    const articleRoot = document.querySelector('.reading-article__content, .reading-markup__content');
+    if (!(articleRoot instanceof HTMLElement)) {
+      return false;
+    }
+
+    const blockCandidates = Array.from(
+      articleRoot.querySelectorAll('.word-token, .reading-article__sentence, .markup-topic-block, .reading-markup__plain-sentence, p, li, blockquote, section, article, div')
+    );
+
+    const matchedBlock = blockCandidates.find((element) => {
+      const text = normalizeText(element.textContent);
+      return text && (text.includes(normalizedTargetSentence) || normalizedTargetSentence.includes(text));
+    });
+
+    return scrollElementIntoContainerView(matchedBlock);
+  }, [safeSentences]);
+
+  const handleMinimapSentenceClick = useCallback((sentenceIndex) => {
+    if (activeTab === 'article' && !fullscreenGraph && !groupedByTopics) {
+      scrollToArticleSentence(sentenceIndex);
+      return;
+    }
+
+    pendingMinimapSentenceRef.current = sentenceIndex;
+    closeFullscreenGraph();
+    setGroupedByTopics(false);
+    setActiveTab('article');
+  }, [activeTab, closeFullscreenGraph, fullscreenGraph, groupedByTopics, scrollToArticleSentence]);
+
   const handleSidebarTabChange = useCallback((tab) => {
     setSidebarTab(tab);
     if (tab === 'topics') {
@@ -410,6 +560,42 @@ function TextPage() {
       }
     };
   }, [activeInsight, activeTab, fullscreenGraph, groupedByTopics, scrollToInsight]);
+
+  useEffect(() => {
+    if (activeTab !== 'article' || groupedByTopics || fullscreenGraph || pendingMinimapSentenceRef.current === null) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let attemptCount = 0;
+    let timeoutId = null;
+
+    const attemptScroll = () => {
+      if (cancelled) {
+        return;
+      }
+      attemptCount += 1;
+      const sentenceIndex = pendingMinimapSentenceRef.current;
+      if (scrollToArticleSentence(sentenceIndex)) {
+        pendingMinimapSentenceRef.current = null;
+        return;
+      }
+      if (attemptCount >= 8) {
+        pendingMinimapSentenceRef.current = null;
+        return;
+      }
+      timeoutId = window.setTimeout(attemptScroll, 120);
+    };
+
+    timeoutId = window.setTimeout(attemptScroll, 0);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [activeTab, fullscreenGraph, groupedByTopics, scrollToArticleSentence]);
 
   if (loading) {
     return (
@@ -510,7 +696,7 @@ function TextPage() {
                 onToggleHighlightInsightTopics={toggleHighlightInsightTopics}
               />
             </div>
-            <div className="right-column">
+            <div className="right-column" ref={rightColumnRef}>
               <div className={`reading-page__panel-shell${showPanel && panelTopic ? ' reading-page__panel-shell--visible' : ' reading-page__panel-shell--hidden'}`}>
                 {panelTopic && (
                   <TopicSentencePanel
@@ -528,86 +714,105 @@ function TextPage() {
                   onToggleGrouped={() => setGroupedByTopics(prev => !prev)}
                   tooltipEnabled={tooltipEnabled}
                   onToggleTooltip={() => setTooltipEnabled(prev => !prev)}
+                  showMinimap={showMinimap}
+                  onToggleMinimap={() => setShowMinimap(prev => !prev)}
                   sourceUrl={submission.source_url}
                 />
 
-                <div className="article-body">
-                  {activeTab === 'article_summary' ? (
-                    <ArticleSummaryView
-                      articleSummaryText={articleSummaryText}
-                      articleSummaryBullets={articleSummaryBullets}
-                      articleBulletMatches={articleBulletMatches}
-                      articleTextMatches={articleTextMatches}
-                      selectedTopics={selectedTopics}
-                      onToggleTopic={toggleTopic}
-                      onShowTopicSentences={handleShowTopicSentences}
-                    />
-                  ) : activeTab === 'markup' ? (
-                    <ArticleMarkupView
-                      safeSentences={safeSentences}
-                      safeTopics={safeTopics}
-                      markup={submission?.results?.markup}
-                      selectedTopics={selectedTopics}
-                      readTopics={readTopics}
-                      onToggleRead={toggleRead}
-                      onToggleTopic={toggleTopic}
-                      onNavigateTopic={navigateTopicSentence}
-                      onShowSentences={handleShowTopicSentences}
-                      tooltipEnabled={tooltipEnabled}
-                      coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
-                      coloredTopicNames={coloredTopicNames}
-                    />
-                  ) : groupedByTopics ? (
-                    <GroupedByTopicsView
-                      topics={safeTopics}
-                      rawHtml={articles[0]?.raw_html || ''}
-                      sentences={articles[0]?.sentences || []}
-                      isRawTextMode={activeTab === 'raw_text'}
-                      highlightedTopicName={highlightedGroupedTopic}
-                    />
-                  ) : activeTab === 'raw_text' ? (
-                    <RawTextView
-                      rawText={rawText}
-                      submissionId={submissionId}
-                      sourceUrl={submission.source_url}
-                      highlightRanges={rawTextHighlightRanges}
-                      fadeRanges={rawTextFadeRanges}
-                      coloredRanges={rawTextColoredRanges}
-                    />
-                  ) : (
-                    articles.map((article, index) => (
-                      article.sentences.length === 0 ? (
-                        <div
-                          key={index}
-                          className="article-section"
-                          dangerouslySetInnerHTML={{ __html: (() => { const m = article.raw_html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return m ? m[1] : article.raw_html; })() }}
-                        />
-                      ) : (
-                        <TextDisplay
-                          key={index}
-                          sentences={article.sentences}
-                          selectedTopics={selectedTopics}
-                          hoveredTopic={hoveredTopic}
-                          readTopics={readTopics}
-                          articleTopics={article.topics}
-                          articleIndex={index}
-                          topicSummaries={article.topic_summaries}
-                          paragraphMap={article.paragraph_map}
-                          rawHtml={article.raw_html}
-                          markerWordIndices={article.marker_word_indices}
-                          onToggleRead={toggleRead}
-                          onToggleTopic={toggleTopic}
-                          onNavigateTopic={navigateTopicSentence}
-                          onShowSentences={handleShowTopicSentences}
-                          tooltipEnabled={tooltipEnabled}
-                          submissionId={submissionId}
-                          coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
-                          activeInsightSentenceIndices={activeInsightSentenceIndices}
-                          activeInsightRanges={activeInsightRanges}
-                          coloredTopicNames={coloredTopicNames}
-                        />
-                      )
-                    ))
+                <div className={`article-body${minimapVisible ? ' reading-page__article-body--with-minimap' : ''}`}>
+                  <div className="reading-page__article-main">
+                    {activeTab === 'article_summary' ? (
+                      <ArticleSummaryView
+                        articleSummaryText={articleSummaryText}
+                        articleSummaryBullets={articleSummaryBullets}
+                        articleBulletMatches={articleBulletMatches}
+                        articleTextMatches={articleTextMatches}
+                        selectedTopics={selectedTopics}
+                        onToggleTopic={toggleTopic}
+                        onShowTopicSentences={handleShowTopicSentences}
+                      />
+                    ) : activeTab === 'markup' ? (
+                      <ArticleMarkupView
+                        safeSentences={safeSentences}
+                        safeTopics={safeTopics}
+                        markup={submission?.results?.markup}
+                        selectedTopics={selectedTopics}
+                        readTopics={readTopics}
+                        onToggleRead={toggleRead}
+                        onToggleTopic={toggleTopic}
+                        onNavigateTopic={navigateTopicSentence}
+                        onShowSentences={handleShowTopicSentences}
+                        tooltipEnabled={tooltipEnabled}
+                        coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
+                        coloredTopicNames={coloredTopicNames}
+                      />
+                    ) : groupedByTopics ? (
+                      <GroupedByTopicsView
+                        topics={safeTopics}
+                        rawHtml={articles[0]?.raw_html || ''}
+                        sentences={articles[0]?.sentences || []}
+                        isRawTextMode={activeTab === 'raw_text'}
+                        highlightedTopicName={highlightedGroupedTopic}
+                      />
+                    ) : activeTab === 'raw_text' ? (
+                      <RawTextView
+                        rawText={rawText}
+                        submissionId={submissionId}
+                        sourceUrl={submission.source_url}
+                        highlightRanges={rawTextHighlightRanges}
+                        fadeRanges={rawTextFadeRanges}
+                        coloredRanges={rawTextColoredRanges}
+                      />
+                    ) : (
+                      articles.map((article, index) => (
+                        article.sentences.length === 0 ? (
+                          <div
+                            key={index}
+                            className="article-section"
+                            dangerouslySetInnerHTML={{ __html: (() => { const m = article.raw_html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return m ? m[1] : article.raw_html; })() }}
+                          />
+                        ) : (
+                          <TextDisplay
+                            key={index}
+                            sentences={article.sentences}
+                            selectedTopics={selectedTopics}
+                            hoveredTopic={hoveredTopic}
+                            readTopics={readTopics}
+                            articleTopics={article.topics}
+                            articleIndex={index}
+                            topicSummaries={article.topic_summaries}
+                            paragraphMap={article.paragraph_map}
+                            rawHtml={article.raw_html}
+                            markerWordIndices={article.marker_word_indices}
+                            onToggleRead={toggleRead}
+                            onToggleTopic={toggleTopic}
+                            onNavigateTopic={navigateTopicSentence}
+                            onShowSentences={handleShowTopicSentences}
+                            tooltipEnabled={tooltipEnabled}
+                            submissionId={submissionId}
+                            coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
+                            activeInsightSentenceIndices={activeInsightSentenceIndices}
+                            activeInsightRanges={activeInsightRanges}
+                            coloredTopicNames={coloredTopicNames}
+                          />
+                        )
+                      ))
+                    )}
+                  </div>
+                  {minimapVisible && (
+                    <aside className="reading-page__minimap-panel" aria-label="Article minimap panel">
+                      <div className="reading-page__minimap-header">
+                        <div className="reading-page__minimap-title">Article Minimap</div>
+                        <div className="reading-page__minimap-subtitle">
+                          {minimapSentenceStates.filter(Boolean).length} active sentences
+                        </div>
+                      </div>
+                      <ArticleMinimap
+                        sentences={articles[0]?.sentences || []}
+                        sentenceStates={minimapSentenceStates}
+                        onSentenceClick={handleMinimapSentenceClick}
+                      />
+                    </aside>
                   )}
                 </div>
               </div>

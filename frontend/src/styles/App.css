@@ -2730,6 +2730,7 @@
 }
 
 .grid-view-minimap-bar {
+  width: var(--minimap-bar-width);
   height: 0.22rem;
   background: rgba(34, 35, 34, 0.14);
   border-radius: 2px;
@@ -2737,14 +2738,32 @@
   opacity: 0.95;
 }
 
-.grid-view-minimap-bar--highlight {
-  background: rgba(31, 32, 29, 0.85);
+.grid-view-minimap-button {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.grid-view-minimap-button:focus-visible {
+  outline: 2px solid rgba(0, 123, 255, 0.45);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.grid-view-minimap-bar--active {
+  background: var(--minimap-bar-color, rgba(31, 32, 29, 0.85));
   height: 0.28rem;
   border-radius: 2px;
 }
 
-.grid-view-minimap-bar--highlight-soft {
-  background: rgba(31, 32, 29, 0.42);
+.grid-view-minimap-bar--active-soft {
+  background: color-mix(in srgb, var(--minimap-bar-color, rgba(31, 32, 29, 0.75)) 68%, white);
 }
 
 .grid-view-leaf-layout {

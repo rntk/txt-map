@@ -9,6 +9,8 @@ import '../styles/text-reading.css';
  * @property {() => void} onToggleGrouped
  * @property {boolean} tooltipEnabled
  * @property {() => void} onToggleTooltip
+ * @property {boolean} showMinimap
+ * @property {() => void} onToggleMinimap
  * @property {string|undefined} sourceUrl
  */
 function ArticleTabHeader({
@@ -18,8 +20,12 @@ function ArticleTabHeader({
   onToggleGrouped,
   tooltipEnabled,
   onToggleTooltip,
+  showMinimap,
+  onToggleMinimap,
   sourceUrl,
 }) {
+  const supportsMinimap = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
+
   return (
     <div className="article-header-sticky article-tab-header">
       <div className="article-tab-header__tabs">
@@ -75,6 +81,16 @@ function ArticleTabHeader({
             Show tooltips
           </label>
         </>
+      )}
+      {supportsMinimap && (
+        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
+          <input
+            type="checkbox"
+            checked={showMinimap}
+            onChange={onToggleMinimap}
+          />
+          Show minimap
+        </label>
       )}
       {sourceUrl && (
         <div className="reading-source-note article-tab-header__source">
