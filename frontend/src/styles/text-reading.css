@@ -386,6 +386,121 @@
   color: inherit;
 }
 
+.topics-meta-panel {
+  width: 320px;
+}
+
+.topics-meta-panel__scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.topics-meta-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topics-meta-panel__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475467;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
+}
+
+.topics-meta-panel__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topics-meta-panel__card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.topics-meta-panel__card-title {
+  font-weight: 700;
+  color: #555;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.topics-meta-panel__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.topics-meta-panel__keyword-tag {
+  background: #e8f0fe;
+  color: #1a56db;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+}
+
+.topics-meta-panel__card-meta {
+  color: #666;
+  font-size: 0.78rem;
+}
+
+.topics-meta-panel__tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.topics-meta-panel__tag-cloud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #f0f4ff;
+  color: #1a56db;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.78rem;
+  cursor: default;
+}
+
+.topics-meta-panel__tag-cloud-freq {
+  background: #d0deff;
+  color: #1a3a8f;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.topics-meta-panel__empty {
+  color: #888;
+  font-style: italic;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.reading-page__article-body--with-topics-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.reading-page__article-body--with-minimap.reading-page__article-body--with-topics-meta {
+  grid-template-columns: minmax(0, 1fr) 240px 320px;
+}
+
 @media (max-width: 1100px) {
   .reading-page__article-body--with-minimap {
     grid-template-columns: 1fr;

@@ -12,6 +12,8 @@ import '../styles/text-reading.css';
  * @property {() => void} onToggleTooltip
  * @property {boolean} showMinimap
  * @property {() => void} onToggleMinimap
+ * @property {boolean} showTopicsMeta
+ * @property {() => void} onToggleTopicsMeta
  * @property {string|undefined} sourceUrl
  * @property {number} [readPercentage]
  */
@@ -24,6 +26,8 @@ function ArticleTabHeader({
   onToggleTooltip,
   showMinimap,
   onToggleMinimap,
+  showTopicsMeta,
+  onToggleTopicsMeta,
   sourceUrl,
   readPercentage = 0,
 }) {
@@ -93,6 +97,16 @@ function ArticleTabHeader({
             onChange={onToggleMinimap}
           />
           Show minimap
+        </label>
+      )}
+      {supportsMinimap && (
+        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
+          <input
+            type="checkbox"
+            checked={showTopicsMeta}
+            onChange={onToggleTopicsMeta}
+          />
+          Show topics meta
         </label>
       )}
       

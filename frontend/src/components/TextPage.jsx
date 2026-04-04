@@ -16,6 +16,7 @@ import ArticleMarkupView from './ArticleMarkupView';
 import RawTextView from './RawTextView';
 import WordSelectionPopup from './WordSelectionPopup';
 import ArticleMinimap from './grid/ArticleMinimap';
+import TopicsMetaPanel from './TopicsMetaPanel';
 import { useSubmission } from '../hooks/useSubmission';
 import { useTopicNavigation } from '../hooks/useTopicNavigation';
 import { useTextSelection } from '../hooks/useTextSelection';
@@ -49,6 +50,7 @@ function TextPage() {
   const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
   const [showMinimap, setShowMinimap] = useState(false);
+  const [showTopicsMeta, setShowTopicsMeta] = useState(false);
   const [highlightedGroupedTopic, setHighlightedGroupedTopic] = useState(null);
   useEffect(() => {
     if (highlightedGroupedTopic && !selectedTopics.some(t => t.name === highlightedGroupedTopic)) {
@@ -426,6 +428,11 @@ function TextPage() {
     const supportedTab = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
     return showMinimap && supportedTab && !groupedByTopics && articles.length > 0;
   }, [activeTab, articles.length, groupedByTopics, showMinimap]);
+
+  const topicsMetaVisible = useMemo(() => {
+    const supportedTab = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
+    return showTopicsMeta && supportedTab && !groupedByTopics && articles.length > 0;
+  }, [activeTab, articles.length, groupedByTopics, showTopicsMeta]);
 
   const minimapSentenceStates = useMemo(() => {
     const article = articles[0];
@@ -851,11 +858,13 @@ function TextPage() {
                   onToggleTooltip={() => setTooltipEnabled(prev => !prev)}
                   showMinimap={showMinimap}
                   onToggleMinimap={() => setShowMinimap(prev => !prev)}
+                  showTopicsMeta={showTopicsMeta}
+                  onToggleTopicsMeta={() => setShowTopicsMeta(prev => !prev)}
                   sourceUrl={submission.source_url}
                   readPercentage={readPercentage}
                 />
 
-                <div className={`article-body${minimapVisible ? ' reading-page__article-body--with-minimap' : ''}`}>
+                <div className={`article-body${minimapVisible ? ' reading-page__article-body--with-minimap' : ''}${topicsMetaVisible ? ' reading-page__article-body--with-topics-meta' : ''}`}>
                   <div className="reading-page__article-main">
                     {activeTab === 'article_summary' ? (
                       <ArticleSummaryView
@@ -937,6 +946,12 @@ function TextPage() {
                       ))
                     )}
                   </div>
+                  {topicsMetaVisible && (
+                    <TopicsMetaPanel
+                      submissionId={submissionId}
+                      selectedTopicName={selectedTopics.length > 0 ? selectedTopics[0].name : null}
+                    />
+                  )}
                   {minimapVisible && (
                     <aside className="reading-page__minimap-panel" aria-label="Article minimap panel">
                       <div className="reading-page__minimap-header">
