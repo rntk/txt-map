@@ -490,6 +490,20 @@
   margin: 0;
 }
 
+.topics-meta-panel__summary {
+  background: #f8faff;
+  border-left: 3px solid #1a56db;
+  border-radius: 0 6px 6px 0;
+  padding: 8px 10px;
+}
+
+.topics-meta-panel__summary-text {
+  font-size: 0.82rem;
+  color: #333;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .reading-page__article-body--with-topics-meta {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;

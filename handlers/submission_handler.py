@@ -515,6 +515,8 @@ def get_topic_analysis(
         "sentences": results.get("sentences", []),
         "clusters": results.get("clusters", []),
         "topic_model": results.get("topic_model", {}),
+        "subtopics": results.get("subtopics", []),
+        "topic_summaries": results.get("topic_summaries", {}),
         "task_status": {
             "clustering_generation": tasks.get("clustering_generation", {}).get("status"),
             "topic_modeling_generation": tasks.get("topic_modeling_generation", {}).get("status"),
