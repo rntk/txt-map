@@ -382,18 +382,18 @@ function TopicList({
 
   return (
     <>
-      {hasInsights && (
-        <div className="topic-nav-panel">
-          <div className="topic-nav-sidebar-tabs" role="tablist" aria-label="Sidebar navigation tabs">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={currentSidebarTab === 'topics'}
-              className={`topic-nav-sidebar-tab${currentSidebarTab === 'topics' ? ' topic-nav-sidebar-tab--active' : ''}`}
-              onClick={() => onSidebarTabChange('topics')}
-            >
-              Topics
-            </button>
+      <div className="topic-nav-panel">
+        <div className="topic-nav-sidebar-tabs" role="tablist" aria-label="Sidebar navigation tabs">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={currentSidebarTab === 'topics'}
+            className={`topic-nav-sidebar-tab${currentSidebarTab === 'topics' ? ' topic-nav-sidebar-tab--active' : ''}`}
+            onClick={() => onSidebarTabChange('topics')}
+          >
+            Topics ({topics.length})
+          </button>
+          {hasInsights && (
             <button
               type="button"
               role="tab"
@@ -401,11 +401,11 @@ function TopicList({
               className={`topic-nav-sidebar-tab${currentSidebarTab === 'insights' ? ' topic-nav-sidebar-tab--active' : ''}`}
               onClick={() => onSidebarTabChange('insights')}
             >
-              Insights
+              Insights ({safeInsights.length})
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {currentSidebarTab === 'topics' && topicTree.length > 0 && (
         <div className="topic-nav-panel">

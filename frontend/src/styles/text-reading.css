@@ -368,6 +368,15 @@
   gap: 12px;
 }
 
+.article-tab-header__progress {
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  border-left: 1px solid #dfe3e8;
+  margin-left: 4px;
+  height: 36px;
+}
+
 .article-tab-header__source {
   color: #666;
   font-size: 11px;

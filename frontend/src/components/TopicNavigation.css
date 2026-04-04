@@ -93,7 +93,7 @@
   background: var(--shell-surface-strong, #ffffff);
   color: var(--shell-ink, #181916);
   font: inherit;
-  font-size: 1.2rem;
+  font-size: 1rem;
   outline: none;
   padding: 0.5rem 0.65rem;
 }
@@ -109,13 +109,13 @@
   overflow-y: auto;
   padding-bottom: 6px;
   padding-right: 2px;
-  font-size: 1.25rem;
+  font-size: 1rem;
   line-height: 1.4;
 }
 
 .topic-nav-empty {
   color: var(--shell-muted, #595b56);
-  font-size: 1.25rem;
+  font-size: 1rem;
 }
 
 .topic-nav-list {
@@ -308,12 +308,12 @@
 }
 
 .topic-tree-node__title--root {
-  font-size: 1.3rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
 .topic-tree-node__title--nested {
-  font-size: 1.2rem;
+  font-size: 0.95rem;
   font-weight: 500;
 }
 

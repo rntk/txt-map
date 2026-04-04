@@ -1,4 +1,5 @@
 import React from 'react';
+import ReadProgress from './ReadProgress';
 import '../styles/text-reading.css';
 
 /**
@@ -12,6 +13,7 @@ import '../styles/text-reading.css';
  * @property {boolean} showMinimap
  * @property {() => void} onToggleMinimap
  * @property {string|undefined} sourceUrl
+ * @property {number} [readPercentage]
  */
 function ArticleTabHeader({
   activeTab,
@@ -23,6 +25,7 @@ function ArticleTabHeader({
   showMinimap,
   onToggleMinimap,
   sourceUrl,
+  readPercentage = 0,
 }) {
   const supportsMinimap = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
 
@@ -92,6 +95,11 @@ function ArticleTabHeader({
           Show minimap
         </label>
       )}
+      
+      <div className="article-tab-header__progress">
+        <ReadProgress percentage={readPercentage} size={45} label="" />
+      </div>
+
       {sourceUrl && (
         <div className="reading-source-note article-tab-header__source">
           Source: <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{sourceUrl}</a>

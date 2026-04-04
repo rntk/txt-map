@@ -807,12 +807,6 @@ function TextPage() {
           <>
           <div className="container reading-page__content reading-page__workspace">
             <div className="left-column">
-              <div className="reading-page__sidebar-header">
-                <h1>{sidebarTab === 'insights' ? `Insights (${insightNavItems.length})` : `Topics (${safeTopics.length})`}</h1>
-                {sidebarTab === 'topics' && (
-                  <ReadProgress percentage={readPercentage} size={60} label="Topics read" />
-                )}
-              </div>
               <TopicList
                 topics={allTopics}
                 insights={insightNavItems}
@@ -849,6 +843,7 @@ function TextPage() {
                   showMinimap={showMinimap}
                   onToggleMinimap={() => setShowMinimap(prev => !prev)}
                   sourceUrl={submission.source_url}
+                  readPercentage={readPercentage}
                 />
 
                 <div className={`article-body${minimapVisible ? ' reading-page__article-body--with-minimap' : ''}`}>
