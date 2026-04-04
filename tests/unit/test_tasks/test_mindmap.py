@@ -3,6 +3,7 @@ Unit tests for the mindmap task handler.
 
 Tests build_tree_from_topics and process_mindmap functions.
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +17,7 @@ from lib.tasks.mindmap import (
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -38,7 +40,7 @@ def mock_llm():
 @pytest.fixture
 def mock_submissions_storage():
     """Mock the SubmissionsStorage class."""
-    with patch('lib.tasks.mindmap.SubmissionsStorage') as mock_storage:
+    with patch("lib.tasks.mindmap.SubmissionsStorage") as mock_storage:
         yield mock_storage
 
 
@@ -49,7 +51,7 @@ def sample_topics():
         {"name": "Programming>Python", "sentences": [1, 2, 3]},
         {"name": "Programming>Java", "sentences": [4, 5]},
         {"name": "Machine Learning>Deep Learning", "sentences": [6, 7, 8]},
-        {"name": "Machine Learning>Traditional ML", "sentences": [9, 10]}
+        {"name": "Machine Learning>Traditional ML", "sentences": [9, 10]},
     ]
 
 
@@ -57,9 +59,21 @@ def sample_topics():
 def sample_subtopics():
     """Create sample subtopics."""
     return [
-        {"name": "Data Structures", "sentences": [1, 2], "parent_topic": "Programming>Python"},
-        {"name": "Web Frameworks", "sentences": [3], "parent_topic": "Programming>Python"},
-        {"name": "Neural Networks", "sentences": [6, 7], "parent_topic": "Machine Learning>Deep Learning"}
+        {
+            "name": "Data Structures",
+            "sentences": [1, 2],
+            "parent_topic": "Programming>Python",
+        },
+        {
+            "name": "Web Frameworks",
+            "sentences": [3],
+            "parent_topic": "Programming>Python",
+        },
+        {
+            "name": "Neural Networks",
+            "sentences": [6, 7],
+            "parent_topic": "Machine Learning>Deep Learning",
+        },
     ]
 
 
@@ -71,27 +85,38 @@ def sample_submission():
         "html_content": "<html><body><p>Sample content</p></body></html>",
         "results": {
             "sentences": [
-                "Sentence 1", "Sentence 2", "Sentence 3",
-                "Sentence 4", "Sentence 5", "Sentence 6",
-                "Sentence 7", "Sentence 8", "Sentence 9",
-                "Sentence 10"
+                "Sentence 1",
+                "Sentence 2",
+                "Sentence 3",
+                "Sentence 4",
+                "Sentence 5",
+                "Sentence 6",
+                "Sentence 7",
+                "Sentence 8",
+                "Sentence 9",
+                "Sentence 10",
             ],
             "topics": [
                 {"name": "Programming>Python", "sentences": [1, 2, 3]},
                 {"name": "Programming>Java", "sentences": [4, 5]},
-                {"name": "Machine Learning>Deep Learning", "sentences": [6, 7, 8]}
+                {"name": "Machine Learning>Deep Learning", "sentences": [6, 7, 8]},
             ],
             "subtopics": [
-                {"name": "Data Structures", "sentences": [1, 2], "parent_topic": "Programming>Python"}
+                {
+                    "name": "Data Structures",
+                    "sentences": [1, 2],
+                    "parent_topic": "Programming>Python",
+                }
             ],
-            "topic_mindmaps": {}
-        }
+            "topic_mindmaps": {},
+        },
     }
 
 
 # =============================================================================
 # Test: build_tree_from_topics - Basic Functionality
 # =============================================================================
+
 
 class TestBuildTreeFromTopicsBasic:
     """Test basic functionality of build_tree_from_topics."""
@@ -121,7 +146,7 @@ class TestBuildTreeFromTopicsBasic:
         """Function skips topics named 'no_topic'."""
         topics = [
             {"name": "no_topic", "sentences": [1, 2]},
-            {"name": "Valid Topic", "sentences": [3]}
+            {"name": "Valid Topic", "sentences": [3]},
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -131,22 +156,22 @@ class TestBuildTreeFromTopicsBasic:
 
     def test_propagates_sentences_to_all_ancestor_levels(self):
         """Function propagates sentences to all ancestor levels."""
-        topics = [
-            {"name": "Category>SubCategory>LeafTopic", "sentences": [1, 2, 3]}
-        ]
+        topics = [{"name": "Category>SubCategory>LeafTopic", "sentences": [1, 2, 3]}]
 
         tree = build_tree_from_topics(topics, [])
 
         # All levels should have the sentences
         assert tree["Category"]["sentences"] == [1, 2, 3]
         assert tree["Category"]["children"]["SubCategory"]["sentences"] == [1, 2, 3]
-        assert tree["Category"]["children"]["SubCategory"]["children"]["LeafTopic"]["sentences"] == [1, 2, 3]
+        assert tree["Category"]["children"]["SubCategory"]["children"]["LeafTopic"][
+            "sentences"
+        ] == [1, 2, 3]
 
     def test_deduplicates_sentence_indices(self):
         """Function deduplicates sentence indices across topics."""
         topics = [
             {"name": "Topic A", "sentences": [1, 2, 3]},
-            {"name": "Topic B", "sentences": [2, 3, 4]}  # Overlapping sentences
+            {"name": "Topic B", "sentences": [2, 3, 4]},  # Overlapping sentences
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -157,9 +182,7 @@ class TestBuildTreeFromTopicsBasic:
 
     def test_sorts_sentence_indices(self):
         """Function sorts sentence indices."""
-        topics = [
-            {"name": "Topic", "sentences": [5, 2, 8, 1, 3]}
-        ]
+        topics = [{"name": "Topic", "sentences": [5, 2, 8, 1, 3]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -177,7 +200,9 @@ class TestBuildTreeFromTopicsBasic:
         dl_children = tree["Machine Learning"]["children"]["Deep Learning"]["children"]
         assert "Neural Networks" in dl_children
 
-    def test_merges_subtopic_sentences_with_parent(self, sample_topics, sample_subtopics):
+    def test_merges_subtopic_sentences_with_parent(
+        self, sample_topics, sample_subtopics
+    ):
         """Function merges subtopic sentences with parent sentences."""
         tree = build_tree_from_topics(sample_topics, sample_subtopics)
 
@@ -192,7 +217,9 @@ class TestBuildTreeFromTopicsBasic:
         """Function creates subtopic nodes with correct structure."""
         tree = build_tree_from_topics(sample_topics, sample_subtopics)
 
-        data_structures = tree["Programming"]["children"]["Python"]["children"]["Data Structures"]
+        data_structures = tree["Programming"]["children"]["Python"]["children"][
+            "Data Structures"
+        ]
 
         assert "children" in data_structures
         assert "sentences" in data_structures
@@ -201,9 +228,7 @@ class TestBuildTreeFromTopicsBasic:
 
     def test_handles_missing_parent_topic_gracefully(self, sample_topics):
         """Function handles subtopics with missing parent_topic gracefully."""
-        subtopics = [
-            {"name": "Orphan Subtopic", "sentences": [1], "parent_topic": ""}
-        ]
+        subtopics = [{"name": "Orphan Subtopic", "sentences": [1], "parent_topic": ""}]
 
         tree = build_tree_from_topics(sample_topics, subtopics)
 
@@ -214,7 +239,11 @@ class TestBuildTreeFromTopicsBasic:
     def test_handles_invalid_parent_paths(self, sample_topics):
         """Function handles subtopics with invalid parent paths."""
         subtopics = [
-            {"name": "Lost Subtopic", "sentences": [1], "parent_topic": "NonExistent>Path"}
+            {
+                "name": "Lost Subtopic",
+                "sentences": [1],
+                "parent_topic": "NonExistent>Path",
+            }
         ]
 
         tree = build_tree_from_topics(sample_topics, subtopics)
@@ -227,6 +256,7 @@ class TestBuildTreeFromTopicsBasic:
 # =============================================================================
 # Test: build_tree_from_topics - Tree Structure
 # =============================================================================
+
 
 class TestBuildTreeFromTopicsStructure:
     """Test tree structure correctness."""
@@ -261,7 +291,7 @@ class TestBuildTreeFromTopicsStructure:
         """Single level topics create flat structure."""
         topics = [
             {"name": "Topic A", "sentences": [1]},
-            {"name": "Topic B", "sentences": [2]}
+            {"name": "Topic B", "sentences": [2]},
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -273,9 +303,7 @@ class TestBuildTreeFromTopicsStructure:
 
     def test_deep_hierarchy_structure(self):
         """Deep hierarchies create properly nested structure."""
-        topics = [
-            {"name": "A>B>C>D", "sentences": [1]}
-        ]
+        topics = [{"name": "A>B>C>D", "sentences": [1]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -288,7 +316,7 @@ class TestBuildTreeFromTopicsStructure:
         """Multiple topics under same parent are siblings."""
         topics = [
             {"name": "Parent>Child1", "sentences": [1]},
-            {"name": "Parent>Child2", "sentences": [2]}
+            {"name": "Parent>Child2", "sentences": [2]},
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -304,14 +332,13 @@ class TestBuildTreeFromTopicsStructure:
 # Test: build_tree_from_topics - Sentence Propagation
 # =============================================================================
 
+
 class TestBuildTreeFromTopicsSentencePropagation:
     """Test sentence propagation through hierarchy."""
 
     def test_sentences_propagated_to_root_level(self):
         """Sentences are propagated to root level of hierarchy."""
-        topics = [
-            {"name": "Root>Level1>Level2", "sentences": [1, 2, 3]}
-        ]
+        topics = [{"name": "Root>Level1>Level2", "sentences": [1, 2, 3]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -321,7 +348,7 @@ class TestBuildTreeFromTopicsSentencePropagation:
         """Parent sentences accumulated from multiple children."""
         topics = [
             {"name": "Parent>Child1", "sentences": [1, 2]},
-            {"name": "Parent>Child2", "sentences": [3, 4]}
+            {"name": "Parent>Child2", "sentences": [3, 4]},
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -331,31 +358,25 @@ class TestBuildTreeFromTopicsSentencePropagation:
 
     def test_sentences_merged_from_subtopics(self):
         """Subtopic sentences stored in subtopic node."""
-        topics = [
-            {"name": "Topic", "sentences": [1, 2]}
-        ]
-        subtopics = [
-            {"name": "Subtopic", "sentences": [3, 4], "parent_topic": "Topic"}
-        ]
+        topics = [{"name": "Topic", "sentences": [1, 2]}]
+        subtopics = [{"name": "Subtopic", "sentences": [3, 4], "parent_topic": "Topic"}]
 
         tree = build_tree_from_topics(topics, subtopics)
 
         # Topic node keeps its own sentences
         topic_node = tree["Topic"]
         assert topic_node["sentences"] == [1, 2]
-        
+
         # Subtopic node has its own sentences
         subtopic_node = topic_node["children"]["Subtopic"]
         assert subtopic_node["sentences"] == [3, 4]
 
     def test_sentence_indices_sorted_after_merge(self):
         """Sentence indices sorted in each node."""
-        topics = [
-            {"name": "Topic", "sentences": [5, 10]}
-        ]
+        topics = [{"name": "Topic", "sentences": [5, 10]}]
         subtopics = [
             {"name": "Sub1", "sentences": [1, 8], "parent_topic": "Topic"},
-            {"name": "Sub2", "sentences": [3, 15], "parent_topic": "Topic"}
+            {"name": "Sub2", "sentences": [3, 15], "parent_topic": "Topic"},
         ]
 
         tree = build_tree_from_topics(topics, subtopics)
@@ -371,15 +392,13 @@ class TestBuildTreeFromTopicsSentencePropagation:
 # Test: build_tree_from_topics - Edge Cases
 # =============================================================================
 
+
 class TestBuildTreeFromTopicsEdgeCases:
     """Test edge cases for build_tree_from_topics."""
 
     def test_handles_empty_topic_name(self):
         """Function handles topics with empty name."""
-        topics = [
-            {"name": "", "sentences": [1]},
-            {"name": "Valid", "sentences": [2]}
-        ]
+        topics = [{"name": "", "sentences": [1]}, {"name": "Valid", "sentences": [2]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -390,7 +409,7 @@ class TestBuildTreeFromTopicsEdgeCases:
         """Function handles topics with missing name key."""
         topics = [
             {"sentences": [1]},  # Missing name
-            {"name": "Valid", "sentences": [2]}
+            {"name": "Valid", "sentences": [2]},
         ]
 
         tree = build_tree_from_topics(topics, [])
@@ -422,9 +441,7 @@ class TestBuildTreeFromTopicsEdgeCases:
 
     def test_handles_missing_subtopic_name(self, sample_topics):
         """Function handles subtopics with missing name."""
-        subtopics = [
-            {"sentences": [1], "parent_topic": "Programming>Python"}
-        ]
+        subtopics = [{"sentences": [1], "parent_topic": "Programming>Python"}]
 
         tree = build_tree_from_topics(sample_topics, subtopics)
 
@@ -440,9 +457,7 @@ class TestBuildTreeFromTopicsEdgeCases:
 
     def test_handles_whitespace_in_topic_names(self):
         """Function handles whitespace in topic names."""
-        topics = [
-            {"name": "  Topic  >  Subtopic  ", "sentences": [1]}
-        ]
+        topics = [{"name": "  Topic  >  Subtopic  ", "sentences": [1]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -452,9 +467,7 @@ class TestBuildTreeFromTopicsEdgeCases:
 
     def test_handles_special_characters_in_topic_names(self):
         """Function handles special characters in topic names."""
-        topics = [
-            {"name": "Topic/Name@123", "sentences": [1]}
-        ]
+        topics = [{"name": "Topic/Name@123", "sentences": [1]}]
 
         tree = build_tree_from_topics(topics, [])
 
@@ -466,6 +479,7 @@ class TestBuildTreeFromTopicsEdgeCases:
 # Test: process_mindmap - Basic Functionality
 # =============================================================================
 
+
 class TestProcessMindmapBasic:
     """Test basic functionality of process_mindmap."""
 
@@ -475,12 +489,12 @@ class TestProcessMindmapBasic:
         """Function raises ValueError when topics are missing."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1", "S2"]
-            }
+            "results": {"sentences": ["S1", "S2"]},
         }
 
-        with pytest.raises(ValueError, match="Topic extraction must be completed first"):
+        with pytest.raises(
+            ValueError, match="Topic extraction must be completed first"
+        ):
             process_mindmap(submission, mock_db, mock_llm)
 
     def test_raises_value_error_when_topics_empty(
@@ -489,13 +503,12 @@ class TestProcessMindmapBasic:
         """Function raises ValueError when topics list is empty."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "sentences": ["S1", "S2"],
-                "topics": []
-            }
+            "results": {"sentences": ["S1", "S2"], "topics": []},
         }
 
-        with pytest.raises(ValueError, match="Topic extraction must be completed first"):
+        with pytest.raises(
+            ValueError, match="Topic extraction must be completed first"
+        ):
             process_mindmap(submission, mock_db, mock_llm)
 
     def test_raises_value_error_when_sentences_missing(
@@ -504,12 +517,12 @@ class TestProcessMindmapBasic:
         """Function raises ValueError when sentences are missing."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+            "results": {"topics": [{"name": "Topic", "sentences": [1]}]},
         }
 
-        with pytest.raises(ValueError, match="Topic extraction must be completed first"):
+        with pytest.raises(
+            ValueError, match="Topic extraction must be completed first"
+        ):
             process_mindmap(submission, mock_db, mock_llm)
 
     def test_raises_value_error_when_sentences_empty(
@@ -520,27 +533,31 @@ class TestProcessMindmapBasic:
             "submission_id": "test-123",
             "results": {
                 "sentences": [],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1]}],
+            },
         }
 
-        with pytest.raises(ValueError, match="Topic extraction must be completed first"):
+        with pytest.raises(
+            ValueError, match="Topic extraction must be completed first"
+        ):
             process_mindmap(submission, mock_db, mock_llm)
 
-    def test_reads_topics_from_results(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_reads_topics_from_results(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function reads topics from submission results."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {}
 
             process_mindmap(submission, mock_db, mock_llm)
@@ -549,21 +566,25 @@ class TestProcessMindmapBasic:
             call_args = mock_build.call_args
             assert call_args[0][0] == submission["results"]["topics"]
 
-    def test_reads_subtopics_from_results(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_reads_subtopics_from_results(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function reads subtopics from submission results."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": [{"name": "Sub", "sentences": [1], "parent_topic": "Topic"}]
-            }
+                "subtopics": [
+                    {"name": "Sub", "sentences": [1], "parent_topic": "Topic"}
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {}
 
             process_mindmap(submission, mock_db, mock_llm)
@@ -571,36 +592,40 @@ class TestProcessMindmapBasic:
             call_args = mock_build.call_args
             assert call_args[0][1] == submission["results"]["subtopics"]
 
-    def test_calls_build_tree_from_topics(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_calls_build_tree_from_topics(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function calls build_tree_from_topics with topics and subtopics."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": []
-            }
+                "subtopics": [],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {"Topic": {"children": {}, "sentences": [1]}}
 
             process_mindmap(submission, mock_db, mock_llm)
 
             mock_build.assert_called_once()
 
-    def test_updates_results_with_topic_mindmaps(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_updates_results_with_topic_mindmaps(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function updates results with topic_mindmaps."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": []
-            }
+                "subtopics": [],
+            },
         }
 
         mock_storage_instance = MagicMock()
@@ -608,7 +633,7 @@ class TestProcessMindmapBasic:
 
         mock_tree = {"Topic": {"children": {}, "sentences": [1]}}
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics', return_value=mock_tree):
+        with patch("lib.tasks.mindmap.build_tree_from_topics", return_value=mock_tree):
             process_mindmap(submission, mock_db, mock_llm)
 
         mock_storage_instance.update_results.assert_called_once()
@@ -621,6 +646,7 @@ class TestProcessMindmapBasic:
 # Test: process_mindmap - LLM Parameter
 # =============================================================================
 
+
 class TestProcessMindmapLLMParameter:
     """Test LLM parameter handling."""
 
@@ -631,14 +657,14 @@ class TestProcessMindmapLLMParameter:
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": []
-            }
+                "subtopics": [],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics', return_value={}):
+        with patch("lib.tasks.mindmap.build_tree_from_topics", return_value={}):
             process_mindmap(submission, mock_db, mock_llm)
 
         # LLM should not be called
@@ -649,6 +675,7 @@ class TestProcessMindmapLLMParameter:
 # =============================================================================
 # Test: process_mindmap - Completion Message
 # =============================================================================
+
 
 class TestProcessMindmapCompletionMessage:
     """Test completion message functionality."""
@@ -663,18 +690,18 @@ class TestProcessMindmapCompletionMessage:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"name": "Topic A", "sentences": [1]},
-                    {"name": "Topic B", "sentences": [2]}
+                    {"name": "Topic B", "sentences": [2]},
                 ],
                 "subtopics": [
                     {"name": "Sub1", "sentences": [1], "parent_topic": "Topic A"}
-                ]
-            }
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics', return_value={}):
+        with patch("lib.tasks.mindmap.build_tree_from_topics", return_value={}):
             process_mindmap(submission, mock_db, mock_llm)
 
         captured = capsys.readouterr()
@@ -688,6 +715,7 @@ class TestProcessMindmapCompletionMessage:
 # Test: process_mindmap - Edge Cases
 # =============================================================================
 
+
 class TestProcessMindmapEdgeCases:
     """Test edge cases for process_mindmap."""
 
@@ -699,37 +727,35 @@ class TestProcessMindmapEdgeCases:
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
+                "topics": [{"name": "Topic", "sentences": [1]}],
                 # No subtopics key
-            }
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {}
 
             # Should not raise
             process_mindmap(submission, mock_db, mock_llm)
 
-    def test_handles_none_subtopics(
-        self, mock_db, mock_llm, mock_submissions_storage
-    ):
+    def test_handles_none_subtopics(self, mock_db, mock_llm, mock_submissions_storage):
         """Function handles subtopics=None in results."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": None
-            }
+                "subtopics": None,
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {}
 
             # Should not raise
@@ -747,7 +773,7 @@ class TestProcessMindmapEdgeCases:
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.mindmap.build_tree_from_topics') as mock_build:
+        with patch("lib.tasks.mindmap.build_tree_from_topics") as mock_build:
             mock_build.return_value = {}
 
             # Should raise ValueError (no topics)

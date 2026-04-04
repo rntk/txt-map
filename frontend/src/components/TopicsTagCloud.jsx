@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import TopicSentencesModal from './shared/TopicSentencesModal';
-import './TopicNavigation.css';
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import TopicSentencesModal from "./shared/TopicSentencesModal";
+import "./TopicNavigation.css";
 
 /**
  * @typedef {Object} TopicTagCloudTopic
@@ -27,12 +27,12 @@ function wordHash(word) {
 }
 
 const TILE_COLORS = [
-  { bg: '#ffd740', fg: '#333' },
-  { bg: '#69f0ae', fg: '#1b5e20' },
-  { bg: '#40c4ff', fg: '#01579b' },
-  { bg: '#ff6e40', fg: '#fff' },
-  { bg: '#e040fb', fg: '#fff' },
-  { bg: '#b2ff59', fg: '#33691e' },
+  { bg: "#ffd740", fg: "#333" },
+  { bg: "#69f0ae", fg: "#1b5e20" },
+  { bg: "#40c4ff", fg: "#01579b" },
+  { bg: "#ff6e40", fg: "#fff" },
+  { bg: "#e040fb", fg: "#fff" },
+  { bg: "#b2ff59", fg: "#33691e" },
 ];
 
 function rectOverlaps(a, placed) {
@@ -89,7 +89,11 @@ function buildCloudLayout(items) {
   const maxY = Math.max(...result.map((r) => r.y + r.bh));
 
   return {
-    items: result.map((r) => ({ ...r, x: r.x - minX + pad, y: r.y - minY + pad })),
+    items: result.map((r) => ({
+      ...r,
+      x: r.x - minX + pad,
+      y: r.y - minY + pad,
+    })),
     totalW: maxX - minX + pad * 2,
     totalH: maxY - minY + pad * 2,
   };
@@ -99,7 +103,11 @@ function buildCloudLayout(items) {
  * @param {{ words: Array<{ word: string, frequency: number }>, onWordClick?: (word: string) => void, emptyMessage?: string }} props
  * @returns {React.ReactElement}
  */
-function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data available.' }) {
+function WordCloudDisplay({
+  words,
+  onWordClick,
+  emptyMessage = "No data available.",
+}) {
   const layout = useMemo(() => {
     if (!words || words.length === 0) {
       return { items: [], totalW: 0, totalH: 0 };
@@ -107,50 +115,49 @@ function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data availabl
 
     const maxFreq = Math.max(...words.map((word) => word.frequency));
     const minFreq = Math.min(...words.map((word) => word.frequency));
-    const norm = (freq) => (maxFreq === minFreq ? 0.5 : (freq - minFreq) / (maxFreq - minFreq));
+    const norm = (freq) =>
+      maxFreq === minFreq ? 0.5 : (freq - minFreq) / (maxFreq - minFreq);
     const getSize = (freq) => 11 + norm(freq) * 41;
 
-    const items = words
-      .slice(0, 120)
-      .map(({ word, frequency }) => {
-        const h = wordHash(word);
-        const n = norm(frequency);
-        const isTile = n > 0.55 && (h % 3 === 0);
-        const rotationDeg = ((h % 7) - 3) * 1.8;
-        const fontSize = getSize(frequency);
+    const items = words.slice(0, 120).map(({ word, frequency }) => {
+      const h = wordHash(word);
+      const n = norm(frequency);
+      const isTile = n > 0.55 && h % 3 === 0;
+      const rotationDeg = ((h % 7) - 3) * 1.8;
+      const fontSize = getSize(frequency);
 
-        if (isTile) {
-          const tile = TILE_COLORS[h % TILE_COLORS.length];
-          return {
-            word,
-            frequency,
-            fontSize,
-            rotationDeg,
-            background: tile.bg,
-            color: tile.fg,
-            fontWeight: '700',
-            borderRadius: '3px',
-            px: 7,
-            py: 3,
-            isTile: true,
-          };
-        }
-
-        const hue = (h % 260) + 20;
+      if (isTile) {
+        const tile = TILE_COLORS[h % TILE_COLORS.length];
         return {
           word,
           frequency,
           fontSize,
           rotationDeg,
-          background: 'transparent',
-          color: `hsl(${hue}, 60%, ${n > 0.5 ? 28 : 42}%)`,
-          fontWeight: n > 0.65 ? '700' : n > 0.3 ? '500' : '400',
-          borderRadius: '3px',
-          px: 4,
-          py: 2,
-          isTile: false,
+          background: tile.bg,
+          color: tile.fg,
+          fontWeight: "700",
+          borderRadius: "3px",
+          px: 7,
+          py: 3,
+          isTile: true,
         };
-      });
+      }
+
+      const hue = (h % 260) + 20;
+      return {
+        word,
+        frequency,
+        fontSize,
+        rotationDeg,
+        background: "transparent",
+        color: `hsl(${hue}, 60%, ${n > 0.5 ? 28 : 42}%)`,
+        fontWeight: n > 0.65 ? "700" : n > 0.3 ? "500" : "400",
+        borderRadius: "3px",
+        px: 4,
+        py: 2,
+        isTile: false,
+      };
+    });
 
     return buildCloudLayout(items);
   }, [words]);
@@ -164,36 +171,56 @@ function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data availabl
       <div
         className="topics-tag-cloud__cloud"
         style={{
-          '--cloud-width': `${layout.totalW}px`,
-          '--cloud-height': `${layout.totalH}px`,
+          "--cloud-width": `${layout.totalW}px`,
+          "--cloud-height": `${layout.totalH}px`,
         }}
       >
-        {layout.items.map(({ word, frequency, x, y, fontSize, rotationDeg, background, color, fontWeight, borderRadius, px, py, isTile }) => (
-          <span
-            key={word}
-            title={`${word}: ${frequency}`}
-            onClick={() => onWordClick?.(word)}
-            className={[
-              'topics-tag-cloud__word',
-              onWordClick ? 'topics-tag-cloud__word--clickable' : '',
-              isTile ? 'topics-tag-cloud__word--tile' : 'topics-tag-cloud__word--text',
-            ].filter(Boolean).join(' ')}
-            style={{
-              '--word-left': `${x}px`,
-              '--word-top': `${y}px`,
-              '--word-font-size': `${fontSize}px`,
-              '--word-rotation': `${rotationDeg}deg`,
-              '--word-bg': background,
-              '--word-color': color,
-              '--word-weight': fontWeight,
-              '--word-radius': `${borderRadius}`,
-              '--word-pad-x': `${px}px`,
-              '--word-pad-y': `${py}px`,
-            }}
-          >
-            {word}
-          </span>
-        ))}
+        {layout.items.map(
+          ({
+            word,
+            frequency,
+            x,
+            y,
+            fontSize,
+            rotationDeg,
+            background,
+            color,
+            fontWeight,
+            borderRadius,
+            px,
+            py,
+            isTile,
+          }) => (
+            <span
+              key={word}
+              title={`${word}: ${frequency}`}
+              onClick={() => onWordClick?.(word)}
+              className={[
+                "topics-tag-cloud__word",
+                onWordClick ? "topics-tag-cloud__word--clickable" : "",
+                isTile
+                  ? "topics-tag-cloud__word--tile"
+                  : "topics-tag-cloud__word--text",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              style={{
+                "--word-left": `${x}px`,
+                "--word-top": `${y}px`,
+                "--word-font-size": `${fontSize}px`,
+                "--word-rotation": `${rotationDeg}deg`,
+                "--word-bg": background,
+                "--word-color": color,
+                "--word-weight": fontWeight,
+                "--word-radius": `${borderRadius}`,
+                "--word-pad-x": `${px}px`,
+                "--word-pad-y": `${py}px`,
+              }}
+            >
+              {word}
+            </span>
+          ),
+        )}
       </div>
     </div>
   );
@@ -201,7 +228,7 @@ function WordCloudDisplay({ words, onWordClick, emptyMessage = 'No data availabl
 
 function getChildTopics(topics, navPath) {
   return topics.filter((topic) => {
-    const parts = topic.name.split('>').map((segment) => segment.trim());
+    const parts = topic.name.split(">").map((segment) => segment.trim());
     if (parts.length <= navPath.length) return false;
     return navPath.every((seg, i) => parts[i] === seg);
   });
@@ -210,7 +237,7 @@ function getChildTopics(topics, navPath) {
 function buildTopicWordCloud(topics, navPath) {
   const freq = {};
   getChildTopics(topics, navPath).forEach((topic) => {
-    const parts = topic.name.split('>').map((segment) => segment.trim());
+    const parts = topic.name.split(">").map((segment) => segment.trim());
     const word = parts[navPath.length];
     if (word) {
       freq[word] = (freq[word] || 0) + (topic.sentences?.length || 1);
@@ -224,7 +251,7 @@ function buildTopicWordCloud(topics, navPath) {
 
 function getSentenceIndicesForPath(topics, navPath) {
   const topicMatches = (name) => {
-    const parts = (name || '').split('>').map((segment) => segment.trim());
+    const parts = (name || "").split(">").map((segment) => segment.trim());
     if (parts.length < navPath.length) return false;
     return navPath.every((seg, i) => parts[i] === seg);
   };
@@ -266,50 +293,59 @@ function TopicsTagCloud({
   const [sentenceCount, setSentenceCount] = useState(0);
   const [loadingCloud, setLoadingCloud] = useState(false);
 
-  const topicWords = useMemo(() => buildTopicWordCloud(topics, navPath), [topics, navPath]);
+  const topicWords = useMemo(
+    () => buildTopicWordCloud(topics, navPath),
+    [topics, navPath],
+  );
   const scopedSentenceIndices = useMemo(
     () => getSentenceIndicesForPath(topics, navPath),
-    [topics, navPath]
+    [topics, navPath],
   );
 
   const scopedSentences = useMemo(
-    () => scopedSentenceIndices
-      .filter((idx) => idx >= 1 && idx <= (sentences?.length || 0))
-      .map((idx) => ({ index: idx, text: sentences[idx - 1] || '' })),
-    [scopedSentenceIndices, sentences]
+    () =>
+      scopedSentenceIndices
+        .filter((idx) => idx >= 1 && idx <= (sentences?.length || 0))
+        .map((idx) => ({ index: idx, text: sentences[idx - 1] || "" })),
+    [scopedSentenceIndices, sentences],
   );
 
   const keywordSentences = useMemo(() => {
     if (!selectedKeyword) return [];
-    const safeKeyword = selectedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`\\b${safeKeyword}\\b`, 'i');
+    const safeKeyword = selectedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`\\b${safeKeyword}\\b`, "i");
     return scopedSentences.filter(({ text }) => pattern.test(text));
   }, [selectedKeyword, scopedSentences]);
 
-  const fetchWordCloud = useCallback(async (path) => {
-    setLoadingCloud(true);
-    try {
-      let queryStr = '';
-      if (forcedPathQuery) {
-        queryStr = forcedPathQuery;
-      } else {
-        const params = new URLSearchParams();
-        path.forEach((seg) => params.append('path', seg));
-        queryStr = params.toString();
+  const fetchWordCloud = useCallback(
+    async (path) => {
+      setLoadingCloud(true);
+      try {
+        let queryStr = "";
+        if (forcedPathQuery) {
+          queryStr = forcedPathQuery;
+        } else {
+          const params = new URLSearchParams();
+          path.forEach((seg) => params.append("path", seg));
+          queryStr = params.toString();
+        }
+        const res = await fetch(
+          `/api/submission/${submissionId}/word-cloud?${queryStr}`,
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        setSentenceWords(data.words || []);
+        setSentenceCount(data.sentence_count || 0);
+      } catch (err) {
+        console.error("word-cloud fetch failed:", err);
+        setSentenceWords([]);
+        setSentenceCount(0);
+      } finally {
+        setLoadingCloud(false);
       }
-      const res = await fetch(`/api/submission/${submissionId}/word-cloud?${queryStr}`);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setSentenceWords(data.words || []);
-      setSentenceCount(data.sentence_count || 0);
-    } catch (err) {
-      console.error('word-cloud fetch failed:', err);
-      setSentenceWords([]);
-      setSentenceCount(0);
-    } finally {
-      setLoadingCloud(false);
-    }
-  }, [submissionId, forcedPathQuery]);
+    },
+    [submissionId, forcedPathQuery],
+  );
 
   useEffect(() => {
     fetchWordCloud(navPath);
@@ -322,9 +358,11 @@ function TopicsTagCloud({
   const isRoot = navPath.length === 0;
 
   const handleTopicClick = (word) => setNavPath((prev) => [...prev, word]);
-  const handleKeywordClick = (word) => setSelectedKeyword((prev) => (prev === word ? null : word));
+  const handleKeywordClick = (word) =>
+    setSelectedKeyword((prev) => (prev === word ? null : word));
   const handleBack = () => setNavPath((prev) => prev.slice(0, -1));
-  const handleBreadcrumbClick = (index) => setNavPath(navPath.slice(0, index + 1));
+  const handleBreadcrumbClick = (index) =>
+    setNavPath(navPath.slice(0, index + 1));
 
   return (
     <div className="topics-tag-cloud-root">
@@ -342,7 +380,7 @@ function TopicsTagCloud({
         <div className="topics-tag-cloud__breadcrumbs">
           <button
             type="button"
-            className={`topics-tag-cloud__breadcrumb${isRoot ? ' topics-tag-cloud__breadcrumb--current' : ''}`}
+            className={`topics-tag-cloud__breadcrumb${isRoot ? " topics-tag-cloud__breadcrumb--current" : ""}`}
             onClick={() => !isRoot && setNavPath([])}
             disabled={isRoot}
           >
@@ -356,8 +394,10 @@ function TopicsTagCloud({
                 <span className="topics-tag-cloud__separator">›</span>
                 <button
                   type="button"
-                  className={`topics-tag-cloud__breadcrumb${isCurrent ? ' topics-tag-cloud__breadcrumb--current' : ''}`}
-                  onClick={() => i < navPath.length - 1 && handleBreadcrumbClick(i)}
+                  className={`topics-tag-cloud__breadcrumb${isCurrent ? " topics-tag-cloud__breadcrumb--current" : ""}`}
+                  onClick={() =>
+                    i < navPath.length - 1 && handleBreadcrumbClick(i)
+                  }
                   disabled={isCurrent}
                 >
                   {seg}
@@ -371,8 +411,12 @@ function TopicsTagCloud({
       {topicWords.length > 0 && (
         <section className="topics-tag-cloud__panel">
           <div className="topics-tag-cloud__panel-header">
-            {isRoot ? 'Topic categories' : `Sub-topics of "${navPath[navPath.length - 1]}"`}
-            <span className="topics-tag-cloud__panel-note">click to explore</span>
+            {isRoot
+              ? "Topic categories"
+              : `Sub-topics of "${navPath[navPath.length - 1]}"`}
+            <span className="topics-tag-cloud__panel-note">
+              click to explore
+            </span>
           </div>
           <WordCloudDisplay words={topicWords} onWordClick={handleTopicClick} />
         </section>
@@ -380,13 +424,15 @@ function TopicsTagCloud({
 
       <section className="topics-tag-cloud__panel">
         <div className="topics-tag-cloud__panel-header">
-          {isRoot ? 'All text' : navPath.join(' › ')} - key words
+          {isRoot ? "All text" : navPath.join(" › ")} - key words
           {!loadingCloud && sentenceWords.length > 0 && (
-            <span className="topics-tag-cloud__panel-note">click a keyword to see matching sentences</span>
+            <span className="topics-tag-cloud__panel-note">
+              click a keyword to see matching sentences
+            </span>
           )}
           {!loadingCloud && (
             <span className="topics-tag-cloud__panel-note">
-              from {sentenceCount} sentence{sentenceCount !== 1 ? 's' : ''}
+              from {sentenceCount} sentence{sentenceCount !== 1 ? "s" : ""}
             </span>
           )}
           {loadingCloud && (

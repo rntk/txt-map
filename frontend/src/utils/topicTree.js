@@ -2,9 +2,9 @@ export function buildTopicTree(topics) {
   const safe = Array.isArray(topics) ? topics : [];
   const tree = new Map();
 
-  safe.forEach(topic => {
-    const parts = topic.name.split('>').map(p => p.trim());
-    let path = '';
+  safe.forEach((topic) => {
+    const parts = topic.name.split(">").map((p) => p.trim());
+    let path = "";
 
     for (let i = 0; i < parts.length; i++) {
       const prevPath = path;
@@ -18,10 +18,10 @@ export function buildTopicTree(topics) {
             fullPath: path,
             isLeaf,
             topic: isLeaf ? topic : null,
-            depth: i
+            depth: i,
           },
           children: new Map(),
-          parent: prevPath || null
+          parent: prevPath || null,
         });
       }
 
@@ -52,7 +52,7 @@ export function getSubtreeStats(treeNode) {
       totalTopics++;
       totalSentences += node.node.topic.totalSentences || 0;
     }
-    node.children.forEach(child => traverse(child));
+    node.children.forEach((child) => traverse(child));
   };
 
   traverse(treeNode);

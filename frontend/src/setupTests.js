@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom/vitest';
+import "@testing-library/jest-dom/vitest";
 
 class MockIntersectionObserver {
   constructor(callback) {
@@ -14,6 +14,6 @@ class MockIntersectionObserver {
   unobserve() {}
 }
 
-if (typeof global.IntersectionObserver === 'undefined') {
+if (typeof global.IntersectionObserver === "undefined") {
   global.IntersectionObserver = MockIntersectionObserver;
 }

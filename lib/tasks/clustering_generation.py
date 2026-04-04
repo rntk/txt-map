@@ -2,6 +2,7 @@
 Sentence clustering task - groups sentences by semantic similarity using TF-IDF + Agglomerative Clustering.
 No LLM required; uses scikit-learn.
 """
+
 from typing import Any
 
 import numpy as np
@@ -11,7 +12,9 @@ from sklearn.metrics.pairwise import cosine_distances
 
 
 def process_clustering_generation(
-    submission: dict[str, Any], db: Any, llm: Any  # noqa: ARG001
+    submission: dict[str, Any],
+    db: Any,
+    llm: Any,  # noqa: ARG001
 ) -> None:
     sentences: list[str] = submission["results"].get("sentences", [])
     topics: list[dict] = submission["results"].get("topics", [])

@@ -1,26 +1,28 @@
-import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import TopicLevelSwitcher from './TopicLevelSwitcher';
+import React from "react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import TopicLevelSwitcher from "./TopicLevelSwitcher";
 
-describe('TopicLevelSwitcher', () => {
-  it('renders level buttons and marks the selected level active', () => {
+describe("TopicLevelSwitcher", () => {
+  it("renders level buttons and marks the selected level active", () => {
     const onChange = vi.fn();
 
     render(
-      <TopicLevelSwitcher
-        selectedLevel={1}
-        maxLevel={2}
-        onChange={onChange}
-      />
+      <TopicLevelSwitcher selectedLevel={1} maxLevel={2} onChange={onChange} />,
     );
 
-    expect(screen.getByText('Topic Level:')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Level 0 (Main Topics)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Level 1 (Subtopics)' })).toHaveClass('active');
-    expect(screen.getByRole('button', { name: 'Level 2 (Depth 2)' })).toBeInTheDocument();
+    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+    ).toHaveClass("active");
+    expect(
+      screen.getByRole("button", { name: "Level 2 (Depth 2)" }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Level 2 (Depth 2)' }));
+    fireEvent.click(screen.getByRole("button", { name: "Level 2 (Depth 2)" }));
     expect(onChange).toHaveBeenCalledWith(2);
   });
 });

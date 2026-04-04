@@ -1,6 +1,7 @@
 """
 Pytest fixtures and configuration for RSS submission analysis tests.
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
@@ -16,8 +17,26 @@ import uuid
 # Create mock NLTK corpus objects
 _mock_stopwords = MagicMock()
 _mock_stopwords.words.return_value = [
-    'the', 'a', 'an', 'and', 'is', 'are', 'was', 'were', 'be', 'has',
-    'he', 'in', 'it', 'its', 'of', 'on', 'that', 'to', 'will', 'with'
+    "the",
+    "a",
+    "an",
+    "and",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "has",
+    "he",
+    "in",
+    "it",
+    "its",
+    "of",
+    "on",
+    "that",
+    "to",
+    "will",
+    "with",
 ]
 _mock_wordnet = MagicMock()
 
@@ -29,8 +48,8 @@ _nltk_wordnet_patcher = None
 def pytest_configure(config):
     """Start NLTK mocks before any test modules are imported."""
     global _nltk_stopwords_patcher, _nltk_wordnet_patcher
-    _nltk_stopwords_patcher = patch('nltk.corpus.stopwords', _mock_stopwords)
-    _nltk_wordnet_patcher = patch('nltk.corpus.wordnet', _mock_wordnet)
+    _nltk_stopwords_patcher = patch("nltk.corpus.stopwords", _mock_stopwords)
+    _nltk_wordnet_patcher = patch("nltk.corpus.wordnet", _mock_wordnet)
     _nltk_stopwords_patcher.start()
     _nltk_wordnet_patcher.start()
 
@@ -98,68 +117,65 @@ def sample_submission():
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "subtopics_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "summarization": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "mindmap": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "prefix_tree": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "insights_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "markup_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "clustering_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
+                "error": None,
             },
             "topic_modeling_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,
-                "error": None
-            }
+                "error": None,
+            },
         },
         "results": {
             "sentences": ["Sentence one.", "Sentence two.", "Sentence three."],
             "topics": [
                 {"name": "Topic A", "sentences": [1, 2]},
-                {"name": "Topic B", "sentences": [3]}
+                {"name": "Topic B", "sentences": [3]},
             ],
             "topic_summaries": {},
-            "article_summary": {
-                "text": "",
-                "bullets": []
-            },
+            "article_summary": {"text": "", "bullets": []},
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],
@@ -169,7 +185,7 @@ def sample_submission():
             "insights": [],
             "annotations": {},
             "markup": {},
-        }
+        },
     }
 
 
@@ -230,6 +246,7 @@ def mock_async_upload_file():
     def async_read():
         async def read():
             return mock_file._read_data
+
         return read()
 
     mock_file.read = async_read
@@ -240,41 +257,38 @@ def mock_async_upload_file():
 @pytest.fixture
 def mock_nltk_dependencies():
     """Mock NLTK dependencies for word cloud tests."""
-    with patch('lib.nlp.word_tokenize') as mock_tokenize, \
-         patch('lib.nlp.nltk.pos_tag') as mock_pos_tag, \
-         patch('lib.nlp.stopwords.words') as mock_stopwords, \
-         patch('lib.nlp.WordNetLemmatizer') as mock_lemmatizer:
-        
+    with (
+        patch("lib.nlp.word_tokenize") as mock_tokenize,
+        patch("lib.nlp.nltk.pos_tag") as mock_pos_tag,
+        patch("lib.nlp.stopwords.words") as mock_stopwords,
+        patch("lib.nlp.WordNetLemmatizer") as mock_lemmatizer,
+    ):
         # Setup mock tokenization
-        mock_tokenize.return_value = ['sample', 'word', 'test']
-        
+        mock_tokenize.return_value = ["sample", "word", "test"]
+
         # Setup mock POS tagging
-        mock_pos_tag.return_value = [
-            ('sample', 'NN'),
-            ('word', 'NN'),
-            ('test', 'NN')
-        ]
-        
+        mock_pos_tag.return_value = [("sample", "NN"), ("word", "NN"), ("test", "NN")]
+
         # Setup mock stop words
-        mock_stopwords.return_value = ['the', 'a', 'an', 'is', 'are']
-        
+        mock_stopwords.return_value = ["the", "a", "an", "is", "are"]
+
         # Setup mock lemmatizer
         mock_lemma_instance = MagicMock()
         mock_lemma_instance.lemmatize.side_effect = lambda word, pos: word
         mock_lemmatizer.return_value = mock_lemma_instance
-        
+
         yield {
-            'tokenize': mock_tokenize,
-            'pos_tag': mock_pos_tag,
-            'stopwords': mock_stopwords,
-            'lemmatizer': mock_lemmatizer
+            "tokenize": mock_tokenize,
+            "pos_tag": mock_pos_tag,
+            "stopwords": mock_stopwords,
+            "lemmatizer": mock_lemmatizer,
         }
 
 
 @pytest.fixture
 def mock_markdown():
     """Mock the markdown library."""
-    with patch('markdown.markdown') as mock_md:
+    with patch("markdown.markdown") as mock_md:
         mock_md.return_value = "<p>Converted HTML</p>"
         yield mock_md
 
@@ -282,13 +296,11 @@ def mock_markdown():
 @pytest.fixture
 def mock_pdf_to_html():
     """Mock the pdf_to_html module."""
-    with patch('lib.pdf_to_html.convert_pdf_to_html') as mock_convert, \
-         patch('lib.pdf_to_html.extract_text_from_pdf') as mock_extract:
-        
+    with (
+        patch("lib.pdf_to_html.convert_pdf_to_html") as mock_convert,
+        patch("lib.pdf_to_html.extract_text_from_pdf") as mock_extract,
+    ):
         mock_convert.return_value = "<html><body><p>PDF HTML content</p></body></html>"
         mock_extract.return_value = "PDF text content"
-        
-        yield {
-            'convert': mock_convert,
-            'extract': mock_extract
-        }
+
+        yield {"convert": mock_convert, "extract": mock_extract}

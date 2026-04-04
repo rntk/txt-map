@@ -131,7 +131,11 @@ class QueuedLLMClient:
         If cache is configured and a cached response exists, returns a
         pre-resolved future without creating a queue entry.
         """
-        if self._cache_store is not None and self._namespace is not None and temperature == 0.0:
+        if (
+            self._cache_store is not None
+            and self._namespace is not None
+            and temperature == 0.0
+        ):
             cache_key = _build_cache_key(
                 namespace=self._namespace,
                 model_id=self._model_id,
@@ -178,7 +182,9 @@ class QueuedLLMClient:
             prompt = prompt_or_msgs
         return self.submit(prompt, temperature).result()
 
-    def with_namespace(self, namespace: str, prompt_version: Optional[str] = None) -> "QueuedLLMClient":
+    def with_namespace(
+        self, namespace: str, prompt_version: Optional[str] = None
+    ) -> "QueuedLLMClient":
         """Return a copy of this client scoped to a specific cache namespace."""
         return QueuedLLMClient(
             store=self._store,

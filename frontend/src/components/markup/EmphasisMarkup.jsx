@@ -1,12 +1,12 @@
-import React from 'react';
-import { getItemIndex, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getItemIndex, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 const STYLE_TAG = {
-  bold: 'strong',
-  italic: 'em',
-  underline: 'u',
-  highlight: 'mark',
+  bold: "strong",
+  italic: "em",
+  underline: "u",
+  highlight: "mark",
 };
 
 function applyHighlights(text, highlights) {
@@ -41,13 +41,15 @@ function applyHighlights(text, highlights) {
   let pos = 0;
   clean.forEach(({ start, end, phrase, style }, i) => {
     if (pos < start) {
-      parts.push(<HighlightedText key={`plain-${i}`} text={text.slice(pos, start)} />);
+      parts.push(
+        <HighlightedText key={`plain-${i}`} text={text.slice(pos, start)} />,
+      );
     }
-    const Tag = STYLE_TAG[style] || 'strong';
+    const Tag = STYLE_TAG[style] || "strong";
     parts.push(
       <Tag key={`style-${i}`} className={`markup-emphasis__${style}`}>
         <HighlightedText text={phrase} />
-      </Tag>
+      </Tag>,
     );
     pos = end;
   });
@@ -59,13 +61,15 @@ function applyHighlights(text, highlights) {
 
 export default function EmphasisMarkup({ segment, sentences }) {
   const { items = [] } = segment.data || {};
-  const sorted = items.slice().sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0));
+  const sorted = items
+    .slice()
+    .sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0));
 
   return (
     <div className="markup-segment markup-emphasis">
       {sorted.map((item, i) => {
         const itemIndex = getItemIndex(item);
-        const rawText = item.text || getTextByIndex(sentences, itemIndex) || '';
+        const rawText = item.text || getTextByIndex(sentences, itemIndex) || "";
         const content = applyHighlights(rawText, item.highlights);
         return (
           <div key={i} className="markup-emphasis__sentence">

@@ -1,16 +1,16 @@
-import React from 'react';
-import { ExtractionActivator } from './DataExtractionTable';
-import { buildExtractionKey } from '../../utils/extractionHighlight';
+import React from "react";
+import { ExtractionActivator } from "./DataExtractionTable";
+import { buildExtractionKey } from "../../utils/extractionHighlight";
 
 const TYPE_LABELS = {
-  statistic: 'Statistic',
-  comparison: 'Comparison',
-  timeline_event: 'Timeline',
-  ranking: 'Ranking',
-  trend: 'Trend',
-  proportion: 'Proportion',
-  process_flow: 'Process',
-  overlap: 'Overlap',
+  statistic: "Statistic",
+  comparison: "Comparison",
+  timeline_event: "Timeline",
+  ranking: "Ranking",
+  trend: "Trend",
+  proportion: "Proportion",
+  process_flow: "Process",
+  overlap: "Overlap",
 };
 
 /**
@@ -31,7 +31,7 @@ export default function ExtractionBadgeBar({
   const filtered = extractions.filter(
     (ex) =>
       Array.isArray(ex.source_sentences) &&
-      ex.source_sentences.some((idx) => topicSentences.includes(idx))
+      ex.source_sentences.some((idx) => topicSentences.includes(idx)),
   );
 
   if (filtered.length === 0) return null;
@@ -41,13 +41,13 @@ export default function ExtractionBadgeBar({
       {filtered.map((ex) => {
         const key = buildExtractionKey(ex);
         const isActive = key === activeExtractionKey;
-        const typeLabel = TYPE_LABELS[ex.type] || ex.type || 'Data';
+        const typeLabel = TYPE_LABELS[ex.type] || ex.type || "Data";
         const title = extractionHints?.[key] || ex.label || typeLabel;
         return (
           <ExtractionActivator
             key={key}
             as="span"
-            className={`rg-extraction-badge rg-extraction-badge--${ex.type || 'data'}`}
+            className={`rg-extraction-badge rg-extraction-badge--${ex.type || "data"}`}
             extractionKey={key}
             isActive={isActive}
             title={title}

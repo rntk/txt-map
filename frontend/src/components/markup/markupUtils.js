@@ -26,6 +26,6 @@ export function getItemIndex(item) {
 }
 
 export function getTextByIndex(units, index) {
-  if (!Array.isArray(units) || index == null || index < 1) return '';
-  return units[index - 1] || '';
+  if (!Array.isArray(units) || index == null || index < 1) return "";
+  return units[index - 1] || "";
 }

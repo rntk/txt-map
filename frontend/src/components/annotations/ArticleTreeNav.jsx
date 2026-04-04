@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import './ArticleTreeNav.css';
+import React, { useEffect, useRef } from "react";
+import "./ArticleTreeNav.css";
 
 const PRIORITY_COLORS = {
-  must_read: '#1a73e8',
-  recommended: '#4a90d9',
-  optional: '#bbb',
-  skip: '#ddd',
+  must_read: "#1a73e8",
+  recommended: "#4a90d9",
+  optional: "#bbb",
+  skip: "#ddd",
 };
 
 /**
@@ -39,17 +39,20 @@ export default function ArticleTreeNav({
 
   useEffect(() => {
     if (!scrollRef.current || !activeTopic) return;
-    const activeEl = scrollRef.current.querySelector('.article-tree-node--active');
+    const activeEl = scrollRef.current.querySelector(
+      ".article-tree-node--active",
+    );
     if (activeEl) {
       // Find the scrollable container (.rg-tree-panel)
-      const container = activeEl.closest('.rg-tree-panel');
+      const container = activeEl.closest(".rg-tree-panel");
       if (container) {
         const parentRect = container.getBoundingClientRect();
         const elRect = activeEl.getBoundingClientRect();
 
         // Only scroll if the active element is outside the visible area of the sidebar
         // This prevents constant "fighting" with the user's manual scroll
-        const isVisible = elRect.top >= parentRect.top && elRect.bottom <= parentRect.bottom;
+        const isVisible =
+          elRect.top >= parentRect.top && elRect.bottom <= parentRect.bottom;
 
         if (!isVisible) {
           // Calculate the target scroll position to center the element in the sidebar
@@ -59,7 +62,7 @@ export default function ArticleTreeNav({
 
           container.scrollTo({
             top: elOffsetTop - containerHeight / 2 + elHeight / 2,
-            behavior: 'smooth',
+            behavior: "smooth",
           });
         }
       }
@@ -74,13 +77,17 @@ export default function ArticleTreeNav({
         <div className="article-tree-nav__line" />
         <div className="article-tree-nav__items" ref={scrollRef}>
           {orderedTopics.map((topic) => {
-            const parts = topic.name.split('>').map((s) => s.trim());
+            const parts = topic.name.split(">").map((s) => s.trim());
             const depth = parts.length - 1;
             const displayName = parts[parts.length - 1];
-            const priority = topicAnnotations[topic.name]?.reading_priority || 'recommended';
+            const priority =
+              topicAnnotations[topic.name]?.reading_priority || "recommended";
             const isRead = readTopics?.has(topic.name);
             const isActive = activeTopic === topic.name;
-            const isParentActive = activeTopic && activeTopic !== topic.name && activeTopic.startsWith(topic.name + ' >');
+            const isParentActive =
+              activeTopic &&
+              activeTopic !== topic.name &&
+              activeTopic.startsWith(topic.name + " >");
 
             // Proportional position in the article (0–100)
             const minSentence =
@@ -88,23 +95,23 @@ export default function ArticleTreeNav({
                 ? Math.min(...topic.sentences)
                 : 0;
             const posPercent =
-              totalSentences > 0 ? Math.round((minSentence / totalSentences) * 100) : null;
+              totalSentences > 0
+                ? Math.round((minSentence / totalSentences) * 100)
+                : null;
 
             return (
               <button
                 key={topic.name}
                 type="button"
-                className={`article-tree-node${isActive ? ' article-tree-node--active' : ''}${isParentActive ? ' article-tree-node--parent-active' : ''}${isRead ? ' article-tree-node--read' : ''}`}
+                className={`article-tree-node${isActive ? " article-tree-node--active" : ""}${isParentActive ? " article-tree-node--parent-active" : ""}${isRead ? " article-tree-node--read" : ""}`}
                 style={{
-                  '--article-tree-node-indent': `${10 + depth * 13}px`,
-                  '--article-tree-node-dot-color': PRIORITY_COLORS[priority],
+                  "--article-tree-node-indent": `${10 + depth * 13}px`,
+                  "--article-tree-node-dot-color": PRIORITY_COLORS[priority],
                 }}
                 onClick={() => onTopicClick(topic.name)}
-                title={topic.name.replace(/\s*>\s*/g, ' › ')}
+                title={topic.name.replace(/\s*>\s*/g, " › ")}
               >
-                <span
-                  className="article-tree-node__dot"
-                />
+                <span className="article-tree-node__dot" />
                 <span className="article-tree-node__label">{displayName}</span>
                 {posPercent !== null && depth === 0 && (
                   <span className="article-tree-node__pos">{posPercent}%</span>

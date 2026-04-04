@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 
 /**
  * Transforms global topics into chart-compatible format.
@@ -10,7 +10,12 @@ import { useMemo } from 'react';
 export function useGlobalChartData(topics, sentencesByTopic) {
   return useMemo(() => {
     if (!topics || topics.length === 0) {
-      return { chartTopics: [], chartSentences: [], allTopics: [], mindmapData: { topic_mindmaps: {}, sentences: [] } };
+      return {
+        chartTopics: [],
+        chartSentences: [],
+        allTopics: [],
+        mindmapData: { topic_mindmaps: {}, sentences: [] },
+      };
     }
 
     // Build contiguous synthetic indices for each topic
@@ -28,20 +33,25 @@ export function useGlobalChartData(topics, sentencesByTopic) {
     // Flat sentences array: use real sentences when available, else topic name as placeholder
     const chartSentences = chartTopics.flatMap((t, i) => {
       const real = sentencesByTopic && sentencesByTopic[topics[i].name];
-      return t.sentences.map((_, j) => (real && real[j] != null ? real[j] : topics[i].name));
+      return t.sentences.map((_, j) =>
+        real && real[j] != null ? real[j] : topics[i].name,
+      );
     });
 
     // allTopics: enriched with totalSentences and empty summary for TopicsBarChart
     const allTopics = chartTopics.map((t, i) => ({
       ...t,
       totalSentences: topics[i].totalSentences || 0,
-      summary: '',
+      summary: "",
     }));
 
     // Build mindmap data from '>' delimited topic names
     const topic_mindmaps = {};
     chartTopics.forEach((t) => {
-      const parts = t.name.split('>').map((p) => p.trim()).filter(Boolean);
+      const parts = t.name
+        .split(">")
+        .map((p) => p.trim())
+        .filter(Boolean);
       if (parts.length === 0) return;
 
       const root = parts[0];

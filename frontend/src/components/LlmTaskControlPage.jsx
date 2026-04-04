@@ -1,17 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { formatDate } from '../utils/chartConstants';
-import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
-import '../styles/App.css';
+import React, { useCallback, useEffect, useState } from "react";
+import { formatDate } from "../utils/chartConstants";
+import {
+  appendPositiveIntegerParam,
+  appendStringParam,
+  buildQueryString,
+  readErrorMessage,
+} from "../utils/requestUtils";
+import "../styles/App.css";
 
 function LlmTaskControlPage() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    status: '',
-    limit: '100'
+    status: "",
+    limit: "100",
   });
-  const [actionMessage, setActionMessage] = useState('');
+  const [actionMessage, setActionMessage] = useState("");
 
   /**
    * @param {string} field
@@ -29,8 +34,8 @@ function LlmTaskControlPage() {
    */
   const buildQuery = useCallback(() => {
     return buildQueryString(function configureParams(params) {
-      appendStringParam(params, 'status', filters.status);
-      appendPositiveIntegerParam(params, 'limit', filters.limit);
+      appendStringParam(params, "status", filters.status);
+      appendPositiveIntegerParam(params, "limit", filters.limit);
     });
   }, [filters.status, filters.limit]);
 
@@ -44,12 +49,14 @@ function LlmTaskControlPage() {
       const query = buildQuery();
       const response = await fetch(`/api/llm-queue?${query}`);
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to load LLM tasks'));
+        throw new Error(
+          await readErrorMessage(response, "Failed to load LLM tasks"),
+        );
       }
       const data = await response.json();
       setTasks(data.tasks || []);
     } catch (err) {
-      setError(err.message || 'Failed to load LLM tasks');
+      setError(err.message || "Failed to load LLM tasks");
     } finally {
       setLoading(false);
     }
@@ -64,15 +71,15 @@ function LlmTaskControlPage() {
    * @returns {Promise<void>}
    */
   const handleDelete = async (requestId) => {
-    setActionMessage('');
+    setActionMessage("");
     try {
       const response = await fetch(`/api/llm-queue/${requestId}`, {
-        method: 'DELETE'
+        method: "DELETE",
       });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Delete failed'));
+        throw new Error(await readErrorMessage(response, "Delete failed"));
       }
-      setActionMessage('LLM task deleted.');
+      setActionMessage("LLM task deleted.");
       fetchTasks();
     } catch (err) {
       setActionMessage(`Delete failed: ${err.message}`);
@@ -95,7 +102,9 @@ function LlmTaskControlPage() {
           <h1>LLM Tasks</h1>
           <p className="task-page-subtitle">Manage LLM queue tasks.</p>
         </div>
-        <button type="button" className="task-refresh" onClick={fetchTasks}>Refresh</button>
+        <button type="button" className="task-refresh" onClick={fetchTasks}>
+          Refresh
+        </button>
       </div>
 
       <div className="task-panels">
@@ -105,7 +114,7 @@ function LlmTaskControlPage() {
             Status
             <select
               value={filters.status}
-              onChange={(event) => updateFilters('status', event.target.value)}
+              onChange={(event) => updateFilters("status", event.target.value)}
             >
               <option value="">Any</option>
               <option value="pending">pending</option>
@@ -121,16 +130,16 @@ function LlmTaskControlPage() {
               min="1"
               max="500"
               value={filters.limit}
-              onChange={(event) => updateFilters('limit', event.target.value)}
+              onChange={(event) => updateFilters("limit", event.target.value)}
             />
           </label>
-          <button type="submit" className="task-primary">Apply Filters</button>
+          <button type="submit" className="task-primary">
+            Apply Filters
+          </button>
         </form>
       </div>
 
-      {actionMessage && (
-        <div className="task-message">{actionMessage}</div>
-      )}
+      {actionMessage && <div className="task-message">{actionMessage}</div>}
 
       {loading ? (
         <div className="task-state loading-text">Loading LLM queue...</div>
@@ -153,22 +162,31 @@ function LlmTaskControlPage() {
             <tbody>
               {tasks.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="task-empty">No tasks match the filters.</td>
+                  <td colSpan="7" className="task-empty">
+                    No tasks match the filters.
+                  </td>
                 </tr>
               ) : (
                 tasks.map((task) => (
                   <tr key={task.request_id}>
                     <td className="task-mono">
-                      <span className="task-mono__value" title={task.request_id}>
+                      <span
+                        className="task-mono__value"
+                        title={task.request_id}
+                      >
                         {task.request_id?.slice(0, 8) ?? task.request_id}…
                       </span>
                     </td>
                     <td>
-                      <span className={`task-status task-status-${task.status}`}>{task.status}</span>
+                      <span
+                        className={`task-status task-status-${task.status}`}
+                      >
+                        {task.status}
+                      </span>
                     </td>
-                    <td>{task.model_id || '-'}</td>
-                    <td>{task.temperature != null ? task.temperature : '-'}</td>
-                    <td>{task.worker_id || '-'}</td>
+                    <td>{task.model_id || "-"}</td>
+                    <td>{task.temperature != null ? task.temperature : "-"}</td>
+                    <td>{task.worker_id || "-"}</td>
                     <td>{formatDate(task.created_at)}</td>
                     <td>
                       <div className="task-actions">

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from "react";
 
 /**
  * @typedef {{
@@ -26,10 +26,13 @@ export function useTooltip(enabled = true) {
   const [tooltip, setTooltip] = useState(null);
   const lastTargetRef = useRef(null);
 
-  const showTooltip = useCallback((topics, x, y, meta = null) => {
-    if (!enabled) return;
-    setTooltip({ x, y, topics, meta });
-  }, [enabled]);
+  const showTooltip = useCallback(
+    (topics, x, y, meta = null) => {
+      if (!enabled) return;
+      setTooltip({ x, y, topics, meta });
+    },
+    [enabled],
+  );
 
   /** Immediately hide the tooltip and clear the last target reference. */
   const hideTooltip = useCallback(() => {

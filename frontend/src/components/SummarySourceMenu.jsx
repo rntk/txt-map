@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import './SummarySourceMenu.css';
+import React, { useEffect, useRef, useState } from "react";
+import "./SummarySourceMenu.css";
 
 /**
  * @typedef {Object} SummarySourceMenuMatch
@@ -27,18 +27,18 @@ function SummarySourceMenu({ matches, onSelect, onClose, x, y }) {
 
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
     const handleMouseDown = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         onClose();
       }
     };
-    document.addEventListener('keydown', handleKey);
-    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleMouseDown);
     return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleMouseDown);
     };
   }, [onClose]);
 
@@ -71,8 +71,8 @@ function SummarySourceMenu({ matches, onSelect, onClose, x, y }) {
       className="summary-source-menu"
       ref={menuRef}
       style={{
-        '--summary-source-menu-left': `${adjustedPos.left}px`,
-        '--summary-source-menu-top': `${adjustedPos.top}px`,
+        "--summary-source-menu-left": `${adjustedPos.left}px`,
+        "--summary-source-menu-top": `${adjustedPos.top}px`,
       }}
       role="menu"
     >
@@ -85,8 +85,12 @@ function SummarySourceMenu({ matches, onSelect, onClose, x, y }) {
             role="menuitem"
             onClick={() => onSelect(topic, sentenceIndices)}
           >
-            <span className="summary-source-menu__topic-name">{topic.name}</span>
-            <span className="summary-source-menu__score">{Math.round(score * 100)}%</span>
+            <span className="summary-source-menu__topic-name">
+              {topic.name}
+            </span>
+            <span className="summary-source-menu__score">
+              {Math.round(score * 100)}%
+            </span>
           </button>
         ))}
       </div>

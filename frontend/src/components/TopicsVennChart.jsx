@@ -1,27 +1,71 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import * as d3 from 'd3';
-import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
-import TopicSentencesModal from './shared/TopicSentencesModal';
-import Breadcrumbs from './shared/Breadcrumbs';
-import { useTopicLevel } from '../hooks/useTopicLevel';
-import { useScopeNavigation } from '../hooks/useScopeNavigation';
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import * as d3 from "d3";
+import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
+import TopicSentencesModal from "./shared/TopicSentencesModal";
+import Breadcrumbs from "./shared/Breadcrumbs";
+import { useTopicLevel } from "../hooks/useTopicLevel";
+import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import {
   getTopicParts,
   isWithinScope,
   getScopeLabel,
-  hasDeeperChildren
-} from '../utils/topicHierarchy';
-import './TopicsVennChart.css';
+  hasDeeperChildren,
+} from "../utils/topicHierarchy";
+import "./TopicsVennChart.css";
 
 const PALETTE = [
-  '#7ba3cc', '#e8a87c', '#85bb65', '#c9a0dc',
-  '#d4a5a5', '#a0c4a9', '#cfb997', '#9db4c0',
-  '#c2b280', '#b5c7d3', '#d4a76a', '#a5b8d0',
-  '#c4d4a0', '#d0b4c8', '#b3cfa0', '#c8b8a0',
+  "#7ba3cc",
+  "#e8a87c",
+  "#85bb65",
+  "#c9a0dc",
+  "#d4a5a5",
+  "#a0c4a9",
+  "#cfb997",
+  "#9db4c0",
+  "#c2b280",
+  "#b5c7d3",
+  "#d4a76a",
+  "#a5b8d0",
+  "#c4d4a0",
+  "#d0b4c8",
+  "#b3cfa0",
+  "#c8b8a0",
 ];
 
 const STOP_WORDS = new Set([
-  'the', 'and', 'or', 'of', 'in', 'to', 'a', 'an', 'is', 'for', 'with', 'on', 'as', 'by', 'at', 'it', 'from', 'that', 'this', 'are', 'be', 'not', 'have', 'has', 'was', 'were', 'but', 'which', 'all', 'can', 'so', 'we', 'will'
+  "the",
+  "and",
+  "or",
+  "of",
+  "in",
+  "to",
+  "a",
+  "an",
+  "is",
+  "for",
+  "with",
+  "on",
+  "as",
+  "by",
+  "at",
+  "it",
+  "from",
+  "that",
+  "this",
+  "are",
+  "be",
+  "not",
+  "have",
+  "has",
+  "was",
+  "were",
+  "but",
+  "which",
+  "all",
+  "can",
+  "so",
+  "we",
+  "will",
 ]);
 
 /**
@@ -35,9 +79,10 @@ const STOP_WORDS = new Set([
  */
 
 function extractWords(text) {
-  return (text || '').toLowerCase()
+  return (text || "")
+    .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 }
 
 /** Lighten a hex color by mixing with white at the given ratio (0=original, 1=white). */
@@ -53,8 +98,12 @@ function lightenHex(hex, ratio) {
 
 /** Blend two hex colors at equal weight. */
 function blendHex(hexA, hexB) {
-  const ra = parseInt(hexA.slice(1, 3), 16), ga = parseInt(hexA.slice(3, 5), 16), ba = parseInt(hexA.slice(5, 7), 16);
-  const rb = parseInt(hexB.slice(1, 3), 16), gb = parseInt(hexB.slice(3, 5), 16), bb = parseInt(hexB.slice(5, 7), 16);
+  const ra = parseInt(hexA.slice(1, 3), 16),
+    ga = parseInt(hexA.slice(3, 5), 16),
+    ba = parseInt(hexA.slice(5, 7), 16);
+  const rb = parseInt(hexB.slice(1, 3), 16),
+    gb = parseInt(hexB.slice(3, 5), 16),
+    bb = parseInt(hexB.slice(5, 7), 16);
   return `rgb(${Math.round((ra + rb) / 2)},${Math.round((ga + gb) / 2)},${Math.round((ba + bb) / 2)})`;
 }
 
@@ -71,25 +120,39 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
       r: Math.max(60, Math.min(140, 50 + s.words.size * 4)),
     }));
 
-    const simLinks = overlaps.map(o => ({
-      source: simNodes.find(n => n.name === o.sets[0].name).index,
-      target: simNodes.find(n => n.name === o.sets[1].name).index,
+    const simLinks = overlaps.map((o) => ({
+      source: simNodes.find((n) => n.name === o.sets[0].name).index,
+      target: simNodes.find((n) => n.name === o.sets[1].name).index,
       sharedWords: o.sharedWords,
     }));
 
-    const simulation = d3.forceSimulation(simNodes)
-      .force('link', d3.forceLink(simLinks).id(d => d.index).distance(d => {
-        const overlapFraction = Math.min(0.65, Math.max(0.2, d.sharedWords.length / 15));
-        return (d.source.r + d.target.r) * (1 - overlapFraction);
-      }).strength(1))
-      .force('charge', d3.forceManyBody().strength(-200))
-      .force('center', d3.forceCenter(0, 0));
+    const simulation = d3
+      .forceSimulation(simNodes)
+      .force(
+        "link",
+        d3
+          .forceLink(simLinks)
+          .id((d) => d.index)
+          .distance((d) => {
+            const overlapFraction = Math.min(
+              0.65,
+              Math.max(0.2, d.sharedWords.length / 15),
+            );
+            return (d.source.r + d.target.r) * (1 - overlapFraction);
+          })
+          .strength(1),
+      )
+      .force("charge", d3.forceManyBody().strength(-200))
+      .force("center", d3.forceCenter(0, 0));
 
     simulation.stop();
     for (let i = 0; i < 400; i++) simulation.tick();
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    simNodes.forEach(n => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    simNodes.forEach((n) => {
       minX = Math.min(minX, n.x - n.r);
       maxX = Math.max(maxX, n.x + n.r);
       minY = Math.min(minY, n.y - n.r);
@@ -97,9 +160,12 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
     });
 
     const padding = 50;
-    minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
 
-    simNodes.forEach(n => {
+    simNodes.forEach((n) => {
       n.x -= minX;
       n.y -= minY;
     });
@@ -115,9 +181,10 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    const zoom = d3.zoom()
+    const zoom = d3
+      .zoom()
       .scaleExtent([0.3, 5])
-      .on('zoom', (event) => {
+      .on("zoom", (event) => {
         setZoomTransform(event.transform);
       });
     svg.call(zoom);
@@ -126,18 +193,37 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
   const colorScale = d3.scaleOrdinal(PALETTE);
 
   return (
-    <svg 
+    <svg
       ref={svgRef}
-      viewBox={`0 0 ${width} ${height}`} 
+      viewBox={`0 0 ${width} ${height}`}
       className="venn-chart__svg chart-svg"
-      style={{ '--venn-max-width': `${width}px`, '--venn-max-height': `${height}px` }}
+      style={{
+        "--venn-max-width": `${width}px`,
+        "--venn-max-height": `${height}px`,
+      }}
     >
       <defs>
-        <pattern id="read-pattern-venn" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(0,0,0,0.18)" strokeWidth="2" />
+        <pattern
+          id="read-pattern-venn"
+          patternUnits="userSpaceOnUse"
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="8"
+            stroke="rgba(0,0,0,0.18)"
+            strokeWidth="2"
+          />
         </pattern>
         {links.map((link, i) => {
-          const a = nodes[typeof link.source === 'object' ? link.source.index : link.source];
+          const a =
+            nodes[
+              typeof link.source === "object" ? link.source.index : link.source
+            ];
           return (
             <clipPath key={`clip-${i}`} id={`venn-clip-${i}`}>
               <circle cx={a.x} cy={a.y} r={a.r} />
@@ -149,7 +235,7 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
       <g transform={zoomTransform.toString()}>
         {/* Base circles */}
         <g>
-          {nodes.map(n => (
+          {nodes.map((n) => (
             <circle
               key={n.name}
               cx={n.x}
@@ -173,8 +259,18 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
         {/* Intersection regions */}
         <g>
           {links.map((link, i) => {
-            const a = nodes[typeof link.source === 'object' ? link.source.index : link.source];
-            const b = nodes[typeof link.target === 'object' ? link.target.index : link.target];
+            const a =
+              nodes[
+                typeof link.source === "object"
+                  ? link.source.index
+                  : link.source
+              ];
+            const b =
+              nodes[
+                typeof link.target === "object"
+                  ? link.target.index
+                  : link.target
+              ];
             const blend = blendHex(colorScale(a.name), colorScale(b.name));
             return (
               <circle
@@ -193,7 +289,7 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
 
         {/* Read-status hatch overlay */}
         <g>
-          {nodes.map(n => {
+          {nodes.map((n) => {
             if (!n.isRead) return null;
             return (
               <circle
@@ -210,7 +306,7 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
 
         {/* Circle labels */}
         <g>
-          {nodes.map(n => {
+          {nodes.map((n) => {
             const lines = n.displayName.split(/\s+/);
             return (
               <text
@@ -241,19 +337,31 @@ function VennComponentGroup({ sets, overlaps, onNodeClick }) {
         {/* Shared-word labels */}
         <g>
           {links.map((link, i) => {
-            const a = nodes[typeof link.source === 'object' ? link.source.index : link.source];
-            const b = nodes[typeof link.target === 'object' ? link.target.index : link.target];
-            
+            const a =
+              nodes[
+                typeof link.source === "object"
+                  ? link.source.index
+                  : link.source
+              ];
+            const b =
+              nodes[
+                typeof link.target === "object"
+                  ? link.target.index
+                  : link.target
+              ];
+
             const dx = b.x - a.x;
             const dy = b.y - a.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-            
+
             // Midpoint of the overlap segment on the line between centers
             const m = (Math.max(0, d - b.r) + Math.min(a.r, d)) / 2;
             const midX = a.x + (dx * m) / d;
             const midY = a.y + (dy * m) / d;
 
-            const displayWords = link.sharedWords.slice(0, 3).join(', ') + (link.sharedWords.length > 3 ? '…' : '');
+            const displayWords =
+              link.sharedWords.slice(0, 3).join(", ") +
+              (link.sharedWords.length > 3 ? "…" : "");
             return (
               <text
                 key={`overlap-label-${i}`}
@@ -289,58 +397,65 @@ export default function TopicsVennChart({
   markup,
 }) {
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
-  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(
+    topics,
+    scopePath,
+  );
   const [modalTopic, setModalTopic] = useState(null);
 
   const { components, overlapsCount } = useMemo(() => {
-    if (!topics || topics.length === 0) return { components: [], overlapsCount: 0 };
-    
-    const levelSets = new Map();
-    const safeReadTopics = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+    if (!topics || topics.length === 0)
+      return { components: [], overlapsCount: 0 };
 
-    topics.forEach(t => {
+    const levelSets = new Map();
+    const safeReadTopics =
+      readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+
+    topics.forEach((t) => {
       const parts = getTopicParts(t);
       if (!isWithinScope(parts, scopePath)) return;
-      
+
       const relativeParts = parts.slice(scopePath.length);
       if (relativeParts.length <= selectedLevel) return;
-      
-      const prefix = parts.slice(0, scopePath.length + selectedLevel + 1).join(' > ');
-      
+
+      const prefix = parts
+        .slice(0, scopePath.length + selectedLevel + 1)
+        .join(" > ");
+
       if (!levelSets.has(prefix)) {
-        levelSets.set(prefix, { 
-          name: prefix, 
-          displayName: parts[scopePath.length + selectedLevel], 
-          topics: [], 
-          words: new Set() 
+        levelSets.set(prefix, {
+          name: prefix,
+          displayName: parts[scopePath.length + selectedLevel],
+          topics: [],
+          words: new Set(),
         });
       }
       const entry = levelSets.get(prefix);
       entry.topics.push(t);
-      
+
       const subParts = parts.slice(scopePath.length + selectedLevel + 1);
-      subParts.forEach(part => {
-        extractWords(part).forEach(w => entry.words.add(w));
+      subParts.forEach((part) => {
+        extractWords(part).forEach((w) => entry.words.add(w));
       });
     });
 
-    const sets = Array.from(levelSets.values()).map(s => {
-      s.isRead = s.topics.every(t => safeReadTopics.has(t.name));
+    const sets = Array.from(levelSets.values()).map((s) => {
+      s.isRead = s.topics.every((t) => safeReadTopics.has(t.name));
       return s;
     });
 
     const overlaps = [];
     for (let i = 0; i < sets.length; i++) {
       for (let j = i + 1; j < sets.length; j++) {
-        const shared = [...sets[i].words].filter(w => sets[j].words.has(w));
+        const shared = [...sets[i].words].filter((w) => sets[j].words.has(w));
         if (shared.length > 0) {
           overlaps.push({ sets: [sets[i], sets[j]], sharedWords: shared });
         }
       }
     }
 
-    const adj = new Map(sets.map(s => [s.name, []]));
-    overlaps.forEach(o => {
+    const adj = new Map(sets.map((s) => [s.name, []]));
+    overlaps.forEach((o) => {
       adj.get(o.sets[0].name).push(o.sets[1].name);
       adj.get(o.sets[1].name).push(o.sets[0].name);
     });
@@ -348,15 +463,15 @@ export default function TopicsVennChart({
     const visited = new Set();
     const components = [];
 
-    sets.forEach(s => {
+    sets.forEach((s) => {
       if (!visited.has(s.name)) {
         const compSets = [];
         const q = [s.name];
         visited.add(s.name);
-        while(q.length > 0) {
+        while (q.length > 0) {
           const curr = q.shift();
-          compSets.push(sets.find(x => x.name === curr));
-          adj.get(curr).forEach(neighbor => {
+          compSets.push(sets.find((x) => x.name === curr));
+          adj.get(curr).forEach((neighbor) => {
             if (!visited.has(neighbor)) {
               visited.add(neighbor);
               q.push(neighbor);
@@ -365,7 +480,9 @@ export default function TopicsVennChart({
         }
         components.push({
           sets: compSets,
-          overlaps: overlaps.filter(o => compSets.some(cs => cs.name === o.sets[0].name))
+          overlaps: overlaps.filter((o) =>
+            compSets.some((cs) => cs.name === o.sets[0].name),
+          ),
         });
       }
     });
@@ -384,32 +501,38 @@ export default function TopicsVennChart({
       // Find one of the actual topic objects to get sentenceIndices/ranges
       // Since 'node.topics' is an array of topics that share this prefix,
       // we can use the one that exactly matches the name if it exists, or just the first one.
-      const exactTopic = node.topics.find(t => t.name === node.name) || node.topics[0];
+      const exactTopic =
+        node.topics.find((t) => t.name === node.name) || node.topics[0];
       if (exactTopic) {
         setModalTopic({
           name: node.name,
           displayName: node.displayName,
           fullPath: node.name,
-          sentenceIndices: Array.isArray(exactTopic.sentences) ? exactTopic.sentences : [],
+          sentenceIndices: Array.isArray(exactTopic.sentences)
+            ? exactTopic.sentences
+            : [],
           ranges: Array.isArray(exactTopic.ranges) ? exactTopic.ranges : [],
         });
       }
     }
   };
 
-  const overlappingComponents = useMemo(() => 
-    components.filter(comp => comp.overlaps.length > 0),
-    [components]
+  const overlappingComponents = useMemo(
+    () => components.filter((comp) => comp.overlaps.length > 0),
+    [components],
   );
 
   const scopeLabel = getScopeLabel(scopePath);
 
   return (
     <div className="venn-chart chart-surface chart-surface--venn">
-      <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
-        navigateTo(path);
-        setSelectedLevel(0);
-      }} />
+      <Breadcrumbs
+        scopePath={scopePath}
+        onNavigate={(path) => {
+          navigateTo(path);
+          setSelectedLevel(0);
+        }}
+      />
 
       <TopicLevelSwitcher
         className="venn-chart-level-switcher"
@@ -419,21 +542,28 @@ export default function TopicsVennChart({
       />
 
       <p className="venn-chart__description chart-section__copy">
-        {scopePath.length > 0 ? `Inside ${scopeLabel} at relative level ${selectedLevel}. ` : `Showing intersections at level ${selectedLevel}. `}
-        Overlapping regions represent shared words from subtopics. Total overlaps: {overlapsCount}.
+        {scopePath.length > 0
+          ? `Inside ${scopeLabel} at relative level ${selectedLevel}. `
+          : `Showing intersections at level ${selectedLevel}. `}
+        Overlapping regions represent shared words from subtopics. Total
+        overlaps: {overlapsCount}.
       </p>
 
       <div className="venn-chart-body">
         {components.length === 0 ? (
-          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">No topics available at this level.</p>
+          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">
+            No topics available at this level.
+          </p>
         ) : overlappingComponents.length === 0 ? (
-          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">No overlapping topics found at this level.</p>
+          <p className="venn-chart__empty chart-empty-state chart-empty-state--panel">
+            No overlapping topics found at this level.
+          </p>
         ) : (
           overlappingComponents.map((comp, idx) => (
-            <VennComponentGroup 
-              key={`${scopePath.join('>')}-${selectedLevel}-${idx}`} 
-              sets={comp.sets} 
-              overlaps={comp.overlaps} 
+            <VennComponentGroup
+              key={`${scopePath.join(">")}-${selectedLevel}-${idx}`}
+              sets={comp.sets}
+              overlaps={comp.overlaps}
               onNodeClick={handleNodeClick}
             />
           ))

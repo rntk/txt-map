@@ -11,7 +11,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 ALGORITHM_VERSION = "semantic-v3-topic-aware-charwb-3-6-th0.25-cr0.5-topk-shared"
 
 
-def canonical_pair(left_submission_id: str, right_submission_id: str) -> Tuple[str, str, str]:
+def canonical_pair(
+    left_submission_id: str, right_submission_id: str
+) -> Tuple[str, str, str]:
     """Return pair key and canonical IDs for an unordered pair."""
     submission_a_id, submission_b_id = sorted([left_submission_id, right_submission_id])
     pair_key = f"{submission_a_id}::{submission_b_id}"
@@ -49,7 +51,9 @@ def _parse_sentence_indices_from_topic(topic: Dict[str, Any]) -> List[int]:
     return sorted(result)
 
 
-def build_topic_units(submission: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]]:
+def build_topic_units(
+    submission: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Build topic-aware sentence units from a submission.
 
@@ -148,7 +152,9 @@ def _compute_directional(
 
     if similarity_matrix is None:
         corpus = [u["text"] for u in source_units] + [u["text"] for u in target_units]
-        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
+        vectorizer = TfidfVectorizer(
+            analyzer="char_wb", ngram_range=(3, 6), lowercase=True
+        )
         tfidf_matrix = vectorizer.fit_transform(corpus)
 
         source_matrix = tfidf_matrix[: len(source_units)]
@@ -241,7 +247,9 @@ def compute_topic_aware_semantic_diff(
     similarity_a_to_b: np.ndarray | None = None
     if units_a and units_b:
         corpus = [u["text"] for u in units_a] + [u["text"] for u in units_b]
-        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 6), lowercase=True)
+        vectorizer = TfidfVectorizer(
+            analyzer="char_wb", ngram_range=(3, 6), lowercase=True
+        )
         tfidf_matrix = vectorizer.fit_transform(corpus)
         matrix_a = tfidf_matrix[: len(units_a)]
         matrix_b = tfidf_matrix[len(units_a) :]
@@ -260,7 +268,9 @@ def compute_topic_aware_semantic_diff(
     b_to_a = _compute_directional(
         units_b,
         units_a,
-        similarity_matrix=similarity_a_to_b.T if similarity_a_to_b is not None else None,
+        similarity_matrix=similarity_a_to_b.T
+        if similarity_a_to_b is not None
+        else None,
         threshold=threshold,
         nearest_min_similarity=nearest_min_similarity,
         top_k_nearest=top_k_nearest,
@@ -302,7 +312,10 @@ def orient_payload(
     """
     Orient canonical A/B payload into requested left/right direction.
     """
-    def remap_rows(rows: List[Dict[str, Any]], left_prefix: str, right_prefix: str) -> List[Dict[str, Any]]:
+
+    def remap_rows(
+        rows: List[Dict[str, Any]], left_prefix: str, right_prefix: str
+    ) -> List[Dict[str, Any]]:
         mapped = []
         for row in rows or []:
             mapped.append(
@@ -321,22 +334,38 @@ def orient_payload(
     if left_submission_id == submission_a_id and right_submission_id == submission_b_id:
         return {
             "meta": payload.get("meta") or {},
-            "matches_left_to_right": remap_rows(payload.get("matches_a_to_b") or [], "a", "b"),
-            "matches_right_to_left": remap_rows(payload.get("matches_b_to_a") or [], "a", "b"),
-            "nearest_left_to_right": remap_rows(payload.get("nearest_a_to_b") or [], "a", "b"),
+            "matches_left_to_right": remap_rows(
+                payload.get("matches_a_to_b") or [], "a", "b"
+            ),
+            "matches_right_to_left": remap_rows(
+                payload.get("matches_b_to_a") or [], "a", "b"
+            ),
+            "nearest_left_to_right": remap_rows(
+                payload.get("nearest_a_to_b") or [], "a", "b"
+            ),
             # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
-            "nearest_right_to_left": remap_rows(payload.get("nearest_b_to_a") or [], "a", "b"),
+            "nearest_right_to_left": remap_rows(
+                payload.get("nearest_b_to_a") or [], "a", "b"
+            ),
             "unmatched_left": payload.get("unmatched_a") or [],
             "unmatched_right": payload.get("unmatched_b") or [],
         }
 
     return {
         "meta": payload.get("meta") or {},
-        "matches_left_to_right": remap_rows(payload.get("matches_b_to_a") or [], "b", "a"),
-        "matches_right_to_left": remap_rows(payload.get("matches_a_to_b") or [], "b", "a"),
-        "nearest_left_to_right": remap_rows(payload.get("nearest_b_to_a") or [], "b", "a"),
+        "matches_left_to_right": remap_rows(
+            payload.get("matches_b_to_a") or [], "b", "a"
+        ),
+        "matches_right_to_left": remap_rows(
+            payload.get("matches_a_to_b") or [], "b", "a"
+        ),
+        "nearest_left_to_right": remap_rows(
+            payload.get("nearest_b_to_a") or [], "b", "a"
+        ),
         # Keep field semantics stable: left_* is always left doc, right_* is always right doc.
-        "nearest_right_to_left": remap_rows(payload.get("nearest_a_to_b") or [], "b", "a"),
+        "nearest_right_to_left": remap_rows(
+            payload.get("nearest_a_to_b") or [], "b", "a"
+        ),
         "unmatched_left": payload.get("unmatched_b") or [],
         "unmatched_right": payload.get("unmatched_a") or [],
     }
@@ -356,8 +385,16 @@ def stale_reasons(
     computed_at = diff_doc.get("computed_at")
     updated_a = submission_a.get("updated_at")
     updated_b = submission_b.get("updated_at")
-    if isinstance(computed_at, datetime) and isinstance(updated_a, datetime) and updated_a > computed_at:
+    if (
+        isinstance(computed_at, datetime)
+        and isinstance(updated_a, datetime)
+        and updated_a > computed_at
+    ):
         reasons.append("left_submission_updated")
-    if isinstance(computed_at, datetime) and isinstance(updated_b, datetime) and updated_b > computed_at:
+    if (
+        isinstance(computed_at, datetime)
+        and isinstance(updated_b, datetime)
+        and updated_b > computed_at
+    ):
         reasons.append("right_submission_updated")
     return reasons

@@ -36,10 +36,7 @@ class SubmissionsStorage:
                 )
 
     def create(
-        self,
-        html_content: str,
-        text_content: str = "",
-        source_url: str = ""
+        self, html_content: str, text_content: str = "", source_url: str = ""
     ) -> dict[str, Any]:
         """Create a new submission and return the document"""
         submission_id = str(uuid.uuid4())
@@ -57,66 +54,63 @@ class SubmissionsStorage:
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "subtopics_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "summarization": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "mindmap": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "prefix_tree": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "insights_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "markup_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "clustering_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
+                    "error": None,
                 },
                 "topic_modeling_generation": {
                     "status": "pending",
                     "started_at": None,
                     "completed_at": None,
-                    "error": None
-                }
+                    "error": None,
+                },
             },
             "read_topics": [],
             "results": {
                 "sentences": [],
                 "topics": [],
                 "topic_summaries": {},
-                "article_summary": {
-                    "text": "",
-                    "bullets": []
-                },
+                "article_summary": {"text": "", "bullets": []},
                 "topic_mindmaps": {},
                 "mindmap_results": [],
                 "subtopics": [],
@@ -127,8 +121,8 @@ class SubmissionsStorage:
                 "annotations": {},
                 "markup": {},
                 "clusters": [],
-                "topic_model": {}
-            }
+                "topic_model": {},
+            },
         }
 
         self._db.submissions.insert_one(submission)
@@ -143,13 +137,13 @@ class SubmissionsStorage:
         submission_id: str,
         task_name: str,
         status: str,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> bool:
         """Update task status (pending, processing, completed, failed)"""
         now = datetime.now(UTC)
         update_fields: dict[str, Any] = {
             f"tasks.{task_name}.status": status,
-            "updated_at": now
+            "updated_at": now,
         }
 
         if status == "processing":
@@ -161,25 +155,20 @@ class SubmissionsStorage:
             update_fields[f"tasks.{task_name}.error"] = error
 
         result = self._db.submissions.update_one(
-            {"submission_id": submission_id},
-            {"$set": update_fields}
+            {"submission_id": submission_id}, {"$set": update_fields}
         )
         return result.modified_count > 0
 
-    def update_results(
-        self,
-        submission_id: str,
-        results: dict[str, Any]
-    ) -> bool:
+    def update_results(self, submission_id: str, results: dict[str, Any]) -> bool:
         """Update results fields"""
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},
             {
                 "$set": {
                     **{f"results.{k}": v for k, v in results.items()},
-                    "updated_at": datetime.now(UTC)
+                    "updated_at": datetime.now(UTC),
                 }
-            }
+            },
         )
         return result.modified_count > 0
 
@@ -187,14 +176,12 @@ class SubmissionsStorage:
         """Update the list of read topic names for a submission"""
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},
-            {"$set": {"read_topics": read_topics, "updated_at": datetime.now(UTC)}}
+            {"$set": {"read_topics": read_topics, "updated_at": datetime.now(UTC)}},
         )
         return result.modified_count > 0
 
     def clear_results(
-        self,
-        submission_id: str,
-        task_names: Optional[List[str]] = None
+        self, submission_id: str, task_names: Optional[List[str]] = None
     ) -> bool:
         """Clear results and reset task statuses for refresh"""
         names = self.expand_recalculation_tasks(task_names)
@@ -244,12 +231,13 @@ class SubmissionsStorage:
             update_fields["results.topic_model"] = {}
 
         result = self._db.submissions.update_one(
-            {"submission_id": submission_id},
-            {"$set": update_fields}
+            {"submission_id": submission_id}, {"$set": update_fields}
         )
         return result.modified_count > 0
 
-    def expand_recalculation_tasks(self, task_names: Optional[List[str]] = None) -> List[str]:
+    def expand_recalculation_tasks(
+        self, task_names: Optional[List[str]] = None
+    ) -> List[str]:
         """
         Expand selected tasks with downstream dependent tasks.
         Example: requesting split_topic_generation also includes dependent tasks.
@@ -278,11 +266,17 @@ class SubmissionsStorage:
         result = self._db.submissions.delete_one({"submission_id": submission_id})
         return result.deleted_count > 0
 
-    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> List[dict[str, Any]]:
+    def list(
+        self, filters: Optional[dict[str, Any]] = None, limit: int = 100
+    ) -> List[dict[str, Any]]:
         """List submissions with optional filters, sorted by created_at desc."""
-        return list(self._db.submissions.find(filters or {}).sort("created_at", -1).limit(limit))
+        return list(
+            self._db.submissions.find(filters or {}).sort("created_at", -1).limit(limit)
+        )
 
-    def list_with_projection(self, filters: dict[str, Any], projection: dict[str, Any]) -> List[dict[str, Any]]:
+    def list_with_projection(
+        self, filters: dict[str, Any], projection: dict[str, Any]
+    ) -> List[dict[str, Any]]:
         """List submissions applying a specific projection (no default sort)."""
         return list(self._db.submissions.find(filters, projection))
 
@@ -295,23 +289,35 @@ class SubmissionsStorage:
         pipeline = [
             {"$match": {"tasks.split_topic_generation.status": "completed"}},
             {"$unwind": "$results.topics"},
-            {"$group": {
-                "_id": "$results.topics.name",
-                "total_sentences": {"$sum": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}},
-                "sources": {"$push": {
-                    "submission_id": "$submission_id",
-                    "source_url": "$source_url",
-                    "sentence_count": {"$size": {"$ifNull": ["$results.topics.sentences", []]}}
-                }}
-            }},
-            {"$project": {
-                "_id": 0,
-                "name": "$_id",
-                "total_sentences": 1,
-                "source_count": {"$size": "$sources"},
-                "sources": 1
-            }},
-            {"$sort": {"name": 1}}
+            {
+                "$group": {
+                    "_id": "$results.topics.name",
+                    "total_sentences": {
+                        "$sum": {
+                            "$size": {"$ifNull": ["$results.topics.sentences", []]}
+                        }
+                    },
+                    "sources": {
+                        "$push": {
+                            "submission_id": "$submission_id",
+                            "source_url": "$source_url",
+                            "sentence_count": {
+                                "$size": {"$ifNull": ["$results.topics.sentences", []]}
+                            },
+                        }
+                    },
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "name": "$_id",
+                    "total_sentences": 1,
+                    "source_count": {"$size": "$sources"},
+                    "sources": 1,
+                }
+            },
+            {"$sort": {"name": 1}},
         ]
         return list(self._db.submissions.aggregate(pipeline))
 

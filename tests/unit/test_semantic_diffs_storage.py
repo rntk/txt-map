@@ -20,6 +20,7 @@ Also tests:
 - Job and Diff document structures
 - Edge cases: concurrent job claims, race conditions, large payloads
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC, timedelta
@@ -32,6 +33,7 @@ from pymongo.errors import DuplicateKeyError
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -101,7 +103,7 @@ def sample_diff():
 def mock_datetime():
     """Mock datetime with fixed timestamp."""
     fixed_now = datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
-    with patch('lib.storage.semantic_diffs.datetime') as mock_dt:
+    with patch("lib.storage.semantic_diffs.datetime") as mock_dt:
         mock_dt.now.return_value = fixed_now
         mock_dt.UTC = UTC
         yield mock_dt, fixed_now
@@ -110,6 +112,7 @@ def mock_datetime():
 # =============================================================================
 # Test: __init__
 # =============================================================================
+
 
 class TestInit:
     """Tests for SemanticDiffsStorage.__init__."""
@@ -128,15 +131,16 @@ class TestInit:
     def test_logger_is_properly_configured(self, mock_db):
         """Logger is properly configured."""
         storage = SemanticDiffsStorage(mock_db)
-        assert hasattr(storage._log, 'warning')
-        assert hasattr(storage._log, 'info')
-        assert hasattr(storage._log, 'error')
-        assert hasattr(storage._log, 'debug')
+        assert hasattr(storage._log, "warning")
+        assert hasattr(storage._log, "info")
+        assert hasattr(storage._log, "error")
+        assert hasattr(storage._log, "debug")
 
 
 # =============================================================================
 # Test: prepare
 # =============================================================================
+
 
 class TestPrepare:
     """Tests for SemanticDiffsStorage.prepare."""
@@ -148,12 +152,16 @@ class TestPrepare:
 
         mock_db.semantic_diffs.create_index.assert_any_call("pair_key", unique=True)
 
-    def test_creates_compound_index_on_semantic_diff_jobs_pair_key_created_at(self, mock_db):
+    def test_creates_compound_index_on_semantic_diff_jobs_pair_key_created_at(
+        self, mock_db
+    ):
         """Creates compound index on semantic_diff_jobs: (pair_key, created_at)."""
         storage = SemanticDiffsStorage(mock_db)
         storage.prepare()
 
-        mock_db.semantic_diff_jobs.create_index.assert_any_call([("pair_key", 1), ("created_at", -1)])
+        mock_db.semantic_diff_jobs.create_index.assert_any_call(
+            [("pair_key", 1), ("created_at", -1)]
+        )
 
     def test_creates_partial_unique_index_for_active_jobs(self, mock_db):
         """Creates partial unique index on semantic_diff_jobs for active jobs."""
@@ -165,13 +173,13 @@ class TestPrepare:
         active_index_call = None
         for call_arg in calls:
             if len(call_arg[0]) > 0 and call_arg[0][0] == [("pair_key", 1)]:
-                if len(call_arg[1]) > 0 and 'partialFilterExpression' in call_arg[1]:
+                if len(call_arg[1]) > 0 and "partialFilterExpression" in call_arg[1]:
                     active_index_call = call_arg
                     break
 
         assert active_index_call is not None
-        assert active_index_call[1]['unique'] is True
-        assert active_index_call[1]['partialFilterExpression'] == {
+        assert active_index_call[1]["unique"] is True
+        assert active_index_call[1]["partialFilterExpression"] == {
             "status": {"$in": ["pending", "processing"]}
         }
 
@@ -199,7 +207,7 @@ class TestPrepare:
 
         storage = SemanticDiffsStorage(mock_db)
 
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             # Act: should not raise
             storage.prepare()
 
@@ -225,6 +233,7 @@ class TestPrepare:
 # =============================================================================
 # Test: get_diff_by_pair_key
 # =============================================================================
+
 
 class TestGetDiffByPairKey:
     """Tests for SemanticDiffsStorage.get_diff_by_pair_key."""
@@ -261,10 +270,13 @@ class TestGetDiffByPairKey:
 # Test: get_latest_job
 # =============================================================================
 
+
 class TestGetLatestJob:
     """Tests for SemanticDiffsStorage.get_latest_job."""
 
-    def test_returns_latest_job_sorted_by_created_at_descending(self, mock_db, sample_job):
+    def test_returns_latest_job_sorted_by_created_at_descending(
+        self, mock_db, sample_job
+    ):
         """Returns latest job sorted by created_at descending."""
         storage = SemanticDiffsStorage(mock_db)
         mock_db.semantic_diff_jobs.find_one.return_value = sample_job
@@ -273,8 +285,7 @@ class TestGetLatestJob:
 
         assert result == sample_job
         mock_db.semantic_diff_jobs.find_one.assert_called_once_with(
-            {"pair_key": "sub-a-001::sub-b-002"},
-            sort=[("created_at", -1)]
+            {"pair_key": "sub-a-001::sub-b-002"}, sort=[("created_at", -1)]
         )
 
     def test_returns_none_when_no_jobs_exist(self, mock_db):
@@ -301,6 +312,7 @@ class TestGetLatestJob:
 # =============================================================================
 # Test: get_active_job
 # =============================================================================
+
 
 class TestGetActiveJob:
     """Tests for SemanticDiffsStorage.get_active_job."""
@@ -368,6 +380,7 @@ class TestGetActiveJob:
 # =============================================================================
 # Test: create_job
 # =============================================================================
+
 
 class TestCreateJob:
     """Tests for SemanticDiffsStorage.create_job."""
@@ -466,6 +479,7 @@ class TestCreateJob:
 # Test: create_or_get_active_job
 # =============================================================================
 
+
 class TestCreateOrGetActiveJob:
     """Tests for SemanticDiffsStorage.create_or_get_active_job."""
 
@@ -494,7 +508,9 @@ class TestCreateOrGetActiveJob:
         sample_job["status"] = "pending"
 
         # Simulate DuplicateKeyError on insert
-        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError("Duplicate key")
+        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError(
+            "Duplicate key"
+        )
         mock_db.semantic_diff_jobs.find_one.return_value = sample_job
 
         result_job, created = storage.create_or_get_active_job(
@@ -524,12 +540,16 @@ class TestCreateOrGetActiveJob:
 
         assert created is True
 
-    def test_returns_tuple_with_created_false_when_retrieved_existing(self, mock_db, sample_job):
+    def test_returns_tuple_with_created_false_when_retrieved_existing(
+        self, mock_db, sample_job
+    ):
         """Returns (job, False) when retrieved existing."""
         storage = SemanticDiffsStorage(mock_db)
         sample_job["status"] = "processing"
 
-        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError("Duplicate")
+        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError(
+            "Duplicate"
+        )
         mock_db.semantic_diff_jobs.find_one.return_value = sample_job
 
         result_job, created = storage.create_or_get_active_job(
@@ -543,11 +563,15 @@ class TestCreateOrGetActiveJob:
 
         assert created is False
 
-    def test_handles_duplicate_key_error_by_fetching_active_job(self, mock_db, sample_job):
+    def test_handles_duplicate_key_error_by_fetching_active_job(
+        self, mock_db, sample_job
+    ):
         """Handles DuplicateKeyError by fetching active job."""
         storage = SemanticDiffsStorage(mock_db)
 
-        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError("Duplicate key")
+        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError(
+            "Duplicate key"
+        )
         mock_db.semantic_diff_jobs.find_one.return_value = sample_job
 
         storage.create_or_get_active_job(
@@ -566,7 +590,9 @@ class TestCreateOrGetActiveJob:
         """Raises if DuplicateKeyError but no active job found."""
         storage = SemanticDiffsStorage(mock_db)
 
-        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError("Duplicate key")
+        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError(
+            "Duplicate key"
+        )
         mock_db.semantic_diff_jobs.find_one.return_value = None
 
         with pytest.raises(DuplicateKeyError):
@@ -584,6 +610,7 @@ class TestCreateOrGetActiveJob:
 # Test: upsert_diff
 # =============================================================================
 
+
 class TestUpsertDiff:
     """Tests for SemanticDiffsStorage.upsert_diff."""
 
@@ -591,7 +618,9 @@ class TestUpsertDiff:
         """Inserts new diff when pair_key doesn't exist."""
         storage = SemanticDiffsStorage(mock_db)
         mock_dt, fixed_now = mock_datetime
-        mock_db.semantic_diffs.update_one.return_value = MagicMock(matched_count=0, modified_count=0, upserted_id="new-id")
+        mock_db.semantic_diffs.update_one.return_value = MagicMock(
+            matched_count=0, modified_count=0, upserted_id="new-id"
+        )
 
         storage.upsert_diff(
             pair_key="sub-a-001::sub-b-002",
@@ -612,7 +641,9 @@ class TestUpsertDiff:
         """Updates existing diff when pair_key exists."""
         storage = SemanticDiffsStorage(mock_db)
         mock_dt, fixed_now = mock_datetime
-        mock_db.semantic_diffs.update_one.return_value = MagicMock(matched_count=1, modified_count=1)
+        mock_db.semantic_diffs.update_one.return_value = MagicMock(
+            matched_count=1, modified_count=1
+        )
 
         storage.upsert_diff(
             pair_key="sub-a-001::sub-b-002",
@@ -688,8 +719,14 @@ class TestUpsertDiff:
         call_args = mock_db.semantic_diffs.update_one.call_args
         update_doc = call_args[0][1]
 
-        assert update_doc["$set"]["source_fingerprint"]["submission_a_updated_at"] == sub_a_updated
-        assert update_doc["$set"]["source_fingerprint"]["submission_b_updated_at"] == sub_b_updated
+        assert (
+            update_doc["$set"]["source_fingerprint"]["submission_a_updated_at"]
+            == sub_a_updated
+        )
+        assert (
+            update_doc["$set"]["source_fingerprint"]["submission_b_updated_at"]
+            == sub_b_updated
+        )
 
     def test_stores_payload(self, mock_db):
         """Stores payload."""
@@ -720,7 +757,9 @@ class TestUpsertDiff:
     def test_set_on_insert_ensures_created_at_only_set_on_insert(self, mock_db):
         """setOnInsert ensures created_at only set on insert."""
         storage = SemanticDiffsStorage(mock_db)
-        mock_db.semantic_diffs.update_one.return_value = MagicMock(matched_count=1, modified_count=1)
+        mock_db.semantic_diffs.update_one.return_value = MagicMock(
+            matched_count=1, modified_count=1
+        )
 
         storage.upsert_diff(
             pair_key="existing-key",
@@ -765,8 +804,12 @@ class TestUpsertDiff:
             "meta": {"version": "v1"},
             "matches_a_to_b": [{"left": i, "right": i + 1} for i in range(10000)],
             "matches_b_to_a": [{"left": i, "right": i + 1} for i in range(10000)],
-            "nearest_a_to_b": [{"left": i, "right": i + 1, "score": 0.95} for i in range(10000)],
-            "nearest_b_to_a": [{"left": i, "right": i + 1, "score": 0.95} for i in range(10000)],
+            "nearest_a_to_b": [
+                {"left": i, "right": i + 1, "score": 0.95} for i in range(10000)
+            ],
+            "nearest_b_to_a": [
+                {"left": i, "right": i + 1, "score": 0.95} for i in range(10000)
+            ],
             "unmatched_a": list(range(5000)),
             "unmatched_b": list(range(5000)),
         }
@@ -788,6 +831,7 @@ class TestUpsertDiff:
 # =============================================================================
 # Test: claim_job
 # =============================================================================
+
 
 class TestClaimJob:
     """Tests for SemanticDiffsStorage.claim_job."""
@@ -823,7 +867,7 @@ class TestClaimJob:
         mock_dt, fixed_now = mock_datetime
         mock_db.semantic_diff_jobs.find_one_and_update.return_value = sample_job
 
-        with patch('lib.storage.semantic_diffs.datetime') as mock_dt_patch:
+        with patch("lib.storage.semantic_diffs.datetime") as mock_dt_patch:
             mock_dt_patch.now.return_value = fixed_now
             mock_dt_patch.UTC = UTC
 
@@ -859,7 +903,9 @@ class TestClaimJob:
 
         assert update_doc["$set"]["error"] is None
 
-    def test_sorted_by_force_recalculate_descending_then_created_at_ascending(self, mock_db):
+    def test_sorted_by_force_recalculate_descending_then_created_at_ascending(
+        self, mock_db
+    ):
         """Sorted by force_recalculate descending, then created_at ascending."""
         storage = SemanticDiffsStorage(mock_db)
         storage.claim_job("worker-001")
@@ -900,6 +946,7 @@ class TestClaimJob:
 # =============================================================================
 # Test: set_job_force_recalculate
 # =============================================================================
+
 
 class TestSetJobForceRecalculate:
     """Tests for SemanticDiffsStorage.set_job_force_recalculate."""
@@ -943,7 +990,9 @@ class TestSetJobForceRecalculate:
     def test_no_error_if_job_does_not_exist(self, mock_db):
         """No error if job doesn't exist (update may not modify)."""
         storage = SemanticDiffsStorage(mock_db)
-        mock_db.semantic_diff_jobs.update_one.return_value = MagicMock(matched_count=0, modified_count=0)
+        mock_db.semantic_diff_jobs.update_one.return_value = MagicMock(
+            matched_count=0, modified_count=0
+        )
 
         # Should not raise
         result = storage.set_job_force_recalculate("non-existent-job", True)
@@ -954,6 +1003,7 @@ class TestSetJobForceRecalculate:
 # =============================================================================
 # Test: mark_job_completed
 # =============================================================================
+
 
 class TestMarkJobCompleted:
     """Tests for SemanticDiffsStorage.mark_job_completed."""
@@ -976,7 +1026,7 @@ class TestMarkJobCompleted:
         mock_dt, fixed_now = mock_datetime
         mock_db.semantic_diff_jobs.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.semantic_diffs.datetime') as mock_dt_patch:
+        with patch("lib.storage.semantic_diffs.datetime") as mock_dt_patch:
             mock_dt_patch.now.return_value = fixed_now
             mock_dt_patch.UTC = UTC
 
@@ -1004,6 +1054,7 @@ class TestMarkJobCompleted:
 # Test: mark_job_failed
 # =============================================================================
 
+
 class TestMarkJobFailed:
     """Tests for SemanticDiffsStorage.mark_job_failed."""
 
@@ -1025,7 +1076,7 @@ class TestMarkJobFailed:
         mock_dt, fixed_now = mock_datetime
         mock_db.semantic_diff_jobs.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.semantic_diffs.datetime') as mock_dt_patch:
+        with patch("lib.storage.semantic_diffs.datetime") as mock_dt_patch:
             mock_dt_patch.now.return_value = fixed_now
             mock_dt_patch.UTC = UTC
 
@@ -1078,6 +1129,7 @@ class TestMarkJobFailed:
 # =============================================================================
 # Test: Job Document Structure
 # =============================================================================
+
 
 class TestJobDocumentStructure:
     """Tests for Job document structure."""
@@ -1247,6 +1299,7 @@ class TestJobDocumentStructure:
 # Test: Diff Document Structure
 # =============================================================================
 
+
 class TestDiffDocumentStructure:
     """Tests for Diff document structure."""
 
@@ -1304,7 +1357,10 @@ class TestDiffDocumentStructure:
         )
 
         call_args = mock_db.semantic_diffs.update_one.call_args
-        assert call_args[0][1]["$set"]["algorithm_version"] == "semantic-v3-topic-aware-charwb"
+        assert (
+            call_args[0][1]["$set"]["algorithm_version"]
+            == "semantic-v3-topic-aware-charwb"
+        )
 
     def test_diff_has_computed_at_timestamp(self, mock_db, mock_datetime):
         """Diff has computed_at timestamp."""
@@ -1410,6 +1466,7 @@ class TestDiffDocumentStructure:
 # Test: Edge Cases
 # =============================================================================
 
+
 class TestEdgeCases:
     """Tests for edge cases and race conditions."""
 
@@ -1430,7 +1487,9 @@ class TestEdgeCases:
         storage = SemanticDiffsStorage(mock_db)
 
         # Simulate race condition: insert fails with DuplicateKeyError
-        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError("Duplicate")
+        mock_db.semantic_diff_jobs.insert_one.side_effect = DuplicateKeyError(
+            "Duplicate"
+        )
         mock_db.semantic_diff_jobs.find_one.return_value = sample_job
 
         # Should gracefully handle and return existing job
@@ -1454,7 +1513,11 @@ class TestEdgeCases:
         # Create a moderately large payload to test without CI instability
         large_payload = {
             "meta": {"version": "v1", "config": {"param": "value" * 100}},
-            "matches_a_to_b": [{"left": i, "right": j, "score": 0.95} for i in range(500) for j in range(2)],
+            "matches_a_to_b": [
+                {"left": i, "right": j, "score": 0.95}
+                for i in range(500)
+                for j in range(2)
+            ],
             "unmatched_a": list(range(1000)),
         }
 
@@ -1490,7 +1553,9 @@ class TestEdgeCases:
 
         storage.get_diff_by_pair_key(special_key)
 
-        mock_db.semantic_diffs.find_one.assert_called_once_with({"pair_key": special_key})
+        mock_db.semantic_diffs.find_one.assert_called_once_with(
+            {"pair_key": special_key}
+        )
 
     def test_job_status_transitions(self, mock_db, sample_job):
         """Job status transitions: pending -> processing -> completed/failed."""
@@ -1544,7 +1609,7 @@ class TestEdgeCases:
         mock_db.semantic_diffs.create_index.side_effect = Exception("Index error")
         mock_db.semantic_diff_jobs.create_index.side_effect = Exception("Index error")
 
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             # Should not raise
             storage.prepare()
 
@@ -1555,7 +1620,7 @@ class TestEdgeCases:
         """datetime.now(UTC) is used for all timestamps."""
         storage = SemanticDiffsStorage(mock_db)
 
-        with patch('lib.storage.semantic_diffs.datetime') as mock_dt:
+        with patch("lib.storage.semantic_diffs.datetime") as mock_dt:
             fixed_now = datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
             mock_dt.now.return_value = fixed_now
             mock_dt.UTC = UTC
@@ -1577,6 +1642,7 @@ class TestEdgeCases:
 # =============================================================================
 # Test: Integration Scenarios
 # =============================================================================
+
 
 class TestIntegrationScenarios:
     """Integration scenario tests."""
@@ -1602,7 +1668,7 @@ class TestIntegrationScenarios:
         mock_db.semantic_diff_jobs.find_one_and_update.return_value = job
 
         # Claim job
-        with patch('lib.storage.semantic_diffs.datetime') as mock_dt_patch:
+        with patch("lib.storage.semantic_diffs.datetime") as mock_dt_patch:
             mock_dt_patch.now.return_value = fixed_now
             mock_dt_patch.UTC = UTC
             claimed = storage.claim_job("worker-001")

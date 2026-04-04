@@ -1,6 +1,7 @@
 """
 Combined text splitting and topic generation task.
 """
+
 import logging
 import time
 from typing import Any
@@ -117,7 +118,9 @@ def process_split_topic_generation(
         raise ValueError("No text content to process")
 
     logger.info(f"Processing split_topic_generation for submission {submission_id}")
-    logger.info(f"Source length: {len(source)} chars (html_content: {bool(html_content)}, text_content: {bool(text_content)})")
+    logger.info(
+        f"Source length: {len(source)} chars (html_content: {bool(html_content)}, text_content: {bool(text_content)})"
+    )
     source_preview = source[:500] + "..." if len(source) > 500 else source
     logger.info(f"Source preview: {source_preview}")
 
@@ -155,7 +158,7 @@ def process_split_topic_generation(
                 text_content=text_content,
             )
             if attempt < max_retries:
-                delay = 2.0 * (2 ** attempt)
+                delay = 2.0 * (2**attempt)
                 logger.warning(
                     f"Split topic generation failed (attempt {attempt + 1}/{max_retries + 1}) "
                     f"for submission {submission_id}: {e}. Retrying in {delay:.2f}s..."
@@ -166,7 +169,7 @@ def process_split_topic_generation(
                     f"Split topic generation failed after {max_retries + 1} attempts "
                     f"for submission {submission_id}: {e}"
                 )
-    
+
     if last_error:
         raise last_error
 

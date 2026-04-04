@@ -16,7 +16,9 @@ from lib.nlp import ensure_nltk_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    auto_download_nltk: bool = os.getenv("NLTK_AUTO_DOWNLOAD_ON_STARTUP", "").lower() in {
+    auto_download_nltk: bool = os.getenv(
+        "NLTK_AUTO_DOWNLOAD_ON_STARTUP", ""
+    ).lower() in {
         "1",
         "true",
         "yes",

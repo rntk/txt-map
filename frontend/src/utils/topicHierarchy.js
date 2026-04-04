@@ -14,10 +14,10 @@
  */
 
 export function getTopicParts(topicOrName) {
-  const raw = typeof topicOrName === 'string' ? topicOrName : topicOrName?.name;
-  return String(raw || '')
-    .split('>')
-    .map(part => part.trim())
+  const raw = typeof topicOrName === "string" ? topicOrName : topicOrName?.name;
+  return String(raw || "")
+    .split(">")
+    .map((part) => part.trim())
     .filter(Boolean);
 }
 
@@ -28,25 +28,29 @@ export function isWithinScope(parts, scopePath) {
 }
 
 export function getScopeLabel(scopePath) {
-  return scopePath.length === 0 ? 'All Topics' : scopePath[scopePath.length - 1];
+  return scopePath.length === 0
+    ? "All Topics"
+    : scopePath[scopePath.length - 1];
 }
 
 export function getLevelLabel(level) {
-  if (level === 0) return 'Main Topics';
-  if (level === 1) return 'Subtopics';
+  if (level === 0) return "Main Topics";
+  if (level === 1) return "Subtopics";
   return `Depth ${level}`;
 }
 
 export function sanitizePathForTestId(path) {
-  return String(path || '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase() || 'root';
+  return (
+    String(path || "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "root"
+  );
 }
 
 export function hasDeeperChildren(topics, fullPath) {
   const baseParts = getTopicParts(fullPath);
-  return (topics || []).some(topic => {
+  return (topics || []).some((topic) => {
     const parts = getTopicParts(topic);
     return parts.length > baseParts.length && isWithinScope(parts, baseParts);
   });
@@ -56,7 +60,7 @@ export function getDirectChildLabels(topics, fullPath) {
   const baseParts = getTopicParts(fullPath);
   const childLabels = new Set();
 
-  (topics || []).forEach(topic => {
+  (topics || []).forEach((topic) => {
     const parts = getTopicParts(topic);
     if (!isWithinScope(parts, baseParts) || parts.length <= baseParts.length) {
       return;
@@ -75,7 +79,7 @@ export function getScopedMaxLevel(topics, scopePath = []) {
   const safeTopics = Array.isArray(topics) ? topics : [];
   let maxLevel = 0;
 
-  safeTopics.forEach(topic => {
+  safeTopics.forEach((topic) => {
     const parts = getTopicParts(topic);
     if (!isWithinScope(parts, scopePath) || parts.length <= scopePath.length) {
       return;
@@ -98,18 +102,24 @@ export function getScopedMaxLevel(topics, scopePath = []) {
  * @param {number} [selectedLevel=0]
  * @returns {ScopedHierarchyNode}
  */
-export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) {
+export function buildScopedHierarchy(
+  topics,
+  scopePath = [],
+  selectedLevel = 0,
+) {
   /** @type {ScopedHierarchyNode} */
-  const root = { name: 'root', fullPath: '', children: [] };
+  const root = { name: "root", fullPath: "", children: [] };
   /** @type {Map<string, ScopedHierarchyNode>} */
   const nodeMap = new Map();
-  nodeMap.set('', root);
+  nodeMap.set("", root);
 
   const safeTopics = Array.isArray(topics) ? topics : [];
   const safeLevel = Math.max(0, selectedLevel);
   const absoluteDepth = scopePath.length + safeLevel;
 
-  const sorted = [...safeTopics].sort((a, b) => getTopicParts(a).length - getTopicParts(b).length);
+  const sorted = [...safeTopics].sort(
+    (a, b) => getTopicParts(a).length - getTopicParts(b).length,
+  );
 
   sorted.forEach((topic) => {
     const parts = getTopicParts(topic);
@@ -122,8 +132,9 @@ export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) 
     for (let index = 0; index < visibleParts.length; index += 1) {
       const segment = visibleParts[index];
       const originalParts = parts.slice(0, absoluteDepth + index + 1);
-      const pathKey = originalParts.join('>');
-      const parentPath = index === 0 ? '' : parts.slice(0, absoluteDepth + index).join('>');
+      const pathKey = originalParts.join(">");
+      const parentPath =
+        index === 0 ? "" : parts.slice(0, absoluteDepth + index).join(">");
 
       if (!nodeMap.has(pathKey)) {
         const isLeaf = index === visibleParts.length - 1;
@@ -131,7 +142,12 @@ export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) 
         const node = {
           name: segment,
           fullPath: pathKey,
-          value: isLeaf ? Math.max(1, Array.isArray(topic.sentences) ? topic.sentences.length : 1) : 0,
+          value: isLeaf
+            ? Math.max(
+                1,
+                Array.isArray(topic.sentences) ? topic.sentences.length : 1,
+              )
+            : 0,
           children: [],
           topic: isLeaf ? topic : null,
         };
@@ -149,21 +165,26 @@ export function buildScopedHierarchy(topics, scopePath = [], selectedLevel = 0) 
   return root;
 }
 
-export function buildScopedChartData(topics, sentences = [], scopePath = [], selectedLevel = 0) {
+export function buildScopedChartData(
+  topics,
+  sentences = [],
+  scopePath = [],
+  selectedLevel = 0,
+) {
   if (!Array.isArray(topics) || topics.length === 0) return [];
 
   const levelMap = new Map();
   const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
   const absoluteDepth = scopePath.length + selectedLevel + 1;
 
-  topics.forEach(topic => {
+  topics.forEach((topic) => {
     const parts = getTopicParts(topic);
     if (!isWithinScope(parts, scopePath) || parts.length < absoluteDepth) {
       return;
     }
 
     const groupParts = parts.slice(0, absoluteDepth);
-    const key = groupParts.join('>');
+    const key = groupParts.join(">");
 
     if (!levelMap.has(key)) {
       levelMap.set(key, {
@@ -180,7 +201,7 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
     const indices = Array.isArray(topic.sentences) ? topic.sentences : [];
 
     if (indices.length > 0) {
-      indices.forEach(idx => {
+      indices.forEach((idx) => {
         const n = Number(idx);
         if (Number.isInteger(n) && n > 0) entry.sentenceIndices.add(n);
       });
@@ -194,19 +215,20 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
   });
 
   return Array.from(levelMap.values())
-    .map(entry => {
+    .map((entry) => {
       let totalChars = 0;
       if (hasSentenceText) {
-        entry.sentenceIndices.forEach(n => {
+        entry.sentenceIndices.forEach((n) => {
           const sentence = sentences[n - 1];
-          if (typeof sentence === 'string') totalChars += sentence.length;
+          if (typeof sentence === "string") totalChars += sentence.length;
         });
       } else {
         totalChars = entry.fallbackChars;
       }
 
       const indices = Array.from(entry.sentenceIndices);
-      const firstSentence = indices.length > 0 ? Math.min(...indices) : Infinity;
+      const firstSentence =
+        indices.length > 0 ? Math.min(...indices) : Infinity;
 
       return {
         name: entry.name,
@@ -216,15 +238,24 @@ export function buildScopedChartData(topics, sentences = [], scopePath = [], sel
         sentenceCount: entry.sentenceIndices.size,
         sentenceIndices: indices,
         ranges: entry.ranges
-          .filter(range => range && (Number.isInteger(range.sentence_start) || Number.isInteger(range.sentence_end)))
+          .filter(
+            (range) =>
+              range &&
+              (Number.isInteger(range.sentence_start) ||
+                Number.isInteger(range.sentence_end)),
+          )
           .sort((left, right) => {
-            const leftStart = Number.isInteger(left.sentence_start) ? left.sentence_start : Number.MAX_SAFE_INTEGER;
-            const rightStart = Number.isInteger(right.sentence_start) ? right.sentence_start : Number.MAX_SAFE_INTEGER;
+            const leftStart = Number.isInteger(left.sentence_start)
+              ? left.sentence_start
+              : Number.MAX_SAFE_INTEGER;
+            const rightStart = Number.isInteger(right.sentence_start)
+              ? right.sentence_start
+              : Number.MAX_SAFE_INTEGER;
             return leftStart - rightStart;
           }),
         firstSentence,
       };
     })
-    .filter(item => item.sentenceCount > 0 || item.totalChars > 0)
+    .filter((item) => item.sentenceCount > 0 || item.totalChars > 0)
     .sort((a, b) => a.firstSentence - b.firstSentence);
 }

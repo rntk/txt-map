@@ -16,12 +16,23 @@ export function normalizeCharRange(range, textLength) {
   return { start: clampedStart, end: clampedEnd };
 }
 
-export function buildTopicStateRanges(topics, selectedTopics, hoveredTopic, readTopics, textLength) {
+export function buildTopicStateRanges(
+  topics,
+  selectedTopics,
+  hoveredTopic,
+  readTopics,
+  textLength,
+) {
   const highlightRanges = [];
   const fadeRanges = [];
-  const selectedNames = new Set((Array.isArray(selectedTopics) ? selectedTopics : []).map((topic) => topic?.name));
+  const selectedNames = new Set(
+    (Array.isArray(selectedTopics) ? selectedTopics : []).map(
+      (topic) => topic?.name,
+    ),
+  );
   const hoveredName = hoveredTopic?.name || null;
-  const readNames = readTopics instanceof Set ? readTopics : new Set(readTopics || []);
+  const readNames =
+    readTopics instanceof Set ? readTopics : new Set(readTopics || []);
 
   (Array.isArray(topics) ? topics : []).forEach((topic) => {
     const topicName = topic?.name;
@@ -30,7 +41,8 @@ export function buildTopicStateRanges(topics, selectedTopics, hoveredTopic, read
       return;
     }
 
-    const isHighlighted = selectedNames.has(topicName) || hoveredName === topicName;
+    const isHighlighted =
+      selectedNames.has(topicName) || hoveredName === topicName;
     const isFaded = readNames.has(topicName);
 
     ranges.forEach((range) => {
@@ -50,13 +62,20 @@ export function buildTopicStateRanges(topics, selectedTopics, hoveredTopic, read
   return { highlightRanges, fadeRanges };
 }
 
-export function buildRawTextSegments(rawText, highlightRanges, fadeRanges, coloredRanges = []) {
+export function buildRawTextSegments(
+  rawText,
+  highlightRanges,
+  fadeRanges,
+  coloredRanges = [],
+) {
   if (!rawText) {
     return [];
   }
 
   const useColoredMode = coloredRanges.length > 0;
-  const activeRanges = useColoredMode ? coloredRanges : [...highlightRanges, ...fadeRanges];
+  const activeRanges = useColoredMode
+    ? coloredRanges
+    : [...highlightRanges, ...fadeRanges];
 
   const boundaries = new Set([0, rawText.length]);
   activeRanges.forEach((range) => {
@@ -65,11 +84,16 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges, color
   });
 
   const sortedBoundaries = Array.from(boundaries)
-    .filter((value) => Number.isFinite(value) && value >= 0 && value <= rawText.length)
+    .filter(
+      (value) =>
+        Number.isFinite(value) && value >= 0 && value <= rawText.length,
+    )
     .sort((a, b) => a - b);
 
-  const overlapsRange = (start, end, ranges) => ranges.some((range) => start < range.end && end > range.start);
-  const findColoredRange = (start, end) => coloredRanges.find((r) => start < r.end && end > r.start) || null;
+  const overlapsRange = (start, end, ranges) =>
+    ranges.some((range) => start < range.end && end > range.start);
+  const findColoredRange = (start, end) =>
+    coloredRanges.find((r) => start < r.end && end > r.start) || null;
   const segments = [];
 
   for (let i = 0; i < sortedBoundaries.length - 1; i += 1) {
@@ -86,14 +110,14 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges, color
     if (useColoredMode) {
       const match = findColoredRange(start, end);
       if (match) {
-        state = 'colored';
+        state = "colored";
         color = match.color;
       }
     } else {
       if (overlapsRange(start, end, highlightRanges)) {
-        state = 'highlighted';
+        state = "highlighted";
       } else if (overlapsRange(start, end, fadeRanges)) {
-        state = 'faded';
+        state = "faded";
       }
     }
 
@@ -103,7 +127,12 @@ export function buildRawTextSegments(rawText, highlightRanges, fadeRanges, color
     }
 
     const previous = segments[segments.length - 1];
-    if (previous && previous.state === state && previous.color === color && previous.end === start) {
+    if (
+      previous &&
+      previous.state === state &&
+      previous.color === color &&
+      previous.end === start
+    ) {
       previous.text += text;
       previous.end = end;
       continue;

@@ -16,6 +16,7 @@ Also tests:
 - Default parameters
 - Edge cases: no topic overlap, identical content, unicode handling
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC, timedelta
@@ -37,6 +38,7 @@ from lib.diff.semantic_diff import (
 # =============================================================================
 # Constants and Default Parameters Tests
 # =============================================================================
+
 
 class TestAlgorithmVersion:
     """Tests for ALGORITHM_VERSION constant."""
@@ -62,25 +64,29 @@ class TestDefaultParameters:
     def test_threshold_default_is_0_25(self):
         """Default threshold is 0.25."""
         import inspect
+
         sig = inspect.signature(compute_topic_aware_semantic_diff)
-        assert sig.parameters['threshold'].default == 0.25
+        assert sig.parameters["threshold"].default == 0.25
 
     def test_nearest_min_similarity_default_is_0_5(self):
         """Default nearest_min_similarity is 0.5."""
         import inspect
+
         sig = inspect.signature(compute_topic_aware_semantic_diff)
-        assert sig.parameters['nearest_min_similarity'].default == 0.5
+        assert sig.parameters["nearest_min_similarity"].default == 0.5
 
     def test_top_k_nearest_default_is_3(self):
         """Default top_k_nearest is 3."""
         import inspect
+
         sig = inspect.signature(compute_topic_aware_semantic_diff)
-        assert sig.parameters['top_k_nearest'].default == 3
+        assert sig.parameters["top_k_nearest"].default == 3
 
 
 # =============================================================================
 # Test: canonical_pair
 # =============================================================================
+
 
 class TestCanonicalPair:
     """Tests for the canonical_pair function."""
@@ -150,51 +156,34 @@ class TestCanonicalPair:
 # Test: _parse_sentence_indices_from_topic
 # =============================================================================
 
+
 class TestParseSentenceIndicesFromTopic:
     """Tests for the _parse_sentence_indices_from_topic function."""
 
     def test_extracts_from_ranges_with_start_and_end(self):
         """Extracts from ranges with both sentence_start and sentence_end."""
-        topic = {
-            "name": "Test",
-            "ranges": [
-                {"sentence_start": 1, "sentence_end": 3}
-            ]
-        }
+        topic = {"name": "Test", "ranges": [{"sentence_start": 1, "sentence_end": 3}]}
         result = _parse_sentence_indices_from_topic(topic)
         # 1-based to 0-based: 1,2,3 -> 0,1,2
         assert result == [0, 1, 2]
 
     def test_extracts_from_ranges_start_only(self):
         """Handles start-only ranges."""
-        topic = {
-            "name": "Test",
-            "ranges": [
-                {"sentence_start": 5}
-            ]
-        }
+        topic = {"name": "Test", "ranges": [{"sentence_start": 5}]}
         result = _parse_sentence_indices_from_topic(topic)
         # 5 -> 4 (0-based)
         assert result == [4]
 
     def test_extracts_from_ranges_end_only(self):
         """Handles end-only ranges."""
-        topic = {
-            "name": "Test",
-            "ranges": [
-                {"sentence_end": 5}
-            ]
-        }
+        topic = {"name": "Test", "ranges": [{"sentence_end": 5}]}
         result = _parse_sentence_indices_from_topic(topic)
         # 5 -> 4 (0-based)
         assert result == [4]
 
     def test_extracts_from_sentences_array(self):
         """Extracts from sentences array."""
-        topic = {
-            "name": "Test",
-            "sentences": [1, 3, 5]
-        }
+        topic = {"name": "Test", "sentences": [1, 3, 5]}
         result = _parse_sentence_indices_from_topic(topic)
         # 1,3,5 -> 0,2,4 (0-based)
         assert result == [0, 2, 4]
@@ -204,26 +193,20 @@ class TestParseSentenceIndicesFromTopic:
         topic = {
             "name": "Test",
             "ranges": [{"sentence_start": 1, "sentence_end": 1}],
-            "sentences": [1]
+            "sentences": [1],
         }
         result = _parse_sentence_indices_from_topic(topic)
         assert result == [0]
 
     def test_handles_missing_ranges(self):
         """Handles missing ranges (None)."""
-        topic = {
-            "name": "Test",
-            "ranges": None
-        }
+        topic = {"name": "Test", "ranges": None}
         result = _parse_sentence_indices_from_topic(topic)
         assert result == []
 
     def test_handles_missing_sentences(self):
         """Handles missing sentences (None)."""
-        topic = {
-            "name": "Test",
-            "sentences": None
-        }
+        topic = {"name": "Test", "sentences": None}
         result = _parse_sentence_indices_from_topic(topic)
         assert result == []
 
@@ -231,7 +214,7 @@ class TestParseSentenceIndicesFromTopic:
         """Handles invalid entry types (non-dict in ranges)."""
         topic = {
             "name": "Test",
-            "ranges": ["invalid", 123, None, {"sentence_start": 1}]
+            "ranges": ["invalid", 123, None, {"sentence_start": 1}],
         }
         result = _parse_sentence_indices_from_topic(topic)
         assert result == [0]
@@ -240,10 +223,7 @@ class TestParseSentenceIndicesFromTopic:
         """Handles missing start/end keys."""
         topic = {
             "name": "Test",
-            "ranges": [
-                {"other_key": "value"},
-                {"sentence_start": 2}
-            ]
+            "ranges": [{"other_key": "value"}, {"sentence_start": 2}],
         }
         result = _parse_sentence_indices_from_topic(topic)
         assert result == [1]
@@ -253,7 +233,7 @@ class TestParseSentenceIndicesFromTopic:
         topic = {
             "name": "Test",
             "ranges": [{"sentence_start": 1, "sentence_end": 2}],
-            "sentences": [1, 2, 3]
+            "sentences": [1, 2, 3],
         }
         result = _parse_sentence_indices_from_topic(topic)
         # ranges: 0,1; sentences: 0,1,2 -> deduplicated: 0,1,2
@@ -261,29 +241,20 @@ class TestParseSentenceIndicesFromTopic:
 
     def test_returns_sorted_list(self):
         """Returns sorted list."""
-        topic = {
-            "name": "Test",
-            "sentences": [5, 2, 8, 1]
-        }
+        topic = {"name": "Test", "sentences": [5, 2, 8, 1]}
         result = _parse_sentence_indices_from_topic(topic)
         assert result == [0, 1, 4, 7]
 
     def test_handles_start_greater_than_end(self):
         """Handles start greater than end (swaps them)."""
-        topic = {
-            "name": "Test",
-            "ranges": [{"sentence_start": 5, "sentence_end": 2}]
-        }
+        topic = {"name": "Test", "ranges": [{"sentence_start": 5, "sentence_end": 2}]}
         result = _parse_sentence_indices_from_topic(topic)
         # Should include 2,3,4,5 -> 1,2,3,4 (0-based)
         assert result == [1, 2, 3, 4]
 
     def test_handles_negative_indices(self):
         """Filters out negative indices after conversion."""
-        topic = {
-            "name": "Test",
-            "ranges": [{"sentence_start": 0, "sentence_end": 2}]
-        }
+        topic = {"name": "Test", "ranges": [{"sentence_start": 0, "sentence_end": 2}]}
         result = _parse_sentence_indices_from_topic(topic)
         # 0 -> -1 (filtered), 1, 2 -> 0, 1
         assert result == [0, 1]
@@ -296,19 +267,13 @@ class TestParseSentenceIndicesFromTopic:
 
     def test_empty_ranges_list(self):
         """Handles empty ranges list."""
-        topic = {
-            "name": "Test",
-            "ranges": []
-        }
+        topic = {"name": "Test", "ranges": []}
         result = _parse_sentence_indices_from_topic(topic)
         assert result == []
 
     def test_non_integer_indices_ignored(self):
         """Non-integer indices are ignored."""
-        topic = {
-            "name": "Test",
-            "sentences": [1, "two", 3.5, None]
-        }
+        topic = {"name": "Test", "sentences": [1, "two", 3.5, None]}
         result = _parse_sentence_indices_from_topic(topic)
         # Only integer 1 is valid, becomes 0 (0-based)
         # "two", 3.5, None are all ignored
@@ -319,6 +284,7 @@ class TestParseSentenceIndicesFromTopic:
 # Test: build_topic_units
 # =============================================================================
 
+
 class TestBuildTopicUnits:
     """Tests for the build_topic_units function."""
 
@@ -328,9 +294,12 @@ class TestBuildTopicUnits:
             "results": {
                 "sentences": ["Sentence one.", "Sentence two.", "Sentence three."],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 1, "sentence_end": 2}]},
-                    {"name": "Topic B", "ranges": [{"sentence_start": 3}]}
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 2}],
+                    },
+                    {"name": "Topic B", "ranges": [{"sentence_start": 3}]},
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -342,12 +311,7 @@ class TestBuildTopicUnits:
 
     def test_missing_sentences_returns_missing_reasons(self):
         """Missing sentences returns missing_reasons=['sentences_missing', 'topics_missing']."""
-        submission = {
-            "results": {
-                "sentences": None,
-                "topics": []
-            }
-        }
+        submission = {"results": {"sentences": None, "topics": []}}
         units, missing = build_topic_units(submission)
         assert units == []
         assert "sentences_missing" in missing
@@ -355,24 +319,14 @@ class TestBuildTopicUnits:
 
     def test_missing_topics_returns_missing_reasons(self):
         """Missing topics returns missing_reasons=['topics_missing']."""
-        submission = {
-            "results": {
-                "sentences": ["Sentence one."],
-                "topics": None
-            }
-        }
+        submission = {"results": {"sentences": ["Sentence one."], "topics": None}}
         units, missing = build_topic_units(submission)
         assert units == []
         assert "topics_missing" in missing
 
     def test_empty_topics_list_returns_missing_reasons(self):
         """Empty topics list returns missing_reasons=['topics_missing']."""
-        submission = {
-            "results": {
-                "sentences": ["Sentence one."],
-                "topics": []
-            }
-        }
+        submission = {"results": {"sentences": ["Sentence one."], "topics": []}}
         units, missing = build_topic_units(submission)
         assert units == []
         assert "topics_missing" in missing
@@ -384,8 +338,8 @@ class TestBuildTopicUnits:
                 "sentences": ["Sentence one.", "Sentence two."],
                 "topics": [
                     {"name": "Topic A", "ranges": None},
-                    {"name": "Topic B", "sentences": []}
-                ]
+                    {"name": "Topic B", "sentences": []},
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -398,8 +352,11 @@ class TestBuildTopicUnits:
             "results": {
                 "sentences": ["Sentence one.", "Sentence two."],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 10}]}  # Out of bounds
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 10}],
+                    }  # Out of bounds
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -414,7 +371,7 @@ class TestBuildTopicUnits:
                 "topics": [
                     {"name": "", "ranges": [{"sentence_start": 1}]},
                     {"name": None, "ranges": [{"sentence_start": 1}]},
-                ]
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -429,8 +386,8 @@ class TestBuildTopicUnits:
                 "sentences": ["Sentence one."],
                 "topics": [
                     {"name": "Topic A", "ranges": [{"sentence_start": 1}]},
-                    {"name": "Topic B", "ranges": [{"sentence_start": 1}]}
-                ]
+                    {"name": "Topic B", "ranges": [{"sentence_start": 1}]},
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -443,8 +400,11 @@ class TestBuildTopicUnits:
             "results": {
                 "sentences": ["Valid sentence.", "", "   ", "Another valid."],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 1, "sentence_end": 4}]}
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 4}],
+                    }
+                ],
             }
         }
         units, missing = build_topic_units(submission)
@@ -457,9 +417,7 @@ class TestBuildTopicUnits:
         submission = {
             "results": {
                 "sentences": ["Test sentence."],
-                "topics": [
-                    {"name": "Test Topic", "ranges": [{"sentence_start": 1}]}
-                ]
+                "topics": [{"name": "Test Topic", "ranges": [{"sentence_start": 1}]}],
             }
         }
         units, missing = build_topic_units(submission)
@@ -480,9 +438,7 @@ class TestBuildTopicUnits:
         submission = {
             "results": {
                 "sentences": ["  Sentence with spaces.  "],
-                "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 1}]}
-                ]
+                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         units, missing = build_topic_units(submission)
@@ -493,6 +449,7 @@ class TestBuildTopicUnits:
 # Test: check_submission_topic_readiness
 # =============================================================================
 
+
 class TestCheckSubmissionTopicReadiness:
     """Tests for the check_submission_topic_readiness function."""
 
@@ -502,8 +459,11 @@ class TestCheckSubmissionTopicReadiness:
             "results": {
                 "sentences": ["Sentence one.", "Sentence two."],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 1, "sentence_end": 2}]}
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 2}],
+                    }
+                ],
             }
         }
         result = check_submission_topic_readiness(submission)
@@ -513,12 +473,7 @@ class TestCheckSubmissionTopicReadiness:
 
     def test_returns_ready_false_with_missing_list(self):
         """Returns ready=false with missing list when not ready."""
-        submission = {
-            "results": {
-                "sentences": [],
-                "topics": []
-            }
-        }
+        submission = {"results": {"sentences": [], "topics": []}}
         result = check_submission_topic_readiness(submission)
         assert result["ready"] is False
         assert len(result["missing"]) > 0
@@ -529,8 +484,11 @@ class TestCheckSubmissionTopicReadiness:
             "results": {
                 "sentences": ["One", "Two", "Three"],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 1, "sentence_end": 3}]}
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 3}],
+                    }
+                ],
             }
         }
         result = check_submission_topic_readiness(submission)
@@ -538,23 +496,13 @@ class TestCheckSubmissionTopicReadiness:
 
     def test_missing_sentences(self):
         """Detects missing sentences."""
-        submission = {
-            "results": {
-                "sentences": None,
-                "topics": []
-            }
-        }
+        submission = {"results": {"sentences": None, "topics": []}}
         result = check_submission_topic_readiness(submission)
         assert "sentences_missing" in result["missing"]
 
     def test_missing_topics(self):
         """Detects missing topics."""
-        submission = {
-            "results": {
-                "sentences": ["Sentence one."],
-                "topics": None
-            }
-        }
+        submission = {"results": {"sentences": ["Sentence one."], "topics": None}}
         result = check_submission_topic_readiness(submission)
         assert "topics_missing" in result["missing"]
 
@@ -563,9 +511,7 @@ class TestCheckSubmissionTopicReadiness:
         submission = {
             "results": {
                 "sentences": ["Sentence one."],
-                "topics": [
-                    {"name": "Topic A", "ranges": None}
-                ]
+                "topics": [{"name": "Topic A", "ranges": None}],
             }
         }
         result = check_submission_topic_readiness(submission)
@@ -577,8 +523,11 @@ class TestCheckSubmissionTopicReadiness:
             "results": {
                 "sentences": ["Sentence one."],
                 "topics": [
-                    {"name": "Topic A", "ranges": [{"sentence_start": 10}]}  # Out of bounds
-                ]
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 10}],
+                    }  # Out of bounds
+                ],
             }
         }
         result = check_submission_topic_readiness(submission)
@@ -588,6 +537,7 @@ class TestCheckSubmissionTopicReadiness:
 # =============================================================================
 # Test: _compute_directional
 # =============================================================================
+
 
 class TestComputeDirectional:
     """Tests for the _compute_directional function."""
@@ -599,12 +549,13 @@ class TestComputeDirectional:
             {"topic": "Topic A", "sentence_index": 0, "text": "Target sentence."}
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert result["matches"] == []
         assert result["nearest"] == []
@@ -617,12 +568,13 @@ class TestComputeDirectional:
         ]
         target_units = []
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert len(result["matches"]) == 1
         assert result["matches"][0]["b_topic"] is None
@@ -640,12 +592,13 @@ class TestComputeDirectional:
             {"topic": "Topic B", "sentence_index": 0, "text": "Similar text there."}
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         # Should have computed similarity
         assert len(result["matches"]) == 1
@@ -657,16 +610,21 @@ class TestComputeDirectional:
             {"topic": "Topic A", "sentence_index": 0, "text": "Source text."}
         ]
         target_units = [
-            {"topic": "Topic B", "sentence_index": 0, "text": "Completely different xyz123."}
+            {
+                "topic": "Topic B",
+                "sentence_index": 0,
+                "text": "Completely different xyz123.",
+            }
         ]
         # High threshold should result in no match
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.99,  # Very high threshold
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert result["matches"][0]["b_topic"] is None
 
@@ -677,18 +635,21 @@ class TestComputeDirectional:
         ]
         target_units = [
             {"topic": "Topic B", "sentence_index": 0, "text": "Target text."},
-            {"topic": "Topic C", "sentence_index": 1, "text": "Very different zzz."}
+            {"topic": "Topic C", "sentence_index": 1, "text": "Very different zzz."},
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.99,  # Very high
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         # With high nearest_min_similarity, nearest should be empty or limited
-        assert len(result["nearest"]) == 0 or all(n["similarity"] >= 0.99 for n in result["nearest"])
+        assert len(result["nearest"]) == 0 or all(
+            n["similarity"] >= 0.99 for n in result["nearest"]
+        )
 
     def test_top_k_nearest_limits_results(self):
         """top_k_nearest limits nearest results."""
@@ -702,12 +663,13 @@ class TestComputeDirectional:
             {"topic": "E", "sentence_index": 3, "text": "Target four here."},
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.0,  # Low to include all
             top_k_nearest=2,  # Only top 2
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         # nearest should have at most 2 entries (excludes best match)
         assert len(result["nearest"]) <= 2
@@ -721,12 +683,13 @@ class TestComputeDirectional:
             {"topic": "Topic B", "sentence_index": 0, "text": "Single target."}
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert len(result["matches"]) == 1
 
@@ -739,12 +702,13 @@ class TestComputeDirectional:
             {"topic": "Topic B", "sentence_index": 0, "text": "Single target."}
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert len(result["matches"]) == 1
 
@@ -757,12 +721,13 @@ class TestComputeDirectional:
             {"topic": "Topic B", "sentence_index": 0, "text": "Identical text."}
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         assert result["matches"][0]["b_topic"] == "Topic B"
         assert result["matches"][0]["b_sentence_index"] == 0
@@ -778,54 +743,54 @@ class TestComputeDirectional:
             {"topic": "C", "sentence_index": 1, "text": "Second best here."},
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.0,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         # Best match should be in matches, not nearest
         best_target_idx = 0  # Assuming first is best
         for nearest_item in result["nearest"]:
-            assert nearest_item["b_sentence_index"] != best_target_idx or len(result["nearest"]) == 0
+            assert (
+                nearest_item["b_sentence_index"] != best_target_idx
+                or len(result["nearest"]) == 0
+            )
 
     def test_unmatched_target_indices_correctly_identified(self):
         """Unmatched target indices correctly identified."""
-        source_units = [
-            {"topic": "Topic A", "sentence_index": 0, "text": "Source."}
-        ]
+        source_units = [{"topic": "Topic A", "sentence_index": 0, "text": "Source."}]
         target_units = [
             {"topic": "B", "sentence_index": 0, "text": "Matched."},
             {"topic": "C", "sentence_index": 1, "text": "Unmatched one."},
             {"topic": "D", "sentence_index": 2, "text": "Unmatched two."},
         ]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         # At least indices 1 and 2 should be unmatched (or some subset)
         assert len(result["unmatched_target_indices"]) >= 1
 
     def test_match_structure_has_all_fields(self):
         """Match structure has all required fields."""
-        source_units = [
-            {"topic": "Topic A", "sentence_index": 0, "text": "Source."}
-        ]
-        target_units = [
-            {"topic": "Topic B", "sentence_index": 1, "text": "Target."}
-        ]
+        source_units = [{"topic": "Topic A", "sentence_index": 0, "text": "Source."}]
+        target_units = [{"topic": "Topic B", "sentence_index": 1, "text": "Target."}]
         result = _compute_directional(
-            source_units, target_units,
+            source_units,
+            target_units,
             threshold=0.25,
             nearest_min_similarity=0.5,
             top_k_nearest=3,
             source_label="a",
-            target_label="b"
+            target_label="b",
         )
         match = result["matches"][0]
         assert "a_topic" in match
@@ -838,24 +803,21 @@ class TestComputeDirectional:
 
     def test_provided_similarity_matrix_is_used(self):
         """Provided similarity matrix is used instead of computing."""
-        source_units = [
-            {"topic": "A", "sentence_index": 0, "text": "Source."}
-        ]
-        target_units = [
-            {"topic": "B", "sentence_index": 0, "text": "Target."}
-        ]
+        source_units = [{"topic": "A", "sentence_index": 0, "text": "Source."}]
+        target_units = [{"topic": "B", "sentence_index": 0, "text": "Target."}]
         # Create a custom similarity matrix
         similarity_matrix = np.array([[0.95]])
 
-        with patch('lib.diff.semantic_diff.TfidfVectorizer') as mock_vectorizer:
+        with patch("lib.diff.semantic_diff.TfidfVectorizer") as mock_vectorizer:
             result = _compute_directional(
-                source_units, target_units,
+                source_units,
+                target_units,
                 similarity_matrix=similarity_matrix,
                 threshold=0.25,
                 nearest_min_similarity=0.5,
                 top_k_nearest=3,
                 source_label="a",
-                target_label="b"
+                target_label="b",
             )
             # TfidfVectorizer should not be called since matrix provided
             mock_vectorizer.assert_not_called()
@@ -866,21 +828,17 @@ class TestComputeDirectional:
 # Test: compute_topic_aware_semantic_diff
 # =============================================================================
 
+
 class TestComputeTopicAwareSemanticDiff:
     """Tests for the compute_topic_aware_semantic_diff function."""
 
     def test_raises_value_error_when_prerequisites_not_ready(self):
         """Raises ValueError when prerequisites not ready."""
-        submission_a = {
-            "results": {
-                "sentences": [],
-                "topics": []
-            }
-        }
+        submission_a = {"results": {"sentences": [], "topics": []}}
         submission_b = {
             "results": {
                 "sentences": ["Sentence."],
-                "topics": [{"name": "Topic", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic", "ranges": [{"sentence_start": 1}]}],
             }
         }
         with pytest.raises(ValueError) as exc_info:
@@ -892,13 +850,23 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["A1", "A2"],
-                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1, "sentence_end": 2}]}]
+                "topics": [
+                    {
+                        "name": "Topic A",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 2}],
+                    }
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["B1", "B2", "B3"],
-                "topics": [{"name": "Topic B", "ranges": [{"sentence_start": 1, "sentence_end": 3}]}]
+                "topics": [
+                    {
+                        "name": "Topic B",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 3}],
+                    }
+                ],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -910,29 +878,29 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test sentence A."],
-                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test sentence B."],
-                "topics": [{"name": "Topic B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.TfidfVectorizer') as mock_vectorizer_class:
+        with patch("lib.diff.semantic_diff.TfidfVectorizer") as mock_vectorizer_class:
             # Create a mock that behaves like a real TF-IDF matrix when sliced
             mock_matrix = MagicMock()
             mock_matrix.__getitem__ = MagicMock(side_effect=lambda key: mock_matrix)
             mock_matrix.__len__ = MagicMock(return_value=2)
-            
+
             mock_instance = MagicMock()
             mock_instance.fit_transform.return_value = mock_matrix
             mock_vectorizer_class.return_value = mock_instance
 
             # Also mock cosine_similarity to avoid actual computation
-            with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
+            with patch("lib.diff.semantic_diff.cosine_similarity") as mock_cosine:
                 mock_cosine.return_value = np.array([[0.5]])
-                
+
                 result = compute_topic_aware_semantic_diff(submission_a, submission_b)
 
                 # Verify char_wb analyzer was used
@@ -945,25 +913,25 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.TfidfVectorizer') as mock_vectorizer_class:
+        with patch("lib.diff.semantic_diff.TfidfVectorizer") as mock_vectorizer_class:
             mock_matrix = MagicMock()
             mock_matrix.__getitem__ = MagicMock(side_effect=lambda key: mock_matrix)
             mock_matrix.__len__ = MagicMock(return_value=2)
-            
+
             mock_instance = MagicMock()
             mock_instance.fit_transform.return_value = mock_matrix
             mock_vectorizer_class.return_value = mock_instance
 
-            with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
+            with patch("lib.diff.semantic_diff.cosine_similarity") as mock_cosine:
                 mock_cosine.return_value = np.array([[0.5]])
 
                 compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -976,13 +944,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["A sentence."],
-                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["B sentence."],
-                "topics": [{"name": "Topic B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -994,16 +962,16 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
+        with patch("lib.diff.semantic_diff.cosine_similarity") as mock_cosine:
             mock_cosine.return_value = np.array([[1.0]])
 
             compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1016,13 +984,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1033,13 +1001,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1050,13 +1018,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1067,13 +1035,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1093,13 +1061,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1113,13 +1081,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1133,13 +1101,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1153,13 +1121,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1170,13 +1138,13 @@ class TestComputeTopicAwareSemanticDiff:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1191,14 +1159,17 @@ class TestComputeTopicAwareSemanticDiff:
                 "sentences": ["A1", "A2", "A3"],
                 "topics": [
                     {"name": "Topic A", "ranges": [{"sentence_start": 1}]},
-                    {"name": "Topic B", "ranges": [{"sentence_start": 2, "sentence_end": 3}]}
-                ]
+                    {
+                        "name": "Topic B",
+                        "ranges": [{"sentence_start": 2, "sentence_end": 3}],
+                    },
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["B1"],
-                "topics": [{"name": "Topic C", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic C", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1210,6 +1181,7 @@ class TestComputeTopicAwareSemanticDiff:
 # Test: orient_payload
 # =============================================================================
 
+
 class TestOrientPayload:
     """Tests for the orient_payload function."""
 
@@ -1218,18 +1190,23 @@ class TestOrientPayload:
         payload = {
             "meta": {"algorithm_version": "v1"},
             "matches_a_to_b": [
-                {"a_topic": "A", "a_sentence_index": 0, "a_text": "Text A",
-                 "b_topic": "B", "b_sentence_index": 1, "b_text": "Text B", "similarity": 0.8}
+                {
+                    "a_topic": "A",
+                    "a_sentence_index": 0,
+                    "a_text": "Text A",
+                    "b_topic": "B",
+                    "b_sentence_index": 1,
+                    "b_text": "Text B",
+                    "similarity": 0.8,
+                }
             ],
             "matches_b_to_a": [],
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
-        result = orient_payload(
-            payload, "sub-a", "sub-b", "sub-a", "sub-b"
-        )
+        result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         assert result["matches_left_to_right"][0]["left_topic"] == "A"
         assert result["matches_left_to_right"][0]["right_topic"] == "B"
 
@@ -1238,18 +1215,23 @@ class TestOrientPayload:
         payload = {
             "meta": {"algorithm_version": "v1"},
             "matches_a_to_b": [
-                {"a_topic": "A", "a_sentence_index": 0, "a_text": "Text A",
-                 "b_topic": "B", "b_sentence_index": 1, "b_text": "Text B", "similarity": 0.8}
+                {
+                    "a_topic": "A",
+                    "a_sentence_index": 0,
+                    "a_text": "Text A",
+                    "b_topic": "B",
+                    "b_sentence_index": 1,
+                    "b_text": "Text B",
+                    "similarity": 0.8,
+                }
             ],
             "matches_b_to_a": [],
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
-        result = orient_payload(
-            payload, "sub-a", "sub-b", "sub-b", "sub-a"
-        )
+        result = orient_payload(payload, "sub-a", "sub-b", "sub-b", "sub-a")
         # When swapped, matches_b_to_a becomes matches_left_to_right
         # But since matches_b_to_a is empty, result should be empty
         assert result["matches_left_to_right"] == []
@@ -1259,14 +1241,21 @@ class TestOrientPayload:
         payload = {
             "meta": {},
             "matches_a_to_b": [
-                {"a_topic": "Topic A", "a_sentence_index": 0, "a_text": "A text",
-                 "b_topic": "Topic B", "b_sentence_index": 0, "b_text": "B text", "similarity": 0.9}
+                {
+                    "a_topic": "Topic A",
+                    "a_sentence_index": 0,
+                    "a_text": "A text",
+                    "b_topic": "Topic B",
+                    "b_sentence_index": 0,
+                    "b_text": "B text",
+                    "similarity": 0.9,
+                }
             ],
             "matches_b_to_a": [],
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         match = result["matches_left_to_right"][0]
@@ -1279,13 +1268,20 @@ class TestOrientPayload:
             "meta": {},
             "matches_a_to_b": [],
             "matches_b_to_a": [
-                {"b_topic": "Topic B", "b_sentence_index": 0, "b_text": "B text",
-                 "a_topic": "Topic A", "a_sentence_index": 0, "a_text": "A text", "similarity": 0.9}
+                {
+                    "b_topic": "Topic B",
+                    "b_sentence_index": 0,
+                    "b_text": "B text",
+                    "a_topic": "Topic A",
+                    "a_sentence_index": 0,
+                    "a_text": "A text",
+                    "similarity": 0.9,
+                }
             ],
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         match = result["matches_right_to_left"][0]
@@ -1299,12 +1295,19 @@ class TestOrientPayload:
             "matches_a_to_b": [],
             "matches_b_to_a": [],
             "nearest_a_to_b": [
-                {"a_topic": "A", "a_sentence_index": 0, "a_text": "A",
-                 "b_topic": "B", "b_sentence_index": 1, "b_text": "B", "similarity": 0.7}
+                {
+                    "a_topic": "A",
+                    "a_sentence_index": 0,
+                    "a_text": "A",
+                    "b_topic": "B",
+                    "b_sentence_index": 1,
+                    "b_text": "B",
+                    "similarity": 0.7,
+                }
             ],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         nearest = result["nearest_left_to_right"][0]
@@ -1319,11 +1322,18 @@ class TestOrientPayload:
             "matches_b_to_a": [],
             "nearest_a_to_b": [],
             "nearest_b_to_a": [
-                {"b_topic": "B", "b_sentence_index": 0, "b_text": "B",
-                 "a_topic": "A", "a_sentence_index": 0, "a_text": "A", "similarity": 0.7}
+                {
+                    "b_topic": "B",
+                    "b_sentence_index": 0,
+                    "b_text": "B",
+                    "a_topic": "A",
+                    "a_sentence_index": 0,
+                    "a_text": "A",
+                    "similarity": 0.7,
+                }
             ],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         nearest = result["nearest_right_to_left"][0]
@@ -1339,7 +1349,7 @@ class TestOrientPayload:
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [{"topic": "A", "sentence_index": 0, "text": "Unmatched A"}],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         assert len(result["unmatched_left"]) == 1
@@ -1354,7 +1364,7 @@ class TestOrientPayload:
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": [{"topic": "B", "sentence_index": 0, "text": "Unmatched B"}]
+            "unmatched_b": [{"topic": "B", "sentence_index": 0, "text": "Unmatched B"}],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         assert len(result["unmatched_right"]) == 1
@@ -1369,7 +1379,7 @@ class TestOrientPayload:
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [],
-            "unmatched_b": []
+            "unmatched_b": [],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         assert result["meta"]["algorithm_version"] == "v1"
@@ -1384,7 +1394,7 @@ class TestOrientPayload:
             "nearest_a_to_b": None,
             "nearest_b_to_a": None,
             "unmatched_a": None,
-            "unmatched_b": None
+            "unmatched_b": None,
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-a", "sub-b")
         assert result["matches_left_to_right"] == []
@@ -1403,7 +1413,7 @@ class TestOrientPayload:
             "nearest_a_to_b": [],
             "nearest_b_to_a": [],
             "unmatched_a": [{"topic": "A", "sentence_index": 0, "text": "A"}],
-            "unmatched_b": [{"topic": "B", "sentence_index": 0, "text": "B"}]
+            "unmatched_b": [{"topic": "B", "sentence_index": 0, "text": "B"}],
         }
         result = orient_payload(payload, "sub-a", "sub-b", "sub-b", "sub-a")
         # When swapped, unmatched_b becomes unmatched_left
@@ -1415,16 +1425,14 @@ class TestOrientPayload:
 # Test: stale_reasons
 # =============================================================================
 
+
 class TestStaleReasons:
     """Tests for the stale_reasons function."""
 
     def test_empty_list_when_diff_is_current(self):
         """Empty list when diff is current."""
         computed_at = datetime(2024, 1, 1, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": ALGORITHM_VERSION,
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": ALGORITHM_VERSION, "computed_at": computed_at}
         submission_a = {"updated_at": computed_at - timedelta(hours=1)}
         submission_b = {"updated_at": computed_at - timedelta(hours=1)}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1433,10 +1441,7 @@ class TestStaleReasons:
     def test_algorithm_version_mismatch(self):
         """'algorithm_version_mismatch' when versions differ."""
         computed_at = datetime(2024, 1, 1, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": "old-version",
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": "old-version", "computed_at": computed_at}
         submission_a = {"updated_at": computed_at - timedelta(hours=1)}
         submission_b = {"updated_at": computed_at - timedelta(hours=1)}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1445,10 +1450,7 @@ class TestStaleReasons:
     def test_left_submission_updated(self):
         """'left_submission_updated' when submission_a updated after computed_at."""
         computed_at = datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": ALGORITHM_VERSION,
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": ALGORITHM_VERSION, "computed_at": computed_at}
         submission_a = {"updated_at": datetime(2024, 1, 1, 11, 0, 0, tzinfo=UTC)}
         submission_b = {"updated_at": computed_at - timedelta(hours=1)}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1457,10 +1459,7 @@ class TestStaleReasons:
     def test_right_submission_updated(self):
         """'right_submission_updated' when submission_b updated after computed_at."""
         computed_at = datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": ALGORITHM_VERSION,
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": ALGORITHM_VERSION, "computed_at": computed_at}
         submission_a = {"updated_at": computed_at - timedelta(hours=1)}
         submission_b = {"updated_at": datetime(2024, 1, 1, 11, 0, 0, tzinfo=UTC)}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1469,10 +1468,7 @@ class TestStaleReasons:
     def test_multiple_reasons_returned_simultaneously(self):
         """Multiple reasons can be returned simultaneously."""
         computed_at = datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": "old-version",
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": "old-version", "computed_at": computed_at}
         submission_a = {"updated_at": datetime(2024, 1, 1, 11, 0, 0, tzinfo=UTC)}
         submission_b = {"updated_at": datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1482,10 +1478,7 @@ class TestStaleReasons:
 
     def test_handles_none_values_gracefully(self):
         """Handles None values gracefully."""
-        diff_doc = {
-            "algorithm_version": ALGORITHM_VERSION,
-            "computed_at": None
-        }
+        diff_doc = {"algorithm_version": ALGORITHM_VERSION, "computed_at": None}
         submission_a = {"updated_at": None}
         submission_b = {"updated_at": None}
         result = stale_reasons(diff_doc, submission_a, submission_b)
@@ -1502,32 +1495,30 @@ class TestStaleReasons:
     def test_custom_algorithm_version_parameter(self):
         """Custom algorithm_version parameter."""
         computed_at = datetime(2024, 1, 1, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": "custom-v1",
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": "custom-v1", "computed_at": computed_at}
         submission_a = {"updated_at": computed_at - timedelta(hours=1)}
         submission_b = {"updated_at": computed_at - timedelta(hours=1)}
-        result = stale_reasons(diff_doc, submission_a, submission_b, algorithm_version="custom-v1")
+        result = stale_reasons(
+            diff_doc, submission_a, submission_b, algorithm_version="custom-v1"
+        )
         assert result == []
 
     def test_custom_algorithm_version_mismatch(self):
         """Custom algorithm_version detects mismatch."""
         computed_at = datetime(2024, 1, 1, tzinfo=UTC)
-        diff_doc = {
-            "algorithm_version": "v1",
-            "computed_at": computed_at
-        }
+        diff_doc = {"algorithm_version": "v1", "computed_at": computed_at}
         submission_a = {"updated_at": computed_at - timedelta(hours=1)}
         submission_b = {"updated_at": computed_at - timedelta(hours=1)}
-        result = stale_reasons(diff_doc, submission_a, submission_b, algorithm_version="v2")
+        result = stale_reasons(
+            diff_doc, submission_a, submission_b, algorithm_version="v2"
+        )
         assert "algorithm_version_mismatch" in result
 
     def test_datetime_comparison_with_non_datetime(self):
         """Handles non-datetime values in computed_at/updated_at."""
         diff_doc = {
             "algorithm_version": ALGORITHM_VERSION,
-            "computed_at": "not-a-datetime"
+            "computed_at": "not-a-datetime",
         }
         submission_a = {"updated_at": "also-not-datetime"}
         submission_b = {"updated_at": "also-not-datetime"}
@@ -1540,6 +1531,7 @@ class TestStaleReasons:
 # Edge Cases
 # =============================================================================
 
+
 class TestEdgeCases:
     """Edge case tests for semantic diff functions."""
 
@@ -1548,13 +1540,13 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": ["A unique sentence."],
-                "topics": [{"name": "Topic A Only", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic A Only", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["B unique sentence."],
-                "topics": [{"name": "Topic B Only", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Topic B Only", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1569,7 +1561,7 @@ class TestEdgeCases:
         submission = {
             "results": {
                 "sentences": ["Identical sentence."],
-                "topics": [{"name": "Same Topic", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Same Topic", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission, submission)
@@ -1584,14 +1576,22 @@ class TestEdgeCases:
         """Unicode text handling."""
         submission_a = {
             "results": {
-                "sentences": ["Unicode: \u00e9\u00e8\u00ea \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439 \ud83d\ude00"],
-                "topics": [{"name": "Unicode Topic", "ranges": [{"sentence_start": 1}]}]
+                "sentences": [
+                    "Unicode: \u00e9\u00e8\u00ea \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439 \ud83d\ude00"
+                ],
+                "topics": [
+                    {"name": "Unicode Topic", "ranges": [{"sentence_start": 1}]}
+                ],
             }
         }
         submission_b = {
             "results": {
-                "sentences": ["Unicode: \u00e9\u00e8\u00ea \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439 \ud83d\ude00"],
-                "topics": [{"name": "Unicode Topic", "ranges": [{"sentence_start": 1}]}]
+                "sentences": [
+                    "Unicode: \u00e9\u00e8\u00ea \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439 \ud83d\ude00"
+                ],
+                "topics": [
+                    {"name": "Unicode Topic", "ranges": [{"sentence_start": 1}]}
+                ],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1603,13 +1603,13 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": ["Special: <>&\"' \\n\\t @#$%^&*()"],
-                "topics": [{"name": "Special", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Special", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Special: <>&\"' \\n\\t @#$%^&*()"],
-                "topics": [{"name": "Special", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Special", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1621,13 +1621,13 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": [long_text],
-                "topics": [{"name": "Long", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Long", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": [long_text],
-                "topics": [{"name": "Long", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Long", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1639,13 +1639,23 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": sentences,
-                "topics": [{"name": "Many", "ranges": [{"sentence_start": 1, "sentence_end": 100}]}]
+                "topics": [
+                    {
+                        "name": "Many",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 100}],
+                    }
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": sentences,
-                "topics": [{"name": "Many", "ranges": [{"sentence_start": 1, "sentence_end": 100}]}]
+                "topics": [
+                    {
+                        "name": "Many",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 100}],
+                    }
+                ],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1657,13 +1667,18 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": ["", "", "Valid", ""],
-                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1, "sentence_end": 4}]}]
+                "topics": [
+                    {
+                        "name": "Test",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 4}],
+                    }
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Valid"],
-                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1674,13 +1689,18 @@ class TestEdgeCases:
         submission_a = {
             "results": {
                 "sentences": ["   ", "\t", "\n", "Valid"],
-                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1, "sentence_end": 4}]}]
+                "topics": [
+                    {
+                        "name": "Test",
+                        "ranges": [{"sentence_start": 1, "sentence_end": 4}],
+                    }
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Valid"],
-                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "Test", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1696,14 +1716,14 @@ class TestEdgeCases:
                     "invalid_string",
                     None,
                     123,
-                    {"name": "Also Valid", "ranges": [{"sentence_start": 2}]}
-                ]
+                    {"name": "Also Valid", "ranges": [{"sentence_start": 2}]},
+                ],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["B1"],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
         result = compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1715,6 +1735,7 @@ class TestEdgeCases:
 # Mock Tests for Dependencies
 # =============================================================================
 
+
 class TestDependencyMocks:
     """Tests verifying proper mocking of sklearn, numpy, datetime."""
 
@@ -1723,25 +1744,25 @@ class TestDependencyMocks:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.TfidfVectorizer') as mock_vectorizer_class:
+        with patch("lib.diff.semantic_diff.TfidfVectorizer") as mock_vectorizer_class:
             mock_matrix = MagicMock()
             mock_matrix.__getitem__ = MagicMock(side_effect=lambda key: mock_matrix)
             mock_matrix.__len__ = MagicMock(return_value=2)
-            
+
             mock_instance = MagicMock()
             mock_instance.fit_transform.return_value = mock_matrix
             mock_vectorizer_class.return_value = mock_instance
 
-            with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
+            with patch("lib.diff.semantic_diff.cosine_similarity") as mock_cosine:
                 mock_cosine.return_value = np.array([[1.0]])
 
                 compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1753,16 +1774,16 @@ class TestDependencyMocks:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.cosine_similarity') as mock_cosine:
+        with patch("lib.diff.semantic_diff.cosine_similarity") as mock_cosine:
             mock_cosine.return_value = np.array([[1.0]])
 
             compute_topic_aware_semantic_diff(submission_a, submission_b)
@@ -1775,16 +1796,16 @@ class TestDependencyMocks:
         submission_a = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "A", "ranges": [{"sentence_start": 1}]}],
             }
         }
         submission_b = {
             "results": {
                 "sentences": ["Test."],
-                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}]
+                "topics": [{"name": "B", "ranges": [{"sentence_start": 1}]}],
             }
         }
-        with patch('lib.diff.semantic_diff.datetime') as mock_dt:
+        with patch("lib.diff.semantic_diff.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_time
             mock_dt.UTC = UTC
 
@@ -1795,25 +1816,24 @@ class TestDependencyMocks:
 
     def test_numpy_argsort_mock(self):
         """numpy argsort can be mocked."""
-        source_units = [
-            {"topic": "A", "sentence_index": 0, "text": "Source."}
-        ]
+        source_units = [{"topic": "A", "sentence_index": 0, "text": "Source."}]
         target_units = [
             {"topic": "B", "sentence_index": 0, "text": "Target 1."},
-            {"topic": "C", "sentence_index": 1, "text": "Target 2."}
+            {"topic": "C", "sentence_index": 1, "text": "Target 2."},
         ]
-        with patch('lib.diff.semantic_diff.np') as mock_np:
+        with patch("lib.diff.semantic_diff.np") as mock_np:
             mock_np.argsort.return_value = [1, 0]  # Mock ranking
             mock_np.ndarray = np.ndarray
 
             _compute_directional(
-                source_units, target_units,
+                source_units,
+                target_units,
                 similarity_matrix=np.array([[0.5, 0.8]]),
                 threshold=0.25,
                 nearest_min_similarity=0.5,
                 top_k_nearest=3,
                 source_label="a",
-                target_label="b"
+                target_label="b",
             )
 
             mock_np.argsort.assert_called()

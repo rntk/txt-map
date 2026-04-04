@@ -1,7 +1,7 @@
-import React from 'react';
-import { buildExtractionKey } from '../../utils/extractionHighlight';
-import DataChart from './charts/DataChart';
-import { isVisualChart } from '../../utils/dataChartUtils';
+import React from "react";
+import { buildExtractionKey } from "../../utils/extractionHighlight";
+import DataChart from "./charts/DataChart";
+import { isVisualChart } from "../../utils/dataChartUtils";
 
 /**
  * @typedef {import('../../utils/extractionHighlight').DataExtraction} DataExtraction
@@ -22,14 +22,14 @@ import { isVisualChart } from '../../utils/dataChartUtils';
 function handleExtractionKeyDown(event, extractionKey, onExtractionToggle) {
   if (!onExtractionToggle) return;
 
-  if (event.key === 'Enter' || event.key === ' ') {
+  if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     onExtractionToggle(extractionKey);
   }
 }
 
 export function ExtractionActivator({
-  as = 'div',
+  as = "div",
   className,
   extractionKey,
   isActive,
@@ -43,13 +43,15 @@ export function ExtractionActivator({
 
   return (
     <Component
-      className={`${className}${isActive ? ' rg-extraction__activator--active' : ''}`}
+      className={`${className}${isActive ? " rg-extraction__activator--active" : ""}`}
       onMouseEnter={() => onExtractionHoverStart?.(extractionKey)}
       onMouseLeave={() => onExtractionHoverEnd?.(extractionKey)}
       onFocus={() => onExtractionHoverStart?.(extractionKey)}
       onBlur={() => onExtractionHoverEnd?.(extractionKey)}
       onClick={() => onExtractionToggle?.(extractionKey)}
-      onKeyDown={(event) => handleExtractionKeyDown(event, extractionKey, onExtractionToggle)}
+      onKeyDown={(event) =>
+        handleExtractionKeyDown(event, extractionKey, onExtractionToggle)
+      }
       role="button"
       tabIndex={0}
       title={title}
@@ -74,11 +76,11 @@ function ExtractionItem({
   onExtractionToggle,
 }) {
   const { label, values, source_sentences, display_suggestion } = extraction;
-  const displayMode = display_suggestion || 'inline';
+  const displayMode = display_suggestion || "inline";
   const hasValues = Array.isArray(values) && values.length > 0;
   const extractionKey = buildExtractionKey(extraction);
   const isActive = extractionKey === activeExtractionKey;
-  const hintText = extractionHints?.[extractionKey] || '';
+  const hintText = extractionHints?.[extractionKey] || "";
 
   // Visual chart rendering (bar, line, timeline, gantt)
   if (hasValues && isVisualChart(extraction)) {
@@ -115,13 +117,18 @@ function ExtractionItem({
       >
         {label && <span className="rg-extraction__label">{label}: </span>}
         {sourceSentences.map(({ idx, text }) => (
-          <span key={idx} className="rg-extraction__value">{text}</span>
+          <span key={idx} className="rg-extraction__value">
+            {text}
+          </span>
         ))}
       </ExtractionActivator>
     );
   }
 
-  if ((displayMode === 'table' || displayMode === 'chart_bar') && values.length > 1) {
+  if (
+    (displayMode === "table" || displayMode === "chart_bar") &&
+    values.length > 1
+  ) {
     return (
       <ExtractionActivator
         className="rg-extraction rg-extraction--table"
@@ -138,7 +145,7 @@ function ExtractionItem({
             {values.map((v, i) => (
               <tr
                 key={i}
-                className={`rg-extraction__table-row${isActive ? ' rg-extraction__table-row--active' : ''}`}
+                className={`rg-extraction__table-row${isActive ? " rg-extraction__table-row--active" : ""}`}
               >
                 {v.key && <td className="rg-extraction__table-key">{v.key}</td>}
                 <td className="rg-extraction__table-val">{v.value}</td>
@@ -163,8 +170,9 @@ function ExtractionItem({
       {label && <span className="rg-extraction__label">{label}: </span>}
       {values.map((v, i) => (
         <span key={i} className="rg-extraction__value">
-          {v.key ? `${v.key}: ` : ''}{v.value}
-          {i < values.length - 1 ? ' · ' : ''}
+          {v.key ? `${v.key}: ` : ""}
+          {v.value}
+          {i < values.length - 1 ? " · " : ""}
         </span>
       ))}
     </ExtractionActivator>
@@ -191,9 +199,10 @@ export default function DataExtractionTable({
   if (!extractions || extractions.length === 0) return null;
 
   const filtered = topicSentences
-    ? extractions.filter((ex) =>
-        Array.isArray(ex.source_sentences) &&
-        ex.source_sentences.some((idx) => topicSentences.includes(idx))
+    ? extractions.filter(
+        (ex) =>
+          Array.isArray(ex.source_sentences) &&
+          ex.source_sentences.some((idx) => topicSentences.includes(idx)),
       )
     : extractions;
 

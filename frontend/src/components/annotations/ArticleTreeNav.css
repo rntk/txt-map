@@ -47,7 +47,9 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .article-tree-node:hover,

@@ -1,6 +1,6 @@
-import React from 'react';
-import DataChart from './DataChart';
-import { getChartType } from '../../../utils/dataChartUtils';
+import React from "react";
+import DataChart from "./DataChart";
+import { getChartType } from "../../../utils/dataChartUtils";
 
 /**
  * DataChartOverview — renders all data extractions matching a given chart type.
@@ -13,7 +13,7 @@ export default function DataChartOverview({ dataExtractions = [], chartType }) {
   if (!chartType) return null;
 
   const matching = dataExtractions.filter(
-    (ex) => getChartType(ex) === chartType
+    (ex) => getChartType(ex) === chartType,
   );
 
   if (!matching.length) return null;

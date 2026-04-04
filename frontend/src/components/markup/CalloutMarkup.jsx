@@ -1,27 +1,27 @@
-import React from 'react';
-import { getSegmentIndices, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getSegmentIndices, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 const LEVEL_CONFIG = {
   warning: {
-    label: 'Warning',
-    icon: '⚠',
-    ariaLabel: 'Warning notice',
+    label: "Warning",
+    icon: "⚠",
+    ariaLabel: "Warning notice",
   },
   tip: {
-    label: 'Tip',
-    icon: '💡',
-    ariaLabel: 'Helpful tip',
+    label: "Tip",
+    icon: "💡",
+    ariaLabel: "Helpful tip",
   },
   note: {
-    label: 'Note',
-    icon: 'ℹ',
-    ariaLabel: 'Information note',
+    label: "Note",
+    icon: "ℹ",
+    ariaLabel: "Information note",
   },
   important: {
-    label: 'Important',
-    icon: '❗',
-    ariaLabel: 'Important notice',
+    label: "Important",
+    icon: "❗",
+    ariaLabel: "Important notice",
   },
 };
 
@@ -30,7 +30,7 @@ const LEVEL_CONFIG = {
  * Supports warning, tip, note, and important levels with icons and accessibility attributes
  */
 export default function CalloutMarkup({ segment, sentences }) {
-  const level = segment.data?.level || 'note';
+  const level = segment.data?.level || "note";
   const config = LEVEL_CONFIG[level] || LEVEL_CONFIG.note;
   const indices = getSegmentIndices(segment);
 

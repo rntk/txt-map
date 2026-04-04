@@ -1,6 +1,7 @@
 """
 Insights generation task.
 """
+
 import inspect
 import logging
 import re
@@ -110,7 +111,9 @@ def _resolve_insight_source_sentences(
     for sentence_index in sentence_indices:
         zero_based_index = sentence_index - 1
         if 0 <= zero_based_index < len(sentence_list):
-            source_sentences.append(_coerce_sentence_text(sentence_list[zero_based_index]))
+            source_sentences.append(
+                _coerce_sentence_text(sentence_list[zero_based_index])
+            )
     return source_sentences
 
 
@@ -184,7 +187,8 @@ def _map_insight_sentence_indices_to_topics(
             continue
 
         matched_indices = sorted(
-            idx for idx in topic_sentences_raw
+            idx
+            for idx in topic_sentences_raw
             if isinstance(idx, int) and idx in sentence_index_set
         )
         if matched_indices:
@@ -275,7 +279,9 @@ def _map_insight_source_sentences_to_topics(
     candidate_sentence_indices: List[int] = []
     seen_indices: set[int] = set()
     for source_sentence in source_sentences:
-        for sentence_index in _find_matching_result_sentence_indices(source_sentence, results_sentences):
+        for sentence_index in _find_matching_result_sentence_indices(
+            source_sentence, results_sentences
+        ):
             if sentence_index in seen_indices:
                 continue
             seen_indices.add(sentence_index)
@@ -302,7 +308,9 @@ def _generate_insights(
     """
     source = submission.get("html_content") or submission.get("text_content", "")
     results_sentences = submission.get("results", {}).get("sentences", [])
-    canonical_sentences = results_sentences if isinstance(results_sentences, list) else []
+    canonical_sentences = (
+        results_sentences if isinstance(results_sentences, list) else []
+    )
     if not source:
         return []
 
@@ -325,7 +333,9 @@ def _generate_insights(
         # Network retries handled by LLM worker; skip RetryingLLMCallable.
         llm_with_retry: Any = llm_adapted
     else:
-        llm_with_retry = RetryingLLMCallable(llm_adapted, max_retries=3, backoff_factor=1.0)
+        llm_with_retry = RetryingLLMCallable(
+            llm_adapted, max_retries=3, backoff_factor=1.0
+        )
     if cache_store is not None:
         llm_callable = CachingLLMCallable(
             llm_with_retry,
@@ -357,9 +367,16 @@ def _generate_insights(
 
     result: List[Dict[str, Any]] = []
     for insight in insights:
-        ranges = [{"start": sentence_range.start, "end": sentence_range.end} for sentence_range in insight.ranges]
-        raw_source_sentence_indices = _insight_ranges_to_sentence_indices(insight.ranges)
-        source_sentences = _resolve_insight_source_sentences(raw_source_sentence_indices, sentence_list)
+        ranges = [
+            {"start": sentence_range.start, "end": sentence_range.end}
+            for sentence_range in insight.ranges
+        ]
+        raw_source_sentence_indices = _insight_ranges_to_sentence_indices(
+            insight.ranges
+        )
+        source_sentences = _resolve_insight_source_sentences(
+            raw_source_sentence_indices, sentence_list
+        )
         aligned_source_sentence_indices = _align_source_sentences_to_results_sentences(
             source_sentences,
             canonical_sentences,
@@ -369,7 +386,9 @@ def _generate_insights(
             for sentence_index in raw_source_sentence_indices
             if 1 <= sentence_index <= len(canonical_sentences)
         ]
-        insight_topics = _map_insight_sentence_indices_to_topics(source_sentence_indices, topics)
+        insight_topics = _map_insight_sentence_indices_to_topics(
+            source_sentence_indices, topics
+        )
         if not insight_topics:
             insight_topics = _map_insight_source_sentences_to_topics(
                 source_sentences,
@@ -406,5 +425,9 @@ def process_insights_generation(
     namespace = _cache_namespace(llm)
     insights = _generate_insights(submission, topics, llm, cache_store, namespace)
 
-    logger.info("Insights generation completed for %s: %d insights", submission_id, len(insights))
+    logger.info(
+        "Insights generation completed for %s: %d insights",
+        submission_id,
+        len(insights),
+    )
     SubmissionsStorage(db).update_results(submission_id, {"insights": insights})

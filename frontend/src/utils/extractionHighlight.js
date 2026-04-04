@@ -44,19 +44,20 @@
  * @returns {string}
  */
 export function buildExtractionKey(extraction) {
-  if (!extraction || typeof extraction !== 'object') {
-    return '';
+  if (!extraction || typeof extraction !== "object") {
+    return "";
   }
 
-  const label = typeof extraction.label === 'string' ? extraction.label.trim() : '';
+  const label =
+    typeof extraction.label === "string" ? extraction.label.trim() : "";
   const sourceSentences = Array.isArray(extraction.source_sentences)
-    ? extraction.source_sentences.join(',')
-    : '';
+    ? extraction.source_sentences.join(",")
+    : "";
   const values = Array.isArray(extraction.values)
     ? extraction.values
-        .map((item) => `${item?.key || ''}:${item?.value || ''}`)
-        .join('|')
-    : '';
+        .map((item) => `${item?.key || ""}:${item?.value || ""}`)
+        .join("|")
+    : "";
 
   return `${label}__${sourceSentences}__${values}`;
 }
@@ -67,7 +68,7 @@ export function buildExtractionKey(extraction) {
  */
 export function getExtractionValues(extraction) {
   return (Array.isArray(extraction?.values) ? extraction.values : [])
-    .map((item) => (typeof item?.value === 'string' ? item.value.trim() : ''))
+    .map((item) => (typeof item?.value === "string" ? item.value.trim() : ""))
     .filter(Boolean);
 }
 
@@ -77,7 +78,10 @@ export function getExtractionValues(extraction) {
  * @returns {boolean}
  */
 export function extractionIncludesSentence(extraction, sentenceIndex) {
-  return Array.isArray(extraction?.source_sentences) && extraction.source_sentences.includes(sentenceIndex);
+  return (
+    Array.isArray(extraction?.source_sentences) &&
+    extraction.source_sentences.includes(sentenceIndex)
+  );
 }
 
 /**
@@ -150,11 +154,15 @@ export function buildExtractionTextSegments(sentence, extraction) {
   }
 
   const ranges = mergeRanges(
-    getExtractionValues(extraction).flatMap((value) => findCaseInsensitiveRanges(sentence, value))
+    getExtractionValues(extraction).flatMap((value) =>
+      findCaseInsensitiveRanges(sentence, value),
+    ),
   );
 
   if (ranges.length === 0) {
-    return [{ start: 0, end: sentence.length, text: sentence, highlighted: false }];
+    return [
+      { start: 0, end: sentence.length, text: sentence, highlighted: false },
+    ];
   }
 
   const segments = [];

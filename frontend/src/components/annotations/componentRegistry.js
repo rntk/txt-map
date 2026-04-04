@@ -1,32 +1,36 @@
-import TreemapChart from '../TreemapChart';
-import ArticleStructureChart from '../ArticleStructureChart';
-import TopicsRiverChart from '../TopicsRiverChart';
-import TopicsBarChart from '../TopicsBarChart';
-import TopicsTagCloud from '../TopicsTagCloud';
-import CircularPackingChart from '../CircularPackingChart';
-import RadarChart from '../RadarChart';
-import MarimekkoChartTab from '../MarimekkoChartTab';
-import MindmapResults from '../MindmapResults';
-import DataChartOverview from './charts/DataChartOverview';
+import TreemapChart from "../TreemapChart";
+import ArticleStructureChart from "../ArticleStructureChart";
+import TopicsRiverChart from "../TopicsRiverChart";
+import TopicsBarChart from "../TopicsBarChart";
+import TopicsTagCloud from "../TopicsTagCloud";
+import CircularPackingChart from "../CircularPackingChart";
+import RadarChart from "../RadarChart";
+import MarimekkoChartTab from "../MarimekkoChartTab";
+import MindmapResults from "../MindmapResults";
+import DataChartOverview from "./charts/DataChartOverview";
 
 /**
  * Topic-structure chart names — selected randomly by the frontend, not by the LLM.
  * These visualize the topic structure in various ways; all work regardless of content.
  */
 export const TOPIC_CHART_NAMES = [
-  'TreemapChart',
-  'ArticleStructureChart',
-  'TopicsRiverChart',
-  'TopicsBarChart',
-  'TopicsTagCloud',
-  'CircularPackingChart',
-  'RadarChart',
-  'MarimekkoChartTab',
-  'MindmapResults',
+  "TreemapChart",
+  "ArticleStructureChart",
+  "TopicsRiverChart",
+  "TopicsBarChart",
+  "TopicsTagCloud",
+  "CircularPackingChart",
+  "RadarChart",
+  "MarimekkoChartTab",
+  "MindmapResults",
 ];
 
 /** Data-driven chart names — selected by the LLM when the article has quantitative data. */
-export const DATA_CHART_NAMES = new Set(['DataBarChart', 'DataLineChart', 'DataTimelineChart']);
+export const DATA_CHART_NAMES = new Set([
+  "DataBarChart",
+  "DataLineChart",
+  "DataTimelineChart",
+]);
 
 /**
  * Registry mapping LLM-output component names to actual React components.
@@ -35,55 +39,55 @@ export const DATA_CHART_NAMES = new Set(['DataBarChart', 'DataLineChart', 'DataT
 export const COMPONENT_REGISTRY = {
   TreemapChart: {
     component: TreemapChart,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   ArticleStructureChart: {
     component: ArticleStructureChart,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   TopicsRiverChart: {
     component: TopicsRiverChart,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   TopicsBarChart: {
     component: TopicsBarChart,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   TopicsTagCloud: {
     component: TopicsTagCloud,
-    dataNeeds: ['submissionId', 'topics', 'sentences'],
+    dataNeeds: ["submissionId", "topics", "sentences"],
   },
   CircularPackingChart: {
     component: CircularPackingChart,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   RadarChart: {
     component: RadarChart,
-    dataNeeds: ['topics', 'sentences'],
+    dataNeeds: ["topics", "sentences"],
   },
   MarimekkoChartTab: {
     component: MarimekkoChartTab,
-    dataNeeds: ['topics', 'sentences', 'markup'],
+    dataNeeds: ["topics", "sentences", "markup"],
   },
   MindmapResults: {
     component: MindmapResults,
-    dataNeeds: ['mindmapData'],
+    dataNeeds: ["mindmapData"],
   },
   // Data-driven charts — render extractions matching their chart type
   DataBarChart: {
     component: DataChartOverview,
-    dataNeeds: ['dataExtractions'],
-    chartType: 'bar',
+    dataNeeds: ["dataExtractions"],
+    chartType: "bar",
   },
   DataLineChart: {
     component: DataChartOverview,
-    dataNeeds: ['dataExtractions'],
-    chartType: 'line',
+    dataNeeds: ["dataExtractions"],
+    chartType: "line",
   },
   DataTimelineChart: {
     component: DataChartOverview,
-    dataNeeds: ['dataExtractions'],
-    chartType: 'timeline',
+    dataNeeds: ["dataExtractions"],
+    chartType: "timeline",
   },
 };
 
@@ -94,18 +98,25 @@ const MIN_FILTERED_TOPICS = 2;
  * Falls back to the full list if filtering yields fewer than MIN_FILTERED_TOPICS.
  */
 export function filterTopics(topics, chartSpec) {
-  if (!chartSpec || !Array.isArray(topics) || topics.length === 0) return topics;
+  if (!chartSpec || !Array.isArray(topics) || topics.length === 0)
+    return topics;
 
   let filtered = topics;
 
-  if (Array.isArray(chartSpec.topic_filter) && chartSpec.topic_filter.length > 0) {
+  if (
+    Array.isArray(chartSpec.topic_filter) &&
+    chartSpec.topic_filter.length > 0
+  ) {
     const allowSet = new Set(chartSpec.topic_filter);
-    filtered = topics.filter(t => allowSet.has(t.name));
-  } else if (typeof chartSpec.scope === 'string' && chartSpec.scope.length > 0) {
+    filtered = topics.filter((t) => allowSet.has(t.name));
+  } else if (
+    typeof chartSpec.scope === "string" &&
+    chartSpec.scope.length > 0
+  ) {
     const prefix = chartSpec.scope;
-    filtered = topics.filter(t => {
-      const name = t.name || '';
-      return name === prefix || name.startsWith(prefix + ' > ');
+    filtered = topics.filter((t) => {
+      const name = t.name || "";
+      return name === prefix || name.startsWith(prefix + " > ");
     });
   }
 
@@ -124,25 +135,25 @@ export function assembleChartProps(componentName, ctx, chartSpec = null) {
 
   for (const need of entry.dataNeeds) {
     switch (need) {
-      case 'topics':
+      case "topics":
         props.topics = filterTopics(ctx.topics || [], chartSpec);
         break;
-      case 'sentences':
+      case "sentences":
         props.sentences = ctx.sentences || [];
         break;
-      case 'submissionId':
+      case "submissionId":
         props.submissionId = ctx.submissionId;
         break;
-      case 'mindmapData':
+      case "mindmapData":
         props.mindmapData = {
           topic_mindmaps: ctx.topicMindmaps || {},
           sentences: ctx.sentences || [],
         };
         break;
-      case 'markup':
+      case "markup":
         props.markup = ctx.markup || {};
         break;
-      case 'dataExtractions':
+      case "dataExtractions":
         props.dataExtractions = ctx.dataExtractions || [];
         break;
       default:
@@ -156,8 +167,17 @@ export function assembleChartProps(componentName, ctx, chartSpec = null) {
   }
 
   // Charts that support onShowInArticle get a noop in overview context
-  if (['TreemapChart', 'ArticleStructureChart', 'TopicsRiverChart', 'TopicsBarChart',
-       'CircularPackingChart', 'RadarChart', 'MarimekkoChartTab'].includes(componentName)) {
+  if (
+    [
+      "TreemapChart",
+      "ArticleStructureChart",
+      "TopicsRiverChart",
+      "TopicsBarChart",
+      "CircularPackingChart",
+      "RadarChart",
+      "MarimekkoChartTab",
+    ].includes(componentName)
+  ) {
     props.onShowInArticle = noop;
   }
 

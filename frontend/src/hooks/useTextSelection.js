@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Hook to detect and handle single-word text selection in the browser.
@@ -44,8 +44,8 @@ export function useTextSelection() {
             word,
             position: {
               x: rect.left + rect.width / 2,
-              y: rect.top - 8 // slightly above the text
-            }
+              y: rect.top - 8, // slightly above the text
+            },
           });
           return;
         }
@@ -67,13 +67,13 @@ export function useTextSelection() {
   }, []);
 
   useEffect(() => {
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("selectionchange", handleSelectionChange);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [handleMouseDown, handleMouseUp, handleSelectionChange]);

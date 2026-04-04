@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 /**
  * KeyInsightsCard — displays key insights extracted from the article.
@@ -28,14 +28,16 @@ export default function KeyInsightsCard({ keyInsights, onTopicClick }) {
                       key={j}
                       className="rg-insight-item__topic-link"
                       onClick={() => onTopicClick && onTopicClick(topicName)}
-                      title={topicName.includes('>') ? topicName : undefined}
+                      title={topicName.includes(">") ? topicName : undefined}
                     >
-                      {topicName.split('>').pop()}
+                      {topicName.split(">").pop()}
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="rg-insight-item__no-topics">No specific topics identified</p>
+                <p className="rg-insight-item__no-topics">
+                  No specific topics identified
+                </p>
               )}
             </div>
           );

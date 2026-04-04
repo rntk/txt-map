@@ -7,6 +7,7 @@ Tests request/response formats for chat, embeddings, rerank
 Mocks: http.client, urlparse, json, os.getenv, logging
 Tests edge cases: empty texts, long prompts, server unavailable, SSL errors
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 import json
@@ -23,10 +24,11 @@ from lib.llm.llamacpp import LLamaCPP
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture(autouse=True)
 def reset_environment():
     """Reset environment and clear mocks before each test."""
-    with patch('lib.llm.llamacpp.os.getenv') as mock_getenv:
+    with patch("lib.llm.llamacpp.os.getenv") as mock_getenv:
         mock_getenv.return_value = None  # Default: no TOKEN env var
         yield mock_getenv
 
@@ -34,7 +36,7 @@ def reset_environment():
 @pytest.fixture
 def mock_http_connection():
     """Create a mock HTTPConnection."""
-    with patch('lib.llm.llamacpp.HTTPConnection') as mock_conn:
+    with patch("lib.llm.llamacpp.HTTPConnection") as mock_conn:
         mock_instance = MagicMock()
         mock_conn.return_value = mock_instance
         yield mock_instance
@@ -43,7 +45,7 @@ def mock_http_connection():
 @pytest.fixture
 def mock_https_connection():
     """Create a mock HTTPSConnection."""
-    with patch('lib.llm.llamacpp.HTTPSConnection') as mock_conn:
+    with patch("lib.llm.llamacpp.HTTPSConnection") as mock_conn:
         mock_instance = MagicMock()
         mock_conn.return_value = mock_instance
         yield mock_instance
@@ -52,14 +54,14 @@ def mock_https_connection():
 @pytest.fixture
 def mock_urlparse():
     """Create a mock urlparse."""
-    with patch('lib.llm.llamacpp.urlparse') as mock_parse:
+    with patch("lib.llm.llamacpp.urlparse") as mock_parse:
         yield mock_parse
 
 
 @pytest.fixture
 def mock_json_dumps():
     """Mock json.dumps."""
-    with patch('lib.llm.llamacpp.json.dumps') as mock_dumps:
+    with patch("lib.llm.llamacpp.json.dumps") as mock_dumps:
         mock_dumps.side_effect = json.dumps
         yield mock_dumps
 
@@ -67,7 +69,7 @@ def mock_json_dumps():
 @pytest.fixture
 def mock_json_loads():
     """Mock json.loads."""
-    with patch('lib.llm.llamacpp.json.loads') as mock_loads:
+    with patch("lib.llm.llamacpp.json.loads") as mock_loads:
         mock_loads.side_effect = json.loads
         yield mock_loads
 
@@ -75,13 +77,14 @@ def mock_json_loads():
 @pytest.fixture
 def mock_logging():
     """Mock logging module."""
-    with patch('lib.llm.llamacpp.logging') as mock_log:
+    with patch("lib.llm.llamacpp.logging") as mock_log:
         yield mock_log
 
 
 # =============================================================================
 # Test: __init__ method
 # =============================================================================
+
 
 class TestLlamaCPPInit:
     """Tests for LLamaCPP.__init__ method."""
@@ -169,7 +172,9 @@ class TestLlamaCPPInit:
         reset_environment.assert_called_with("TOKEN")
         assert llm._LLamaCPP__token == "env-token"
 
-    def test_provided_token_takes_precedence_over_env(self, mock_urlparse, reset_environment):
+    def test_provided_token_takes_precedence_over_env(
+        self, mock_urlparse, reset_environment
+    ):
         """Provided token takes precedence over environment variable."""
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
@@ -181,7 +186,9 @@ class TestLlamaCPPInit:
 
         assert llm._LLamaCPP__token == "provided-token"
 
-    def test_token_is_none_when_not_provided_and_not_in_env(self, mock_urlparse, reset_environment):
+    def test_token_is_none_when_not_provided_and_not_in_env(
+        self, mock_urlparse, reset_environment
+    ):
         """Token is None when not provided and not in environment."""
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
@@ -193,7 +200,9 @@ class TestLlamaCPPInit:
 
         assert llm._LLamaCPP__token is None
 
-    def test_detects_https_scheme_case_insensitive(self, mock_urlparse, reset_environment):
+    def test_detects_https_scheme_case_insensitive(
+        self, mock_urlparse, reset_environment
+    ):
         """Detects HTTPS scheme case-insensitively."""
         mock_parsed = MagicMock()
         mock_parsed.netloc = "example.com"
@@ -209,12 +218,13 @@ class TestLlamaCPPInit:
 # Test: estimate_tokens method
 # =============================================================================
 
+
 class TestEstimateTokens:
     """Tests for LLamaCPP.estimate_tokens method."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse:
+        with patch("lib.llm.llamacpp.urlparse") as mock_parse:
             mock_parsed = MagicMock()
             mock_parsed.netloc = "localhost:8989"
             mock_parsed.scheme = "http"
@@ -226,7 +236,7 @@ class TestReasoningExtraction:
     """Tests for LLamaCPP reasoning extraction."""
 
     def setup_method(self) -> None:
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse:
+        with patch("lib.llm.llamacpp.urlparse") as mock_parse:
             mock_parsed = MagicMock()
             mock_parsed.netloc = "localhost:8989"
             mock_parsed.scheme = "http"
@@ -305,13 +315,16 @@ class TestReasoningExtraction:
 # Test: get_connection method
 # =============================================================================
 
+
 class TestGetConnection:
     """Tests for LLamaCPP.get_connection method."""
 
     def test_returns_https_connection_for_https_urls(self):
         """Returns HTTPSConnection for HTTPS URLs."""
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse, \
-             patch('lib.llm.llamacpp.HTTPSConnection') as mock_https:
+        with (
+            patch("lib.llm.llamacpp.urlparse") as mock_parse,
+            patch("lib.llm.llamacpp.HTTPSConnection") as mock_https,
+        ):
             mock_parsed = MagicMock()
             mock_parsed.netloc = "example.com"
             mock_parsed.scheme = "https"
@@ -327,8 +340,10 @@ class TestGetConnection:
 
     def test_returns_http_connection_for_http_urls(self):
         """Returns HTTPConnection for HTTP URLs."""
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse, \
-             patch('lib.llm.llamacpp.HTTPConnection') as mock_http:
+        with (
+            patch("lib.llm.llamacpp.urlparse") as mock_parse,
+            patch("lib.llm.llamacpp.HTTPConnection") as mock_http,
+        ):
             mock_parsed = MagicMock()
             mock_parsed.netloc = "localhost:8989"
             mock_parsed.scheme = "http"
@@ -344,8 +359,10 @@ class TestGetConnection:
 
     def test_uses_stored_host(self):
         """Uses stored host for connection."""
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse, \
-             patch('lib.llm.llamacpp.HTTPConnection') as mock_http:
+        with (
+            patch("lib.llm.llamacpp.urlparse") as mock_parse,
+            patch("lib.llm.llamacpp.HTTPConnection") as mock_http,
+        ):
             mock_parsed = MagicMock()
             mock_parsed.netloc = "custom-host:9999"
             mock_parsed.scheme = "http"
@@ -363,27 +380,28 @@ class TestGetConnection:
 # Test: call method
 # =============================================================================
 
+
 class TestCall:
     """Tests for LLamaCPP.call method."""
 
     def _create_llm_with_mocks(self):
         """Helper to create LLM with proper mocks."""
-        urlparse_patch = patch('lib.llm.llamacpp.urlparse')
-        http_patch = patch('lib.llm.llamacpp.HTTPConnection')
-        
+        urlparse_patch = patch("lib.llm.llamacpp.urlparse")
+        http_patch = patch("lib.llm.llamacpp.HTTPConnection")
+
         mock_parse = urlparse_patch.start()
         mock_http = http_patch.start()
-        
+
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
         mock_parsed.scheme = "http"
         mock_parse.return_value = mock_parsed
-        
+
         mock_conn_instance = MagicMock()
         mock_http.return_value = mock_conn_instance
-        
+
         llm = LLamaCPP("http://localhost:8989")
-        
+
         return llm, mock_conn_instance, urlparse_patch, http_patch
 
     def test_post_to_v1_chat_completions(self):
@@ -392,9 +410,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"])
@@ -413,9 +431,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"])
@@ -433,9 +451,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Response"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Response"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["First message", "Second message"])
@@ -453,9 +471,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"])
@@ -473,9 +491,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"], temperature=0.7)
@@ -493,9 +511,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"])
@@ -513,9 +531,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm.call(["Hello"])
@@ -533,9 +551,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm._LLamaCPP__token = "test-token"
@@ -554,9 +572,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Hello!"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "Hello!"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             llm._LLamaCPP__token = None
@@ -575,9 +593,9 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "The answer is 42"}}]
-            })
+            mock_response.read.return_value = json.dumps(
+                {"choices": [{"message": {"content": "The answer is 42"}}]}
+            )
             mock_conn.getresponse.return_value = mock_response
 
             result = llm.call(["What is the answer?"])
@@ -628,9 +646,7 @@ class TestCall:
             mock_response = MagicMock()
             mock_response.status = 200
             response_body = {
-                "choices": [
-                    {"message": {"content": "Specific response content"}}
-                ]
+                "choices": [{"message": {"content": "Specific response content"}}]
             }
             mock_response.read.return_value = json.dumps(response_body)
             mock_conn.getresponse.return_value = mock_response
@@ -672,7 +688,7 @@ class TestCall:
         try:
             mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.read.return_value = b'invalid json {'
+            mock_response.read.return_value = b"invalid json {"
             mock_conn.getresponse.return_value = mock_response
 
             with pytest.raises(RuntimeError, match="JSON"):
@@ -718,19 +734,20 @@ class TestCall:
 # Test: embeddings method
 # =============================================================================
 
+
 class TestEmbeddings:
     """Tests for LLamaCPP.embeddings method."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.patch_urlparse = patch('lib.llm.llamacpp.urlparse')
+        self.patch_urlparse = patch("lib.llm.llamacpp.urlparse")
         self.mock_parse = self.patch_urlparse.start()
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
         mock_parsed.scheme = "http"
         self.mock_parse.return_value = mock_parsed
 
-        self.patch_http = patch('lib.llm.llamacpp.HTTPConnection')
+        self.patch_http = patch("lib.llm.llamacpp.HTTPConnection")
         self.mock_http = self.patch_http.start()
         self.mock_conn_instance = MagicMock()
         self.mock_http.return_value = self.mock_conn_instance
@@ -827,10 +844,7 @@ class TestEmbeddings:
         mock_response = MagicMock()
         mock_response.status = 200
         response_body = {
-            "data": [
-                {"embedding": [0.1, 0.2, 0.3]},
-                {"embedding": [0.4, 0.5, 0.6]}
-            ]
+            "data": [{"embedding": [0.1, 0.2, 0.3]}, {"embedding": [0.4, 0.5, 0.6]}]
         }
         mock_response.read.return_value = json.dumps(response_body)
         self.mock_conn_instance.getresponse.return_value = mock_response
@@ -866,7 +880,9 @@ class TestEmbeddings:
 
     def test_handles_connection_error(self, mock_logging):
         """Handles connection errors by returning None."""
-        self.mock_conn_instance.request.side_effect = ConnectionError("Connection refused")
+        self.mock_conn_instance.request.side_effect = ConnectionError(
+            "Connection refused"
+        )
 
         result = self.llm.embeddings(["text"])
 
@@ -877,7 +893,7 @@ class TestEmbeddings:
         """Handles invalid JSON response by returning None."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = b'invalid json {'
+        mock_response.read.return_value = b"invalid json {"
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         result = self.llm.embeddings(["text"])
@@ -905,19 +921,20 @@ class TestEmbeddings:
 # Test: rerank method
 # =============================================================================
 
+
 class TestRerank:
     """Tests for LLamaCPP.rerank method."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.patch_urlparse = patch('lib.llm.llamacpp.urlparse')
+        self.patch_urlparse = patch("lib.llm.llamacpp.urlparse")
         self.mock_parse = self.patch_urlparse.start()
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
         mock_parsed.scheme = "http"
         self.mock_parse.return_value = mock_parsed
 
-        self.patch_http = patch('lib.llm.llamacpp.HTTPConnection')
+        self.patch_http = patch("lib.llm.llamacpp.HTTPConnection")
         self.mock_http = self.patch_http.start()
         self.mock_conn_instance = MagicMock()
         self.mock_http.return_value = self.mock_conn_instance
@@ -1029,7 +1046,7 @@ class TestRerank:
         response_body = {
             "results": [
                 {"document": "doc1", "index": 0, "relevance_score": 0.9},
-                {"document": "doc2", "index": 1, "relevance_score": 0.7}
+                {"document": "doc2", "index": 1, "relevance_score": 0.7},
             ]
         }
         mock_response.read.return_value = json.dumps(response_body)
@@ -1039,7 +1056,7 @@ class TestRerank:
 
         assert result == [
             {"document": "doc1", "index": 0, "relevance_score": 0.9},
-            {"document": "doc2", "index": 1, "relevance_score": 0.7}
+            {"document": "doc2", "index": 1, "relevance_score": 0.7},
         ]
 
     def test_response_status_error_logs_and_returns_none(self, mock_logging):
@@ -1057,7 +1074,9 @@ class TestRerank:
 
     def test_handles_connection_error(self, mock_logging):
         """Handles connection errors by returning None."""
-        self.mock_conn_instance.request.side_effect = ConnectionError("Connection refused")
+        self.mock_conn_instance.request.side_effect = ConnectionError(
+            "Connection refused"
+        )
 
         result = self.llm.rerank("query", ["doc1"])
 
@@ -1068,7 +1087,7 @@ class TestRerank:
         """Handles invalid JSON response by returning None."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = b'invalid json {'
+        mock_response.read.return_value = b"invalid json {"
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         result = self.llm.rerank("query", ["doc1"])
@@ -1108,7 +1127,9 @@ class TestRerank:
         mock_response = MagicMock()
         mock_response.status = 200
         response_body = {
-            "results": [{"document": "original doc text", "index": 0, "relevance_score": 0.95}]
+            "results": [
+                {"document": "original doc text", "index": 0, "relevance_score": 0.95}
+            ]
         }
         mock_response.read.return_value = json.dumps(response_body)
         self.mock_conn_instance.getresponse.return_value = mock_response
@@ -1150,19 +1171,20 @@ class TestRerank:
 # Test: Edge Cases and Error Handling
 # =============================================================================
 
+
 class TestEdgeCases:
     """Tests for edge cases and error handling."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.patch_urlparse = patch('lib.llm.llamacpp.urlparse')
+        self.patch_urlparse = patch("lib.llm.llamacpp.urlparse")
         self.mock_parse = self.patch_urlparse.start()
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
         mock_parsed.scheme = "http"
         self.mock_parse.return_value = mock_parsed
 
-        self.patch_http = patch('lib.llm.llamacpp.HTTPConnection')
+        self.patch_http = patch("lib.llm.llamacpp.HTTPConnection")
         self.mock_http = self.patch_http.start()
         self.mock_conn_instance = MagicMock()
         self.mock_http.return_value = self.mock_conn_instance
@@ -1176,22 +1198,28 @@ class TestEdgeCases:
 
     def test_server_unavailable_connection_refused(self):
         """Server unavailable: connection refused."""
-        self.mock_conn_instance.request.side_effect = ConnectionRefusedError("Connection refused")
+        self.mock_conn_instance.request.side_effect = ConnectionRefusedError(
+            "Connection refused"
+        )
 
         with pytest.raises(RuntimeError, match="Connection refused"):
             self.llm.call(["Hello"])
 
     def test_server_unavailable_timeout(self):
         """Server unavailable: timeout."""
-        self.mock_conn_instance.getresponse.side_effect = TimeoutError("Connection timed out")
+        self.mock_conn_instance.getresponse.side_effect = TimeoutError(
+            "Connection timed out"
+        )
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "OK"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "OK"}}]}
+        )
         self.mock_conn_instance.request.side_effect = None
-        self.mock_conn_instance.getresponse.side_effect = TimeoutError("Connection timed out")
+        self.mock_conn_instance.getresponse.side_effect = TimeoutError(
+            "Connection timed out"
+        )
 
         with pytest.raises(RuntimeError, match="timed out"):
             self.llm.call(["Hello"])
@@ -1202,13 +1230,13 @@ class TestEdgeCases:
         self.patch_http.stop()
 
         # Create new mocks for HTTPS
-        with patch('lib.llm.llamacpp.urlparse') as mock_parse:
+        with patch("lib.llm.llamacpp.urlparse") as mock_parse:
             mock_parsed = MagicMock()
             mock_parsed.netloc = "secure.example.com"
             mock_parsed.scheme = "https"
             mock_parse.return_value = mock_parsed
 
-            with patch('lib.llm.llamacpp.HTTPSConnection') as mock_https:
+            with patch("lib.llm.llamacpp.HTTPSConnection") as mock_https:
                 mock_https.side_effect = Exception("SSL: CERTIFICATE_VERIFY_FAILED")
 
                 llm = LLamaCPP("https://secure.example.com")
@@ -1221,9 +1249,9 @@ class TestEdgeCases:
         long_text = "a" * 50000  # 50KB prompt
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "Response to long prompt"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "Response to long prompt"}}]}
+        )
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         result = self.llm.call([long_text])
@@ -1238,9 +1266,9 @@ class TestEdgeCases:
         """Empty user message."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "Response"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "Response"}}]}
+        )
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         result = self.llm.call([""])
@@ -1288,9 +1316,9 @@ class TestEdgeCases:
         special_text = "Hello! @#$%^&*() \u4e16\u754c \u00e9\u00e8\u00ea"
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "Response"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "Response"}}]}
+        )
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         self.llm.call([special_text])
@@ -1304,9 +1332,9 @@ class TestEdgeCases:
         text_with_newlines = "Line 1\nLine 2\nLine 3"
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "Response"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "Response"}}]}
+        )
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         self.llm.call([text_with_newlines])
@@ -1323,7 +1351,7 @@ class TestEdgeCases:
             "data": [
                 {"embedding": [0.1] * 1536},
                 {"embedding": [0.2] * 1536},
-                {"embedding": [0.3] * 1536}
+                {"embedding": [0.3] * 1536},
             ]
         }
         mock_response.read.return_value = json.dumps(response_body)
@@ -1339,7 +1367,10 @@ class TestEdgeCases:
         docs = [f"Document {i}" for i in range(100)]
         mock_response = MagicMock()
         mock_response.status = 200
-        results = [{"document": f"Document {i}", "index": i, "relevance_score": 1.0 - i * 0.01} for i in range(100)]
+        results = [
+            {"document": f"Document {i}", "index": i, "relevance_score": 1.0 - i * 0.01}
+            for i in range(100)
+        ]
         mock_response.read.return_value = json.dumps({"results": results})
         self.mock_conn_instance.getresponse.return_value = mock_response
 
@@ -1353,7 +1384,10 @@ class TestEdgeCases:
         mock_response = MagicMock()
         mock_response.status = 200
         # Server should return top_n results
-        results = [{"document": f"doc{i+1}", "index": i, "relevance_score": 1.0 - i * 0.1} for i in range(3)]
+        results = [
+            {"document": f"doc{i + 1}", "index": i, "relevance_score": 1.0 - i * 0.1}
+            for i in range(3)
+        ]
         mock_response.read.return_value = json.dumps({"results": results})
         self.mock_conn_instance.getresponse.return_value = mock_response
 
@@ -1370,19 +1404,20 @@ class TestEdgeCases:
 # Test: Integration Scenarios
 # =============================================================================
 
+
 class TestIntegrationScenarios:
     """Integration scenario tests."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.patch_urlparse = patch('lib.llm.llamacpp.urlparse')
+        self.patch_urlparse = patch("lib.llm.llamacpp.urlparse")
         self.mock_parse = self.patch_urlparse.start()
         mock_parsed = MagicMock()
         mock_parsed.netloc = "localhost:8989"
         mock_parsed.scheme = "http"
         self.mock_parse.return_value = mock_parsed
 
-        self.patch_http = patch('lib.llm.llamacpp.HTTPConnection')
+        self.patch_http = patch("lib.llm.llamacpp.HTTPConnection")
         self.mock_http = self.patch_http.start()
         self.mock_conn_instance = MagicMock()
         self.mock_http.return_value = self.mock_conn_instance
@@ -1404,10 +1439,10 @@ class TestIntegrationScenarios:
                 {
                     "message": {
                         "role": "assistant",
-                        "content": "The capital of France is Paris."
+                        "content": "The capital of France is Paris.",
                     }
                 }
-            ]
+            ],
         }
         mock_response.read.return_value = json.dumps(response_body)
         self.mock_conn_instance.getresponse.return_value = mock_response
@@ -1423,9 +1458,9 @@ class TestIntegrationScenarios:
         response_body = {
             "data": [
                 {"index": 0, "embedding": [0.01, 0.02, 0.03]},
-                {"index": 1, "embedding": [0.04, 0.05, 0.06]}
+                {"index": 1, "embedding": [0.04, 0.05, 0.06]},
             ],
-            "usage": {"total_tokens": 10}
+            "usage": {"total_tokens": 10},
         }
         mock_response.read.return_value = json.dumps(response_body)
         self.mock_conn_instance.getresponse.return_value = mock_response
@@ -1442,16 +1477,23 @@ class TestIntegrationScenarios:
         mock_response.status = 200
         response_body = {
             "results": [
-                {"document": "Paris is the capital", "index": 1, "relevance_score": 0.95},
-                {"document": "France country info", "index": 0, "relevance_score": 0.75}
+                {
+                    "document": "Paris is the capital",
+                    "index": 1,
+                    "relevance_score": 0.95,
+                },
+                {
+                    "document": "France country info",
+                    "index": 0,
+                    "relevance_score": 0.75,
+                },
             ]
         }
         mock_response.read.return_value = json.dumps(response_body)
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         result = self.llm.rerank(
-            "capital of France",
-            ["France country info", "Paris is the capital"]
+            "capital of France", ["France country info", "Paris is the capital"]
         )
 
         assert len(result) == 2
@@ -1461,9 +1503,9 @@ class TestIntegrationScenarios:
         """Token authentication included in all methods."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "OK"}}]
-        })
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "OK"}}]}
+        )
         self.mock_conn_instance.getresponse.return_value = mock_response
 
         # Test call

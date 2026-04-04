@@ -1,6 +1,6 @@
-import React from 'react';
-import { getItemIndex, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getItemIndex, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * TimelineMarkup - Displays chronological events with visual timeline
@@ -26,15 +26,14 @@ export default function TimelineMarkup({ segment, sentences }) {
       <div className="markup-timeline__container">
         <div className="markup-timeline__line" aria-hidden="true" />
         {sortedEvents.map((event, index) => {
-          const text = event.description || getTextByIndex(sentences, getItemIndex(event)) || '';
-          const date = event.date || '';
+          const text =
+            event.description ||
+            getTextByIndex(sentences, getItemIndex(event)) ||
+            "";
+          const date = event.date || "";
 
           return (
-            <div
-              key={index}
-              className="markup-timeline__event"
-              role="listitem"
-            >
+            <div key={index} className="markup-timeline__event" role="listitem">
               <div className="markup-timeline__dot" aria-hidden="true" />
               {date && (
                 <time className="markup-timeline__date" dateTime={date}>

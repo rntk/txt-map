@@ -25,6 +25,7 @@ Also tests:
 - Error handling
 - MongoDB mocking
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
@@ -36,6 +37,7 @@ from pymongo import DESCENDING, UpdateMany
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -76,7 +78,7 @@ def sample_post():
 def mock_datetime():
     """Mock datetime with fixed timestamp."""
     fixed_now = datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
-    with patch('lib.storage.posts.datetime') as mock_dt:
+    with patch("lib.storage.posts.datetime") as mock_dt:
         mock_dt.now.return_value = fixed_now
         mock_dt.UTC = UTC
         yield mock_dt, fixed_now
@@ -85,6 +87,7 @@ def mock_datetime():
 # =============================================================================
 # Test: Constants
 # =============================================================================
+
 
 class TestConstants:
     """Tests for class-level constants."""
@@ -99,6 +102,7 @@ class TestConstants:
 # =============================================================================
 # Test: __init__
 # =============================================================================
+
 
 class TestInit:
     """Tests for PostsStorage.__init__."""
@@ -117,10 +121,10 @@ class TestInit:
     def test_logger_has_required_methods(self, mock_db):
         """Logger has required methods."""
         storage = PostsStorage(mock_db)
-        assert hasattr(storage._log, 'warning')
-        assert hasattr(storage._log, 'info')
-        assert hasattr(storage._log, 'error')
-        assert hasattr(storage._log, 'debug')
+        assert hasattr(storage._log, "warning")
+        assert hasattr(storage._log, "info")
+        assert hasattr(storage._log, "error")
+        assert hasattr(storage._log, "debug")
 
     def test_stores_db_reference(self, mock_db):
         """Stores db reference correctly."""
@@ -131,6 +135,7 @@ class TestInit:
 # =============================================================================
 # Test: prepare
 # =============================================================================
+
 
 class TestPrepare:
     """Tests for PostsStorage.prepare."""
@@ -202,7 +207,7 @@ class TestPrepare:
         mock_db.posts.create_index.side_effect = Exception("Index already exists")
 
         storage = PostsStorage(mock_db)
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             # Act: should not raise
             storage.prepare()
 
@@ -215,7 +220,7 @@ class TestPrepare:
         mock_db.posts.create_index.side_effect = Exception("Database error")
 
         storage = PostsStorage(mock_db)
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             # Act: should not raise
             storage.prepare()
 
@@ -227,7 +232,7 @@ class TestPrepare:
         mock_db.posts.create_index.side_effect = Exception("Index error")
 
         storage = PostsStorage(mock_db)
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             storage.prepare()
 
             # Check that at least one warning contains "owner"
@@ -238,6 +243,7 @@ class TestPrepare:
 # =============================================================================
 # Test: get_by_category
 # =============================================================================
+
 
 class TestGetByCategory:
     """Tests for PostsStorage.get_by_category."""
@@ -385,6 +391,7 @@ class TestGetByCategory:
 # Test: get_all
 # =============================================================================
 
+
 class TestGetAll:
     """Tests for PostsStorage.get_all."""
 
@@ -458,6 +465,7 @@ class TestGetAll:
 # =============================================================================
 # Test: get_grouped_stat
 # =============================================================================
+
 
 class TestGetGroupedStat:
     """Tests for PostsStorage.get_grouped_stat."""
@@ -536,6 +544,7 @@ class TestGetGroupedStat:
 # =============================================================================
 # Test: get_by_tags
 # =============================================================================
+
 
 class TestGetByTags:
     """Tests for PostsStorage.get_by_tags."""
@@ -623,6 +632,7 @@ class TestGetByTags:
 # Test: get_by_bi_grams
 # =============================================================================
 
+
 class TestGetByBiGrams:
     """Tests for PostsStorage.get_by_bi_grams."""
 
@@ -695,6 +705,7 @@ class TestGetByBiGrams:
 # =============================================================================
 # Test: get_by_feed_id
 # =============================================================================
+
 
 class TestGetByFeedId:
     """Tests for PostsStorage.get_by_feed_id."""
@@ -769,6 +780,7 @@ class TestGetByFeedId:
 # Test: get_by_pid
 # =============================================================================
 
+
 class TestGetByPid:
     """Tests for PostsStorage.get_by_pid."""
 
@@ -811,6 +823,7 @@ class TestGetByPid:
 # =============================================================================
 # Test: get_by_id
 # =============================================================================
+
 
 class TestGetById:
     """Tests for PostsStorage.get_by_id."""
@@ -855,6 +868,7 @@ class TestGetById:
 # Test: get_by_pids
 # =============================================================================
 
+
 class TestGetByPids:
     """Tests for PostsStorage.get_by_pids."""
 
@@ -895,6 +909,7 @@ class TestGetByPids:
 # =============================================================================
 # Test: change_status
 # =============================================================================
+
 
 class TestChangeStatus:
     """Tests for PostsStorage.change_status."""
@@ -953,6 +968,7 @@ class TestChangeStatus:
 # Test: get_stat
 # =============================================================================
 
+
 class TestGetStat:
     """Tests for PostsStorage.get_stat."""
 
@@ -960,10 +976,9 @@ class TestGetStat:
         """Returns stat dictionary."""
         storage = PostsStorage(mock_db)
         mock_cursor = MagicMock()
-        mock_cursor.__iter__ = lambda self: iter([
-            {"_id": True, "counter": 5},
-            {"_id": False, "counter": 10}
-        ])
+        mock_cursor.__iter__ = lambda self: iter(
+            [{"_id": True, "counter": 5}, {"_id": False, "counter": 10}]
+        )
         mock_db.posts.aggregate.return_value = mock_cursor
         mock_db.tags.count_documents.return_value = 3
 
@@ -978,9 +993,7 @@ class TestGetStat:
         """Counts read posts."""
         storage = PostsStorage(mock_db)
         mock_cursor = MagicMock()
-        mock_cursor.__iter__ = lambda self: iter([
-            {"_id": True, "counter": 5}
-        ])
+        mock_cursor.__iter__ = lambda self: iter([{"_id": True, "counter": 5}])
         mock_db.posts.aggregate.return_value = mock_cursor
         mock_db.tags.count_documents.return_value = 0
 
@@ -992,9 +1005,7 @@ class TestGetStat:
         """Counts unread posts."""
         storage = PostsStorage(mock_db)
         mock_cursor = MagicMock()
-        mock_cursor.__iter__ = lambda self: iter([
-            {"_id": False, "counter": 10}
-        ])
+        mock_cursor.__iter__ = lambda self: iter([{"_id": False, "counter": 10}])
         mock_db.posts.aggregate.return_value = mock_cursor
         mock_db.tags.count_documents.return_value = 0
 
@@ -1050,6 +1061,7 @@ class TestGetStat:
 # =============================================================================
 # Test: set_clusters
 # =============================================================================
+
 
 class TestSetClusters:
     """Tests for PostsStorage.set_clusters."""
@@ -1120,6 +1132,7 @@ class TestSetClusters:
 # =============================================================================
 # Test: get_by_clusters
 # =============================================================================
+
 
 class TestGetByClusters:
     """Tests for PostsStorage.get_by_clusters."""
@@ -1208,6 +1221,7 @@ class TestGetByClusters:
 # Test: get_clusters
 # =============================================================================
 
+
 class TestGetClusters:
     """Tests for PostsStorage.get_clusters."""
 
@@ -1285,6 +1299,7 @@ class TestGetClusters:
 # Test: count
 # =============================================================================
 
+
 class TestCount:
     """Tests for PostsStorage.count."""
 
@@ -1320,6 +1335,7 @@ class TestCount:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration-style tests for PostsStorage."""
 
@@ -1337,7 +1353,9 @@ class TestIntegration:
         mock_cursor.sort.return_value = mock_cursor
         mock_db.posts.find.return_value = mock_cursor
 
-        result = storage.get_by_category("test-owner", category="cat-001", only_unread=True)
+        result = storage.get_by_category(
+            "test-owner", category="cat-001", only_unread=True
+        )
         assert result is not None
 
         # Update
@@ -1351,10 +1369,9 @@ class TestIntegration:
 
         # Setup mock aggregation
         mock_cursor = MagicMock()
-        mock_cursor.__iter__ = lambda self: iter([
-            {"_id": True, "counter": 10},
-            {"_id": False, "counter": 20}
-        ])
+        mock_cursor.__iter__ = lambda self: iter(
+            [{"_id": True, "counter": 10}, {"_id": False, "counter": 20}]
+        )
         mock_db.posts.aggregate.return_value = mock_cursor
         mock_db.tags.count_documents.return_value = 5
 

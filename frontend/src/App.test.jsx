@@ -1,21 +1,35 @@
-import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import App from './App';
+import React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import App from "./App";
 
-vi.mock('./components/TextPage', () => ({ default: () => <div>Text Page</div> }));
-vi.mock('./components/TaskControlPage', () => ({ default: () => <div>Task Control</div> }));
-vi.mock('./components/TextListPage', () => ({ default: () => <div>Texts List</div> }));
-vi.mock('./components/MainPage', () => ({ default: () => <div>Main Page</div> }));
-vi.mock('./components/DiffPage', () => ({ default: () => <div>Diff Page</div> }));
-vi.mock('./components/CachePage', () => ({ default: () => <div>Cache Page</div> }));
-vi.mock('./components/GlobalTopicsPage', () => ({ default: () => <div>Global Topics</div> }));
+vi.mock("./components/TextPage", () => ({
+  default: () => <div>Text Page</div>,
+}));
+vi.mock("./components/TaskControlPage", () => ({
+  default: () => <div>Task Control</div>,
+}));
+vi.mock("./components/TextListPage", () => ({
+  default: () => <div>Texts List</div>,
+}));
+vi.mock("./components/MainPage", () => ({
+  default: () => <div>Main Page</div>,
+}));
+vi.mock("./components/DiffPage", () => ({
+  default: () => <div>Diff Page</div>,
+}));
+vi.mock("./components/CachePage", () => ({
+  default: () => <div>Cache Page</div>,
+}));
+vi.mock("./components/GlobalTopicsPage", () => ({
+  default: () => <div>Global Topics</div>,
+}));
 
-describe('App LLM selector', () => {
+describe("App LLM selector", () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    window.history.pushState({}, '', '/page/tasks');
+    window.history.pushState({}, "", "/page/tasks");
   });
 
   afterEach(() => {
@@ -23,19 +37,19 @@ describe('App LLM selector', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders provider and model selectors from settings payload', async () => {
+  it("renders provider and model selectors from settings payload", async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        llm_provider: 'OpenAI',
-        llm_model: 'gpt-4o',
+        llm_provider: "OpenAI",
+        llm_model: "gpt-4o",
         llm_applies_on_next_task: true,
         llm_available_providers: [
           {
-            key: 'openai',
-            name: 'OpenAI',
-            models: ['gpt-4o', 'gpt-5-mini'],
-            default_model: 'gpt-4o',
+            key: "openai",
+            name: "OpenAI",
+            models: ["gpt-4o", "gpt-5-mini"],
+            default_model: "gpt-4o",
           },
         ],
       }),
@@ -43,24 +57,24 @@ describe('App LLM selector', () => {
 
     render(<App />);
 
-    expect(await screen.findByLabelText('LLM provider')).toHaveValue('OpenAI');
-    expect(screen.getByLabelText('LLM model')).toHaveValue('gpt-4o');
-    expect(screen.queryByText('Applies on next task')).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("LLM provider")).toHaveValue("OpenAI");
+    expect(screen.getByLabelText("LLM model")).toHaveValue("gpt-4o");
+    expect(screen.queryByText("Applies on next task")).not.toBeInTheDocument();
   });
 
-  it('renders topbar controls without the legacy app shell header', async () => {
+  it("renders topbar controls without the legacy app shell header", async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        llm_provider: 'OpenAI',
-        llm_model: 'gpt-4o',
+        llm_provider: "OpenAI",
+        llm_model: "gpt-4o",
         llm_applies_on_next_task: true,
         llm_available_providers: [
           {
-            key: 'openai',
-            name: 'OpenAI',
-            models: ['gpt-4o', 'gpt-5-mini'],
-            default_model: 'gpt-4o',
+            key: "openai",
+            name: "OpenAI",
+            models: ["gpt-4o", "gpt-5-mini"],
+            default_model: "gpt-4o",
           },
         ],
       }),
@@ -68,38 +82,38 @@ describe('App LLM selector', () => {
 
     const { container } = render(<App />);
 
-    await screen.findByLabelText('LLM provider');
+    await screen.findByLabelText("LLM provider");
 
-    expect(container.querySelector('.app-shell__header')).toBeNull();
+    expect(container.querySelector(".app-shell__header")).toBeNull();
 
-    const topbar = container.querySelector('.app-shell__topbar');
-    const portalTarget = container.querySelector('#global-menu-portal-target');
+    const topbar = container.querySelector(".app-shell__topbar");
+    const portalTarget = container.querySelector("#global-menu-portal-target");
 
     expect(topbar).not.toBeNull();
     expect(portalTarget).not.toBeNull();
     expect(topbar?.contains(portalTarget)).toBe(true);
-    expect(topbar?.contains(screen.getByLabelText('LLM provider'))).toBe(true);
+    expect(topbar?.contains(screen.getByLabelText("LLM provider"))).toBe(true);
   });
 
-  it('switches model to provider default when provider changes', async () => {
+  it("switches model to provider default when provider changes", async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        llm_provider: 'OpenAI',
-        llm_model: 'gpt-5-mini',
+        llm_provider: "OpenAI",
+        llm_model: "gpt-5-mini",
         llm_applies_on_next_task: true,
         llm_available_providers: [
           {
-            key: 'openai',
-            name: 'OpenAI',
-            models: ['gpt-4o', 'gpt-5-mini'],
-            default_model: 'gpt-4o',
+            key: "openai",
+            name: "OpenAI",
+            models: ["gpt-4o", "gpt-5-mini"],
+            default_model: "gpt-4o",
           },
           {
-            key: 'anthropic',
-            name: 'Anthropic',
-            models: ['claude-sonnet-4-20250514'],
-            default_model: 'claude-sonnet-4-20250514',
+            key: "anthropic",
+            name: "Anthropic",
+            models: ["claude-sonnet-4-20250514"],
+            default_model: "claude-sonnet-4-20250514",
           },
         ],
       }),
@@ -107,28 +121,30 @@ describe('App LLM selector', () => {
 
     render(<App />);
 
-    fireEvent.change(await screen.findByLabelText('LLM provider'), {
-      target: { value: 'Anthropic' },
+    fireEvent.change(await screen.findByLabelText("LLM provider"), {
+      target: { value: "Anthropic" },
     });
 
-    expect(screen.getByLabelText('LLM model')).toHaveValue('claude-sonnet-4-20250514');
+    expect(screen.getByLabelText("LLM model")).toHaveValue(
+      "claude-sonnet-4-20250514",
+    );
   });
 
-  it('saves the selected provider and model', async () => {
+  it("saves the selected provider and model", async () => {
     global.fetch = vi
       .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          llm_provider: 'OpenAI',
-          llm_model: 'gpt-4o',
+          llm_provider: "OpenAI",
+          llm_model: "gpt-4o",
           llm_applies_on_next_task: true,
           llm_available_providers: [
             {
-              key: 'openai',
-              name: 'OpenAI',
-              models: ['gpt-4o', 'gpt-5-mini'],
-              default_model: 'gpt-4o',
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
             },
           ],
         }),
@@ -136,15 +152,15 @@ describe('App LLM selector', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          llm_provider: 'OpenAI',
-          llm_model: 'gpt-5-mini',
+          llm_provider: "OpenAI",
+          llm_model: "gpt-5-mini",
           llm_applies_on_next_task: true,
           llm_available_providers: [
             {
-              key: 'openai',
-              name: 'OpenAI',
-              models: ['gpt-4o', 'gpt-5-mini'],
-              default_model: 'gpt-4o',
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
             },
           ],
         }),
@@ -152,37 +168,37 @@ describe('App LLM selector', () => {
 
     render(<App />);
 
-    fireEvent.change(await screen.findByLabelText('LLM model'), {
-      target: { value: 'gpt-5-mini' },
+    fireEvent.change(await screen.findByLabelText("LLM model"), {
+      target: { value: "gpt-5-mini" },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenNthCalledWith(
         2,
-        '/api/settings/llm',
+        "/api/settings/llm",
         expect.objectContaining({
-          method: 'PUT',
+          method: "PUT",
         }),
       );
     });
   });
 
-  it('shows an inline error hint when saving fails', async () => {
+  it("shows an inline error hint when saving fails", async () => {
     global.fetch = vi
       .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          llm_provider: 'OpenAI',
-          llm_model: 'gpt-4o',
+          llm_provider: "OpenAI",
+          llm_model: "gpt-4o",
           llm_applies_on_next_task: true,
           llm_available_providers: [
             {
-              key: 'openai',
-              name: 'OpenAI',
-              models: ['gpt-4o', 'gpt-5-mini'],
-              default_model: 'gpt-4o',
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
             },
           ],
         }),
@@ -194,11 +210,11 @@ describe('App LLM selector', () => {
 
     render(<App />);
 
-    fireEvent.change(await screen.findByLabelText('LLM model'), {
-      target: { value: 'gpt-5-mini' },
+    fireEvent.change(await screen.findByLabelText("LLM model"), {
+      target: { value: "gpt-5-mini" },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
-    expect(await screen.findByText('Save failed')).toBeInTheDocument();
+    expect(await screen.findByText("Save failed")).toBeInTheDocument();
   });
 });

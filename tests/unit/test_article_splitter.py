@@ -4,6 +4,7 @@ Unit tests for the article_splitter module.
 Tests ArticleSplitResult dataclass, _groups_to_topics, _LLMCallableAdapter,
 split_article, and split_article_with_markers functions.
 """
+
 from unittest.mock import MagicMock, patch
 from txt_splitt.protocols import LLMRequest
 
@@ -26,8 +27,10 @@ from lib.article_splitter import (
 # Mock Classes for txt_splitt Components
 # =============================================================================
 
+
 class MockSentence:
     """Mock Sentence object from txt_splitt."""
+
     def __init__(self, text, index, start=None, end=None):
         self.text = text
         self.index = index
@@ -37,6 +40,7 @@ class MockSentence:
 
 class MockSentenceRange:
     """Mock SentenceRange object from txt_splitt."""
+
     def __init__(self, start, end):
         self.start = start
         self.end = end
@@ -44,6 +48,7 @@ class MockSentenceRange:
 
 class MockGroup:
     """Mock Group object from txt_splitt."""
+
     def __init__(self, label, ranges):
         self.label = label
         self.ranges = ranges
@@ -51,6 +56,7 @@ class MockGroup:
 
 class MockTracer:
     """Mock Tracer from txt_splitt."""
+
     def __init__(self):
         self.traces = []
 
@@ -65,6 +71,7 @@ class MockTracer:
 
 class MockLLMClient:
     """Mock LLM client (LLamaCPP)."""
+
     def __init__(self, response="Mock LLM response"):
         self.response = response
         self.call_count = 0
@@ -95,6 +102,7 @@ class MockCacheStore:
 
 class MockSparseRegexSentenceSplitter:
     """Mock SparseRegexSentenceSplitter from txt_splitt."""
+
     def __init__(self, anchor_every_words=5, html_aware=False):
         self.anchor_every_words = anchor_every_words
         self.html_aware = html_aware
@@ -103,7 +111,8 @@ class MockSparseRegexSentenceSplitter:
         # Simple mock: split by sentence-ending punctuation
         sentences = []
         import re
-        parts = re.split(r'(?<=[.!?])\s+', text.strip())
+
+        parts = re.split(r"(?<=[.!?])\s+", text.strip())
         for i, part in enumerate(parts):
             if part.strip():
                 sentences.append(MockSentence(part.strip(), i))
@@ -112,17 +121,20 @@ class MockSparseRegexSentenceSplitter:
 
 class MockBracketMarker:
     """Mock BracketMarker from txt_splitt."""
+
     pass
 
 
 class MockOverlapChunker:
     """Mock OverlapChunker from txt_splitt."""
+
     def __init__(self, max_chars=12000):
         self.max_chars = max_chars
 
 
 class MockTopicRangeLLM:
     """Mock TopicRangeLLM from txt_splitt."""
+
     def __init__(self, client=None, temperature=0.0, chunker=None):
         self.client = client
         self.temperature = temperature
@@ -131,11 +143,13 @@ class MockTopicRangeLLM:
 
 class MockTopicRangeParser:
     """Mock TopicRangeParser from txt_splitt."""
+
     pass
 
 
 class MockLLMRepairingGapHandler:
     """Mock LLMRepairingGapHandler from txt_splitt."""
+
     def __init__(self, llm_callable, temperature=0.0, tracer=None):
         self.llm_callable = llm_callable
         self.temperature = temperature
@@ -144,28 +158,43 @@ class MockLLMRepairingGapHandler:
 
 class MockAdjacentSameTopicJoiner:
     """Mock AdjacentSameTopicJoiner from txt_splitt."""
+
     pass
 
 
 class MockHTMLParserTagStripCleaner:
     """Mock HTMLParserTagStripCleaner from txt_splitt."""
+
     def clean(self, html):
         # Simple mock: strip HTML tags
         import re
-        text = re.sub(r'<[^>]+>', '', html)
-        text = re.sub(r'\s+', ' ', text).strip()
+
+        text = re.sub(r"<[^>]+>", "", html)
+        text = re.sub(r"\s+", " ", text).strip()
         return text, None
 
 
 class MockMappingOffsetRestorer:
     """Mock MappingOffsetRestorer from txt_splitt."""
+
     pass
 
 
 class MockPipeline:
     """Mock Pipeline from txt_splitt."""
-    def __init__(self, splitter, marker, llm, parser, gap_handler, joiner,
-                 html_cleaner, offset_restorer, tracer=None):
+
+    def __init__(
+        self,
+        splitter,
+        marker,
+        llm,
+        parser,
+        gap_handler,
+        joiner,
+        html_cleaner,
+        offset_restorer,
+        tracer=None,
+    ):
         self.splitter = splitter
         self.marker = marker
         self.llm = llm
@@ -185,14 +214,8 @@ class MockPipeline:
         ]
 
         groups = [
-            MockGroup(
-                label=["Topic", "Subtopic"],
-                ranges=[MockSentenceRange(0, 1)]
-            ),
-            MockGroup(
-                label=["Another Topic"],
-                ranges=[MockSentenceRange(2, 2)]
-            ),
+            MockGroup(label=["Topic", "Subtopic"], ranges=[MockSentenceRange(0, 1)]),
+            MockGroup(label=["Another Topic"], ranges=[MockSentenceRange(2, 2)]),
         ]
 
         result = MagicMock()
@@ -204,6 +227,7 @@ class MockPipeline:
 # =============================================================================
 # Test ArticleSplitResult Dataclass
 # =============================================================================
+
 
 class TestArticleSplitResult:
     """Test ArticleSplitResult dataclass."""
@@ -247,8 +271,8 @@ class TestArticleSplitResult:
         """ArticleSplitResult has correct fields."""
         result = ArticleSplitResult(sentences=["test"], topics=[])
 
-        assert hasattr(result, 'sentences')
-        assert hasattr(result, 'topics')
+        assert hasattr(result, "sentences")
+        assert hasattr(result, "topics")
         assert isinstance(result.sentences, list)
         assert isinstance(result.topics, list)
 
@@ -295,10 +319,12 @@ class TestArticleSplitCacheValidation:
             inner,
             cache_store,
             namespace="article-split:test",
-            validator=lambda prompt_text, response_text: _response_has_valid_topic_ranges(
-                prompt_text,
-                response_text,
-                "auto",
+            validator=lambda prompt_text, response_text: (
+                _response_has_valid_topic_ranges(
+                    prompt_text,
+                    response_text,
+                    "auto",
+                )
             ),
         )
 
@@ -340,10 +366,12 @@ class TestArticleSplitCacheValidation:
             inner,
             cache_store,
             namespace="article-split:test",
-            validator=lambda prompt_text, response_text: _response_has_valid_topic_ranges(
-                prompt_text,
-                response_text,
-                "auto",
+            validator=lambda prompt_text, response_text: (
+                _response_has_valid_topic_ranges(
+                    prompt_text,
+                    response_text,
+                    "auto",
+                )
             ),
         )
 
@@ -456,7 +484,9 @@ class TestPipelineExecutionCompatibility:
         assert len(submitted_responses) == 1
         assert submitted_responses[0].content == "LLM output"
 
-    def test_execute_pipeline_submits_deferred_batch_requests_in_parallel_when_supported(self):
+    def test_execute_pipeline_submits_deferred_batch_requests_in_parallel_when_supported(
+        self,
+    ):
         """Deferred sessions use non-blocking submission when available."""
         pipeline = MagicMock()
         pipeline.run.side_effect = RuntimeError(
@@ -494,7 +524,10 @@ class TestPipelineExecutionCompatibility:
         llm_callable.submit.assert_any_call("Prompt B", 0.2)
         llm_callable.call.assert_not_called()
         submitted_responses = session.submit_responses.call_args.args[0]
-        assert [response.content for response in submitted_responses] == ["Result A", "Result B"]
+        assert [response.content for response in submitted_responses] == [
+            "Result A",
+            "Result B",
+        ]
 
     def test_execute_pipeline_reraises_other_runtime_errors(self):
         """Unrelated runtime errors are not swallowed."""
@@ -516,6 +549,7 @@ class TestPipelineExecutionCompatibility:
 # Test _groups_to_topics Function
 # =============================================================================
 
+
 class TestGroupsToTopics:
     """Test _groups_to_topics function."""
 
@@ -533,12 +567,7 @@ class TestGroupsToTopics:
             MockSentence("Second.", 1, start=7, end=14),
         ]
 
-        groups = [
-            MockGroup(
-                label=["Topic A"],
-                ranges=[MockSentenceRange(0, 1)]
-            )
-        ]
+        groups = [MockGroup(label=["Topic A"], ranges=[MockSentenceRange(0, 1)])]
 
         result = _groups_to_topics(groups, sentence_objects)
 
@@ -567,14 +596,8 @@ class TestGroupsToTopics:
         ]
 
         groups = [
-            MockGroup(
-                label=["Topic A"],
-                ranges=[MockSentenceRange(0, 1)]
-            ),
-            MockGroup(
-                label=["Topic B"],
-                ranges=[MockSentenceRange(2, 3)]
-            ),
+            MockGroup(label=["Topic A"], ranges=[MockSentenceRange(0, 1)]),
+            MockGroup(label=["Topic B"], ranges=[MockSentenceRange(2, 3)]),
         ]
 
         result = _groups_to_topics(groups, sentence_objects)
@@ -592,7 +615,7 @@ class TestGroupsToTopics:
         groups = [
             MockGroup(
                 label=["Parent", "Child", "Grandchild"],
-                ranges=[MockSentenceRange(0, 0)]
+                ranges=[MockSentenceRange(0, 0)],
             )
         ]
 
@@ -608,12 +631,7 @@ class TestGroupsToTopics:
             MockSentence("Third.", 2),
         ]
 
-        groups = [
-            MockGroup(
-                label=["Topic"],
-                ranges=[MockSentenceRange(0, 2)]
-            )
-        ]
+        groups = [MockGroup(label=["Topic"], ranges=[MockSentenceRange(0, 2)])]
 
         result = _groups_to_topics(groups, sentence_objects)
 
@@ -635,7 +653,7 @@ class TestGroupsToTopics:
                 ranges=[
                     MockSentenceRange(0, 1),
                     MockSentenceRange(1, 2),  # Overlaps at index 1
-                ]
+                ],
             )
         ]
 
@@ -651,12 +669,7 @@ class TestGroupsToTopics:
             MockSentence("Second.", 1, start=7, end=14),
         ]
 
-        groups = [
-            MockGroup(
-                label=["Topic"],
-                ranges=[MockSentenceRange(0, 1)]
-            )
-        ]
+        groups = [MockGroup(label=["Topic"], ranges=[MockSentenceRange(0, 1)])]
 
         result = _groups_to_topics(groups, sentence_objects)
 
@@ -678,12 +691,7 @@ class TestGroupsToTopics:
             MockSentence("Second.", 1, start=7, end=14),
         ]
 
-        groups = [
-            MockGroup(
-                label=["Topic"],
-                ranges=[MockSentenceRange(0, 1)]
-            )
-        ]
+        groups = [MockGroup(label=["Topic"], ranges=[MockSentenceRange(0, 1)])]
 
         result = _groups_to_topics(groups, sentence_objects)
 
@@ -705,7 +713,9 @@ class TestGroupsToTopics:
         groups = [
             MockGroup(
                 label=["Topic"],
-                ranges=[MockSentenceRange(0, 1)]  # References index 1 which doesn't exist
+                ranges=[
+                    MockSentenceRange(0, 1)
+                ],  # References index 1 which doesn't exist
             )
         ]
 
@@ -713,7 +723,10 @@ class TestGroupsToTopics:
 
         assert len(result) == 1
         # Should have None for missing sentence offsets
-        assert result[0]["ranges"][0]["start"] is None or result[0]["ranges"][0]["end"] is None
+        assert (
+            result[0]["ranges"][0]["start"] is None
+            or result[0]["ranges"][0]["end"] is None
+        )
 
     def test_group_with_empty_ranges_skipped(self):
         """Groups with empty ranges are skipped."""
@@ -722,7 +735,7 @@ class TestGroupsToTopics:
         groups = [
             MockGroup(
                 label=["Empty Topic"],
-                ranges=[]  # No ranges
+                ranges=[],  # No ranges
             )
         ]
 
@@ -746,7 +759,7 @@ class TestGroupsToTopics:
                 ranges=[
                     MockSentenceRange(2, 3),
                     MockSentenceRange(0, 1),
-                ]
+                ],
             )
         ]
 
@@ -758,6 +771,7 @@ class TestGroupsToTopics:
 # =============================================================================
 # Test _LLMCallableAdapter Class
 # =============================================================================
+
 
 class TestLLMCallableAdapterInit:
     """Test _LLMCallableAdapter.__init__ method."""
@@ -771,6 +785,7 @@ class TestLLMCallableAdapterInit:
 
     def test_accepts_any_llm_client(self):
         """Adapter accepts any LLM client object."""
+
         class CustomLLM:
             def call(self, *args, **kwargs):
                 return "response"
@@ -835,7 +850,9 @@ class TestLLMCallableAdapterCall:
         mock_llm.call.return_value = "Unicode response"
 
         adapter = _LLMCallableAdapter(mock_llm)
-        adapter.call("Test with unicode: \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439")
+        adapter.call(
+            "Test with unicode: \u4e2d\u6587 \u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+        )
 
         mock_llm.call.assert_called_once()
         call_args = mock_llm.call.call_args
@@ -845,6 +862,7 @@ class TestLLMCallableAdapterCall:
 # =============================================================================
 # Test split_article Function
 # =============================================================================
+
 
 class TestSplitArticleEmptyInput:
     """Test split_article with empty input."""
@@ -869,9 +887,11 @@ class TestSplitArticleEmptyInput:
 class TestSplitArticleWithoutLLM:
     """Test split_article without LLM (no topic extraction)."""
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    def test_cleans_html_with_html_cleaner(self, mock_cleaner_class, mock_splitter_class):
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    def test_cleans_html_with_html_cleaner(
+        self, mock_cleaner_class, mock_splitter_class
+    ):
         """Cleans HTML with html_cleaner when no LLM provided."""
         mock_cleaner = MagicMock()
         mock_cleaner.clean.return_value = ("Clean text", None)
@@ -886,8 +906,8 @@ class TestSplitArticleWithoutLLM:
         mock_cleaner_class.assert_called_once()
         mock_cleaner.clean.assert_called_once_with("<html><body>Test</body></html>")
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
     def test_splits_with_splitter(self, mock_cleaner_class, mock_splitter_class):
         """Splits cleaned text with splitter."""
         mock_cleaner = MagicMock()
@@ -905,9 +925,11 @@ class TestSplitArticleWithoutLLM:
         mock_splitter.split.assert_called_once_with("Clean text")
         assert result.sentences == ["Test sentence."]
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    def test_returns_sentences_without_topics(self, mock_cleaner_class, mock_splitter_class):
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    def test_returns_sentences_without_topics(
+        self, mock_cleaner_class, mock_splitter_class
+    ):
         """Returns sentences without topics when no LLM."""
         mock_cleaner = MagicMock()
         mock_cleaner.clean.return_value = ("Clean text", None)
@@ -926,9 +948,11 @@ class TestSplitArticleWithoutLLM:
         assert result.sentences == ["First.", "Second."]
         assert result.topics == []
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    def test_splitter_configured_with_anchor_every_words(self, mock_cleaner_class, mock_splitter_class):
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    def test_splitter_configured_with_anchor_every_words(
+        self, mock_cleaner_class, mock_splitter_class
+    ):
         """Splitter configured with anchor_every_words parameter."""
         mock_cleaner = MagicMock()
         mock_cleaner.clean.return_value = ("text", None)
@@ -941,13 +965,14 @@ class TestSplitArticleWithoutLLM:
         split_article("Test", llm=None, anchor_every_words=10)
 
         mock_splitter_class.assert_called_once_with(
-            anchor_every_words=10,
-            html_aware=True
+            anchor_every_words=10, html_aware=True
         )
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    def test_splitter_configured_with_html_aware_true(self, mock_cleaner_class, mock_splitter_class):
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    def test_splitter_configured_with_html_aware_true(
+        self, mock_cleaner_class, mock_splitter_class
+    ):
         """Splitter configured with html_aware=True."""
         mock_cleaner = MagicMock()
         mock_cleaner.clean.return_value = ("text", None)
@@ -960,23 +985,27 @@ class TestSplitArticleWithoutLLM:
         split_article("Test", llm=None)
 
         mock_splitter_class.assert_called_once_with(
-            anchor_every_words=5,
-            html_aware=True
+            anchor_every_words=5, html_aware=True
         )
 
 
 class TestSplitArticleWithLLM:
     """Test split_article with LLM (full pipeline)."""
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.TracingLLMCallable')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.TracingLLMCallable")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_creates_adapter_for_llm_client(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_tracing_class, mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_tracing_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Creates _LLMCallableAdapter for LLM client."""
         mock_llm = MockLLMClient()
@@ -1005,15 +1034,20 @@ class TestSplitArticleWithLLM:
         # Verify Pipeline was created (which uses the adapter)
         assert mock_pipeline_class.called
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.TracingLLMCallable')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.TracingLLMCallable")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_wraps_with_tracing_llm_callable_if_tracer_provided(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_tracing_class, mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_tracing_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Wraps adapter with TracingLLMCallable if tracer provided."""
         mock_llm = MockLLMClient()
@@ -1044,14 +1078,18 @@ class TestSplitArticleWithLLM:
 
         mock_tracing_class.assert_called_once()
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_configures_pipeline_components(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Configures all pipeline components."""
         mock_llm = MockLLMClient()
@@ -1083,24 +1121,29 @@ class TestSplitArticleWithLLM:
         call_kwargs = mock_pipeline_class.call_args[1]
 
         # Verify all components are configured
-        assert 'splitter' in call_kwargs
-        assert 'marker' in call_kwargs
-        assert 'llm' in call_kwargs
-        assert 'parser' in call_kwargs
-        assert 'gap_handler' in call_kwargs
-        assert 'joiner' in call_kwargs
-        assert 'html_cleaner' in call_kwargs
-        assert 'offset_restorer' in call_kwargs
+        assert "splitter" in call_kwargs
+        assert "marker" in call_kwargs
+        assert "llm" in call_kwargs
+        assert "parser" in call_kwargs
+        assert "gap_handler" in call_kwargs
+        assert "joiner" in call_kwargs
+        assert "html_cleaner" in call_kwargs
+        assert "offset_restorer" in call_kwargs
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.OverlapChunker')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.OverlapChunker")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_topic_range_llm_with_overlap_chunker(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_chunker_class, mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_chunker_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """TopicRangeLLM configured with OverlapChunker."""
         mock_llm = MockLLMClient()
@@ -1133,14 +1176,18 @@ class TestSplitArticleWithLLM:
 
         mock_chunker_class.assert_called_once_with(max_chars=15000)
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_temperature_zero_for_llm_calls(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Temperature set to 0.0 for LLM calls."""
         mock_llm = MockLLMClient()
@@ -1172,15 +1219,20 @@ class TestSplitArticleWithLLM:
         call_kwargs = mock_topic_llm_class.call_args[1]
         assert call_kwargs["temperature"] == 0.0
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.LLMRepairingGapHandler')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.LLMRepairingGapHandler")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_gap_handler_with_temperature_zero(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_gap_handler_class, mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_gap_handler_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """LLMRepairingGapHandler configured with temperature 0.0."""
         mock_llm = MockLLMClient()
@@ -1215,14 +1267,18 @@ class TestSplitArticleWithLLM:
         call_kwargs = mock_gap_handler_class.call_args[1]
         assert call_kwargs["temperature"] == 0.0
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_extracts_sentences_from_pipeline_result(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Extracts sentences from pipeline result."""
         mock_llm = MockLLMClient()
@@ -1256,14 +1312,18 @@ class TestSplitArticleWithLLM:
 
         assert result.sentences == ["First.", "Second."]
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_converts_groups_to_topics(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Converts groups from pipeline result to topics."""
         mock_llm = MockLLMClient()
@@ -1287,9 +1347,7 @@ class TestSplitArticleWithLLM:
             MockSentence("First.", 0),
             MockSentence("Second.", 1),
         ]
-        mock_groups = [
-            MockGroup(label=["Topic"], ranges=[MockSentenceRange(0, 1)])
-        ]
+        mock_groups = [MockGroup(label=["Topic"], ranges=[MockSentenceRange(0, 1)])]
         mock_result = MagicMock()
         mock_result.sentences = mock_sentences
         mock_result.groups = mock_groups
@@ -1301,14 +1359,18 @@ class TestSplitArticleWithLLM:
         assert len(result.topics) == 1
         assert result.topics[0]["name"] == "Topic"
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_passes_tracer_to_pipeline(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Passes tracer to pipeline for debugging."""
         mock_llm = MockLLMClient()
@@ -1345,17 +1407,17 @@ class TestSplitArticleWithLLM:
 # Test split_article_with_markers Function
 # =============================================================================
 
+
 class TestSplitArticleWithMarkers:
     """Test split_article_with_markers function."""
 
-    @patch('lib.article_splitter.split_article')
+    @patch("lib.article_splitter.split_article")
     def test_passes_all_parameters_to_split_article(self, mock_split_article):
         """Passes all parameters to split_article."""
         mock_llm = MockLLMClient()
         mock_tracer = MockTracer()
         mock_split_article.return_value = ArticleSplitResult(
-            sentences=["Test."],
-            topics=[]
+            sentences=["Test."], topics=[]
         )
 
         split_article_with_markers(
@@ -1363,7 +1425,7 @@ class TestSplitArticleWithMarkers:
             llm=mock_llm,
             tracer=mock_tracer,
             anchor_every_words=10,
-            max_chunk_chars=15000
+            max_chunk_chars=15000,
         )
 
         mock_split_article.assert_called_once_with(
@@ -1375,15 +1437,15 @@ class TestSplitArticleWithMarkers:
             cache_store=None,
             temperature=0.0,
             retry_policy=None,
-            use_json=False
+            use_json=False,
         )
 
-    @patch('lib.article_splitter.split_article')
+    @patch("lib.article_splitter.split_article")
     def test_returns_same_result_as_split_article(self, mock_split_article):
         """Returns same result as split_article."""
         expected_result = ArticleSplitResult(
             sentences=["First.", "Second."],
-            topics=[{"name": "Topic", "sentences": [1, 2]}]
+            topics=[{"name": "Topic", "sentences": [1, 2]}],
         )
         mock_split_article.return_value = expected_result
 
@@ -1391,13 +1453,10 @@ class TestSplitArticleWithMarkers:
 
         assert result == expected_result
 
-    @patch('lib.article_splitter.split_article')
+    @patch("lib.article_splitter.split_article")
     def test_uses_default_parameters(self, mock_split_article):
         """Uses default parameters when not specified."""
-        mock_split_article.return_value = ArticleSplitResult(
-            sentences=[],
-            topics=[]
-        )
+        mock_split_article.return_value = ArticleSplitResult(sentences=[], topics=[])
 
         split_article_with_markers("Test")
 
@@ -1410,7 +1469,7 @@ class TestSplitArticleWithMarkers:
             cache_store=None,
             temperature=0.0,
             retry_policy=None,
-            use_json=False
+            use_json=False,
         )
 
 
@@ -1418,11 +1477,12 @@ class TestSplitArticleWithMarkers:
 # Edge Cases Tests
 # =============================================================================
 
+
 class TestEdgeCases:
     """Test edge cases for article splitter."""
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
     def test_complex_html_nesting(self, mock_cleaner_class, mock_splitter_class):
         """Handles HTML with complex nesting."""
         complex_html = """
@@ -1441,7 +1501,10 @@ class TestEdgeCases:
         """
 
         mock_cleaner = MagicMock()
-        mock_cleaner.clean.return_value = ("First sentence. Second bold sentence.", None)
+        mock_cleaner.clean.return_value = (
+            "First sentence. Second bold sentence.",
+            None,
+        )
         mock_cleaner_class.return_value = mock_cleaner
 
         mock_sentences = [
@@ -1456,8 +1519,8 @@ class TestEdgeCases:
 
         assert len(result.sentences) == 2
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
     def test_plain_text_without_html(self, mock_cleaner_class, mock_splitter_class):
         """Handles plain text without HTML tags."""
         plain_text = "First sentence. Second sentence. Third sentence."
@@ -1479,14 +1542,18 @@ class TestEdgeCases:
 
         assert len(result.sentences) == 3
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_very_long_article(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Handles very long articles with chunking."""
         long_text = " ".join([f"Sentence {i}." for i in range(1000)])
@@ -1518,8 +1585,8 @@ class TestEdgeCases:
         # Pipeline should be configured to handle chunking
         mock_topic_llm_class.assert_called_once()
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
     def test_malformed_html(self, mock_cleaner_class, mock_splitter_class):
         """Handles malformed HTML gracefully."""
         malformed_html = "<p>Unclosed paragraph <div>Mixed tags</p></div>"
@@ -1541,8 +1608,8 @@ class TestEdgeCases:
         assert isinstance(result, ArticleSplitResult)
         assert isinstance(result.sentences, list)  # sentences should always be a list
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
     def test_unicode_content(self, mock_cleaner_class, mock_splitter_class):
         """Handles Unicode content correctly."""
         unicode_text = "Chinese: \u4e2d\u6587\u3002Russian: \u041f\u0440\u0438\u0432\u0435\u0442\u3002Emoji: \ud83d\ude00"
@@ -1563,9 +1630,11 @@ class TestEdgeCases:
         assert len(result.sentences) == 1
         assert "\u4e2d\u6587" in result.sentences[0]
 
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    def test_empty_sentences_after_cleaning(self, mock_cleaner_class, mock_splitter_class):
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    def test_empty_sentences_after_cleaning(
+        self, mock_cleaner_class, mock_splitter_class
+    ):
         """Handles empty sentences after HTML cleaning."""
         html_only_tags = "<div><span></span></div>"
 
@@ -1582,14 +1651,18 @@ class TestEdgeCases:
         assert result.sentences == []
         assert result.topics == []
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_single_topic_article(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Handles article with single topic."""
         mock_splitter = MagicMock()
@@ -1625,14 +1698,18 @@ class TestEdgeCases:
         assert len(result.topics) == 1
         assert result.topics[0]["name"] == "Single Topic"
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_no_clear_topics(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Handles article with no clear topics (empty groups)."""
         mock_splitter = MagicMock()
@@ -1665,14 +1742,18 @@ class TestEdgeCases:
         assert len(result.sentences) == 2
         assert result.topics == []
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_overlapping_topic_ranges(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Handles overlapping topic ranges correctly."""
         mock_splitter = MagicMock()
@@ -1702,7 +1783,7 @@ class TestEdgeCases:
                 ranges=[
                     MockSentenceRange(0, 1),
                     MockSentenceRange(1, 2),
-                ]
+                ],
             )
         ]
         mock_result = MagicMock()
@@ -1717,14 +1798,18 @@ class TestEdgeCases:
         # Sentences should be deduplicated
         assert result.topics[0]["sentences"] == [1, 2, 3]
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_gaps_between_topic_ranges(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Handles gaps between topic ranges."""
         mock_splitter = MagicMock()
@@ -1750,14 +1835,8 @@ class TestEdgeCases:
         ]
         # Non-contiguous ranges (gap at sentence 2)
         mock_groups = [
-            MockGroup(
-                label=["Topic A"],
-                ranges=[MockSentenceRange(0, 0)]
-            ),
-            MockGroup(
-                label=["Topic B"],
-                ranges=[MockSentenceRange(2, 3)]
-            ),
+            MockGroup(label=["Topic A"], ranges=[MockSentenceRange(0, 0)]),
+            MockGroup(label=["Topic B"], ranges=[MockSentenceRange(2, 3)]),
         ]
         mock_result = MagicMock()
         mock_result.sentences = mock_sentences
@@ -1776,17 +1855,22 @@ class TestEdgeCases:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests for article splitter with mocked dependencies."""
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_full_pipeline_with_html_content(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Full pipeline integration with HTML content."""
         html_content = """
@@ -1805,7 +1889,7 @@ class TestIntegration:
         mock_cleaner = MagicMock()
         mock_cleaner.clean.return_value = (
             "Article Title Introduction paragraph with context. Main content paragraph. Conclusion paragraph.",
-            None
+            None,
         )
         mock_cleaner_class.return_value = mock_cleaner
 
@@ -1842,14 +1926,18 @@ class TestIntegration:
         assert result.topics[1]["name"] == "Content"
         assert result.topics[2]["name"] == "Conclusion"
 
-    @patch('lib.article_splitter.build_pipeline')
-    @patch('lib.article_splitter.TopicRangeLLM')
-    @patch('lib.article_splitter.SparseRegexSentenceSplitter')
-    @patch('lib.article_splitter.HTMLParserTagStripCleaner')
-    @patch('lib.article_splitter.MappingOffsetRestorer')
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
     def test_full_pipeline_with_tracer(
-        self, mock_restorer_class, mock_cleaner_class, mock_splitter_class,
-        mock_topic_llm_class, mock_pipeline_class
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_topic_llm_class,
+        mock_pipeline_class,
     ):
         """Full pipeline integration with tracer for debugging."""
         mock_splitter = MagicMock()

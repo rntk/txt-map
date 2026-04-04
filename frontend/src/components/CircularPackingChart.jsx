@@ -1,22 +1,34 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
-import * as d3 from 'd3';
-import TopicLevelSwitcher from './shared/TopicLevelSwitcher';
-import TopicSentencesModal from './shared/TopicSentencesModal';
-import Breadcrumbs from './shared/Breadcrumbs';
-import { useTopicLevel } from '../hooks/useTopicLevel';
-import { useScopeNavigation } from '../hooks/useScopeNavigation';
+import React, { useRef, useEffect, useMemo, useState } from "react";
+import * as d3 from "d3";
+import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
+import TopicSentencesModal from "./shared/TopicSentencesModal";
+import Breadcrumbs from "./shared/Breadcrumbs";
+import { useTopicLevel } from "../hooks/useTopicLevel";
+import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import {
   buildScopedHierarchy,
   getScopeLabel,
   getLevelLabel,
-  hasDeeperChildren
-} from '../utils/topicHierarchy';
+  hasDeeperChildren,
+} from "../utils/topicHierarchy";
 
 const PALETTE = [
-  '#7ba3cc', '#e8a87c', '#85bb65', '#c9a0dc',
-  '#d4a5a5', '#a0c4a9', '#cfb997', '#9db4c0',
-  '#c2b280', '#b5c7d3', '#d4a76a', '#a5b8d0',
-  '#c4d4a0', '#d0b4c8', '#b3cfa0', '#c8b8a0',
+  "#7ba3cc",
+  "#e8a87c",
+  "#85bb65",
+  "#c9a0dc",
+  "#d4a5a5",
+  "#a0c4a9",
+  "#cfb997",
+  "#9db4c0",
+  "#c2b280",
+  "#b5c7d3",
+  "#d4a76a",
+  "#a5b8d0",
+  "#c4d4a0",
+  "#d0b4c8",
+  "#b3cfa0",
+  "#c8b8a0",
 ];
 
 const CHAR_ASPECT = 0.58; // approximate width/height ratio per character
@@ -24,7 +36,7 @@ const PACK_PADDING = 1;
 const PACK_AREA_RATIO = 0.7;
 const CIRCLE_ENLARGE_FACTOR = 1.6;
 
-export { buildScopedHierarchy } from '../utils/topicHierarchy';
+export { buildScopedHierarchy } from "../utils/topicHierarchy";
 
 /**
  * @typedef {Object} CircularPackingChartProps
@@ -38,10 +50,13 @@ export { buildScopedHierarchy } from '../utils/topicHierarchy';
 
 // Wrap label into lines that fit within maxWidth pixels at given fontSize
 function wrapLines(label, maxWidth, fontSize) {
-  const maxCharsPerLine = Math.max(1, Math.floor(maxWidth / (fontSize * CHAR_ASPECT)));
+  const maxCharsPerLine = Math.max(
+    1,
+    Math.floor(maxWidth / (fontSize * CHAR_ASPECT)),
+  );
   const words = label.split(/\s+/);
   const lines = [];
-  let current = '';
+  let current = "";
 
   for (const word of words) {
     const candidate = current ? `${current} ${word}` : word;
@@ -49,9 +64,10 @@ function wrapLines(label, maxWidth, fontSize) {
       current = candidate;
     } else {
       if (current) lines.push(current);
-      current = word.length > maxCharsPerLine
-        ? `${word.slice(0, maxCharsPerLine - 1)}…`
-        : word;
+      current =
+        word.length > maxCharsPerLine
+          ? `${word.slice(0, maxCharsPerLine - 1)}…`
+          : word;
     }
   }
   if (current) lines.push(current);
@@ -64,35 +80,39 @@ function renderLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   const totalH = lines.length * lineHeight;
   const baseY = y - totalH / 2 + lineHeight * 0.8;
 
-  const halo = g.append('text')
-    .attr('text-anchor', 'middle')
-    .attr('pointer-events', 'none')
-    .style('font-size', `${fontSize}px`)
-    .style('font-weight', fontWeight)
-    .style('stroke', 'white')
-    .style('stroke-width', '3px')
-    .style('stroke-linejoin', 'round')
-    .style('fill', 'none')
-    .style('paint-order', 'stroke');
+  const halo = g
+    .append("text")
+    .attr("text-anchor", "middle")
+    .attr("pointer-events", "none")
+    .style("font-size", `${fontSize}px`)
+    .style("font-weight", fontWeight)
+    .style("stroke", "white")
+    .style("stroke-width", "3px")
+    .style("stroke-linejoin", "round")
+    .style("fill", "none")
+    .style("paint-order", "stroke");
 
   lines.forEach((line, index) => {
-    halo.append('tspan')
-      .attr('x', x)
-      .attr('y', baseY + index * lineHeight)
+    halo
+      .append("tspan")
+      .attr("x", x)
+      .attr("y", baseY + index * lineHeight)
       .text(line);
   });
 
-  const front = g.append('text')
-    .attr('text-anchor', 'middle')
-    .attr('pointer-events', 'none')
-    .style('font-size', `${fontSize}px`)
-    .style('font-weight', fontWeight)
-    .style('fill', textColor);
+  const front = g
+    .append("text")
+    .attr("text-anchor", "middle")
+    .attr("pointer-events", "none")
+    .style("font-size", `${fontSize}px`)
+    .style("font-weight", fontWeight)
+    .style("fill", textColor);
 
   lines.forEach((line, index) => {
-    front.append('tspan')
-      .attr('x', x)
-      .attr('y', baseY + index * lineHeight)
+    front
+      .append("tspan")
+      .attr("x", x)
+      .attr("y", baseY + index * lineHeight)
       .text(line);
   });
 }
@@ -109,7 +129,10 @@ export default function CircularPackingChart({
   markup,
 }) {
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
-  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(
+    topics,
+    scopePath,
+  );
   const [modalTopic, setModalTopic] = useState(null);
 
   const svgRef = useRef(null);
@@ -118,12 +141,12 @@ export default function CircularPackingChart({
 
   const hierarchyData = useMemo(
     () => buildScopedHierarchy(topics, scopePath, selectedLevel),
-    [topics, scopePath, selectedLevel]
+    [topics, scopePath, selectedLevel],
   );
 
   const safeReadTopics = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
-    [readTopics]
+    [readTopics],
   );
 
   const hasHierarchyData = (hierarchyData.children || []).length > 0;
@@ -131,25 +154,28 @@ export default function CircularPackingChart({
   const resetZoom = () => {
     if (!svgRef.current || !zoomRef.current) return;
     d3.select(svgRef.current)
-      .transition().duration(350)
+      .transition()
+      .duration(350)
       .call(zoomRef.current.transform, d3.zoomIdentity);
   };
 
-    useEffect(() => {
-        if (!svgRef.current || !containerRef.current || !hasHierarchyData) return undefined;
+  useEffect(() => {
+    if (!svgRef.current || !containerRef.current || !hasHierarchyData)
+      return undefined;
 
     const containerWidth = containerRef.current.clientWidth || 800;
     const size = Math.max(320, containerWidth);
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
-        svg
-          .attr('width', size)
-          .attr('height', size)
-          .attr('viewBox', `0 0 ${size} ${size}`)
-          .attr('class', 'circular-packing-svg chart-svg chart-svg--centered');
+    svg.selectAll("*").remove();
+    svg
+      .attr("width", size)
+      .attr("height", size)
+      .attr("viewBox", `0 0 ${size} ${size}`)
+      .attr("class", "circular-packing-svg chart-svg chart-svg--centered");
 
-    const root = d3.hierarchy(hierarchyData)
+    const root = d3
+      .hierarchy(hierarchyData)
       .sum((d) => d.value || 0)
       .sort((a, b) => b.value - a.value);
 
@@ -166,7 +192,9 @@ export default function CircularPackingChart({
       node.y = pivotY + (node.y - pivotY) * scale;
       node.r *= scale;
       if (node.children) {
-        node.children.forEach((child) => scaleSubtree(child, pivotX, pivotY, scale));
+        node.children.forEach((child) =>
+          scaleSubtree(child, pivotX, pivotY, scale),
+        );
       }
     }
 
@@ -188,119 +216,132 @@ export default function CircularPackingChart({
     applySingleChildShrink(root);
     scaleSubtree(root, size / 2, size / 2, CIRCLE_ENLARGE_FACTOR);
 
-    const topLevelNames = (hierarchyData.children || []).map((child) => child.name);
+    const topLevelNames = (hierarchyData.children || []).map(
+      (child) => child.name,
+    );
     const colorScale = d3.scaleOrdinal().domain(topLevelNames).range(PALETTE);
 
     const getColor = (nodeDatum) => {
       let node = nodeDatum;
       while (node.depth > 1) node = node.parent;
-      if (node.depth === 0) return '#eee';
+      if (node.depth === 0) return "#eee";
       const base = colorScale(node.data.name);
       const t = Math.min(0.85, (nodeDatum.depth - 1) * 0.22);
-      return d3.interpolate(base, '#ffffff')(t);
+      return d3.interpolate(base, "#ffffff")(t);
     };
 
-    const g = svg.append('g');
+    const g = svg.append("g");
     const nodes = root.descendants().filter((node) => node.depth > 0);
     const isLeaf = (node) => !node.children || node.children.length === 0;
 
     // Add pattern definition for read status indicator (diagonal lines)
-    const defs = svg.append('defs');
-    const pattern = defs.append('pattern')
-      .attr('id', 'read-pattern-circular')
-      .attr('patternUnits', 'userSpaceOnUse')
-      .attr('width', 8)
-      .attr('height', 8)
-      .attr('patternTransform', 'rotate(45)');
-    
-    pattern.append('line')
-      .attr('x1', 0)
-      .attr('y1', 0)
-      .attr('x2', 0)
-      .attr('y2', 8)
-      .attr('stroke', 'rgba(0,0,0,0.12)')
-      .attr('stroke-width', 2);
+    const defs = svg.append("defs");
+    const pattern = defs
+      .append("pattern")
+      .attr("id", "read-pattern-circular")
+      .attr("patternUnits", "userSpaceOnUse")
+      .attr("width", 8)
+      .attr("height", 8)
+      .attr("patternTransform", "rotate(45)");
 
-    const circles = g.selectAll('circle')
+    pattern
+      .append("line")
+      .attr("x1", 0)
+      .attr("y1", 0)
+      .attr("x2", 0)
+      .attr("y2", 8)
+      .attr("stroke", "rgba(0,0,0,0.12)")
+      .attr("stroke-width", 2);
+
+    const circles = g
+      .selectAll("circle")
       .data(nodes)
       .enter()
-      .append('circle')
-      .attr('cx', (node) => node.x)
-      .attr('cy', (node) => node.y)
-      .attr('r', (node) => node.r)
-      .attr('fill', (node) => getColor(node))
-      .attr('stroke', (node) => {
+      .append("circle")
+      .attr("cx", (node) => node.x)
+      .attr("cy", (node) => node.y)
+      .attr("r", (node) => node.r)
+      .attr("fill", (node) => getColor(node))
+      .attr("stroke", (node) => {
         const color = d3.color(getColor(node));
-        return color ? color.darker(0.5).toString() : '#aaa';
+        return color ? color.darker(0.5).toString() : "#aaa";
       })
-      .attr('stroke-width', (node) => (node.depth === 1 ? 2 : 0.8))
-      .style('opacity', 0.92)
-      .style('cursor', 'pointer');
-
-    circles.append('title').text((node) => node.data.fullPath || node.data.name);
-
-    const tooltip = d3.select(containerRef.current)
-      .append('div')
-      .attr('class', 'circular-packing-tooltip chart-tooltip')
-      .style('opacity', 0);
+      .attr("stroke-width", (node) => (node.depth === 1 ? 2 : 0.8))
+      .style("opacity", 0.92)
+      .style("cursor", "pointer");
 
     circles
-      .on('mouseover', (event, node) => {
+      .append("title")
+      .text((node) => node.data.fullPath || node.data.name);
+
+    const tooltip = d3
+      .select(containerRef.current)
+      .append("div")
+      .attr("class", "circular-packing-tooltip chart-tooltip")
+      .style("opacity", 0);
+
+    circles
+      .on("mouseover", (event, node) => {
         const sentenceCount = node.data.topic
-          ? (Array.isArray(node.data.topic.sentences) ? node.data.topic.sentences.length : 0)
+          ? Array.isArray(node.data.topic.sentences)
+            ? node.data.topic.sentences.length
+            : 0
           : node.value;
         tooltip
-          .style('opacity', 1)
-          .html(`<strong>${node.data.fullPath || node.data.name}</strong><br/>${sentenceCount} sentence${sentenceCount !== 1 ? 's' : ''}`);
+          .style("opacity", 1)
+          .html(
+            `<strong>${node.data.fullPath || node.data.name}</strong><br/>${sentenceCount} sentence${sentenceCount !== 1 ? "s" : ""}`,
+          );
       })
-      .on('mousemove', (event) => {
+      .on("mousemove", (event) => {
         const rect = containerRef.current.getBoundingClientRect();
         tooltip
-          .style('left', `${event.clientX - rect.left + 14}px`)
-          .style('top', `${event.clientY - rect.top - 12}px`);
+          .style("left", `${event.clientX - rect.left + 14}px`)
+          .style("top", `${event.clientY - rect.top - 12}px`);
       })
-      .on('mouseout', () => tooltip.style('opacity', 0));
+      .on("mouseout", () => tooltip.style("opacity", 0));
 
-    circles
-      .on('click', (event, node) => {
-        event.stopPropagation();
-        const isDrillable = hasDeeperChildren(topics, node.data.fullPath);
-        if (isDrillable) {
-          drillInto(node.data.fullPath);
-          setSelectedLevel(0);
-        } else {
-          const topicData = node.data.topic;
-          if (topicData) {
-            setModalTopic({
-              name: node.data.fullPath,
-              displayName: node.data.name,
-              fullPath: node.data.fullPath,
-              sentenceIndices: Array.isArray(topicData.sentences) ? topicData.sentences : [],
-              ranges: Array.isArray(topicData.ranges) ? topicData.ranges : [],
-            });
-          }
+    circles.on("click", (event, node) => {
+      event.stopPropagation();
+      const isDrillable = hasDeeperChildren(topics, node.data.fullPath);
+      if (isDrillable) {
+        drillInto(node.data.fullPath);
+        setSelectedLevel(0);
+      } else {
+        const topicData = node.data.topic;
+        if (topicData) {
+          setModalTopic({
+            name: node.data.fullPath,
+            displayName: node.data.name,
+            fullPath: node.data.fullPath,
+            sentenceIndices: Array.isArray(topicData.sentences)
+              ? topicData.sentences
+              : [],
+            ranges: Array.isArray(topicData.ranges) ? topicData.ranges : [],
+          });
         }
-      });
+      }
+    });
 
     // Add overlay pattern for read topics
     nodes.forEach((node) => {
       if (!isLeaf(node)) return;
       if (!node.data.topic) return;
-      
+
       const topicFullPath = node.data.fullPath;
       if (!topicFullPath) return;
-      
+
       const isRead = safeReadTopics.has(topicFullPath);
       if (!isRead) return;
       if (node.r < 8) return;
 
-      g.append('circle')
-        .attr('cx', node.x)
-        .attr('cy', node.y)
-        .attr('r', node.r - 1)
-        .attr('fill', 'url(#read-pattern-circular)')
-        .attr('pointer-events', 'none')
-        .style('opacity', 0.7);
+      g.append("circle")
+        .attr("cx", node.x)
+        .attr("cy", node.y)
+        .attr("r", node.r - 1)
+        .attr("fill", "url(#read-pattern-circular)")
+        .attr("pointer-events", "none")
+        .style("opacity", 0.7);
     });
 
     nodes.forEach((node) => {
@@ -315,7 +356,7 @@ export default function CircularPackingChart({
 
         if (totalH > node.r * 1.8) return;
 
-        renderLabel(g, node.x, node.y, fontSize, '500', '#222', lines);
+        renderLabel(g, node.x, node.y, fontSize, "500", "#222", lines);
         return;
       }
 
@@ -324,48 +365,68 @@ export default function CircularPackingChart({
       const fontSize = Math.min(13, Math.max(8, node.r * 0.18));
       const availWidth = node.r * 1.6;
       const maxChars = Math.floor(availWidth / (fontSize * CHAR_ASPECT));
-      const label = node.data.name.length > maxChars
-        ? `${node.data.name.slice(0, maxChars - 1)}…`
-        : node.data.name;
+      const label =
+        node.data.name.length > maxChars
+          ? `${node.data.name.slice(0, maxChars - 1)}…`
+          : node.data.name;
       const labelY = node.y - node.r + fontSize + 5;
 
-      renderLabel(g, node.x, labelY, fontSize, '700', '#333', [label]);
+      renderLabel(g, node.x, labelY, fontSize, "700", "#333", [label]);
     });
 
-    const zoom = d3.zoom()
+    const zoom = d3
+      .zoom()
       .scaleExtent([0.5, 8])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
-        svg.style('cursor', event.transform.k > 1 ? 'grabbing' : 'grab');
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+        svg.style("cursor", event.transform.k > 1 ? "grabbing" : "grab");
       });
 
     zoomRef.current = zoom;
     svg.call(zoom);
     svg.call(zoom.transform, d3.zoomIdentity);
-    svg.on('dblclick.zoom', null);
+    svg.on("dblclick.zoom", null);
 
     return () => {
       tooltip.remove();
-      svg.selectAll('*').remove();
+      svg.selectAll("*").remove();
     };
-  }, [drillInto, hierarchyData, hasHierarchyData, setSelectedLevel, topics, safeReadTopics]);
+  }, [
+    drillInto,
+    hierarchyData,
+    hasHierarchyData,
+    setSelectedLevel,
+    topics,
+    safeReadTopics,
+  ]);
 
   const scopeLabel = getScopeLabel(scopePath);
 
-  const subtitle = scopePath.length === 0
-    ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`
-    : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`;
+  const subtitle =
+    scopePath.length === 0
+      ? `Showing all topics at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`
+      : `Inside ${scopeLabel} at relative level ${selectedLevel} (${getLevelLabel(selectedLevel)}). Circle size reflects sentence count.`;
 
-    if (!topics || topics.length === 0) {
-    return <p className="chart-empty-state chart-empty-state--panel">No topics available.</p>;
+  if (!topics || topics.length === 0) {
+    return (
+      <p className="chart-empty-state chart-empty-state--panel">
+        No topics available.
+      </p>
+    );
   }
 
   return (
-    <div ref={containerRef} className="circular-packing-chart chart-surface chart-surface--circular">
-      <Breadcrumbs scopePath={scopePath} onNavigate={(path) => {
-        navigateTo(path);
-        setSelectedLevel(0);
-      }} />
+    <div
+      ref={containerRef}
+      className="circular-packing-chart chart-surface chart-surface--circular"
+    >
+      <Breadcrumbs
+        scopePath={scopePath}
+        onNavigate={(path) => {
+          navigateTo(path);
+          setSelectedLevel(0);
+        }}
+      />
 
       <TopicLevelSwitcher
         className="circular-packing-level-switcher"
@@ -399,7 +460,10 @@ export default function CircularPackingChart({
           >
             Reset zoom
           </button>
-          <svg ref={svgRef} className="circular-packing-svg chart-svg chart-svg--centered" />
+          <svg
+            ref={svgRef}
+            className="circular-packing-svg chart-svg chart-svg--centered"
+          />
         </div>
       )}
 

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import SummarySourceMenu from './SummarySourceMenu';
-import '../styles/text-reading.css';
+import React, { useState, useMemo, useCallback } from "react";
+import SummarySourceMenu from "./SummarySourceMenu";
+import "../styles/text-reading.css";
 
 /**
  * @typedef {Object} ArticleSummaryViewProps
@@ -24,11 +24,12 @@ function ArticleSummaryView({
   const [bulletSourceMenu, setBulletSourceMenu] = useState(null);
 
   const highlightedBulletIndices = useMemo(() => {
-    if (!selectedTopics.length || !articleBulletMatches.length) return new Set();
-    const selectedNames = new Set(selectedTopics.map(t => t.name));
+    if (!selectedTopics.length || !articleBulletMatches.length)
+      return new Set();
+    const selectedNames = new Set(selectedTopics.map((t) => t.name));
     const result = new Set();
     articleBulletMatches.forEach((matches, idx) => {
-      if (matches.some(m => selectedNames.has(m.topic.name))) result.add(idx);
+      if (matches.some((m) => selectedNames.has(m.topic.name))) result.add(idx);
     });
     return result;
   }, [selectedTopics, articleBulletMatches]);
@@ -36,7 +37,11 @@ function ArticleSummaryView({
   const handleBulletSourceClick = useCallback((e, index) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setBulletSourceMenu({ bulletIndex: index, x: rect.left, y: rect.bottom + 4 });
+    setBulletSourceMenu({
+      bulletIndex: index,
+      x: rect.left,
+      y: rect.bottom + 4,
+    });
   }, []);
 
   const handleTextSourceClick = useCallback((e) => {
@@ -45,16 +50,19 @@ function ArticleSummaryView({
     setBulletSourceMenu({ bulletIndex: -1, x: rect.left, y: rect.bottom + 4 });
   }, []);
 
-  const handleBulletTopicSelect = useCallback((topic, sentenceIndices) => {
-    setBulletSourceMenu(null);
-    onShowTopicSentences({
-      name: topic.name,
-      displayName: topic.name,
-      fullPath: topic.name,
-      sentenceIndices,
-      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
-    });
-  }, [onShowTopicSentences]);
+  const handleBulletTopicSelect = useCallback(
+    (topic, sentenceIndices) => {
+      setBulletSourceMenu(null);
+      onShowTopicSentences({
+        name: topic.name,
+        displayName: topic.name,
+        fullPath: topic.name,
+        sentenceIndices,
+        ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
+      });
+    },
+    [onShowTopicSentences],
+  );
 
   return (
     <>
@@ -67,7 +75,7 @@ function ArticleSummaryView({
                   {articleSummaryText}
                   {articleTextMatches.length > 0 && (
                     <>
-                      {' '}
+                      {" "}
                       <button
                         type="button"
                         className="summary-source-link"
@@ -89,7 +97,7 @@ function ArticleSummaryView({
                     return (
                       <li
                         key={`${index}-${bullet}`}
-                        className={`reading-summary__bullet${isHighlighted ? ' reading-summary__bullet--highlighted' : ''}`}
+                        className={`reading-summary__bullet${isHighlighted ? " reading-summary__bullet--highlighted" : ""}`}
                       >
                         {bullet}
                         {topicBadges.slice(0, 3).map(({ topic }) => (
@@ -100,12 +108,12 @@ function ArticleSummaryView({
                             onClick={() => onToggleTopic(topic)}
                             title={`Select topic: ${topic.name}`}
                           >
-                            {topic.name.split('/').pop()}
+                            {topic.name.split("/").pop()}
                           </button>
                         ))}
                         {articleBulletMatches[index]?.length > 0 && (
                           <>
-                            {' '}
+                            {" "}
                             <button
                               type="button"
                               className="summary-source-link"
@@ -132,7 +140,7 @@ function ArticleSummaryView({
           matches={
             bulletSourceMenu.bulletIndex === -1
               ? articleTextMatches
-              : (articleBulletMatches[bulletSourceMenu.bulletIndex] || [])
+              : articleBulletMatches[bulletSourceMenu.bulletIndex] || []
           }
           onSelect={handleBulletTopicSelect}
           onClose={() => setBulletSourceMenu(null)}

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ReadProgress from './ReadProgress';
-import { calculateReadPercentage } from '../utils/readProgress';
+import React, { useState, useEffect, useRef } from "react";
+import ReadProgress from "./ReadProgress";
+import { calculateReadPercentage } from "../utils/readProgress";
 
 const PLACEHOLDER_SIZE = 80;
 
 function supportsIntersectionObserver() {
-  return typeof IntersectionObserver !== 'undefined';
+  return typeof IntersectionObserver !== "undefined";
 }
 
 export default function ArticleReadProgress({ submissionId }) {
@@ -24,7 +24,9 @@ export default function ArticleReadProgress({ submissionId }) {
       return undefined;
     }
 
-    const observer = new IntersectionObserver(function handleIntersection([entry]) {
+    const observer = new IntersectionObserver(function handleIntersection([
+      entry,
+    ]) {
       if (entry.isIntersecting) {
         setIsVisible(true);
         observer.unobserve(element);
@@ -47,7 +49,9 @@ export default function ArticleReadProgress({ submissionId }) {
 
     async function loadProgress() {
       try {
-        const response = await fetch(`/api/submission/${submissionId}/read-progress`);
+        const response = await fetch(
+          `/api/submission/${submissionId}/read-progress`,
+        );
         const data = await response.json();
 
         if (isActive) {
@@ -71,7 +75,11 @@ export default function ArticleReadProgress({ submissionId }) {
 
   return (
     <div ref={ref}>
-      <ReadProgress percentage={percentage} size={PLACEHOLDER_SIZE} label="Article progress" />
+      <ReadProgress
+        percentage={percentage}
+        size={PLACEHOLDER_SIZE}
+        label="Article progress"
+      />
     </div>
   );
 }

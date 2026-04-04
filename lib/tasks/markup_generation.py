@@ -128,8 +128,8 @@ TYPE_SCHEMAS: Dict[str, str] = {
         "paragraph — multiple distinct thematic blocks with clear topic shifts.\n"
         '  Do NOT use for continuous prose with transition words ("However", "But", "Additionally").\n'
         "  A single argument, even a long one, is NOT a paragraph segment.\n"
-        '  Emit exactly ONE paragraph segment per contiguous paragraph region.\n'
-        '  data.paragraphs MUST contain 2+ contiguous paragraph groups; do NOT emit one-group paragraph segments.\n'
+        "  Emit exactly ONE paragraph segment per contiguous paragraph region.\n"
+        "  data.paragraphs MUST contain 2+ contiguous paragraph groups; do NOT emit one-group paragraph segments.\n"
         '  {{"type": "paragraph", "words": W, "data": {{"paragraphs": [{{"words": W}}, {{"words": W}}]}}}}'
     ),
     "callout": (
@@ -139,9 +139,9 @@ TYPE_SCHEMAS: Dict[str, str] = {
     "quote": (
         'quote — text inside quotation marks (NOT reported speech). Top-level "words" = quoted text only\n'
         '  (exclude "She said" etc.). Quoted headlines are title, not quote.\n'
-        '  quote.words MUST be one contiguous span. Do NOT split a quote around attribution.\n'
-        '  If quote boundaries are unclear in <content>, omit quote rather than infer from <plain_text>.\n'
-        '  Omit attribution if no separate contiguous attribution span exists in <content>.\n'
+        "  quote.words MUST be one contiguous span. Do NOT split a quote around attribution.\n"
+        "  If quote boundaries are unclear in <content>, omit quote rather than infer from <plain_text>.\n"
+        "  Omit attribution if no separate contiguous attribution span exists in <content>.\n"
         '  {{"type": "quote", "words": W, "data": {{"attribution": W}}}}'
     ),
     "dialog": (
@@ -324,6 +324,7 @@ _PREFORMATTED_RE = re.compile(
 
 
 # ─── Cache helpers ─────────────────────────────────────────────────────────────
+
 
 def _cache_namespace(llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")

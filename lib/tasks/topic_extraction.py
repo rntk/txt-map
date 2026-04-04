@@ -1,6 +1,7 @@
 """
 Topic extraction task - extracts topics from text using sentence tagging approach
 """
+
 from lib.storage.submissions import SubmissionsStorage
 import hashlib
 from datetime import datetime, UTC
@@ -12,7 +13,7 @@ def normalize_topic(topic_name: str) -> str:
     """
     Normalize topic name to avoid duplicates due to case, spaces vs underscores, etc.
     """
-    return re.sub(r'[^a-z0-9]+', '_', topic_name.lower()).strip('_')
+    return re.sub(r"[^a-z0-9]+", "_", topic_name.lower()).strip("_")
 
 
 def generate_subtopics_for_topic(
@@ -20,25 +21,27 @@ def generate_subtopics_for_topic(
     sentences: List[str],
     sentence_indices: List[int],
     llm: Any,
-    cache_collection: Any
+    cache_collection: Any,
 ) -> List[Dict[str, Any]]:
     """
     Generate subtopics for a specific chapter/topic.
-    
+
     Args:
         topic_name: Name of the parent topic
         sentences: List of sentence texts for this topic
         sentence_indices: List of sentence indices (1-based) in the original document
         llm: LLamaCPP client instance
         cache_collection: MongoDB cache collection
-        
+
     Returns:
         List of subtopic dictionaries with name, sentences, and parent_topic
     """
     if not sentences or topic_name == "no_topic":
         return []
 
-    numbered_sentences = [f"{sentence_indices[i]}. {sentences[i]}" for i in range(len(sentences))]
+    numbered_sentences = [
+        f"{sentence_indices[i]}. {sentences[i]}" for i in range(len(sentences))
+    ]
     sentences_text = "\n".join(numbered_sentences)
 
     prompt_template = """Group the following sentences into detailed sub-chapters for the topic "{topic_name}".
@@ -56,7 +59,9 @@ Topic: {topic_name}
 Sentences:
 {sentences_text}"""
 
-    prompt = prompt_template.replace("{topic_name}", topic_name).replace("{sentences_text}", sentences_text)
+    prompt = prompt_template.replace("{topic_name}", topic_name).replace(
+        "{sentences_text}", sentences_text
+    )
     prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
 
     cached_response = cache_collection.find_one({"prompt_hash": prompt_hash})
@@ -67,30 +72,30 @@ Sentences:
         response = llm.call([prompt])
         cache_collection.update_one(
             {"prompt_hash": prompt_hash},
-            {"$set": {
-                "prompt_hash": prompt_hash,
-                "prompt": prompt,
-                "response": response,
-                "created_at": datetime.now(UTC)
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "prompt_hash": prompt_hash,
+                    "prompt": prompt,
+                    "response": response,
+                    "created_at": datetime.now(UTC),
+                }
+            },
+            upsert=True,
         )
 
     subtopics = []
-    for line in response.strip().split('\n'):
-        if ':' in line:
-            name, nums_str = line.split(':', 1)
+    for line in response.strip().split("\n"):
+        if ":" in line:
+            name, nums_str = line.split(":", 1)
             name = name.strip()
             # Normalize subtopic name but keep it descriptive
-            clean_name = re.sub(r'[^a-zA-Z0-9 ]+', ' ', name).strip()
-            nums = [int(n.strip()) for n in nums_str.split(',') if n.strip().isdigit()]
+            clean_name = re.sub(r"[^a-zA-Z0-9 ]+", " ", name).strip()
+            nums = [int(n.strip()) for n in nums_str.split(",") if n.strip().isdigit()]
             if nums:
-                subtopics.append({
-                    "name": clean_name,
-                    "sentences": nums,
-                    "parent_topic": topic_name
-                })
-    
+                subtopics.append(
+                    {"name": clean_name, "sentences": nums, "parent_topic": topic_name}
+                )
+
     return subtopics
 
 
@@ -148,8 +153,7 @@ def parse_llm_ranges(response: str) -> List[Tuple[str, int, int]]:
 
 
 def normalize_topic_ranges(
-    topic_ranges: List[Tuple[str, int, int]],
-    max_index: int
+    topic_ranges: List[Tuple[str, int, int]], max_index: int
 ) -> List[Tuple[str, int, int]]:
     """
     Clamp, order, and fill gaps to ensure continuous coverage.
@@ -319,7 +323,9 @@ Output:"""
 
     # Token/Chunking Estimation
     try:
-        context_size = getattr(llm, "context_size", getattr(llm, "max_context_tokens", 64000))
+        context_size = getattr(
+            llm, "context_size", getattr(llm, "max_context_tokens", 64000)
+        )
     except Exception:
         context_size = 64000
 
@@ -329,55 +335,57 @@ Output:"""
     # Reserve buffer for output and safety (1500 tokens)
     max_chunk_tokens = context_size - template_tokens - 1500
 
-    print(f"DEBUG: Context size: {context_size}, Template tokens: {template_tokens}, Max chunk tokens: {max_chunk_tokens}")
+    print(
+        f"DEBUG: Context size: {context_size}, Template tokens: {template_tokens}, Max chunk tokens: {max_chunk_tokens}"
+    )
 
     chunks = []
     current_chunk = []
     current_tokens = 0
     current_start_idx = 0
-    
+
     # Pre-calculate tokens for each sentence to build optimal chunks
     for i, sent in enumerate(sentences):
         # Format like: {N} Sentence text
         line = f"{{{i}}} {sent}"
         # Estimate +1 for newline character in join
         line_tokens = llm.estimate_tokens(line) + 1
-        
+
         # If adding this line exceeds the chunk limit, finalize current chunk
         if current_tokens + line_tokens > max_chunk_tokens and current_chunk:
-            chunks.append({
-                "sentences": current_chunk,
-                "start_idx": current_start_idx
-            })
-            print(f"DEBUG: Created chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)")
+            chunks.append({"sentences": current_chunk, "start_idx": current_start_idx})
+            print(
+                f"DEBUG: Created chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)"
+            )
             # Reset for next chunk
             current_chunk = []
             current_tokens = 0
             current_start_idx = i
-            
+
         current_chunk.append(sent)
         current_tokens += line_tokens
-        
+
     # Add final chunk
     if current_chunk:
-        chunks.append({
-            "sentences": current_chunk,
-            "start_idx": current_start_idx
-        })
-        print(f"DEBUG: Created final chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)")
+        chunks.append({"sentences": current_chunk, "start_idx": current_start_idx})
+        print(
+            f"DEBUG: Created final chunk starting at {current_start_idx} with {len(current_chunk)} sentences ({current_tokens} tokens)"
+        )
 
     # Process all chunks
     all_topic_ranges = []
-    
+
     for chunk_idx, chunk in enumerate(chunks):
         chunk_sentences = chunk["sentences"]
         start_idx = chunk["start_idx"]
-        
-        print(f"Processing chunk {chunk_idx + 1}/{len(chunks)} (Indices {start_idx}-{start_idx + len(chunk_sentences) - 1})...")
+
+        print(
+            f"Processing chunk {chunk_idx + 1}/{len(chunks)} (Indices {start_idx}-{start_idx + len(chunk_sentences) - 1})..."
+        )
 
         # 1. Build Tagged Text for this chunk
         tagged_text = build_tagged_text(chunk_sentences, start_index=start_idx)
-        
+
         # 2. Prepare Prompt
         prompt = prompt_template.replace("{tagged_text}", tagged_text)
         prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
@@ -393,13 +401,15 @@ Output:"""
                 response = llm.call([prompt])
                 cache_collection.update_one(
                     {"prompt_hash": prompt_hash},
-                    {"$set": {
-                        "prompt_hash": prompt_hash,
-                        "prompt": prompt,
-                        "response": response,
-                        "created_at": datetime.now(UTC)
-                    }},
-                    upsert=True
+                    {
+                        "$set": {
+                            "prompt_hash": prompt_hash,
+                            "prompt": prompt,
+                            "response": response,
+                            "created_at": datetime.now(UTC),
+                        }
+                    },
+                    upsert=True,
                 )
             except Exception as e:
                 print(f"  Error calling LLM for chunk {chunk_idx + 1}: {e}")
@@ -419,11 +429,11 @@ Output:"""
     # 5. Convert to Topics List
     # Map back to 1-based indices and grouping structure
     final_topics = {}
-    
+
     for topic, start, end in normalized_ranges:
         # Convert 0-based range [start, end] to 1-based list of indices
         sent_indices = list(range(start + 1, end + 2))
-        
+
         if topic not in final_topics:
             final_topics[topic] = []
         final_topics[topic].extend(sent_indices)
@@ -434,29 +444,26 @@ Output:"""
         clean_name = name.strip()
         unique_indices = sorted(list(set(sent_indices)))
         if unique_indices:
-            topics_list.append({
-                "name": clean_name,
-                "sentences": unique_indices
-            })
+            topics_list.append({"name": clean_name, "sentences": unique_indices})
 
     # 6. Generate subtopics
     all_subtopics = []
-    
+
     for topic in topics_list:
         if topic["sentences"] and topic["name"] != "no_topic":
             # Get the actual sentence texts for this topic
             topic_sentences = [sentences[idx - 1] for idx in topic["sentences"]]
-            
-            # Use just the last part of the hierarchy for the subtopic prompt 
+
+            # Use just the last part of the hierarchy for the subtopic prompt
             # or the full path? The original code used normalize_topic(name).
-            # The prompt in generate_subtopics_for_topic uses existing name. 
-            
+            # The prompt in generate_subtopics_for_topic uses existing name.
+
             subtopics = generate_subtopics_for_topic(
-                topic["name"], 
-                topic_sentences, 
-                topic["sentences"], 
-                llm, 
-                cache_collection
+                topic["name"],
+                topic_sentences,
+                topic["sentences"],
+                llm,
+                cache_collection,
             )
             all_subtopics.extend(subtopics)
             print(f"  Generated {len(subtopics)} subtopics for topic '{topic['name']}'")
@@ -467,9 +474,11 @@ Output:"""
         submission_id,
         {
             "topics": topics_list,
-            "sentences": sentences, # Ensure sentences are saved
-            "subtopics": all_subtopics
-        }
+            "sentences": sentences,  # Ensure sentences are saved
+            "subtopics": all_subtopics,
+        },
     )
 
-    print(f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(all_subtopics)} subtopics")
+    print(
+        f"Topic extraction completed for submission {submission_id}: {len(topics_list)} topics, {len(all_subtopics)} subtopics"
+    )

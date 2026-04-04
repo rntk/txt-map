@@ -98,7 +98,9 @@ def repeat_task_queue_entry(
     )
 
     inserted_ids = [
-        task_queue_storage.create(make_task_document(submission_id, t, TASK_PRIORITIES.get(t, 3)))
+        task_queue_storage.create(
+            make_task_document(submission_id, t, TASK_PRIORITIES.get(t, 3))
+        )
         for t in expanded_tasks
     ]
 
@@ -124,7 +126,15 @@ def add_task_queue_entry(
 
     inserted_ids = []
     for t in expanded_tasks:
-        priority = payload.priority if payload.priority is not None else TASK_PRIORITIES.get(t, 3)
-        inserted_ids.append(task_queue_storage.create(make_task_document(payload.submission_id, t, priority)))
+        priority = (
+            payload.priority
+            if payload.priority is not None
+            else TASK_PRIORITIES.get(t, 3)
+        )
+        inserted_ids.append(
+            task_queue_storage.create(
+                make_task_document(payload.submission_id, t, priority)
+            )
+        )
 
     return {"queued": True, "tasks": expanded_tasks, "task_ids": inserted_ids}

@@ -1,6 +1,6 @@
-import React from 'react';
-import { getNestedIndices, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getNestedIndices, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * @typedef {Object} ParagraphGroup
@@ -24,11 +24,11 @@ export default function ParagraphMarkup({ segment, sentences }) {
     .map((paragraph) => {
       const indices = Array.isArray(paragraph.sentence_indices)
         ? [...paragraph.sentence_indices].sort((a, b) => a - b)
-        : getNestedIndices(paragraph, 'position_indices', 'sentence_indices');
+        : getNestedIndices(paragraph, "position_indices", "sentence_indices");
       const text = indices
         .map((idx) => getTextByIndex(sentences, idx))
         .filter(Boolean)
-        .join(' ')
+        .join(" ")
         .trim();
 
       return text;

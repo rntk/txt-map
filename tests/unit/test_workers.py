@@ -3,6 +3,7 @@ Unit tests for the workers module.
 
 Tests Worker class, main function, and constants.
 """
+
 import pytest
 import signal
 from datetime import datetime, UTC
@@ -119,10 +120,12 @@ class TestTaskHandlers:
 class TestWorkerInit:
     """Test Worker.__init__ method."""
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_stores_db_and_llm_references(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_stores_db_and_llm_references(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker stores db and llm references."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -132,10 +135,12 @@ class TestWorkerInit:
         assert worker.db is mock_db
         assert worker.llm is mock_llm
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_sets_running_true_initially(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_sets_running_true_initially(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker sets running=True initially."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -144,11 +149,13 @@ class TestWorkerInit:
 
         assert worker.running is True
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    @patch('workers.os.getpid')
-    def test_generates_worker_id_from_process_id(self, mock_getpid, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    @patch("workers.os.getpid")
+    def test_generates_worker_id_from_process_id(
+        self, mock_getpid, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker generates worker_id from process ID."""
         mock_getpid.return_value = 12345
         mock_db = MagicMock()
@@ -158,10 +165,12 @@ class TestWorkerInit:
 
         assert worker.worker_id == "worker-12345"
 
-    @patch('workers.signal.signal')
-    @patch('workers.SemanticDiffsStorage')
-    @patch('workers.SubmissionsStorage')
-    def test_creates_submissions_storage_instance(self, mock_submissions_storage, mock_semantic_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SemanticDiffsStorage")
+    @patch("workers.SubmissionsStorage")
+    def test_creates_submissions_storage_instance(
+        self, mock_submissions_storage, mock_semantic_storage, mock_signal
+    ):
         """Worker creates SubmissionsStorage instance."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -171,10 +180,12 @@ class TestWorkerInit:
         mock_submissions_storage.assert_called_once_with(mock_db)
         assert worker.submissions_storage is mock_submissions_storage.return_value
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_creates_semantic_diffs_storage_instance(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_creates_semantic_diffs_storage_instance(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker creates SemanticDiffsStorage instance."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -184,10 +195,12 @@ class TestWorkerInit:
         mock_semantic_storage.assert_called_once_with(mock_db)
         assert worker.semantic_diffs_storage is mock_semantic_storage.return_value
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_registers_sigint_handler(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_registers_sigint_handler(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker registers signal handler for SIGINT."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -196,10 +209,12 @@ class TestWorkerInit:
 
         mock_signal.assert_any_call(signal.SIGINT, worker._signal_handler)
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_registers_sigterm_handler(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_registers_sigterm_handler(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Worker registers signal handler for SIGTERM."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -212,10 +227,12 @@ class TestWorkerInit:
 class TestWorkerSignalHandler:
     """Test Worker._signal_handler method."""
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_sets_running_false_on_signal(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_sets_running_false_on_signal(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Signal handler sets running=False."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -227,10 +244,12 @@ class TestWorkerSignalHandler:
 
         assert worker.running is False
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_logs_shutdown_message(self, mock_semantic_storage, mock_submissions_storage, mock_signal, caplog):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_logs_shutdown_message(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal, caplog
+    ):
         """Signal handler logs shutdown message."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -243,10 +262,12 @@ class TestWorkerSignalHandler:
         assert "Received signal" in caplog.text
         assert "shutting down" in caplog.text
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_handles_sigint(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_handles_sigint(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Signal handler handles SIGINT (Ctrl+C)."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -258,10 +279,12 @@ class TestWorkerSignalHandler:
 
         assert worker.running is False
 
-    @patch('workers.signal.signal')
-    @patch('workers.SubmissionsStorage')
-    @patch('workers.SemanticDiffsStorage')
-    def test_handles_sigterm(self, mock_semantic_storage, mock_submissions_storage, mock_signal):
+    @patch("workers.signal.signal")
+    @patch("workers.SubmissionsStorage")
+    @patch("workers.SemanticDiffsStorage")
+    def test_handles_sigterm(
+        self, mock_semantic_storage, mock_submissions_storage, mock_signal
+    ):
         """Signal handler handles SIGTERM."""
         mock_db = MagicMock()
         mock_llm = MagicMock()
@@ -280,19 +303,18 @@ class TestWorkerDependenciesMet:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
 
     def test_returns_true_for_task_with_no_dependencies(self, worker):
         """Returns True for tasks with no dependencies (split_topic_generation)."""
-        task = {
-            "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "split_topic_generation", "submission_id": "sub-123"}
 
         result = worker._dependencies_met(task)
 
@@ -300,16 +322,11 @@ class TestWorkerDependenciesMet:
 
     def test_returns_true_when_all_dependencies_completed(self, worker):
         """Returns True when all dependencies have status='completed'."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
-            "tasks": {
-                "split_topic_generation": {"status": "completed"}
-            }
+            "tasks": {"split_topic_generation": {"status": "completed"}},
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -320,16 +337,11 @@ class TestWorkerDependenciesMet:
 
     def test_returns_false_when_dependency_pending(self, worker):
         """Returns False when any dependency is 'pending'."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
-            "tasks": {
-                "split_topic_generation": {"status": "pending"}
-            }
+            "tasks": {"split_topic_generation": {"status": "pending"}},
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -339,16 +351,11 @@ class TestWorkerDependenciesMet:
 
     def test_returns_false_when_dependency_processing(self, worker):
         """Returns False when any dependency is 'processing'."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
-            "tasks": {
-                "split_topic_generation": {"status": "processing"}
-            }
+            "tasks": {"split_topic_generation": {"status": "processing"}},
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -358,16 +365,11 @@ class TestWorkerDependenciesMet:
 
     def test_returns_false_when_dependency_failed(self, worker):
         """Returns False when any dependency is 'failed'."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
-            "tasks": {
-                "split_topic_generation": {"status": "failed"}
-            }
+            "tasks": {"split_topic_generation": {"status": "failed"}},
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -377,10 +379,7 @@ class TestWorkerDependenciesMet:
 
     def test_returns_false_when_submission_not_found(self, worker, caplog):
         """Returns False when submission not found (logs warning)."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
         worker.submissions_storage.get_by_id.return_value = None
 
@@ -393,15 +392,9 @@ class TestWorkerDependenciesMet:
 
     def test_handles_missing_task_data_in_submission(self, worker):
         """Handles missing task data in submission."""
-        task = {
-            "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "subtopics_generation", "submission_id": "sub-123"}
 
-        submission = {
-            "_id": "sub-123",
-            "tasks": {}
-        }
+        submission = {"_id": "sub-123", "tasks": {}}
         worker.submissions_storage.get_by_id.return_value = submission
 
         result = worker._dependencies_met(task)
@@ -410,17 +403,14 @@ class TestWorkerDependenciesMet:
 
     def test_mindmap_requires_subtopics_generation_completed(self, worker):
         """mindmap requires subtopics_generation to be completed."""
-        task = {
-            "task_type": "mindmap",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "mindmap", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
             "tasks": {
                 "split_topic_generation": {"status": "completed"},
-                "subtopics_generation": {"status": "completed"}
-            }
+                "subtopics_generation": {"status": "completed"},
+            },
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -430,17 +420,14 @@ class TestWorkerDependenciesMet:
 
     def test_mindmap_blocked_if_subtopics_not_completed(self, worker):
         """mindmap blocked if subtopics_generation not completed."""
-        task = {
-            "task_type": "mindmap",
-            "submission_id": "sub-123"
-        }
+        task = {"task_type": "mindmap", "submission_id": "sub-123"}
 
         submission = {
             "_id": "sub-123",
             "tasks": {
                 "split_topic_generation": {"status": "completed"},
-                "subtopics_generation": {"status": "pending"}
-            }
+                "subtopics_generation": {"status": "pending"},
+            },
         }
         worker.submissions_storage.get_by_id.return_value = submission
 
@@ -455,9 +442,11 @@ class TestWorkerClaimTask:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             worker = Worker(mock_db, mock_llm)
@@ -470,10 +459,18 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
         # Only return task for split_topic_generation, None for others
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
 
         result = worker.claim_task()
 
@@ -487,10 +484,16 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "summarization",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
         # Return None for priority 1 and 2 tasks, then return the summarization task
-        worker.db.task_queue.find_one_and_update.side_effect = [None, None, mock_task, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            None,
+            None,
+            mock_task,
+            None,
+            None,
+        ]
 
         worker.claim_task()
 
@@ -505,9 +508,17 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
 
         worker.claim_task()
 
@@ -520,9 +531,17 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
 
         worker.claim_task()
 
@@ -536,9 +555,17 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [mock_task, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
 
         worker.claim_task()
 
@@ -551,9 +578,19 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            None,
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
 
         worker.claim_task()
 
@@ -564,9 +601,19 @@ class TestWorkerClaimTask:
         mock_task = {
             "_id": "task-1",
             "task_type": "subtopics_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [
+            None,
+            mock_task,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
         worker._dependencies_met.return_value = False
 
         result = worker.claim_task()
@@ -611,9 +658,11 @@ class TestWorkerClaimDiffJob:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage') as mock_semantic_storage:
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage") as mock_semantic_storage,
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             worker = Worker(mock_db, mock_llm)
@@ -627,7 +676,9 @@ class TestWorkerClaimDiffJob:
 
         result = worker.claim_diff_job()
 
-        worker.semantic_diffs_storage.claim_job.assert_called_once_with(worker.worker_id)
+        worker.semantic_diffs_storage.claim_job.assert_called_once_with(
+            worker.worker_id
+        )
         assert result == mock_job
 
     def test_returns_claimed_job(self, worker):
@@ -654,93 +705,27 @@ class TestWorkerProcessTask:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             mock_queue_store = MagicMock()
             worker = Worker(mock_db, mock_llm, queue_store=mock_queue_store)
             yield worker
 
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_finds_handler_from_task_handlers_mapping(self, mock_create_llm, mock_handlers, worker, caplog):
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_finds_handler_from_task_handlers_mapping(
+        self, mock_create_llm, mock_handlers, worker, caplog
+    ):
         """Finds handler from TASK_HANDLERS mapping."""
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
-        }
-        
-        mock_handler = MagicMock()
-        mock_handlers.__getitem__.return_value = mock_handler
-        mock_handlers.get.return_value = mock_handler
-
-        submission = {"_id": "sub-123"}
-        worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
-
-        with patch.object(worker, '_mark_task_completed'):
-            worker.process_task(task)
-            mock_handler.assert_called_once()
-
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_updates_submission_task_status_to_processing(self, mock_create_llm, mock_handlers, worker):
-        """Updates submission task status to 'processing'."""
-        task = {
-            "_id": "task-1",
-            "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
-        }
-
-        mock_handler = MagicMock()
-        mock_handlers.__getitem__.return_value = mock_handler
-        mock_handlers.get.return_value = mock_handler
-
-        submission = {"_id": "sub-123"}
-        worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
-
-        with patch.object(worker, '_mark_task_completed'):
-            worker.process_task(task)
-
-        worker.submissions_storage.update_task_status.assert_called_with(
-            "sub-123", "split_topic_generation", "processing"
-        )
-
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_fetches_submission_document(self, mock_create_llm, mock_handlers, worker):
-        """Fetches submission document."""
-        task = {
-            "_id": "task-1",
-            "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
-        }
-
-        mock_handler = MagicMock()
-        mock_handlers.__getitem__.return_value = mock_handler
-        mock_handlers.get.return_value = mock_handler
-
-        submission = {"_id": "sub-123"}
-        worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
-
-        with patch.object(worker, '_mark_task_completed'):
-            worker.process_task(task)
-
-        worker.submissions_storage.get_by_id.assert_called_once_with("sub-123")
-
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_calls_handler_with_submission_db_llm(self, mock_create_llm, mock_handlers, worker):
-        """Non-cache tasks (e.g. mindmap) called with (submission, db, QueuedLLMClient) only."""
-        task = {
-            "_id": "task-1",
-            "task_type": "mindmap",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         mock_handler = MagicMock()
@@ -750,11 +735,89 @@ class TestWorkerProcessTask:
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
         mock_create_llm.return_value = MagicMock(
-            provider_name="OpenAI", model_name="gpt-4o",
-            model_id="openai:gpt-4o", max_context_tokens=128000,
+            provider_name="OpenAI", model_name="gpt-4o"
         )
 
-        with patch.object(worker, '_mark_task_completed'):
+        with patch.object(worker, "_mark_task_completed"):
+            worker.process_task(task)
+            mock_handler.assert_called_once()
+
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_updates_submission_task_status_to_processing(
+        self, mock_create_llm, mock_handlers, worker
+    ):
+        """Updates submission task status to 'processing'."""
+        task = {
+            "_id": "task-1",
+            "task_type": "split_topic_generation",
+            "submission_id": "sub-123",
+        }
+
+        mock_handler = MagicMock()
+        mock_handlers.__getitem__.return_value = mock_handler
+        mock_handlers.get.return_value = mock_handler
+
+        submission = {"_id": "sub-123"}
+        worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
+
+        with patch.object(worker, "_mark_task_completed"):
+            worker.process_task(task)
+
+        worker.submissions_storage.update_task_status.assert_called_with(
+            "sub-123", "split_topic_generation", "processing"
+        )
+
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_fetches_submission_document(self, mock_create_llm, mock_handlers, worker):
+        """Fetches submission document."""
+        task = {
+            "_id": "task-1",
+            "task_type": "split_topic_generation",
+            "submission_id": "sub-123",
+        }
+
+        mock_handler = MagicMock()
+        mock_handlers.__getitem__.return_value = mock_handler
+        mock_handlers.get.return_value = mock_handler
+
+        submission = {"_id": "sub-123"}
+        worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
+
+        with patch.object(worker, "_mark_task_completed"):
+            worker.process_task(task)
+
+        worker.submissions_storage.get_by_id.assert_called_once_with("sub-123")
+
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_calls_handler_with_submission_db_llm(
+        self, mock_create_llm, mock_handlers, worker
+    ):
+        """Non-cache tasks (e.g. mindmap) called with (submission, db, QueuedLLMClient) only."""
+        task = {"_id": "task-1", "task_type": "mindmap", "submission_id": "sub-123"}
+
+        mock_handler = MagicMock()
+        mock_handlers.__getitem__.return_value = mock_handler
+        mock_handlers.get.return_value = mock_handler
+
+        submission = {"_id": "sub-123"}
+        worker.submissions_storage.get_by_id.return_value = submission
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI",
+            model_name="gpt-4o",
+            model_id="openai:gpt-4o",
+            max_context_tokens=128000,
+        )
+
+        with patch.object(worker, "_mark_task_completed"):
             worker.process_task(task)
 
         args, kwargs = mock_handler.call_args
@@ -762,14 +825,16 @@ class TestWorkerProcessTask:
         assert args[1] is worker.db
         assert isinstance(args[2], QueuedLLMClient)
 
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_calls_cache_task_handler_with_runtime_llm(self, mock_create_llm, mock_handlers, worker):
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_calls_cache_task_handler_with_runtime_llm(
+        self, mock_create_llm, mock_handlers, worker
+    ):
         """Cache tasks receive a QueuedLLMClient and cache store."""
         task = {
             "_id": "task-1",
             "task_type": "summarization",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         mock_handler = MagicMock()
@@ -777,11 +842,13 @@ class TestWorkerProcessTask:
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
         mock_create_llm.return_value = MagicMock(
-            provider_name="OpenAI", model_name="gpt-4o",
-            model_id="openai:gpt-4o", max_context_tokens=128000,
+            provider_name="OpenAI",
+            model_name="gpt-4o",
+            model_id="openai:gpt-4o",
+            max_context_tokens=128000,
         )
 
-        with patch.object(worker, '_mark_task_completed'):
+        with patch.object(worker, "_mark_task_completed"):
             worker.process_task(task)
 
         args, kwargs = mock_handler.call_args
@@ -790,14 +857,16 @@ class TestWorkerProcessTask:
         assert isinstance(args[2], QueuedLLMClient)
         assert kwargs.get("cache_store") is worker.cache_store
 
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_marks_task_completed_on_success(self, mock_create_llm, mock_handlers, worker):
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_marks_task_completed_on_success(
+        self, mock_create_llm, mock_handlers, worker
+    ):
         """Marks task completed on success."""
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         mock_handler = MagicMock()
@@ -806,29 +875,33 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
 
-        with patch.object(worker, '_mark_task_completed') as mock_mark_completed:
+        with patch.object(worker, "_mark_task_completed") as mock_mark_completed:
             worker.process_task(task)
 
             mock_mark_completed.assert_called_once_with(task)
 
-    @patch('workers.create_llm_client')
+    @patch("workers.create_llm_client")
     def test_marks_task_failed_on_exception(self, mock_create_llm, worker):
         """Marks task failed on exception."""
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
 
-        with patch.object(worker, '_mark_task_failed') as mock_mark_failed:
-            with patch.object(worker, '_mark_task_completed'):
-                with patch('workers.TASK_HANDLERS') as mock_handlers:
+        with patch.object(worker, "_mark_task_failed") as mock_mark_failed:
+            with patch.object(worker, "_mark_task_completed"):
+                with patch("workers.TASK_HANDLERS") as mock_handlers:
                     mock_handler = MagicMock(side_effect=Exception("Test error"))
                     mock_handlers.__getitem__.return_value = mock_handler
                     mock_handlers.get.return_value = mock_handler
@@ -841,41 +914,45 @@ class TestWorkerProcessTask:
         task = {
             "_id": "task-1",
             "task_type": "unknown_task_type",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
-        with patch.object(worker, '_mark_task_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_task_failed") as mock_mark_failed:
             worker.process_task(task)
 
             mock_mark_failed.assert_called_once()
             call_args = mock_mark_failed.call_args
             assert "No handler for task type" in call_args[0][1]
 
-    @patch('workers.create_llm_client')
+    @patch("workers.create_llm_client")
     def test_submission_not_found_marks_failed(self, mock_create_llm, worker):
         """Submission not found -> mark failed."""
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker.submissions_storage.get_by_id.return_value = None
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
 
-        with patch.object(worker, '_mark_task_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_task_failed") as mock_mark_failed:
             worker.process_task(task)
 
             mock_mark_failed.assert_called_once()
 
-    @patch('workers.TASK_HANDLERS')
-    @patch('workers.create_llm_client')
-    def test_logs_errors_with_exc_info(self, mock_create_llm, mock_handlers, worker, caplog):
+    @patch("workers.TASK_HANDLERS")
+    @patch("workers.create_llm_client")
+    def test_logs_errors_with_exc_info(
+        self, mock_create_llm, mock_handlers, worker, caplog
+    ):
         """Logs errors with exc_info."""
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         mock_handler = MagicMock(side_effect=Exception("Test error"))
@@ -884,10 +961,12 @@ class TestWorkerProcessTask:
 
         submission = {"_id": "sub-123"}
         worker.submissions_storage.get_by_id.return_value = submission
-        mock_create_llm.return_value = MagicMock(provider_name="OpenAI", model_name="gpt-4o")
+        mock_create_llm.return_value = MagicMock(
+            provider_name="OpenAI", model_name="gpt-4o"
+        )
 
-        with patch.object(worker, '_mark_task_failed'):
-            with patch.object(worker, '_mark_task_completed'):
+        with patch.object(worker, "_mark_task_failed"):
+            with patch.object(worker, "_mark_task_completed"):
                 with caplog.at_level("ERROR"):
                     worker.process_task(task)
 
@@ -901,9 +980,11 @@ class TestWorkerMarkTaskCompleted:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
@@ -913,7 +994,7 @@ class TestWorkerMarkTaskCompleted:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_completed(task)
@@ -927,7 +1008,7 @@ class TestWorkerMarkTaskCompleted:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_completed(task)
@@ -940,7 +1021,7 @@ class TestWorkerMarkTaskCompleted:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_completed(task)
@@ -954,7 +1035,7 @@ class TestWorkerMarkTaskCompleted:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_completed(task)
@@ -968,9 +1049,11 @@ class TestWorkerMarkTaskFailed:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
@@ -980,7 +1063,7 @@ class TestWorkerMarkTaskFailed:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_failed(task, "Test error message")
@@ -993,7 +1076,7 @@ class TestWorkerMarkTaskFailed:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_failed(task, "Test error message")
@@ -1006,7 +1089,7 @@ class TestWorkerMarkTaskFailed:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_failed(task, "Test error message")
@@ -1019,7 +1102,7 @@ class TestWorkerMarkTaskFailed:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_failed(task, "Test error message")
@@ -1032,7 +1115,7 @@ class TestWorkerMarkTaskFailed:
         task = {
             "_id": "task-1",
             "task_type": "split_topic_generation",
-            "submission_id": "sub-123"
+            "submission_id": "sub-123",
         }
 
         worker._mark_task_failed(task, "Test error message")
@@ -1048,9 +1131,11 @@ class TestWorkerProcessDiffJob:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             worker = Worker(mock_db, mock_llm)
@@ -1062,10 +1147,10 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": None,
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
-        with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
             worker.process_diff_job(job)
             mock_mark_failed.assert_called_once()
 
@@ -1075,10 +1160,10 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": None,
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
-        with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
             worker.process_diff_job(job)
             mock_mark_failed.assert_called_once()
 
@@ -1088,10 +1173,10 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": None
+            "submission_b_id": None,
         }
 
-        with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
             worker.process_diff_job(job)
             mock_mark_failed.assert_called_once()
 
@@ -1101,10 +1186,10 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": None,
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
-        with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
             worker.process_diff_job(job)
             mock_mark_failed.assert_called_once_with(job, "Invalid job payload")
 
@@ -1114,21 +1199,21 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch.object(worker, '_mark_diff_job_completed'):
-                with patch('workers.compute_topic_aware_semantic_diff'):
-                    with patch.object(worker.semantic_diffs_storage, 'upsert_diff'):
+            with patch.object(worker, "_mark_diff_job_completed"):
+                with patch("workers.compute_topic_aware_semantic_diff"):
+                    with patch.object(worker.semantic_diffs_storage, "upsert_diff"):
                         worker.process_diff_job(job)
 
         assert worker.submissions_storage.get_by_id.call_count == 2
@@ -1139,12 +1224,12 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         worker.submissions_storage.get_by_id.return_value = None
 
-        with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+        with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
             worker.process_diff_job(job)
             mock_mark_failed.assert_called_once()
 
@@ -1154,21 +1239,21 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch.object(worker, '_mark_diff_job_completed'):
-                with patch('workers.compute_topic_aware_semantic_diff'):
-                    with patch.object(worker.semantic_diffs_storage, 'upsert_diff'):
+            with patch.object(worker, "_mark_diff_job_completed"):
+                with patch("workers.compute_topic_aware_semantic_diff"):
+                    with patch.object(worker.semantic_diffs_storage, "upsert_diff"):
                         worker.process_diff_job(job)
 
             assert mock_readiness.call_count == 2
@@ -1179,19 +1264,19 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": False, "missing": ["topics"]},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+            with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
                 worker.process_diff_job(job)
                 mock_mark_failed.assert_called_once()
                 assert "Topic prerequisites" in mock_mark_failed.call_args[0][1]
@@ -1203,7 +1288,7 @@ class TestWorkerProcessDiffJob:
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
             "submission_b_id": "sub-b",
-            "force_recalculate": False
+            "force_recalculate": False,
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
@@ -1213,14 +1298,16 @@ class TestWorkerProcessDiffJob:
         existing_diff = {"_id": "diff-1"}
         worker.semantic_diffs_storage.get_diff_by_pair_key.return_value = existing_diff
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.stale_reasons') as mock_stale:
+            with patch("workers.stale_reasons") as mock_stale:
                 mock_stale.return_value = []  # No stale reasons = up to date
-                with patch.object(worker, '_mark_diff_job_completed') as mock_mark_completed:
+                with patch.object(
+                    worker, "_mark_diff_job_completed"
+                ) as mock_mark_completed:
                     worker.process_diff_job(job)
 
                     mock_mark_completed.assert_called_once()
@@ -1232,7 +1319,7 @@ class TestWorkerProcessDiffJob:
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
             "submission_b_id": "sub-b",
-            "force_recalculate": False
+            "force_recalculate": False,
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
@@ -1242,14 +1329,14 @@ class TestWorkerProcessDiffJob:
         existing_diff = {"_id": "diff-1"}
         worker.semantic_diffs_storage.get_diff_by_pair_key.return_value = existing_diff
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.stale_reasons') as mock_stale:
+            with patch("workers.stale_reasons") as mock_stale:
                 mock_stale.return_value = []
-                with patch.object(worker, '_mark_diff_job_completed'):
+                with patch.object(worker, "_mark_diff_job_completed"):
                     with caplog.at_level("INFO"):
                         worker.process_diff_job(job)
 
@@ -1262,22 +1349,22 @@ class TestWorkerProcessDiffJob:
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
             "submission_b_id": "sub-b",
-            "force_recalculate": True
+            "force_recalculate": True,
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.compute_topic_aware_semantic_diff') as mock_compute:
+            with patch("workers.compute_topic_aware_semantic_diff") as mock_compute:
                 mock_compute.return_value = {"diff": "result"}
-                with patch.object(worker.semantic_diffs_storage, 'upsert_diff'):
-                    with patch.object(worker, '_mark_diff_job_completed'):
+                with patch.object(worker.semantic_diffs_storage, "upsert_diff"):
+                    with patch.object(worker, "_mark_diff_job_completed"):
                         worker.process_diff_job(job)
 
                         mock_compute.assert_called_once_with(submission_a, submission_b)
@@ -1289,7 +1376,7 @@ class TestWorkerProcessDiffJob:
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
             "submission_b_id": "sub-b",
-            "force_recalculate": True
+            "force_recalculate": True,
         }
 
         submission_a = {"_id": "sub-a", "results": {}, "updated_at": datetime.now(UTC)}
@@ -1298,15 +1385,17 @@ class TestWorkerProcessDiffJob:
 
         diff_payload = {"diff": "result"}
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.compute_topic_aware_semantic_diff') as mock_compute:
+            with patch("workers.compute_topic_aware_semantic_diff") as mock_compute:
                 mock_compute.return_value = diff_payload
-                with patch.object(worker.semantic_diffs_storage, 'upsert_diff') as mock_upsert:
-                    with patch.object(worker, '_mark_diff_job_completed'):
+                with patch.object(
+                    worker.semantic_diffs_storage, "upsert_diff"
+                ) as mock_upsert:
+                    with patch.object(worker, "_mark_diff_job_completed"):
                         worker.process_diff_job(job)
 
                         mock_upsert.assert_called_once()
@@ -1321,21 +1410,23 @@ class TestWorkerProcessDiffJob:
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
             "submission_b_id": "sub-b",
-            "force_recalculate": True
+            "force_recalculate": True,
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.compute_topic_aware_semantic_diff'):
-                with patch.object(worker.semantic_diffs_storage, 'upsert_diff'):
-                    with patch.object(worker, '_mark_diff_job_completed') as mock_mark_completed:
+            with patch("workers.compute_topic_aware_semantic_diff"):
+                with patch.object(worker.semantic_diffs_storage, "upsert_diff"):
+                    with patch.object(
+                        worker, "_mark_diff_job_completed"
+                    ) as mock_mark_completed:
                         worker.process_diff_job(job)
 
                         mock_mark_completed.assert_called_once()
@@ -1346,21 +1437,21 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.compute_topic_aware_semantic_diff') as mock_compute:
+            with patch("workers.compute_topic_aware_semantic_diff") as mock_compute:
                 mock_compute.side_effect = Exception("Computation error")
-                with patch.object(worker, '_mark_diff_job_failed') as mock_mark_failed:
+                with patch.object(worker, "_mark_diff_job_failed") as mock_mark_failed:
                     worker.process_diff_job(job)
 
                     mock_mark_failed.assert_called_once()
@@ -1372,21 +1463,21 @@ class TestWorkerProcessDiffJob:
             "_id": "job-1",
             "pair_key": "pair-1",
             "submission_a_id": "sub-a",
-            "submission_b_id": "sub-b"
+            "submission_b_id": "sub-b",
         }
 
         submission_a = {"_id": "sub-a", "results": {}}
         submission_b = {"_id": "sub-b", "results": {}}
         worker.submissions_storage.get_by_id.side_effect = [submission_a, submission_b]
 
-        with patch('workers.check_submission_topic_readiness') as mock_readiness:
+        with patch("workers.check_submission_topic_readiness") as mock_readiness:
             mock_readiness.side_effect = [
                 {"ready": True, "missing": []},
-                {"ready": True, "missing": []}
+                {"ready": True, "missing": []},
             ]
-            with patch('workers.compute_topic_aware_semantic_diff') as mock_compute:
+            with patch("workers.compute_topic_aware_semantic_diff") as mock_compute:
                 mock_compute.side_effect = Exception("Computation error")
-                with patch.object(worker, '_mark_diff_job_failed'):
+                with patch.object(worker, "_mark_diff_job_failed"):
                     with caplog.at_level("ERROR"):
                         worker.process_diff_job(job)
 
@@ -1399,9 +1490,11 @@ class TestWorkerMarkDiffJobCompleted:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
@@ -1412,7 +1505,9 @@ class TestWorkerMarkDiffJobCompleted:
 
         worker._mark_diff_job_completed(job)
 
-        worker.semantic_diffs_storage.mark_job_completed.assert_called_once_with("job-1")
+        worker.semantic_diffs_storage.mark_job_completed.assert_called_once_with(
+            "job-1"
+        )
 
 
 class TestWorkerMarkDiffJobFailed:
@@ -1421,9 +1516,11 @@ class TestWorkerMarkDiffJobFailed:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
@@ -1434,7 +1531,9 @@ class TestWorkerMarkDiffJobFailed:
 
         worker._mark_diff_job_failed(job, "Error message")
 
-        worker.semantic_diffs_storage.mark_job_failed.assert_called_once_with("job-1", "Error message")
+        worker.semantic_diffs_storage.mark_job_failed.assert_called_once_with(
+            "job-1", "Error message"
+        )
 
 
 class TestWorkerRun:
@@ -1443,9 +1542,11 @@ class TestWorkerRun:
     @pytest.fixture
     def worker(self):
         """Create a worker instance with mocked dependencies."""
-        with patch('workers.signal.signal'), \
-             patch('workers.SubmissionsStorage'), \
-             patch('workers.SemanticDiffsStorage'):
+        with (
+            patch("workers.signal.signal"),
+            patch("workers.SubmissionsStorage"),
+            patch("workers.SemanticDiffsStorage"),
+        ):
             mock_db = MagicMock()
             mock_llm = MagicMock()
             yield Worker(mock_db, mock_llm)
@@ -1473,7 +1574,7 @@ class TestWorkerRun:
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = MagicMock(return_value=None)
 
-        with patch('workers.time.sleep'):
+        with patch("workers.time.sleep"):
             worker.run()
 
         # Should have looped at least 3 times
@@ -1481,20 +1582,24 @@ class TestWorkerRun:
 
     def test_attempts_to_claim_task_first(self, worker):
         """Attempts to claim task first."""
-        mock_task = {"_id": "task-1", "task_type": "split_topic_generation", "submission_id": "sub-1"}
+        mock_task = {
+            "_id": "task-1",
+            "task_type": "split_topic_generation",
+            "submission_id": "sub-1",
+        }
         mock_claim_task = MagicMock(return_value=mock_task)
         mock_claim_diff_job = MagicMock(return_value=None)
-        
+
         def claim_task_side_effect():
             worker.running = False
             return mock_task
-        
+
         mock_claim_task.side_effect = claim_task_side_effect
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = mock_claim_diff_job
 
-        with patch.object(worker, 'process_task'):
-            with patch('workers.time.sleep'):
+        with patch.object(worker, "process_task"):
+            with patch("workers.time.sleep"):
                 worker.run()
 
         mock_claim_task.assert_called_once()
@@ -1504,22 +1609,22 @@ class TestWorkerRun:
         """If no task, attempts to claim diff job."""
         mock_diff_job = {"_id": "job-1", "pair_key": "pair-1"}
         call_count = [0]
-        
+
         mock_claim_task = MagicMock(return_value=None)
         mock_claim_diff_job = MagicMock(return_value=mock_diff_job)
-        
+
         def claim_diff_job_side_effect():
             call_count[0] += 1
             if call_count[0] > 1:
                 worker.running = False
             return mock_diff_job
-        
+
         mock_claim_diff_job.side_effect = claim_diff_job_side_effect
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = mock_claim_diff_job
 
-        with patch.object(worker, 'process_diff_job'):
-            with patch('workers.time.sleep'):
+        with patch.object(worker, "process_diff_job"):
+            with patch("workers.time.sleep"):
                 worker.run()
 
         assert mock_claim_task.call_count >= 1
@@ -1528,37 +1633,41 @@ class TestWorkerRun:
     def test_sleeps_if_no_jobs_available(self, worker):
         """If no jobs, sleeps for poll_interval."""
         call_count = [0]
-        
+
         def mock_claim_task():
             call_count[0] += 1
             if call_count[0] > 1:
                 worker.running = False
             return None
-            
+
         def mock_claim_diff_job():
             return None
-        
+
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = mock_claim_diff_job
 
-        with patch('workers.time.sleep') as mock_sleep:
+        with patch("workers.time.sleep") as mock_sleep:
             worker.run(poll_interval=5)
 
             mock_sleep.assert_called_with(5)
 
     def test_processes_claimed_task(self, worker):
         """Processes claimed task."""
-        mock_task = {"_id": "task-1", "task_type": "split_topic_generation", "submission_id": "sub-1"}
-        
+        mock_task = {
+            "_id": "task-1",
+            "task_type": "split_topic_generation",
+            "submission_id": "sub-1",
+        }
+
         def mock_claim_task():
             worker.running = False
             return mock_task
-        
+
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = MagicMock(return_value=None)
 
-        with patch.object(worker, 'process_task') as mock_process:
-            with patch('workers.time.sleep'):
+        with patch.object(worker, "process_task") as mock_process:
+            with patch("workers.time.sleep"):
                 worker.run()
 
             mock_process.assert_called_once_with(mock_task)
@@ -1567,21 +1676,21 @@ class TestWorkerRun:
         """Processes claimed diff job."""
         mock_diff_job = {"_id": "job-1", "pair_key": "pair-1"}
         call_count = [0]
-        
+
         def mock_claim_task():
             call_count[0] += 1
             return None
-            
+
         def mock_claim_diff_job():
             if call_count[0] > 0:
                 worker.running = False
             return mock_diff_job
-        
+
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = mock_claim_diff_job
 
-        with patch.object(worker, 'process_diff_job') as mock_process:
-            with patch('workers.time.sleep'):
+        with patch.object(worker, "process_diff_job") as mock_process:
+            with patch("workers.time.sleep"):
                 worker.run()
 
             mock_process.assert_called_once_with(mock_diff_job)
@@ -1600,7 +1709,7 @@ class TestWorkerRun:
         worker.claim_task = mock_claim_task
         worker.claim_diff_job = MagicMock(return_value=None)
 
-        with patch('workers.time.sleep'):
+        with patch("workers.time.sleep"):
             with caplog.at_level("ERROR"):
                 worker.run()
 
@@ -1622,7 +1731,7 @@ class TestWorkerRun:
         worker.running = False
         worker.claim_task = MagicMock()
 
-        with patch('workers.time.sleep'):
+        with patch("workers.time.sleep"):
             worker.run()
 
         # When running is False from start, the while loop condition is False

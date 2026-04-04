@@ -1,19 +1,18 @@
 """
 Prefix tree (compressed radix trie) task - builds a trie of all words in the text.
 """
+
 import re
 from collections import defaultdict
 from typing import Any
 
 
-def process_prefix_tree(
-    submission: dict[str, Any], db: Any, llm: Any
-) -> None:
+def process_prefix_tree(submission: dict[str, Any], db: Any, llm: Any) -> None:
     sentences: list[str] = submission["results"].get("sentences", [])
     tree = build_compressed_trie(sentences)
     db.submissions.update_one(
         {"submission_id": submission["submission_id"]},
-        {"$set": {"results.prefix_tree": tree}}
+        {"$set": {"results.prefix_tree": tree}},
     )
 
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import './sharedControls.css';
+import React, { useEffect, useState } from "react";
+import "./sharedControls.css";
 
 /**
  * @typedef {Object} StatusIndicatorTaskInfo
@@ -18,14 +18,19 @@ import './sharedControls.css';
  * @property {StatusIndicatorTasks} tasks
  */
 
-const KNOWN_STATUSES = new Set(['completed', 'processing', 'failed', 'pending']);
+const KNOWN_STATUSES = new Set([
+  "completed",
+  "processing",
+  "failed",
+  "pending",
+]);
 
 /**
  * @param {string | undefined | null} status
  * @returns {'completed' | 'processing' | 'failed' | 'pending'}
  */
 function normalizeStatus(status) {
-  return KNOWN_STATUSES.has(status) ? status : 'pending';
+  return KNOWN_STATUSES.has(status) ? status : "pending";
 }
 
 /**
@@ -34,14 +39,14 @@ function normalizeStatus(status) {
  */
 function getStatusIcon(status) {
   switch (status) {
-    case 'completed':
-      return '✓';
-    case 'processing':
-      return '⟳';
-    case 'failed':
-      return '✗';
+    case "completed":
+      return "✓";
+    case "processing":
+      return "⟳";
+    case "failed":
+      return "✗";
     default:
-      return '○';
+      return "○";
   }
 }
 
@@ -73,13 +78,17 @@ function TaskDetail({ taskName, taskInfo, onClose }) {
   return (
     <div className="shared-control-popover shared-control-popover--status shared-status-detail">
       <div className="shared-status-detail__title">
-        {taskName.replace(/_/g, ' ')}
+        {taskName.replace(/_/g, " ")}
       </div>
       <div className="shared-status-detail__row">
-        <span className={`shared-status-pill__icon shared-status-pill__icon--${status}`}>
+        <span
+          className={`shared-status-pill__icon shared-status-pill__icon--${status}`}
+        >
           {getStatusIcon(status)}
         </span>
-        <span className={`shared-status-detail__status shared-status-detail__status--${status}`}>
+        <span
+          className={`shared-status-detail__status shared-status-detail__status--${status}`}
+        >
           {status}
         </span>
       </div>
@@ -89,9 +98,7 @@ function TaskDetail({ taskName, taskInfo, onClose }) {
         </div>
       )}
       {taskInfo.error && (
-        <div className="shared-status-detail__error">
-          {taskInfo.error}
-        </div>
+        <div className="shared-status-detail__error">{taskInfo.error}</div>
       )}
       <button
         type="button"
@@ -117,23 +124,23 @@ function StatusIndicator({ tasks }) {
 
     const handlePointerDown = (event) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (!target || !target.closest('.shared-status-indicator__item')) {
+      if (!target || !target.closest(".shared-status-indicator__item")) {
         setOpenTask(null);
       }
     };
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setOpenTask(null);
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [openTask]);
 
@@ -149,25 +156,23 @@ function StatusIndicator({ tasks }) {
       {Object.entries(tasks || {}).map(([taskName, taskInfo]) => {
         const status = normalizeStatus(taskInfo?.status);
         const isOpen = openTask === taskName;
-        const label = taskName.replace(/_/g, ' ');
+        const label = taskName.replace(/_/g, " ");
         return (
           <div key={taskName} className="shared-status-indicator__item">
             <button
               type="button"
               onClick={() => handleToggle(taskName)}
-              className={`shared-status-pill${isOpen ? ' shared-status-pill--active' : ''} shared-status-pill--${status}`}
+              className={`shared-status-pill${isOpen ? " shared-status-pill--active" : ""} shared-status-pill--${status}`}
               aria-expanded={isOpen}
               aria-label={`${label} ${status}`}
             >
-              <span className={`shared-status-pill__icon shared-status-pill__icon--${status}`}>
+              <span
+                className={`shared-status-pill__icon shared-status-pill__icon--${status}`}
+              >
                 {getStatusIcon(status)}
               </span>
-              <span className="shared-status-pill__label">
-                {label}
-              </span>
-              <span className="shared-status-pill__state">
-                {status}
-              </span>
+              <span className="shared-status-pill__label">{label}</span>
+              <span className="shared-status-pill__state">{status}</span>
             </button>
             {isOpen && (
               <TaskDetail

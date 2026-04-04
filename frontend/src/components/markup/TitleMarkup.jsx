@@ -1,16 +1,20 @@
-import React from 'react';
-import { getSegmentIndices, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getSegmentIndices, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 export default function TitleMarkup({ segment, sentences }) {
-  const { level = 2, title_position_index, title_sentence_index } = segment.data || {};
+  const {
+    level = 2,
+    title_position_index,
+    title_sentence_index,
+  } = segment.data || {};
   const Tag = `h${Math.min(Math.max(parseInt(level, 10) || 2, 2), 4)}`;
   const titleIndex = title_position_index ?? title_sentence_index;
 
   const titleText = getTextByIndex(sentences, titleIndex);
 
   const bodyIndices = getSegmentIndices(segment).filter(
-    idx => idx !== titleIndex
+    (idx) => idx !== titleIndex,
   );
 
   return (

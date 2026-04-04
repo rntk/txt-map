@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import './sharedControls.css';
+import React, { useEffect, useRef, useState } from "react";
+import "./sharedControls.css";
 
 /**
  * @typedef {Object} DropdownMenuProps
@@ -20,23 +20,26 @@ function DropdownMenu({ buttonContent, children }) {
     }
 
     const handlePointerDown = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
         setIsOpen(false);
       }
     };
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
@@ -47,12 +50,15 @@ function DropdownMenu({ buttonContent, children }) {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className={`shared-control-trigger${isOpen ? ' shared-control-trigger--active' : ''}`}
+        className={`shared-control-trigger${isOpen ? " shared-control-trigger--active" : ""}`}
       >
         {buttonContent}
       </button>
       {isOpen && (
-        <div className="shared-control-popover shared-control-popover--menu" role="menu">
+        <div
+          className="shared-control-popover shared-control-popover--menu"
+          role="menu"
+        >
           {children}
         </div>
       )}

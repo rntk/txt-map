@@ -69,9 +69,31 @@ def _stop_words_set() -> set:
         except LookupError:
             # Keep endpoint functional if corpus download is unavailable.
             _stop_words = {
-                "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-                "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
-                "to", "was", "were", "will", "with",
+                "a",
+                "an",
+                "and",
+                "are",
+                "as",
+                "at",
+                "be",
+                "by",
+                "for",
+                "from",
+                "has",
+                "he",
+                "in",
+                "is",
+                "it",
+                "its",
+                "of",
+                "on",
+                "that",
+                "the",
+                "to",
+                "was",
+                "were",
+                "will",
+                "with",
             }
     return _stop_words
 
@@ -132,6 +154,5 @@ def compute_word_frequencies(texts: List[str], top_n: int = 60) -> List[Dict[str
         freq[lemma] += 1
 
     return [
-        {"word": word, "frequency": count}
-        for word, count in freq.most_common(top_n)
+        {"word": word, "frequency": count} for word, count in freq.most_common(top_n)
     ]

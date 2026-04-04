@@ -8,7 +8,11 @@ from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
 from lib.nlp import compute_word_frequencies
-from handlers.dependencies import get_submissions_storage, get_task_queue_storage, require_submission
+from handlers.dependencies import (
+    get_submissions_storage,
+    get_task_queue_storage,
+    require_submission,
+)
 
 
 class SubmitRequest(BaseModel):
@@ -34,7 +38,9 @@ router = APIRouter()
 def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -> None:
     """Insert task queue entries for a new submission."""
     for task_type, priority in TASK_PRIORITIES.items():
-        task_queue_storage.create(make_task_document(submission_id, task_type, priority))
+        task_queue_storage.create(
+            make_task_document(submission_id, task_type, priority)
+        )
 
 
 @router.post("/submit")
@@ -50,14 +56,14 @@ def post_submit(
         html_content=request.html,
         # Keep raw HTML in text_content as well to avoid any pre-cleaning.
         text_content=request.html,
-        source_url=request.source_url
+        source_url=request.source_url,
     )
 
     _queue_all_tasks(task_queue_storage, submission["submission_id"])
 
     return {
         "submission_id": submission["submission_id"],
-        "redirect_url": f"/page/text/{submission['submission_id']}"
+        "redirect_url": f"/page/text/{submission['submission_id']}",
     }
 
 
@@ -77,12 +83,14 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 
     if ext == ".md":
         import markdown as md_lib
+
         text = data.decode("utf-8", errors="replace")
-        html = md_lib.markdown(text, extensions=['extra', 'codehilite'])
+        html = md_lib.markdown(text, extensions=["extra", "codehilite"])
         return html, text
 
     if ext == ".pdf":
         from lib.pdf_to_html import convert_pdf_to_html, extract_text_from_pdf
+
         try:
             # Generate semantic HTML with headings, paragraphs, bold, italic
             html_content = convert_pdf_to_html(data)
@@ -91,7 +99,7 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
             if not text_content.strip():
                 raise HTTPException(
                     status_code=400,
-                    detail="PDF appears to contain no extractable text (may be scanned/image-only)."
+                    detail="PDF appears to contain no extractable text (may be scanned/image-only).",
                 )
             return html_content, text_content
         except HTTPException:
@@ -101,11 +109,15 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 
     if ext == ".fb2":
         from lib.fb2_to_html import convert_fb2_to_html, extract_text_from_fb2
+
         try:
             html_content = convert_fb2_to_html(data)
             text_content = extract_text_from_fb2(data)
             if not text_content.strip():
-                raise HTTPException(status_code=400, detail="FB2 appears to contain no extractable text.")
+                raise HTTPException(
+                    status_code=400,
+                    detail="FB2 appears to contain no extractable text.",
+                )
             return html_content, text_content
         except HTTPException:
             raise
@@ -114,11 +126,15 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 
     if ext == ".epub":
         from lib.epub_to_html import convert_epub_to_html, extract_text_from_epub
+
         try:
             html_content = convert_epub_to_html(data)
             text_content = extract_text_from_epub(data)
             if not text_content.strip():
-                raise HTTPException(status_code=400, detail="EPUB appears to contain no extractable text.")
+                raise HTTPException(
+                    status_code=400,
+                    detail="EPUB appears to contain no extractable text.",
+                )
             return html_content, text_content
         except HTTPException:
             raise
@@ -127,7 +143,7 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 
     raise HTTPException(
         status_code=415,
-        detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+        detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}",
     )
 
 
@@ -146,7 +162,7 @@ async def post_upload(
     if ext not in ALLOWED_UPLOAD_EXTENSIONS:
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+            detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}",
         )
 
     data = await file.read()
@@ -162,7 +178,7 @@ async def post_upload(
 
     return {
         "submission_id": submission["submission_id"],
-        "redirect_url": f"/page/text/{submission['submission_id']}"
+        "redirect_url": f"/page/text/{submission['submission_id']}",
     }
 
 
@@ -178,7 +194,9 @@ def post_fetch_url(
     """
     url = request.url.strip()
     if not url.startswith(("http://", "https://")):
-        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+        raise HTTPException(
+            status_code=400, detail="URL must start with http:// or https://"
+        )
 
     try:
         response = http_requests.get(
@@ -189,27 +207,37 @@ def post_fetch_url(
         )
         response.raise_for_status()
     except http_requests.exceptions.Timeout:
-        raise HTTPException(status_code=502, detail="Request timed out while fetching the URL.")
+        raise HTTPException(
+            status_code=502, detail="Request timed out while fetching the URL."
+        )
     except http_requests.exceptions.ConnectionError as e:
         raise HTTPException(status_code=502, detail=f"Could not connect to URL: {e}")
     except http_requests.exceptions.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Remote server returned an error: {e}")
+        raise HTTPException(
+            status_code=502, detail=f"Remote server returned an error: {e}"
+        )
     except http_requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {e}")
 
-    content_type = response.headers.get("Content-Type", "").lower().split(";")[0].strip()
+    content_type = (
+        response.headers.get("Content-Type", "").lower().split(";")[0].strip()
+    )
     data = response.content
 
     if content_type == "application/pdf":
         html_content, text_content = _extract_content_from_upload("document.pdf", data)
-    elif content_type.startswith("text/") or content_type in ("application/xhtml+xml",) or not content_type:
+    elif (
+        content_type.startswith("text/")
+        or content_type in ("application/xhtml+xml",)
+        or not content_type
+    ):
         decoded = data.decode("utf-8", errors="replace")
         html_content = decoded
         text_content = decoded
     else:
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported content type '{content_type}'. Supported: HTML pages and PDFs."
+            detail=f"Unsupported content type '{content_type}'. Supported: HTML pages and PDFs.",
         )
 
     submission = submissions_storage.create(
@@ -222,7 +250,7 @@ def post_fetch_url(
 
     return {
         "submission_id": submission["submission_id"],
-        "redirect_url": f"/page/text/{submission['submission_id']}"
+        "redirect_url": f"/page/text/{submission['submission_id']}",
     }
 
 
@@ -239,7 +267,7 @@ def get_submission_status(
     return {
         "submission_id": submission["submission_id"],
         "tasks": submissions_storage.get_known_tasks(submission),
-        "overall_status": overall_status
+        "overall_status": overall_status,
     }
 
 
@@ -261,10 +289,10 @@ def get_submission(
         "created_at": submission["created_at"],
         "status": {
             "overall": overall_status,
-            "tasks": submissions_storage.get_known_tasks(submission)
+            "tasks": submissions_storage.get_known_tasks(submission),
         },
         "results": submission["results"],
-        "read_topics": submission.get("read_topics", [])
+        "read_topics": submission.get("read_topics", []),
     }
 
 
@@ -280,10 +308,7 @@ def put_read_topics(
     submission_id = submission["submission_id"]
     submissions_storage.update_read_topics(submission_id, body.read_topics)
 
-    return {
-        "submission_id": submission_id,
-        "read_topics": body.read_topics
-    }
+    return {"submission_id": submission_id, "read_topics": body.read_topics}
 
 
 @router.delete("/submission/{submission_id}")
@@ -302,10 +327,7 @@ def delete_submission(
     if not deleted:
         raise HTTPException(status_code=500, detail="Failed to delete submission")
 
-    return {
-        "message": "Submission deleted",
-        "submission_id": submission_id
-    }
+    return {"message": "Submission deleted", "submission_id": submission_id}
 
 
 @router.post("/submission/{submission_id}/refresh")
@@ -322,14 +344,15 @@ def post_refresh(
 
     requested_tasks = refresh_request.tasks or ["all"]
     valid_task_names = submissions_storage.task_names
-    invalid_tasks = [t for t in requested_tasks if t != "all" and t not in valid_task_names]
-    
+    invalid_tasks = [
+        t for t in requested_tasks if t != "all" and t not in valid_task_names
+    ]
+
     if invalid_tasks:
         raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported task(s): {', '.join(invalid_tasks)}"
+            status_code=400, detail=f"Unsupported task(s): {', '.join(invalid_tasks)}"
         )
-        
+
     task_names = submissions_storage.expand_recalculation_tasks(requested_tasks)
 
     # Reset existing data and queue
@@ -339,12 +362,11 @@ def post_refresh(
     # Re-queue
     for task_name in task_names:
         priority = TASK_PRIORITIES.get(task_name, 3)
-        task_queue_storage.create(make_task_document(submission_id, task_name, priority))
+        task_queue_storage.create(
+            make_task_document(submission_id, task_name, priority)
+        )
 
-    return {
-        "message": "Tasks queued for recalculation",
-        "tasks_queued": task_names
-    }
+    return {"message": "Tasks queued for recalculation", "tasks_queued": task_names}
 
 
 @router.get("/submission/{submission_id}/word-cloud")
@@ -368,10 +390,10 @@ def get_word_cloud(
 
     # Collect sentence indices
     sentence_indices: Set[int] = set()
-    
+
     if word:
         # Regex to match exact word with boundaries, case-insensitive
-        pattern = re.compile(rf'\b{re.escape(word)}\b', re.IGNORECASE)
+        pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
         for idx, sentence in enumerate(sentences):
             if pattern.search(sentence):
                 sentence_indices.add(idx + 1)
@@ -379,16 +401,16 @@ def get_word_cloud(
         for topic in topics:
             name = topic.get("name", "")
             parts = [p.strip() for p in name.split(">")]
-            
+
             # Check if topic matches hierarchical path
-            if len(parts) >= len(path) and all(parts[i] == path[i] for i in range(len(path))):
-                for idx in (topic.get("sentences") or []):
+            if len(parts) >= len(path) and all(
+                parts[i] == path[i] for i in range(len(path))
+            ):
+                for idx in topic.get("sentences") or []:
                     sentence_indices.add(int(idx))
 
     filtered_texts = [
-        sentences[idx - 1]
-        for idx in sentence_indices
-        if 1 <= idx <= len(sentences)
+        sentences[idx - 1] for idx in sentence_indices if 1 <= idx <= len(sentences)
     ]
 
     words = compute_word_frequencies(filtered_texts, top_n=top_n)
@@ -419,7 +441,12 @@ def get_global_topics_sentences(
 
     submissions = submissions_storage.list_with_projection(
         {"tasks.split_topic_generation.status": "completed"},
-        {"submission_id": 1, "source_url": 1, "results.topics": 1, "results.sentences": 1},
+        {
+            "submission_id": 1,
+            "source_url": 1,
+            "results.topics": 1,
+            "results.sentences": 1,
+        },
     )
 
     groups = []
@@ -427,25 +454,33 @@ def get_global_topics_sentences(
         results = sub.get("results") or {}
         all_sentences = results.get("sentences") or []
         topics = results.get("topics") or []
-        
+
         for topic in topics:
             if topic.get("name") not in topic_name:
                 continue
-                
+
             indices = topic.get("sentences") or []
-            texts = [all_sentences[i-1] for i in indices if 1 <= i <= len(all_sentences)]
-            
+            texts = [
+                all_sentences[i - 1] for i in indices if 1 <= i <= len(all_sentences)
+            ]
+
             if texts:
                 group = {
                     "submission_id": sub["submission_id"],
                     "source_url": sub.get("source_url", ""),
                     "topic_name": topic["name"],
-                    "sentences": texts
+                    "sentences": texts,
                 }
                 if include_context:
-                    group.update({"all_sentences": all_sentences, "topics": topics, "indices": indices})
+                    group.update(
+                        {
+                            "all_sentences": all_sentences,
+                            "topics": topics,
+                            "indices": indices,
+                        }
+                    )
                 groups.append(group)
-                
+
     return {"groups": groups}
 
 
@@ -464,24 +499,29 @@ def get_global_read_progress(
 ) -> Dict[str, int]:
     submissions = submissions_storage.list_with_projection(
         {},
-        {"results.sentences": 1, "results.topics.name": 1, "results.topics.sentences": 1, "read_topics": 1}
+        {
+            "results.sentences": 1,
+            "results.topics.name": 1,
+            "results.topics.sentences": 1,
+            "read_topics": 1,
+        },
     )
-    
+
     total_sentences = 0
     total_read = 0
-    
+
     for sub in submissions:
         results = sub.get("results") or {}
         sentences = results.get("sentences") or []
         if not sentences:
             continue
-            
+
         read_topics = set(sub.get("read_topics") or [])
         read_indices = _calculate_read_indices(results.get("topics") or [], read_topics)
-                    
+
         total_sentences += len(sentences)
         total_read += len(read_indices)
-        
+
     return {"read_count": total_read, "total_count": total_sentences}
 
 
@@ -492,13 +532,13 @@ def get_submission_read_progress(
     results = submission.get("results") or {}
     sentences = results.get("sentences") or []
     total_sentences = len(sentences)
-    
+
     if total_sentences == 0:
         return {"read_count": 0, "total_count": 0}
-        
+
     read_topics = set(submission.get("read_topics") or [])
     read_indices = _calculate_read_indices(results.get("topics") or [], read_topics)
-                
+
     return {"read_count": len(read_indices), "total_count": total_sentences}
 
 
@@ -518,9 +558,15 @@ def get_topic_analysis(
         "subtopics": results.get("subtopics", []),
         "topic_summaries": results.get("topic_summaries", {}),
         "task_status": {
-            "clustering_generation": tasks.get("clustering_generation", {}).get("status"),
-            "topic_modeling_generation": tasks.get("topic_modeling_generation", {}).get("status"),
-            "split_topic_generation": tasks.get("split_topic_generation", {}).get("status"),
+            "clustering_generation": tasks.get("clustering_generation", {}).get(
+                "status"
+            ),
+            "topic_modeling_generation": tasks.get("topic_modeling_generation", {}).get(
+                "status"
+            ),
+            "split_topic_generation": tasks.get("split_topic_generation", {}).get(
+                "status"
+            ),
         },
     }
 
@@ -550,16 +596,18 @@ def list_submissions(
             continue
 
         results = sub.get("results") or {}
-        items.append({
-            "submission_id": sub.get("submission_id"),
-            "source_url": sub.get("source_url", ""),
-            "created_at": sub.get("created_at"),
-            "updated_at": sub.get("updated_at"),
-            "overall_status": overall_status,
-            "text_characters": len(sub.get("text_content") or ""),
-            "sentence_count": len(results.get("sentences") or []),
-            "topic_count": len(results.get("topics") or [])
-        })
+        items.append(
+            {
+                "submission_id": sub.get("submission_id"),
+                "source_url": sub.get("source_url", ""),
+                "created_at": sub.get("created_at"),
+                "updated_at": sub.get("updated_at"),
+                "overall_status": overall_status,
+                "text_characters": len(sub.get("text_content") or ""),
+                "sentence_count": len(results.get("sentences") or []),
+                "topic_count": len(results.get("topics") or []),
+            }
+        )
 
         if len(items) >= limit:
             break

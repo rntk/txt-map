@@ -1,4 +1,4 @@
-@import '../../styles/design-tokens.css';
+@import "../../styles/design-tokens.css";
 
 /* ─── Shared markup container ─────────────────────────────────────────────── */
 
@@ -121,7 +121,10 @@
   width: 20px;
   height: 20px;
   border-radius: var(--radius-full);
-  background: var(--markup-dialog-avatar-background, linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700)));
+  background: var(
+    --markup-dialog-avatar-background,
+    linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,7 +140,9 @@
   line-height: var(--leading-normal);
   position: relative;
   box-shadow: var(--shadow-2);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .markup-dialog__bubble:hover {
@@ -205,7 +210,7 @@
 }
 
 .markup-comparison__item::before {
-  content: '•';
+  content: "•";
   color: var(--color-primary-500);
   flex-shrink: 0;
 }
@@ -316,7 +321,11 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(to bottom, var(--color-primary-500), var(--color-primary-100));
+  background: linear-gradient(
+    to bottom,
+    var(--color-primary-500),
+    var(--color-primary-100)
+  );
   border-radius: 1px;
 }
 
@@ -525,7 +534,7 @@
 }
 
 .markup-quote__attribution::before {
-  content: '— ';
+  content: "— ";
   color: var(--color-primary-500);
 }
 
@@ -543,9 +552,15 @@
   margin-top: var(--space-8);
 }
 
-.markup-title h2.markup-title__heading { font-size: var(--text-2xl); }
-.markup-title h3.markup-title__heading { font-size: var(--text-xl); }
-.markup-title h4.markup-title__heading { font-size: var(--text-lg); }
+.markup-title h2.markup-title__heading {
+  font-size: var(--text-2xl);
+}
+.markup-title h3.markup-title__heading {
+  font-size: var(--text-xl);
+}
+.markup-title h4.markup-title__heading {
+  font-size: var(--text-lg);
+}
 
 .markup-title__body {
   display: flex;
@@ -620,7 +635,9 @@
   position: relative;
   z-index: 1;
   box-shadow: var(--shadow-2);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .markup-steps__number:hover {
@@ -726,7 +743,7 @@
 }
 
 .markup-qa__question::before {
-  content: 'Q:';
+  content: "Q:";
   color: var(--color-primary-500);
   font-weight: var(--font-extrabold);
   font-size: var(--text-lg);
@@ -878,7 +895,7 @@
 }
 
 .markup-summary__point::before {
-  content: '✦';
+  content: "✦";
   color: var(--color-primary-500);
   font-size: var(--text-xs);
   flex-shrink: 0;

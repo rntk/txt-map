@@ -1,6 +1,6 @@
-import React from 'react';
-import { getSegmentIndices, getItemIndex, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getSegmentIndices, getItemIndex, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * SummaryMarkup - Displays summary or key takeaways
@@ -11,7 +11,10 @@ export default function SummaryMarkup({ segment, sentences }) {
 
   if (points.length === 0) {
     const indices = getSegmentIndices(segment);
-    const text = indices.map(idx => getTextByIndex(sentences, idx)).filter(Boolean).join(' ');
+    const text = indices
+      .map((idx) => getTextByIndex(sentences, idx))
+      .filter(Boolean)
+      .join(" ");
     if (!text) return null;
     return (
       <div
@@ -21,7 +24,9 @@ export default function SummaryMarkup({ segment, sentences }) {
       >
         {label && (
           <div className="markup-summary__label">
-            <span className="markup-summary__label-icon" aria-hidden="true">📝</span>
+            <span className="markup-summary__label-icon" aria-hidden="true">
+              📝
+            </span>
             <HighlightedText text={label} />
           </div>
         )}
@@ -40,7 +45,9 @@ export default function SummaryMarkup({ segment, sentences }) {
     >
       {label && (
         <div className="markup-summary__label">
-          <span className="markup-summary__label-icon" aria-hidden="true">📝</span>
+          <span className="markup-summary__label-icon" aria-hidden="true">
+            📝
+          </span>
           <HighlightedText text={label} />
         </div>
       )}
@@ -50,7 +57,8 @@ export default function SummaryMarkup({ segment, sentences }) {
         aria-label="Key points"
       >
         {points.map((point, i) => {
-          const text = point.text || getTextByIndex(sentences, getItemIndex(point)) || '';
+          const text =
+            point.text || getTextByIndex(sentences, getItemIndex(point)) || "";
           if (!text) return null;
           return (
             <li key={i} className="markup-summary__point" role="listitem">

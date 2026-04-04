@@ -2,11 +2,12 @@ import hashlib
 from datetime import datetime, UTC
 from typing import List, Tuple, Dict, Any
 
+
 def summarize_by_sentence_groups(
     sent_list: List[str],
     llm_client: Any,
     cache_collection: Any,
-    max_groups_tokens_buffer: int = 400
+    max_groups_tokens_buffer: int = 400,
 ) -> Tuple[List[str], List[Dict[str, Any]]]:
     """
     Create one summary per sentence-group (i.e., per entry in sent_list), so the number of
@@ -20,8 +21,12 @@ def summarize_by_sentence_groups(
     )
 
     template_tokens = llm_client.estimate_tokens(prompt_template.format(sentence=""))
-    max_text_tokens = llm_client.max_context_tokens - template_tokens - max_groups_tokens_buffer
-    print(f"\n=== DEBUG: Summarization (per-group) - max_text_tokens: {max_text_tokens}, total groups: {len(sent_list)} ===")
+    max_text_tokens = (
+        llm_client.max_context_tokens - template_tokens - max_groups_tokens_buffer
+    )
+    print(
+        f"\n=== DEBUG: Summarization (per-group) - max_text_tokens: {max_text_tokens}, total groups: {len(sent_list)} ==="
+    )
 
     all_summary_sentences = []
     summary_mappings = []
@@ -39,23 +44,29 @@ def summarize_by_sentence_groups(
             resp = llm_client.call([prompt])
             cache_collection.update_one(
                 {"prompt_hash": prompt_hash},
-                {"$set": {
-                    "prompt_hash": prompt_hash,
-                    "prompt": prompt,
-                    "response": resp,
-                    "created_at": datetime.now(UTC)
-                }},
-                upsert=True
+                {
+                    "$set": {
+                        "prompt_hash": prompt_hash,
+                        "prompt": prompt,
+                        "response": resp,
+                        "created_at": datetime.now(UTC),
+                    }
+                },
+                upsert=True,
             )
 
         summary_text = resp.strip()
         if summary_text:
             summary_idx = len(all_summary_sentences)
             all_summary_sentences.append(summary_text)
-            summary_mappings.append({
-                "summary_index": summary_idx,
-                "summary_sentence": summary_text,
-                "source_sentences": [idx + 1]  # 1-indexed mapping to the group sentence
-            })
+            summary_mappings.append(
+                {
+                    "summary_index": summary_idx,
+                    "summary_sentence": summary_text,
+                    "source_sentences": [
+                        idx + 1
+                    ],  # 1-indexed mapping to the group sentence
+                }
+            )
 
     return all_summary_sentences, summary_mappings

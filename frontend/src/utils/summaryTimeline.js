@@ -1,7 +1,7 @@
-const TOPIC_SEPARATOR = '>';
+const TOPIC_SEPARATOR = ">";
 
 export function splitTopicPath(topicName) {
-  return String(topicName || '')
+  return String(topicName || "")
     .split(TOPIC_SEPARATOR)
     .map((segment) => segment.trim())
     .filter(Boolean);
@@ -9,9 +9,9 @@ export function splitTopicPath(topicName) {
 
 function hashString(value) {
   let hash = 0;
-  const input = String(value || '');
+  const input = String(value || "");
   for (let i = 0; i < input.length; i += 1) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
+    hash = (hash << 5) - hash + input.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
@@ -34,7 +34,7 @@ export function getTopicColorTokens(topicLabel) {
     sectionSurface: `hsla(${hue} 48% 52% / 0.12)`,
     sectionBorder: `hsla(${hue} 40% 40% / 0.18)`,
     sectionText: `hsl(${hue} 36% 42%)`,
-    subtopicText: `hsla(${hue} 28% 24% / 0.44)`
+    subtopicText: `hsla(${hue} 28% 24% / 0.44)`,
   };
 }
 
@@ -74,7 +74,7 @@ export function chooseSummaryTopic(mapping, topics) {
       topicIndex,
       overlapCount,
       pathSegments,
-      depth: pathSegments.length
+      depth: pathSegments.length,
     };
 
     if (!bestMatch) {
@@ -87,7 +87,10 @@ export function chooseSummaryTopic(mapping, topics) {
       return;
     }
 
-    if (candidate.depth === bestMatch.depth && candidate.overlapCount > bestMatch.overlapCount) {
+    if (
+      candidate.depth === bestMatch.depth &&
+      candidate.overlapCount > bestMatch.overlapCount
+    ) {
       bestMatch = candidate;
       return;
     }
@@ -104,7 +107,11 @@ export function chooseSummaryTopic(mapping, topics) {
   return bestMatch;
 }
 
-export function buildSummaryTimelineItems(summaryEntries, summaryMappings, topics) {
+export function buildSummaryTimelineItems(
+  summaryEntries,
+  summaryMappings,
+  topics,
+) {
   const mappingByIndex = new Map();
   (Array.isArray(summaryMappings) ? summaryMappings : []).forEach((mapping) => {
     const summaryIndex = Number(mapping?.summary_index);
@@ -115,28 +122,32 @@ export function buildSummaryTimelineItems(summaryEntries, summaryMappings, topic
 
   let previousTopLevelLabel = null;
 
-  return (Array.isArray(summaryEntries) ? summaryEntries : []).map((summaryText, index) => {
-    const mapping = mappingByIndex.get(index) || null;
-    const chosenTopic = chooseSummaryTopic(mapping, topics);
-    const topLevelLabel = chosenTopic ? chosenTopic.pathSegments[0] : '';
-    const subtopicLabel = chosenTopic
-      ? chosenTopic.pathSegments[chosenTopic.pathSegments.length - 1]
-      : '';
-    const showSectionLabel = Boolean(topLevelLabel && topLevelLabel !== previousTopLevelLabel);
+  return (Array.isArray(summaryEntries) ? summaryEntries : []).map(
+    (summaryText, index) => {
+      const mapping = mappingByIndex.get(index) || null;
+      const chosenTopic = chooseSummaryTopic(mapping, topics);
+      const topLevelLabel = chosenTopic ? chosenTopic.pathSegments[0] : "";
+      const subtopicLabel = chosenTopic
+        ? chosenTopic.pathSegments[chosenTopic.pathSegments.length - 1]
+        : "";
+      const showSectionLabel = Boolean(
+        topLevelLabel && topLevelLabel !== previousTopLevelLabel,
+      );
 
-    if (topLevelLabel) {
-      previousTopLevelLabel = topLevelLabel;
-    }
+      if (topLevelLabel) {
+        previousTopLevelLabel = topLevelLabel;
+      }
 
-    return {
-      index,
-      summaryText,
-      mapping,
-      topLevelLabel,
-      subtopicLabel,
-      showSectionLabel,
-      topicColor: topLevelLabel ? getTopicColorTokens(topLevelLabel) : null,
-      topicName: chosenTopic ? chosenTopic.topic.name : null
-    };
-  });
+      return {
+        index,
+        summaryText,
+        mapping,
+        topLevelLabel,
+        subtopicLabel,
+        showSectionLabel,
+        topicColor: topLevelLabel ? getTopicColorTokens(topLevelLabel) : null,
+        topicName: chosenTopic ? chosenTopic.topic.name : null,
+      };
+    },
+  );
 }

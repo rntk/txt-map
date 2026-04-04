@@ -1,7 +1,7 @@
-import React from 'react';
+import React from "react";
 
 export function formatDate(value) {
-  if (!value) return '';
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
@@ -9,14 +9,16 @@ export function formatDate(value) {
 
 export function similarityClass(similarity) {
   const pct = Math.round((similarity || 0) * 100);
-  if (pct >= 70) return 'diff-sim-high';
-  if (pct >= 25) return 'diff-sim-mid';
-  return 'diff-sim-low';
+  if (pct >= 70) return "diff-sim-high";
+  if (pct >= 25) return "diff-sim-mid";
+  return "diff-sim-low";
 }
 
 export function highlightText(text, query) {
-  const raw = String(text || '');
-  const term = String(query || '').trim().toLowerCase();
+  const raw = String(text || "");
+  const term = String(query || "")
+    .trim()
+    .toLowerCase();
   if (!term) return raw;
   const idx = raw.toLowerCase().indexOf(term);
   if (idx < 0) return raw;

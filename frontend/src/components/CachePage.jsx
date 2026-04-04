@@ -1,6 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
-import '../styles/App.css';
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  appendPositiveIntegerParam,
+  appendStringParam,
+  buildQueryString,
+  readErrorMessage,
+} from "../utils/requestUtils";
+import "../styles/App.css";
 
 /**
  * @typedef {Object} CacheNamespace
@@ -26,10 +31,10 @@ import '../styles/App.css';
  */
 function formatCacheDate(value) {
   if (!value) {
-    return '-';
+    return "-";
   }
 
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return new Date(value * 1000).toLocaleString();
   }
 
@@ -37,7 +42,7 @@ function formatCacheDate(value) {
 }
 
 function truncateKey(value) {
-  return value ? `${value.slice(0, 12)}…` : '-';
+  return value ? `${value.slice(0, 12)}…` : "-";
 }
 
 function CachePage() {
@@ -46,8 +51,12 @@ function CachePage() {
   const [namespaces, setNamespaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [actionMessage, setActionMessage] = useState('');
-  const [filters, setFilters] = useState({ namespace: '', limit: '50', skip: '0' });
+  const [actionMessage, setActionMessage] = useState("");
+  const [filters, setFilters] = useState({
+    namespace: "",
+    limit: "50",
+    skip: "0",
+  });
 
   /**
    * @param {string} field
@@ -65,7 +74,7 @@ function CachePage() {
    */
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/llm-cache/stats');
+      const response = await fetch("/api/llm-cache/stats");
       if (!response.ok) {
         return;
       }
@@ -83,20 +92,22 @@ function CachePage() {
     setError(null);
     try {
       const query = buildQueryString(function configureParams(params) {
-        appendStringParam(params, 'namespace', filters.namespace);
-        appendPositiveIntegerParam(params, 'limit', filters.limit);
-        appendPositiveIntegerParam(params, 'skip', filters.skip);
+        appendStringParam(params, "namespace", filters.namespace);
+        appendPositiveIntegerParam(params, "limit", filters.limit);
+        appendPositiveIntegerParam(params, "skip", filters.skip);
       });
       const response = await fetch(`/api/llm-cache?${query}`);
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Unknown error'));
+        throw new Error(await readErrorMessage(response, "Unknown error"));
       }
 
       const data = await response.json();
       setEntries(data.entries || []);
       setTotal(data.total || 0);
     } catch (err) {
-      setError(`Failed to load: ${err.message || 'Unknown error'}. Try refreshing.`);
+      setError(
+        `Failed to load: ${err.message || "Unknown error"}. Try refreshing.`,
+      );
     } finally {
       setLoading(false);
     }
@@ -110,24 +121,29 @@ function CachePage() {
   /**
    * @returns {void}
    */
-  const refreshCacheData = useCallback(function refreshCacheData() {
-    fetchEntries();
-    fetchStats();
-  }, [fetchEntries, fetchStats]);
+  const refreshCacheData = useCallback(
+    function refreshCacheData() {
+      fetchEntries();
+      fetchStats();
+    },
+    [fetchEntries, fetchStats],
+  );
 
   /**
    * @param {string | number} entryId
    * @returns {Promise<void>}
    */
   const handleDeleteEntry = async (entryId) => {
-    setActionMessage('');
+    setActionMessage("");
     try {
-      const response = await fetch(`/api/llm-cache/entry/${entryId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/llm-cache/entry/${entryId}`, {
+        method: "DELETE",
+      });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Delete failed'));
+        throw new Error(await readErrorMessage(response, "Delete failed"));
       }
 
-      setActionMessage('Entry deleted.');
+      setActionMessage("Entry deleted.");
       refreshCacheData();
     } catch (err) {
       setActionMessage(`Delete failed: ${err.message}`);
@@ -142,19 +158,28 @@ function CachePage() {
       return;
     }
 
-    if (!window.confirm(`Delete all cache entries for namespace "${filters.namespace}"?`)) {
+    if (
+      !window.confirm(
+        `Delete all cache entries for namespace "${filters.namespace}"?`,
+      )
+    ) {
       return;
     }
 
-    setActionMessage('');
+    setActionMessage("");
     try {
-      const response = await fetch(`/api/llm-cache?namespace=${encodeURIComponent(filters.namespace)}`, { method: 'DELETE' });
+      const response = await fetch(
+        `/api/llm-cache?namespace=${encodeURIComponent(filters.namespace)}`,
+        { method: "DELETE" },
+      );
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Clear failed'));
+        throw new Error(await readErrorMessage(response, "Clear failed"));
       }
 
       const data = await response.json();
-      setActionMessage(`Cleared ${data.deleted_count} entries from namespace "${filters.namespace}".`);
+      setActionMessage(
+        `Cleared ${data.deleted_count} entries from namespace "${filters.namespace}".`,
+      );
       refreshCacheData();
     } catch (err) {
       setActionMessage(`Clear failed: ${err.message}`);
@@ -165,20 +190,20 @@ function CachePage() {
    * @returns {Promise<void>}
    */
   const handleClearAll = async () => {
-    if (!window.confirm('Delete ALL cache entries? This cannot be undone.')) {
+    if (!window.confirm("Delete ALL cache entries? This cannot be undone.")) {
       return;
     }
 
-    setActionMessage('');
+    setActionMessage("");
     try {
-      const response = await fetch('/api/llm-cache', { method: 'DELETE' });
+      const response = await fetch("/api/llm-cache", { method: "DELETE" });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Clear all failed'));
+        throw new Error(await readErrorMessage(response, "Clear all failed"));
       }
 
       const data = await response.json();
       setActionMessage(`Cleared ${data.deleted_count} cache entries.`);
-      updateFilters('namespace', '');
+      updateFilters("namespace", "");
       refreshCacheData();
     } catch (err) {
       setActionMessage(`Clear all failed: ${err.message}`);
@@ -190,9 +215,17 @@ function CachePage() {
       <div className="task-page-header">
         <div>
           <h1>LLM Cache</h1>
-          <p className="task-page-subtitle">Browse and manage cached LLM responses. Total: {total}</p>
+          <p className="task-page-subtitle">
+            Browse and manage cached LLM responses. Total: {total}
+          </p>
         </div>
-        <button type="button" className="task-refresh" onClick={refreshCacheData}>Refresh</button>
+        <button
+          type="button"
+          className="task-refresh"
+          onClick={refreshCacheData}
+        >
+          Refresh
+        </button>
       </div>
 
       <div className="task-panels">
@@ -203,8 +236,8 @@ function CachePage() {
             <select
               value={filters.namespace}
               onChange={(event) => {
-                updateFilters('namespace', event.target.value);
-                updateFilters('skip', '0');
+                updateFilters("namespace", event.target.value);
+                updateFilters("skip", "0");
               }}
             >
               <option value="">All namespaces</option>
@@ -222,7 +255,7 @@ function CachePage() {
               min="1"
               max="500"
               value={filters.limit}
-              onChange={(event) => updateFilters('limit', event.target.value)}
+              onChange={(event) => updateFilters("limit", event.target.value)}
             />
           </label>
           <label>
@@ -231,7 +264,7 @@ function CachePage() {
               type="number"
               min="0"
               value={filters.skip}
-              onChange={(event) => updateFilters('skip', event.target.value)}
+              onChange={(event) => updateFilters("skip", event.target.value)}
             />
           </label>
         </div>
@@ -247,7 +280,8 @@ function CachePage() {
             onClick={handleClearNamespace}
             disabled={!filters.namespace}
           >
-            Clear Namespace {filters.namespace ? `"${filters.namespace}"` : '(select above)'}
+            Clear Namespace{" "}
+            {filters.namespace ? `"${filters.namespace}"` : "(select above)"}
           </button>
           <button
             type="button"
@@ -259,9 +293,7 @@ function CachePage() {
         </div>
       </div>
 
-      {actionMessage && (
-        <div className="task-message">{actionMessage}</div>
-      )}
+      {actionMessage && <div className="task-message">{actionMessage}</div>}
 
       {loading ? (
         <div className="task-state loading-text">Loading cache entries...</div>
@@ -284,17 +316,36 @@ function CachePage() {
             <tbody>
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="task-empty">No cache entries found.</td>
+                  <td colSpan="7" className="task-empty">
+                    No cache entries found.
+                  </td>
                 </tr>
               ) : (
                 entries.map((entry) => (
                   <tr key={entry.id}>
-                    <td className="task-mono" title={entry.key || entry.prompt_hash}>{truncateKey(entry.key || entry.prompt_hash)}</td>
-                    <td><span className="task-status task-status-completed">{entry.namespace || '-'}</span></td>
-                    <td>{entry.model_id || '-'}</td>
-                    <td>{entry.temperature != null ? entry.temperature.toFixed(2) : '-'}</td>
+                    <td
+                      className="task-mono"
+                      title={entry.key || entry.prompt_hash}
+                    >
+                      {truncateKey(entry.key || entry.prompt_hash)}
+                    </td>
+                    <td>
+                      <span className="task-status task-status-completed">
+                        {entry.namespace || "-"}
+                      </span>
+                    </td>
+                    <td>{entry.model_id || "-"}</td>
+                    <td>
+                      {entry.temperature != null
+                        ? entry.temperature.toFixed(2)
+                        : "-"}
+                    </td>
                     <td>{formatCacheDate(entry.created_at)}</td>
-                    <td>{entry.stored_at ? new Date(entry.stored_at).toLocaleString() : '-'}</td>
+                    <td>
+                      {entry.stored_at
+                        ? new Date(entry.stored_at).toLocaleString()
+                        : "-"}
+                    </td>
                     <td>
                       <button
                         type="button"

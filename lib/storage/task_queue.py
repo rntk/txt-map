@@ -6,7 +6,9 @@ from bson import ObjectId
 from pymongo.database import Database
 
 
-def make_task_document(submission_id: str, task_type: str, priority: int = 3) -> dict[str, Any]:
+def make_task_document(
+    submission_id: str, task_type: str, priority: int = 3
+) -> dict[str, Any]:
     now = datetime.now(UTC)
     return {
         "submission_id": submission_id,
@@ -27,9 +29,13 @@ class TaskQueueStorage:
         self._db: Database = db
         self._log = logging.getLogger("task_queue")
 
-    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> List[dict[str, Any]]:
+    def list(
+        self, filters: Optional[dict[str, Any]] = None, limit: int = 100
+    ) -> List[dict[str, Any]]:
         """List task queue entries with optional filters, sorted by created_at desc."""
-        return list(self._db.task_queue.find(filters or {}).sort("created_at", -1).limit(limit))
+        return list(
+            self._db.task_queue.find(filters or {}).sort("created_at", -1).limit(limit)
+        )
 
     def get_by_id(self, task_id: str) -> Optional[dict[str, Any]]:
         """Get a task queue entry by its ObjectId string. Raises ValueError on invalid ID."""

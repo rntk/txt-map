@@ -1,6 +1,6 @@
-import React from 'react';
-import { getNestedIndices, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getNestedIndices, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * DefinitionMarkup - Displays term with its definition/explanation
@@ -10,13 +10,13 @@ export default function DefinitionMarkup({ segment, sentences }) {
   const { term } = segment.data || {};
   const explanationIndices = getNestedIndices(
     segment.data,
-    'explanation_position_indices',
-    'explanation_sentence_indices'
+    "explanation_position_indices",
+    "explanation_sentence_indices",
   );
   const explanationText = explanationIndices
-    .map(idx => getTextByIndex(sentences, idx))
+    .map((idx) => getTextByIndex(sentences, idx))
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   if (!term && !explanationText) return null;
 
@@ -24,7 +24,7 @@ export default function DefinitionMarkup({ segment, sentences }) {
     <div
       className="markup-segment markup-definition"
       role="region"
-      aria-label={term ? `Definition of ${term}` : 'Definition'}
+      aria-label={term ? `Definition of ${term}` : "Definition"}
     >
       {term && (
         <dfn className="markup-definition__term">

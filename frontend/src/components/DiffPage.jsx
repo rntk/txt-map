@@ -1,10 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { buildDiffRows } from '../utils/diffRowBuilder';
-import { formatDate, similarityClass, highlightText } from '../utils/diffUtils.jsx';
-import { readErrorMessage } from '../utils/requestUtils';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { buildDiffRows } from "../utils/diffRowBuilder";
+import {
+  formatDate,
+  similarityClass,
+  highlightText,
+} from "../utils/diffUtils.jsx";
+import { readErrorMessage } from "../utils/requestUtils";
 
-const DIFF_POLLING_STATES = ['waiting_prerequisites', 'queued', 'processing'];
-const RECALCULABLE_STATES = ['missing', 'failed', 'stale'];
+const DIFF_POLLING_STATES = ["waiting_prerequisites", "queued", "processing"];
+const RECALCULABLE_STATES = ["missing", "failed", "stale"];
 
 /**
  * @param {string} key
@@ -12,7 +16,7 @@ const RECALCULABLE_STATES = ['missing', 'failed', 'stale'];
  */
 function getInitialSubmissionId(key) {
   const params = new URLSearchParams(window.location.search);
-  return params.get(key) || '';
+  return params.get(key) || "";
 }
 
 /**
@@ -20,7 +24,7 @@ function getInitialSubmissionId(key) {
  * @returns {string}
  */
 function getSubmissionOptionLabel(submission) {
-  return `${submission.source_url || '(no source)'} [${submission.submission_id.slice(0, 8)}] ${formatDate(submission.created_at)}`;
+  return `${submission.source_url || "(no source)"} [${submission.submission_id.slice(0, 8)}] ${formatDate(submission.created_at)}`;
 }
 
 /**
@@ -35,39 +39,43 @@ function isDiffPairSelected(leftId, rightId) {
 function DiffPage() {
   const [submissions, setSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
-  const [submissionsError, setSubmissionsError] = useState('');
+  const [submissionsError, setSubmissionsError] = useState("");
 
-  const [leftId, setLeftId] = useState(() => getInitialSubmissionId('left'));
-  const [rightId, setRightId] = useState(() => getInitialSubmissionId('right'));
+  const [leftId, setLeftId] = useState(() => getInitialSubmissionId("left"));
+  const [rightId, setRightId] = useState(() => getInitialSubmissionId("right"));
   const [diffState, setDiffState] = useState(null);
   const [loadingDiff, setLoadingDiff] = useState(false);
-  const [diffError, setDiffError] = useState('');
-  const [diffMessage, setDiffMessage] = useState('');
+  const [diffError, setDiffError] = useState("");
+  const [diffMessage, setDiffMessage] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
   const [pendingJumpRowId, setPendingJumpRowId] = useState(null);
   const canFetchDiff = isDiffPairSelected(leftId, rightId);
-  const canDeleteDiff = Boolean(leftId && rightId && leftId !== rightId && !jobLoading && !deleteLoading);
+  const canDeleteDiff = Boolean(
+    leftId && rightId && leftId !== rightId && !jobLoading && !deleteLoading,
+  );
 
   /**
    * @returns {Promise<void>}
    */
   const fetchSubmissions = useCallback(async () => {
     setLoadingSubmissions(true);
-    setSubmissionsError('');
+    setSubmissionsError("");
     try {
-      const response = await fetch('/api/submissions?limit=500');
+      const response = await fetch("/api/submissions?limit=500");
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to load documents'));
+        throw new Error(
+          await readErrorMessage(response, "Failed to load documents"),
+        );
       }
       const data = await response.json();
       setSubmissions(data.submissions || []);
     } catch (error) {
-      setSubmissionsError(error.message || 'Failed to load documents');
+      setSubmissionsError(error.message || "Failed to load documents");
     } finally {
       setLoadingSubmissions(false);
     }
@@ -83,7 +91,7 @@ function DiffPage() {
     }
 
     setLoadingDiff(true);
-    setDiffError('');
+    setDiffError("");
     try {
       const params = new URLSearchParams({
         left_submission_id: leftId,
@@ -91,12 +99,14 @@ function DiffPage() {
       });
       const response = await fetch(`/api/diff?${params.toString()}`);
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to load diff'));
+        throw new Error(
+          await readErrorMessage(response, "Failed to load diff"),
+        );
       }
       const data = await response.json();
       setDiffState(data);
     } catch (error) {
-      setDiffError(error.message || 'Failed to load diff');
+      setDiffError(error.message || "Failed to load diff");
       setDiffState(null);
     } finally {
       setLoadingDiff(false);
@@ -136,34 +146,39 @@ function DiffPage() {
    * @param {boolean} [force=false]
    * @returns {Promise<void>}
    */
-  const runCalculation = useCallback(async (force = false) => {
-    if (!canFetchDiff) {
-      return;
-    }
-
-    setJobLoading(true);
-    setDiffError('');
-    setDiffMessage('');
-    try {
-      const response = await fetch('/api/diff/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          left_submission_id: leftId,
-          right_submission_id: rightId,
-          force,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to queue calculation'));
+  const runCalculation = useCallback(
+    async (force = false) => {
+      if (!canFetchDiff) {
+        return;
       }
-      await fetchDiff();
-    } catch (error) {
-      setDiffError(error.message || 'Failed to queue calculation');
-    } finally {
-      setJobLoading(false);
-    }
-  }, [canFetchDiff, fetchDiff, leftId, rightId]);
+
+      setJobLoading(true);
+      setDiffError("");
+      setDiffMessage("");
+      try {
+        const response = await fetch("/api/diff/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            left_submission_id: leftId,
+            right_submission_id: rightId,
+            force,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(
+            await readErrorMessage(response, "Failed to queue calculation"),
+          );
+        }
+        await fetchDiff();
+      } catch (error) {
+        setDiffError(error.message || "Failed to queue calculation");
+      } finally {
+        setJobLoading(false);
+      }
+    },
+    [canFetchDiff, fetchDiff, leftId, rightId],
+  );
 
   /**
    * @returns {Promise<void>}
@@ -173,30 +188,36 @@ function DiffPage() {
       return;
     }
 
-    const shouldDelete = window.confirm('Delete stored semantic diff data for this pair? This removes cached diff results and queued/completed diff jobs for these two documents.');
+    const shouldDelete = window.confirm(
+      "Delete stored semantic diff data for this pair? This removes cached diff results and queued/completed diff jobs for these two documents.",
+    );
     if (!shouldDelete) {
       return;
     }
 
     setDeleteLoading(true);
-    setDiffError('');
-    setDiffMessage('');
+    setDiffError("");
+    setDiffMessage("");
     try {
       const params = new URLSearchParams({
         left_submission_id: leftId,
         right_submission_id: rightId,
       });
       const response = await fetch(`/api/diff?${params.toString()}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to delete diff data'));
+        throw new Error(
+          await readErrorMessage(response, "Failed to delete diff data"),
+        );
       }
       const data = await response.json();
       await fetchDiff();
-      setDiffMessage(`Deleted diff data (${data.deleted_diff_count || 0} diff docs, ${data.deleted_job_count || 0} jobs).`);
+      setDiffMessage(
+        `Deleted diff data (${data.deleted_diff_count || 0} diff docs, ${data.deleted_job_count || 0} jobs).`,
+      );
     } catch (error) {
-      setDiffError(error.message || 'Failed to delete diff data');
+      setDiffError(error.message || "Failed to delete diff data");
     } finally {
       setDeleteLoading(false);
     }
@@ -208,14 +229,9 @@ function DiffPage() {
     const needle = debouncedQuery.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((row) => {
-      const hay = [
-        row.leftTopic,
-        row.leftText,
-        row.rightTopic,
-        row.rightText,
-      ]
-        .map((value) => String(value || '').toLowerCase())
-        .join(' ');
+      const hay = [row.leftTopic, row.leftText, row.rightTopic, row.rightText]
+        .map((value) => String(value || "").toLowerCase())
+        .join(" ");
       return hay.includes(needle);
     });
   }, [rows, debouncedQuery]);
@@ -225,8 +241,10 @@ function DiffPage() {
   }, [debouncedQuery, filteredRows.length]);
 
   useEffect(() => {
-    if (!pendingJumpRowId || debouncedQuery.trim() !== '') return;
-    const targetIndex = filteredRows.findIndex((row) => row.id === pendingJumpRowId);
+    if (!pendingJumpRowId || debouncedQuery.trim() !== "") return;
+    const targetIndex = filteredRows.findIndex(
+      (row) => row.id === pendingJumpRowId,
+    );
     if (targetIndex >= 0) {
       setActiveIndex(targetIndex);
     }
@@ -235,9 +253,11 @@ function DiffPage() {
 
   useEffect(() => {
     if (activeIndex < 0 || activeIndex >= filteredRows.length) return;
-    const row = document.getElementById(`diff-row-${filteredRows[activeIndex].id}`);
+    const row = document.getElementById(
+      `diff-row-${filteredRows[activeIndex].id}`,
+    );
     if (row) {
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [activeIndex, filteredRows]);
 
@@ -245,73 +265,97 @@ function DiffPage() {
    * @param {number} delta
    * @returns {void}
    */
-  const navigate = useCallback(function navigate(delta) {
-    if (!filteredRows.length) {
-      return;
-    }
+  const navigate = useCallback(
+    function navigate(delta) {
+      if (!filteredRows.length) {
+        return;
+      }
 
-    setActiveIndex((prev) => {
-      const current = prev < 0 ? 0 : prev;
-      return (current + delta + filteredRows.length) % filteredRows.length;
-    });
-  }, [filteredRows.length]);
-
-  /**
-   * @param {number | null | undefined} sentenceIndex
-   * @returns {void}
-   */
-  const jumpToRightSentence = useCallback((sentenceIndex) => {
-    if (sentenceIndex == null) {
-      return;
-    }
-
-    const targetInFiltered = filteredRows.findIndex((row) => row.rightSentenceIndex === sentenceIndex);
-    if (targetInFiltered >= 0) {
-      setActiveIndex(targetInFiltered);
-      return;
-    }
-
-    const targetInAll = rows.find((row) => row.rightSentenceIndex === sentenceIndex);
-    if (!targetInAll) {
-      return;
-    }
-
-    setQuery('');
-    setPendingJumpRowId(targetInAll.id);
-  }, [filteredRows, rows]);
+      setActiveIndex((prev) => {
+        const current = prev < 0 ? 0 : prev;
+        return (current + delta + filteredRows.length) % filteredRows.length;
+      });
+    },
+    [filteredRows.length],
+  );
 
   /**
    * @param {number | null | undefined} sentenceIndex
    * @returns {void}
    */
-  const jumpToLeftSentence = useCallback((sentenceIndex) => {
-    if (sentenceIndex == null) {
-      return;
-    }
+  const jumpToRightSentence = useCallback(
+    (sentenceIndex) => {
+      if (sentenceIndex == null) {
+        return;
+      }
 
-    const targetInFiltered = filteredRows.findIndex((row) => row.leftSentenceIndex === sentenceIndex);
-    if (targetInFiltered >= 0) {
-      setActiveIndex(targetInFiltered);
-      return;
-    }
+      const targetInFiltered = filteredRows.findIndex(
+        (row) => row.rightSentenceIndex === sentenceIndex,
+      );
+      if (targetInFiltered >= 0) {
+        setActiveIndex(targetInFiltered);
+        return;
+      }
 
-    const targetInAll = rows.find((row) => row.leftSentenceIndex === sentenceIndex);
-    if (!targetInAll) {
-      return;
-    }
+      const targetInAll = rows.find(
+        (row) => row.rightSentenceIndex === sentenceIndex,
+      );
+      if (!targetInAll) {
+        return;
+      }
 
-    setQuery('');
-    setPendingJumpRowId(targetInAll.id);
-  }, [filteredRows, rows]);
+      setQuery("");
+      setPendingJumpRowId(targetInAll.id);
+    },
+    [filteredRows, rows],
+  );
+
+  /**
+   * @param {number | null | undefined} sentenceIndex
+   * @returns {void}
+   */
+  const jumpToLeftSentence = useCallback(
+    (sentenceIndex) => {
+      if (sentenceIndex == null) {
+        return;
+      }
+
+      const targetInFiltered = filteredRows.findIndex(
+        (row) => row.leftSentenceIndex === sentenceIndex,
+      );
+      if (targetInFiltered >= 0) {
+        setActiveIndex(targetInFiltered);
+        return;
+      }
+
+      const targetInAll = rows.find(
+        (row) => row.leftSentenceIndex === sentenceIndex,
+      );
+      if (!targetInAll) {
+        return;
+      }
+
+      setQuery("");
+      setPendingJumpRowId(targetInAll.id);
+    },
+    [filteredRows, rows],
+  );
 
   return (
     <div className="page-stack diff-page">
       <div className="diff-page-header">
         <div>
           <h1>Semantic Diff</h1>
-          <p className="diff-page-subtitle">Topic-aware comparison between two documents.</p>
+          <p className="diff-page-subtitle">
+            Topic-aware comparison between two documents.
+          </p>
         </div>
-        <button type="button" className="text-list-refresh" onClick={fetchSubmissions} disabled={loadingSubmissions}>
+        <button
+          type="button"
+          className="text-list-refresh"
+          onClick={fetchSubmissions}
+          disabled={loadingSubmissions}
+        >
           Refresh docs
         </button>
       </div>
@@ -319,10 +363,16 @@ function DiffPage() {
       <div className="diff-selectors">
         <label>
           Left document
-          <select value={leftId} onChange={(event) => setLeftId(event.target.value)}>
+          <select
+            value={leftId}
+            onChange={(event) => setLeftId(event.target.value)}
+          >
             <option value="">Select document</option>
             {submissions.map((submission) => (
-              <option key={submission.submission_id} value={submission.submission_id}>
+              <option
+                key={submission.submission_id}
+                value={submission.submission_id}
+              >
                 {getSubmissionOptionLabel(submission)}
               </option>
             ))}
@@ -330,10 +380,16 @@ function DiffPage() {
         </label>
         <label>
           Right document
-          <select value={rightId} onChange={(event) => setRightId(event.target.value)}>
+          <select
+            value={rightId}
+            onChange={(event) => setRightId(event.target.value)}
+          >
             <option value="">Select document</option>
             {submissions.map((submission) => (
-              <option key={submission.submission_id} value={submission.submission_id}>
+              <option
+                key={submission.submission_id}
+                value={submission.submission_id}
+              >
                 {getSubmissionOptionLabel(submission)}
               </option>
             ))}
@@ -341,12 +397,20 @@ function DiffPage() {
         </label>
       </div>
 
-      {submissionsError && <div className="text-list-message text-list-error">{submissionsError}</div>}
-      {diffError && <div className="text-list-message text-list-error">{diffError}</div>}
+      {submissionsError && (
+        <div className="text-list-message text-list-error">
+          {submissionsError}
+        </div>
+      )}
+      {diffError && (
+        <div className="text-list-message text-list-error">{diffError}</div>
+      )}
       {diffMessage && <div className="text-list-message">{diffMessage}</div>}
 
       {leftId && rightId && leftId === rightId && (
-        <div className="text-list-message text-list-error">Left and right documents must be different.</div>
+        <div className="text-list-message text-list-error">
+          Left and right documents must be different.
+        </div>
       )}
 
       {loadingDiff && <div className="text-list-message">Loading diff...</div>}
@@ -354,22 +418,33 @@ function DiffPage() {
       {!loadingDiff && diffState && (
         <div className="diff-content">
           <div className="diff-state-card">
-            <div><strong>State:</strong> {diffState.state}</div>
+            <div>
+              <strong>State:</strong> {diffState.state}
+            </div>
             {diffState.stale_reasons?.length > 0 && (
-              <div><strong>Stale reasons:</strong> {diffState.stale_reasons.join(', ')}</div>
+              <div>
+                <strong>Stale reasons:</strong>{" "}
+                {diffState.stale_reasons.join(", ")}
+              </div>
             )}
             {diffState.latest_job && (
-              <div><strong>Latest job:</strong> {diffState.latest_job.status}</div>
+              <div>
+                <strong>Latest job:</strong> {diffState.latest_job.status}
+              </div>
             )}
-            {diffState.state === 'waiting_prerequisites' && (
+            {diffState.state === "waiting_prerequisites" && (
               <div className="diff-prereq">
                 <div>
-                  <strong>Left ready:</strong> {String(diffState.prereq?.left?.ready)}
-                  {!diffState.prereq?.left?.ready && ` (${(diffState.prereq?.left?.missing || []).join(', ')})`}
+                  <strong>Left ready:</strong>{" "}
+                  {String(diffState.prereq?.left?.ready)}
+                  {!diffState.prereq?.left?.ready &&
+                    ` (${(diffState.prereq?.left?.missing || []).join(", ")})`}
                 </div>
                 <div>
-                  <strong>Right ready:</strong> {String(diffState.prereq?.right?.ready)}
-                  {!diffState.prereq?.right?.ready && ` (${(diffState.prereq?.right?.missing || []).join(', ')})`}
+                  <strong>Right ready:</strong>{" "}
+                  {String(diffState.prereq?.right?.ready)}
+                  {!diffState.prereq?.right?.ready &&
+                    ` (${(diffState.prereq?.right?.missing || []).join(", ")})`}
                 </div>
                 <div>Waiting until topic/sentence prerequisites are ready.</div>
               </div>
@@ -377,11 +452,21 @@ function DiffPage() {
             <div className="diff-actions">
               {RECALCULABLE_STATES.includes(diffState.state) && (
                 <>
-                  <button type="button" className="text-list-primary" onClick={() => runCalculation(false)} disabled={jobLoading || deleteLoading}>
-                    {jobLoading ? '...' : 'Calculate diff'}
+                  <button
+                    type="button"
+                    className="text-list-primary"
+                    onClick={() => runCalculation(false)}
+                    disabled={jobLoading || deleteLoading}
+                  >
+                    {jobLoading ? "..." : "Calculate diff"}
                   </button>
-                  <button type="button" className="action-btn" onClick={() => runCalculation(true)} disabled={jobLoading || deleteLoading}>
-                    {jobLoading ? '...' : 'Recalculate'}
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => runCalculation(true)}
+                    disabled={jobLoading || deleteLoading}
+                  >
+                    {jobLoading ? "..." : "Recalculate"}
                   </button>
                 </>
               )}
@@ -391,7 +476,7 @@ function DiffPage() {
                 onClick={deleteDiffData}
                 disabled={!canDeleteDiff}
               >
-                {deleteLoading ? 'Deleting...' : 'Delete diff data'}
+                {deleteLoading ? "Deleting..." : "Delete diff data"}
               </button>
             </div>
           </div>
@@ -406,9 +491,25 @@ function DiffPage() {
                   placeholder="Filter by topic/text"
                 />
                 <div className="diff-nav">
-                  <button type="button" onClick={() => navigate(-1)} disabled={filteredRows.length === 0}>Prev</button>
-                  <span>{filteredRows.length ? `${activeIndex + 1}/${filteredRows.length}` : '0/0'}</span>
-                  <button type="button" onClick={() => navigate(1)} disabled={filteredRows.length === 0}>Next</button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    disabled={filteredRows.length === 0}
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    {filteredRows.length
+                      ? `${activeIndex + 1}/${filteredRows.length}`
+                      : "0/0"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(1)}
+                    disabled={filteredRows.length === 0}
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
 
@@ -416,14 +517,16 @@ function DiffPage() {
                 {filteredRows.map((row, index) => (
                   <div
                     key={row.id}
-                    className={`diff-row ${index === activeIndex ? 'active' : ''}`}
+                    className={`diff-row ${index === activeIndex ? "active" : ""}`}
                     id={`diff-row-${row.id}`}
                   >
                     <div className="diff-cell diff-left">
                       {row.hasLeft ? (
                         <>
                           <div className="diff-topic">{row.leftTopic}</div>
-                          <div className="diff-meta">Sentence #{(row.leftSentenceIndex ?? -1) + 1}</div>
+                          <div className="diff-meta">
+                            Sentence #{(row.leftSentenceIndex ?? -1) + 1}
+                          </div>
                           <div>{highlightText(row.leftText, query)}</div>
                           {row.nearestRight.length > 0 && (
                             <div className="diff-nearest">
@@ -432,10 +535,16 @@ function DiffPage() {
                                   type="button"
                                   key={`${row.id}-nearest-right-from-left-${idx}`}
                                   className="diff-nearest-chip diff-nearest-link"
-                                  onClick={() => jumpToRightSentence(item.right_sentence_index)}
+                                  onClick={() =>
+                                    jumpToRightSentence(
+                                      item.right_sentence_index,
+                                    )
+                                  }
                                   title={`Go to right sentence #${(item.right_sentence_index ?? -1) + 1}`}
                                 >
-                                  Similar: {item.right_topic || '(untitled)'} · #{(item.right_sentence_index ?? -1) + 1} ({Math.round((item.similarity || 0) * 100)}%)
+                                  Similar: {item.right_topic || "(untitled)"} ·
+                                  #{(item.right_sentence_index ?? -1) + 1} (
+                                  {Math.round((item.similarity || 0) * 100)}%)
                                 </button>
                               ))}
                             </div>
@@ -446,11 +555,13 @@ function DiffPage() {
                       )}
                     </div>
                     <div className="diff-center">
-                      {row.kind === 'match' ? (
-                        <span className={`diff-sim ${similarityClass(row.similarity)}`}>
+                      {row.kind === "match" ? (
+                        <span
+                          className={`diff-sim ${similarityClass(row.similarity)}`}
+                        >
                           {Math.round((row.similarity || 0) * 100)}%
                         </span>
-                      ) : row.kind === 'unmatched-right' ? (
+                      ) : row.kind === "unmatched-right" ? (
                         <span className="diff-sim diff-sim-new">NEW</span>
                       ) : (
                         <span className="diff-sim diff-sim-low">NO MATCH</span>
@@ -460,7 +571,9 @@ function DiffPage() {
                       {row.hasRight ? (
                         <>
                           <div className="diff-topic">{row.rightTopic}</div>
-                          <div className="diff-meta">Sentence #{(row.rightSentenceIndex ?? -1) + 1}</div>
+                          <div className="diff-meta">
+                            Sentence #{(row.rightSentenceIndex ?? -1) + 1}
+                          </div>
                           <div>{highlightText(row.rightText, query)}</div>
                         </>
                       ) : (
@@ -473,10 +586,14 @@ function DiffPage() {
                               type="button"
                               key={`${row.id}-nearest-left-from-right-${idx}`}
                               className="diff-nearest-chip diff-nearest-link"
-                              onClick={() => jumpToLeftSentence(item.left_sentence_index)}
+                              onClick={() =>
+                                jumpToLeftSentence(item.left_sentence_index)
+                              }
                               title={`Go to left sentence #${(item.left_sentence_index ?? -1) + 1}`}
                             >
-                              Similar: {item.left_topic || '(untitled)'} · #{(item.left_sentence_index ?? -1) + 1} ({Math.round((item.similarity || 0) * 100)}%)
+                              Similar: {item.left_topic || "(untitled)"} · #
+                              {(item.left_sentence_index ?? -1) + 1} (
+                              {Math.round((item.similarity || 0) * 100)}%)
                             </button>
                           ))}
                         </div>

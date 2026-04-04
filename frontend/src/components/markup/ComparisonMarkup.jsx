@@ -1,8 +1,8 @@
-import React from 'react';
-import { getTextByIndex, getItemIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getTextByIndex, getItemIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
-const COLUMN_COLORS = ['#e8f5e9', '#fce4ec', '#e3f2fd', '#fff3e0', '#f3e5f5'];
+const COLUMN_COLORS = ["#e8f5e9", "#fce4ec", "#e3f2fd", "#fff3e0", "#f3e5f5"];
 
 /**
  * @typedef {Object} ComparisonMarkupProps
@@ -20,16 +20,18 @@ export default function ComparisonMarkup({ segment, sentences }) {
   // Normalise to new columns format; support legacy left_label/right_label data
   const columns = data.columns || [
     {
-      label: data.left_label || 'Left',
-      items: (data.left_items || []).map(text => ({ text })),
+      label: data.left_label || "Left",
+      items: (data.left_items || []).map((text) => ({ text })),
     },
     {
-      label: data.right_label || 'Right',
-      items: (data.right_items || []).map(text => ({ text })),
+      label: data.right_label || "Right",
+      items: (data.right_items || []).map((text) => ({ text })),
     },
   ];
 
-  const gridStyle = { gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` };
+  const gridStyle = {
+    gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
+  };
 
   return (
     <div className="markup-segment markup-comparison">
@@ -38,7 +40,10 @@ export default function ComparisonMarkup({ segment, sentences }) {
           <div
             key={i}
             className="markup-comparison__header"
-            style={{ '--markup-comparison-header-bg': COLUMN_COLORS[i % COLUMN_COLORS.length] }}
+            style={{
+              "--markup-comparison-header-bg":
+                COLUMN_COLORS[i % COLUMN_COLORS.length],
+            }}
           >
             <HighlightedText text={col.label} />
           </div>
@@ -48,7 +53,10 @@ export default function ComparisonMarkup({ segment, sentences }) {
         {columns.map((col, i) => (
           <div key={i} className="markup-comparison__col">
             {col.items.map((item, j) => {
-              const text = item.text || getTextByIndex(sentences, getItemIndex(item)) || '';
+              const text =
+                item.text ||
+                getTextByIndex(sentences, getItemIndex(item)) ||
+                "";
               return (
                 <div key={j} className="markup-comparison__item">
                   <HighlightedText text={text} />

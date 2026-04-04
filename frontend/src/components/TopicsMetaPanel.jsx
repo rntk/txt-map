@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
 
 /**
  * @typedef {{ word: string, frequency: number }} WordFreq
@@ -18,7 +18,9 @@ function KeywordList({ keywords }) {
   return (
     <div className="topics-meta-panel__keywords">
       {(keywords || []).map((kw) => (
-        <span key={kw} className="topics-meta-panel__keyword-tag">{kw}</span>
+        <span key={kw} className="topics-meta-panel__keyword-tag">
+          {kw}
+        </span>
       ))}
     </div>
   );
@@ -29,16 +31,20 @@ function KeywordList({ keywords }) {
  */
 function PanelClusters({ clusters }) {
   if (!clusters || clusters.length === 0) {
-    return <p className="topics-meta-panel__empty">No clusters for this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">No clusters for this topic.</p>
+    );
   }
   return (
     <div className="topics-meta-panel__cards">
       {clusters.map((c) => (
         <div key={c.cluster_id} className="topics-meta-panel__card">
-          <div className="topics-meta-panel__card-title">Cluster {c.cluster_id + 1}</div>
+          <div className="topics-meta-panel__card-title">
+            Cluster {c.cluster_id + 1}
+          </div>
           <KeywordList keywords={c.keywords} />
           <div className="topics-meta-panel__card-meta">
-            {c.sentence_count} sentence{c.sentence_count !== 1 ? 's' : ''}
+            {c.sentence_count} sentence{c.sentence_count !== 1 ? "s" : ""}
           </div>
         </div>
       ))}
@@ -51,7 +57,11 @@ function PanelClusters({ clusters }) {
  */
 function PanelLatentTopics({ topicMapping, latentTopics }) {
   if (!topicMapping || !latentTopics || latentTopics.length === 0) {
-    return <p className="topics-meta-panel__empty">No latent topics for this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">
+        No latent topics for this topic.
+      </p>
+    );
   }
 
   const relevantIds = new Set(topicMapping.latent_topic_ids || []);
@@ -64,17 +74,24 @@ function PanelLatentTopics({ topicMapping, latentTopics }) {
 
   const filtered = latentTopics.filter((lt) => relevantIds.has(lt.id));
   if (filtered.length === 0) {
-    return <p className="topics-meta-panel__empty">No latent topics mapped to this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">
+        No latent topics mapped to this topic.
+      </p>
+    );
   }
 
   return (
     <div className="topics-meta-panel__cards">
       {filtered.map((lt) => (
         <div key={lt.id} className="topics-meta-panel__card">
-          <div className="topics-meta-panel__card-title">Latent topic {lt.id + 1}</div>
+          <div className="topics-meta-panel__card-title">
+            Latent topic {lt.id + 1}
+          </div>
           <KeywordList keywords={lt.keywords} />
           <div className="topics-meta-panel__card-meta">
-            Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight: {((lt.weight || 0) * 100).toFixed(1)}%
+            Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight:{" "}
+            {((lt.weight || 0) * 100).toFixed(1)}%
           </div>
         </div>
       ))}
@@ -88,13 +105,17 @@ function PanelLatentTopics({ topicMapping, latentTopics }) {
 function PanelTagCloud({ sentences, sentenceIndices }) {
   /** @type {WordFreq[]} */
   const words = useMemo(() => {
-    if (!sentences || !sentenceIndices || sentenceIndices.length === 0) return [];
+    if (!sentences || !sentenceIndices || sentenceIndices.length === 0)
+      return [];
     /** @type {Record<string, number>} */
     const freq = {};
     for (const idx of sentenceIndices) {
       const text = sentences[idx - 1];
       if (!text) continue;
-      const tokens = text.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+      const tokens = text
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((w) => w.length > 2);
       for (const token of tokens) {
         freq[token] = (freq[token] || 0) + 1;
       }
@@ -106,7 +127,9 @@ function PanelTagCloud({ sentences, sentenceIndices }) {
   }, [sentences, sentenceIndices]);
 
   if (words.length === 0) {
-    return <p className="topics-meta-panel__empty">No tag data for this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">No tag data for this topic.</p>
+    );
   }
 
   return (
@@ -126,7 +149,11 @@ function PanelTagCloud({ sentences, sentenceIndices }) {
  */
 function PanelSummary({ summary }) {
   if (!summary) {
-    return <p className="topics-meta-panel__empty">No summary available for this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">
+        No summary available for this topic.
+      </p>
+    );
   }
   return (
     <div className="topics-meta-panel__summary">
@@ -140,7 +167,9 @@ function PanelSummary({ summary }) {
  */
 function PanelSubtopics({ subtopics }) {
   if (!subtopics || subtopics.length === 0) {
-    return <p className="topics-meta-panel__empty">No subtopics for this topic.</p>;
+    return (
+      <p className="topics-meta-panel__empty">No subtopics for this topic.</p>
+    );
   }
   return (
     <div className="topics-meta-panel__cards">
@@ -148,7 +177,8 @@ function PanelSubtopics({ subtopics }) {
         <div key={st.name} className="topics-meta-panel__card">
           <div className="topics-meta-panel__card-title">{st.name}</div>
           <div className="topics-meta-panel__card-meta">
-            {(st.sentences || []).length} sentence{(st.sentences || []).length !== 1 ? 's' : ''}
+            {(st.sentences || []).length} sentence
+            {(st.sentences || []).length !== 1 ? "s" : ""}
           </div>
         </div>
       ))}
@@ -187,7 +217,11 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
   const selectedTopic = useMemo(() => {
     if (!data || !data.topics) return null;
     if (!selectedTopicName) return data.topics[0] || null;
-    return data.topics.find((t) => t.name === selectedTopicName) || data.topics[0] || null;
+    return (
+      data.topics.find((t) => t.name === selectedTopicName) ||
+      data.topics[0] ||
+      null
+    );
   }, [data, selectedTopicName]);
 
   const filteredClusters = useMemo(() => {
@@ -195,7 +229,9 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
     const topicSentenceSet = new Set(selectedTopic.sentences || []);
     return (data.clusters || [])
       .map((c) => {
-        const overlapping = (c.sentence_indices || []).filter((idx) => topicSentenceSet.has(idx));
+        const overlapping = (c.sentence_indices || []).filter((idx) =>
+          topicSentenceSet.has(idx),
+        );
         if (overlapping.length === 0) return null;
         return { ...c, sentence_count: overlapping.length };
       })
@@ -204,7 +240,11 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
 
   const topicMapping = useMemo(() => {
     if (!selectedTopic || !data?.topic_model?.topic_mapping) return null;
-    return data.topic_model.topic_mapping.find((m) => m.topic_name === selectedTopic.name) || null;
+    return (
+      data.topic_model.topic_mapping.find(
+        (m) => m.topic_name === selectedTopic.name,
+      ) || null
+    );
   }, [data, selectedTopic]);
 
   const latentTopics = data?.topic_model?.latent_topics || [];
@@ -216,12 +256,17 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
 
   const filteredSubtopics = useMemo(() => {
     if (!selectedTopic || !data?.subtopics) return [];
-    return data.subtopics.filter((st) => st.parent_topic === selectedTopic.name);
+    return data.subtopics.filter(
+      (st) => st.parent_topic === selectedTopic.name,
+    );
   }, [data, selectedTopic]);
 
   if (loading) {
     return (
-      <aside className="reading-page__minimap-panel" aria-label="Topics meta panel">
+      <aside
+        className="reading-page__minimap-panel"
+        aria-label="Topics meta panel"
+      >
         <div className="reading-page__minimap-header">
           <div className="reading-page__minimap-title">Topics Meta</div>
         </div>
@@ -232,7 +277,10 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
 
   if (error) {
     return (
-      <aside className="reading-page__minimap-panel" aria-label="Topics meta panel">
+      <aside
+        className="reading-page__minimap-panel"
+        aria-label="Topics meta panel"
+      >
         <div className="reading-page__minimap-header">
           <div className="reading-page__minimap-title">Topics Meta</div>
         </div>
@@ -242,11 +290,16 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
   }
 
   return (
-    <aside className="reading-page__minimap-panel topics-meta-panel" aria-label="Topics meta panel">
+    <aside
+      className="reading-page__minimap-panel topics-meta-panel"
+      aria-label="Topics meta panel"
+    >
       <div className="reading-page__minimap-header">
         <div className="reading-page__minimap-title">Topics Meta</div>
         {selectedTopic && (
-          <div className="reading-page__minimap-subtitle">{selectedTopic.name}</div>
+          <div className="reading-page__minimap-subtitle">
+            {selectedTopic.name}
+          </div>
         )}
       </div>
 
@@ -263,7 +316,10 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
 
         <section className="topics-meta-panel__section">
           <div className="topics-meta-panel__section-title">Latent Topics</div>
-          <PanelLatentTopics topicMapping={topicMapping} latentTopics={latentTopics} />
+          <PanelLatentTopics
+            topicMapping={topicMapping}
+            latentTopics={latentTopics}
+          />
         </section>
 
         <section className="topics-meta-panel__section">

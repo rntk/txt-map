@@ -27,7 +27,9 @@ _PROMPT_CONTENT_PATTERN = re.compile(r"<content>\s*(.*?)\s*</content>", re.DOTAL
 _PROMPT_MARKER_PATTERN = re.compile(r"^\{(\d+)\}", re.MULTILINE)
 _TEXT_RESPONSE_FORMAT = "text"
 _JSON_RESPONSE_FORMAT = "json"
-_DEFERRED_BATCH_ERROR = "run() cannot execute deferred batches; use start() and drive the session"
+_DEFERRED_BATCH_ERROR = (
+    "run() cannot execute deferred batches; use start() and drive the session"
+)
 
 
 @dataclass
@@ -38,16 +40,13 @@ class ArticleSplitResult:
 
 class _TopicRangeParserProtocol(Protocol):
     @property
-    def supported_response_formats(self) -> frozenset[str]:
-        ...
+    def supported_response_formats(self) -> frozenset[str]: ...
 
-    def parse(self, response: str, sentence_count: int) -> list[Any]:
-        ...
+    def parse(self, response: str, sentence_count: int) -> list[Any]: ...
 
 
 class _LLMFutureProtocol(Protocol):
-    def result(self, timeout: float = 300.0) -> str:
-        ...
+    def result(self, timeout: float = 300.0) -> str: ...
 
 
 class _ResolvedLLMFuture:
@@ -243,10 +242,14 @@ class _LLMCallableAdapter:
 
     def call(self, prompt: str, temperature: float = 0.0) -> str:
         prompt_preview = prompt[:300] + "..." if len(prompt) > 300 else prompt
-        logger.info(f"LLMCallableAdapter sending chunk ({len(prompt)} chars): {prompt_preview}")
+        logger.info(
+            f"LLMCallableAdapter sending chunk ({len(prompt)} chars): {prompt_preview}"
+        )
         result = self._llm_client.call([prompt], temperature=temperature)
         result_preview = result[:300] + "..." if len(result) > 300 else result
-        logger.info(f"LLMCallableAdapter received response ({len(result)} chars): {result_preview}")
+        logger.info(
+            f"LLMCallableAdapter received response ({len(result)} chars): {result_preview}"
+        )
         return result
 
 
@@ -312,7 +315,9 @@ def _resolve_response_modes(
         _JSON_RESPONSE_FORMAT if use_json else _TEXT_RESPONSE_FORMAT
     )
     requested_parser_mode: Literal["text", "json", "auto"] = (
-        _JSON_RESPONSE_FORMAT if requested_output_mode == _JSON_RESPONSE_FORMAT else "auto"
+        _JSON_RESPONSE_FORMAT
+        if requested_output_mode == _JSON_RESPONSE_FORMAT
+        else "auto"
     )
     parser = _build_topic_range_parser(requested_parser_mode)
     supported_formats = getattr(
@@ -330,7 +335,9 @@ def _resolve_response_modes(
     return _TEXT_RESPONSE_FORMAT, _TEXT_RESPONSE_FORMAT
 
 
-def _groups_to_topics(groups: List[Any], sentence_objects: List[Any]) -> List[Dict[str, Any]]:
+def _groups_to_topics(
+    groups: List[Any], sentence_objects: List[Any]
+) -> List[Dict[str, Any]]:
     topics: List[Dict[str, Any]] = []
     sentence_by_index = {s.index: s for s in sentence_objects}
 
@@ -424,7 +431,9 @@ def _run_pipeline_session(
     session = pipeline.start(article)
     while not session.is_complete():
         requests = session.pending_requests()
-        futures_or_none = [_submit_request(llm_callable, request) for request in requests]
+        futures_or_none = [
+            _submit_request(llm_callable, request) for request in requests
+        ]
         if all(future is not None for future in futures_or_none):
             responses = [
                 LLMResponse(content=cast(_LLMFutureProtocol, future).result())
@@ -432,8 +441,7 @@ def _run_pipeline_session(
             ]
         else:
             responses = [
-                _execute_request(llm_callable, request)
-                for request in requests
+                _execute_request(llm_callable, request) for request in requests
             ]
         session.submit_responses(responses)
     return session.result()
@@ -502,7 +510,9 @@ def split_article(
     if isinstance(llm, QueuedLLMClient):
         llm_with_retry = llm_callable
     else:
-        llm_with_retry = RetryingLLMCallable(llm_callable, max_retries=3, backoff_factor=1.0)
+        llm_with_retry = RetryingLLMCallable(
+            llm_callable, max_retries=3, backoff_factor=1.0
+        )
 
     if retry_policy is None:
         retry_policy = RetryConfig(
@@ -529,7 +539,9 @@ def split_article(
         if cache_store is not None
         else llm_with_retry
     )
-    llm_callable = TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
+    llm_callable = (
+        TracingLLMCallable(cached_adapter, tracer) if tracer else cached_adapter
+    )
 
     pipeline = build_pipeline(
         splitter=splitter,
@@ -552,8 +564,10 @@ def split_article(
     )
 
     article_preview = article[:500] + "..." if len(article) > 500 else article
-    logger.info(f"Running pipeline on article ({len(article)} chars): {article_preview}")
-    
+    logger.info(
+        f"Running pipeline on article ({len(article)} chars): {article_preview}"
+    )
+
     split_result = _execute_pipeline(pipeline, article, llm_callable)
     sentences = [s.text for s in split_result.sentences]
     topics = _groups_to_topics(split_result.groups, split_result.sentences)

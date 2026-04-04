@@ -1,6 +1,6 @@
-import React from 'react';
-import { getNestedIndices, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getNestedIndices, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * QuoteMarkup - Displays blockquotes with proper semantic HTML and accessibility
@@ -8,11 +8,15 @@ import HighlightedText from '../shared/HighlightedText';
  */
 export default function QuoteMarkup({ segment, sentences }) {
   const { attribution } = segment.data || {};
-  const quoteIndices = getNestedIndices(segment.data, 'position_indices', 'sentence_indices');
+  const quoteIndices = getNestedIndices(
+    segment.data,
+    "position_indices",
+    "sentence_indices",
+  );
   const quoteText = quoteIndices
-    .map(idx => getTextByIndex(sentences, idx))
+    .map((idx) => getTextByIndex(sentences, idx))
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   if (!quoteText) return null;
 

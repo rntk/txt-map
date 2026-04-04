@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import ExtractionBadgeBar from './ExtractionBadgeBar';
+import React, { useMemo, useState } from "react";
+import ExtractionBadgeBar from "./ExtractionBadgeBar";
 import {
   buildExtractionTextSegments,
   extractionIncludesSentence,
-} from '../../utils/extractionHighlight';
+} from "../../utils/extractionHighlight";
 
 /**
  * @typedef {import('../../utils/extractionHighlight').DataExtraction} DataExtraction
@@ -30,25 +30,25 @@ import {
  */
 
 const PRIORITY_LABELS = {
-  must_read: 'Must Read',
-  recommended: 'Recommended',
-  optional: 'Optional',
-  skip: 'Low priority',
+  must_read: "Must Read",
+  recommended: "Recommended",
+  optional: "Optional",
+  skip: "Low priority",
 };
 
 const SKIP_REASON_LABELS = {
-  repetitive: 'Covers similar ground as other topics',
-  tangential: 'Tangential to the main story',
-  too_brief: 'Too brief to be meaningful',
+  repetitive: "Covers similar ground as other topics",
+  tangential: "Tangential to the main story",
+  too_brief: "Too brief to be meaningful",
 };
 
 const FLAG_LABELS = {
-  quote: 'Quote',
-  data_point: 'Data',
-  unique_insight: 'Insight',
-  opinion: 'Opinion',
-  definition: 'Definition',
-  key_insight: 'Key Insight',
+  quote: "Quote",
+  data_point: "Data",
+  unique_insight: "Insight",
+  opinion: "Opinion",
+  definition: "Definition",
+  key_insight: "Key Insight",
 };
 
 function SentenceBadges({ flags }) {
@@ -64,24 +64,35 @@ function SentenceBadges({ flags }) {
   );
 }
 
-function KeySentence({ text, annotation, isActive, isSourceReveal, activeExtraction }) {
-  const importance = annotation?.importance || 'normal';
+function KeySentence({
+  text,
+  annotation,
+  isActive,
+  isSourceReveal,
+  activeExtraction,
+}) {
+  const importance = annotation?.importance || "normal";
   const flags = annotation?.flags || [];
-  const isKeyInsight = flags.includes('key_insight');
+  const isKeyInsight = flags.includes("key_insight");
   const segments = useMemo(
-    () => (isActive ? buildExtractionTextSegments(text, activeExtraction) : [{ text, highlighted: false }]),
-    [text, isActive, activeExtraction]
+    () =>
+      isActive
+        ? buildExtractionTextSegments(text, activeExtraction)
+        : [{ text, highlighted: false }],
+    [text, isActive, activeExtraction],
   );
 
   return (
     <div
-      className={`rg-sentence rg-sentence--${importance}${isActive ? ' rg-sentence--active' : ''}${isSourceReveal ? ' rg-sentence--source-reveal' : ''}${isKeyInsight ? ' rg-sentence--key-insight' : ''}`}
+      className={`rg-sentence rg-sentence--${importance}${isActive ? " rg-sentence--active" : ""}${isSourceReveal ? " rg-sentence--source-reveal" : ""}${isKeyInsight ? " rg-sentence--key-insight" : ""}`}
     >
       <span className="rg-sentence__text">
         {segments.map((segment, index) => (
           <span
             key={`${segment.text}-${index}`}
-            className={segment.highlighted ? 'rg-sentence__text-highlight' : undefined}
+            className={
+              segment.highlighted ? "rg-sentence__text-highlight" : undefined
+            }
           >
             {segment.text}
           </span>
@@ -122,24 +133,26 @@ export default function TopicCard({
   onExtractionToggle,
   showPath = true,
 }) {
-  const name = topic?.name || '';
+  const name = topic?.name || "";
   const finalSummary = topicSummary || topic?.summary;
   const topicSentences = useMemo(
     () => (Array.isArray(topic?.sentences) ? topic.sentences : []),
-    [topic?.sentences]
+    [topic?.sentences],
   );
   const ann = topicAnnotation || {};
-  const priority = ann.reading_priority || 'recommended';
+  const priority = ann.reading_priority || "recommended";
   const skipReason = ann.skip_reason;
   const recommendedSentences = ann.recommended_sentences || [];
 
   // optional and skip topics start folded; read topics also start folded
-  const startFolded = priority === 'optional' || priority === 'skip' || isRead;
+  const startFolded = priority === "optional" || priority === "skip" || isRead;
   const [folded, setFolded] = useState(startFolded);
-  const [viewMode, setViewMode] = useState('full');
+  const [viewMode, setViewMode] = useState("full");
 
-  const displayName = name.includes('>') ? name.split('>').pop() : name;
-  const fullPath = name.includes('>') ? name.split('>').slice(0, -1).join(' › ') : null;
+  const displayName = name.includes(">") ? name.split(">").pop() : name;
+  const fullPath = name.includes(">")
+    ? name.split(">").slice(0, -1).join(" › ")
+    : null;
 
   // Debug summary presence
   /*
@@ -153,26 +166,35 @@ export default function TopicCard({
   */
 
   const lockedSourceSentenceIndices = useMemo(() => {
-    if (!lockedExtraction || !Array.isArray(lockedExtraction.source_sentences)) {
+    if (
+      !lockedExtraction ||
+      !Array.isArray(lockedExtraction.source_sentences)
+    ) {
       return [];
     }
 
-    return lockedExtraction.source_sentences.filter((idx) => topicSentences.includes(idx));
+    return lockedExtraction.source_sentences.filter((idx) =>
+      topicSentences.includes(idx),
+    );
   }, [lockedExtraction, topicSentences]);
   const isOpen = !folded || lockedSourceSentenceIndices.length > 0;
 
   // Key sentences: LLM-recommended (high importance), capped at 5
   const highImportanceIndices = topicSentences
-    .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
+    .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === "high")
     .slice(0, 5);
 
-  const keySentenceIndices = recommendedSentences.length > 0
-    ? recommendedSentences.slice(0, 5)
-    : highImportanceIndices.length > 0
+  const keySentenceIndices =
+    recommendedSentences.length > 0
+      ? recommendedSentences.slice(0, 5)
+      : highImportanceIndices.length > 0
         ? highImportanceIndices
         : topicSentences.slice(0, 3);
   const visibleSentenceIndices = useMemo(() => {
-    const merged = new Set([...keySentenceIndices, ...lockedSourceSentenceIndices]);
+    const merged = new Set([
+      ...keySentenceIndices,
+      ...lockedSourceSentenceIndices,
+    ]);
     return [...merged].sort((a, b) => a - b);
   }, [keySentenceIndices, lockedSourceSentenceIndices]);
 
@@ -183,15 +205,22 @@ export default function TopicCard({
 
   return (
     <div
-      className={`rg-topic-card rg-topic-card--${priority}${isRead ? ' rg-topic-card--read' : ''}${isHighlighted ? ' rg-topic-card--highlighted' : ''}`}
+      className={`rg-topic-card rg-topic-card--${priority}${isRead ? " rg-topic-card--read" : ""}${isHighlighted ? " rg-topic-card--highlighted" : ""}`}
       ref={cardRef}
       id={`topic-card-${encodeURIComponent(name)}`}
     >
-      <div className="rg-topic-card__header" onClick={() => setFolded((f) => !f)}>
+      <div
+        className="rg-topic-card__header"
+        onClick={() => setFolded((f) => !f)}
+      >
         <div className="rg-topic-card__title-row">
-          {showPath && fullPath && <span className="rg-topic-card__path">{fullPath} ›</span>}
+          {showPath && fullPath && (
+            <span className="rg-topic-card__path">{fullPath} ›</span>
+          )}
           <span className="rg-topic-card__name">{displayName}</span>
-          <span className={`rg-topic-card__badge rg-topic-card__badge--${priority}`}>
+          <span
+            className={`rg-topic-card__badge rg-topic-card__badge--${priority}`}
+          >
             {PRIORITY_LABELS[priority] || priority}
           </span>
           {isRead && <span className="rg-topic-card__read-badge">Read</span>}
@@ -207,24 +236,31 @@ export default function TopicCard({
               className="rg-topic-card__toggle-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                setViewMode((v) => (v === 'full' ? 'summary' : 'full'));
+                setViewMode((v) => (v === "full" ? "summary" : "full"));
               }}
-              title={`Switch to ${viewMode === 'full' ? 'summary' : 'full sentences'}`}
+              title={`Switch to ${viewMode === "full" ? "summary" : "full sentences"}`}
             >
-              {viewMode === 'full' ? 'Summary' : 'Full'}
+              {viewMode === "full" ? "Summary" : "Full"}
             </button>
           )}
           {onToggleRead && (
             <button
-              className={`rg-read-btn${isRead ? ' rg-read-btn--read' : ''}`}
+              className={`rg-read-btn${isRead ? " rg-read-btn--read" : ""}`}
               onClick={handleReadToggle}
-              title={isRead ? 'Mark as unread' : 'Mark as read (will be faded in full view)'}
+              title={
+                isRead
+                  ? "Mark as unread"
+                  : "Mark as read (will be faded in full view)"
+              }
             >
-              {isRead ? 'Unread' : 'Mark read'}
+              {isRead ? "Unread" : "Mark read"}
             </button>
           )}
-          <button className="rg-topic-card__fold-btn" aria-label={folded ? 'Expand' : 'Collapse'}>
-            {isOpen ? '▾' : '▸'}
+          <button
+            className="rg-topic-card__fold-btn"
+            aria-label={folded ? "Expand" : "Collapse"}
+          >
+            {isOpen ? "▾" : "▸"}
           </button>
         </div>
       </div>
@@ -238,7 +274,7 @@ export default function TopicCard({
       {isOpen && (
         <div className="rg-topic-card__body">
           <div className="rg-topic-card__content">
-            {viewMode === 'full' && (
+            {viewMode === "full" && (
               <ExtractionBadgeBar
                 extractions={dataExtractions}
                 topicSentences={topicSentences}
@@ -249,30 +285,37 @@ export default function TopicCard({
                 onExtractionToggle={onExtractionToggle}
               />
             )}
-            {viewMode === 'summary' && finalSummary ? (
+            {viewMode === "summary" && finalSummary ? (
               <div className="rg-topic-card__summary">
                 <p>{finalSummary}</p>
               </div>
-            ) : visibleSentenceIndices.length > 0 && (
-              <div className="rg-topic-card__sentences">
-                {visibleSentenceIndices.map((idx) => {
-                  const text = sentences && sentences[idx - 1];
-                  if (!text) return null;
-                  const annotation = sentenceAnnotations?.[String(idx)];
-                  const isActiveSourceSentence = extractionIncludesSentence(activeExtraction, idx);
-                  const isSourceReveal = isActiveSourceSentence && !keySentenceIndices.includes(idx);
-                  return (
-                    <KeySentence
-                      key={idx}
-                      text={text}
-                      annotation={annotation}
-                      isActive={isActiveSourceSentence}
-                      isSourceReveal={isSourceReveal}
-                      activeExtraction={activeExtraction}
-                    />
-                  );
-                })}
-              </div>
+            ) : (
+              visibleSentenceIndices.length > 0 && (
+                <div className="rg-topic-card__sentences">
+                  {visibleSentenceIndices.map((idx) => {
+                    const text = sentences && sentences[idx - 1];
+                    if (!text) return null;
+                    const annotation = sentenceAnnotations?.[String(idx)];
+                    const isActiveSourceSentence = extractionIncludesSentence(
+                      activeExtraction,
+                      idx,
+                    );
+                    const isSourceReveal =
+                      isActiveSourceSentence &&
+                      !keySentenceIndices.includes(idx);
+                    return (
+                      <KeySentence
+                        key={idx}
+                        text={text}
+                        annotation={annotation}
+                        isActive={isActiveSourceSentence}
+                        isSourceReveal={isSourceReveal}
+                        activeExtraction={activeExtraction}
+                      />
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -280,4 +323,3 @@ export default function TopicCard({
     </div>
   );
 }
-

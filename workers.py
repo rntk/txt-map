@@ -1,6 +1,7 @@
 """
 Background worker for processing submission tasks
 """
+
 import time
 import signal
 import logging
@@ -34,8 +35,7 @@ from lib.tasks.topic_modeling_generation import process_topic_modeling_generatio
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("worker")
 
@@ -80,7 +80,9 @@ TASK_HANDLERS = {
 
 
 class Worker:
-    def __init__(self, db, llm=None, cache_store=None, queue_store=None, heartbeat_file=None):
+    def __init__(
+        self, db, llm=None, cache_store=None, queue_store=None, heartbeat_file=None
+    ):
         self.db = db
         self.llm = llm
         self.cache_store = cache_store
@@ -135,20 +137,19 @@ class Worker:
         Returns the task document if claimed, None otherwise.
         """
         # Try to claim tasks in priority order
-        for task_type in sorted(TASK_HANDLERS.keys(), key=lambda t: TASK_PRIORITIES.get(t, 99)):
+        for task_type in sorted(
+            TASK_HANDLERS.keys(), key=lambda t: TASK_PRIORITIES.get(t, 99)
+        ):
             task = self.db.task_queue.find_one_and_update(
-                {
-                    "status": "pending",
-                    "task_type": task_type
-                },
+                {"status": "pending", "task_type": task_type},
                 {
                     "$set": {
                         "status": "processing",
                         "started_at": datetime.now(UTC),
-                        "worker_id": self.worker_id
+                        "worker_id": self.worker_id,
                     }
                 },
-                sort=[("priority", 1), ("created_at", 1)]
+                sort=[("priority", 1), ("created_at", 1)],
             )
 
             if task:
@@ -166,9 +167,9 @@ class Worker:
                             "$set": {
                                 "status": "pending",
                                 "started_at": None,
-                                "worker_id": None
+                                "worker_id": None,
                             }
-                        }
+                        },
                     )
 
         return None
@@ -194,7 +195,9 @@ class Worker:
         try:
             logger.info(f"Processing {task_type} for submission {submission_id}")
             llm_meta = create_llm_client(db=self.db)
-            logger.info(f"Using LLM provider: {llm_meta.provider_name}, model: {llm_meta.model_name}")
+            logger.info(
+                f"Using LLM provider: {llm_meta.provider_name}, model: {llm_meta.model_name}"
+            )
 
             if self.queue_store is not None:
                 # Queued path: dispatch LLM calls through llm_queue so that
@@ -224,7 +227,13 @@ class Worker:
                 raise ValueError(f"Submission {submission_id} not found")
 
             # Execute the handler (pass cache_store to LLM-using tasks)
-            cache_tasks = {"split_topic_generation", "subtopics_generation", "summarization", "insights_generation", "markup_generation"}
+            cache_tasks = {
+                "split_topic_generation",
+                "subtopics_generation",
+                "summarization",
+                "insights_generation",
+                "markup_generation",
+            }
             if task_type in cache_tasks:
                 handler(submission, self.db, llm, cache_store=self.cache_store)
             else:
@@ -237,7 +246,7 @@ class Worker:
         except Exception as e:
             logger.error(
                 f"Error processing {task_type} for submission {submission_id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             self._mark_task_failed(task, str(e))
 
@@ -247,20 +256,12 @@ class Worker:
 
         # Update task queue
         self.db.task_queue.update_one(
-            {"_id": task["_id"]},
-            {
-                "$set": {
-                    "status": "completed",
-                    "completed_at": now
-                }
-            }
+            {"_id": task["_id"]}, {"$set": {"status": "completed", "completed_at": now}}
         )
 
         # Update submission
         self.submissions_storage.update_task_status(
-            task["submission_id"],
-            task["task_type"],
-            "completed"
+            task["submission_id"], task["task_type"], "completed"
         )
 
         # Remove the completed task from the database
@@ -274,21 +275,14 @@ class Worker:
         self.db.task_queue.update_one(
             {"_id": task["_id"]},
             {
-                "$set": {
-                    "status": "failed",
-                    "completed_at": now,
-                    "error": error_msg
-                },
-                "$inc": {"retry_count": 1}
-            }
+                "$set": {"status": "failed", "completed_at": now, "error": error_msg},
+                "$inc": {"retry_count": 1},
+            },
         )
 
         # Update submission
         self.submissions_storage.update_task_status(
-            task["submission_id"],
-            task["task_type"],
-            "failed",
-            error=error_msg
+            task["submission_id"], task["task_type"], "failed", error=error_msg
         )
 
     def process_diff_job(self, job):
@@ -317,7 +311,9 @@ class Worker:
                 )
 
             if not force_recalculate:
-                existing_diff = self.semantic_diffs_storage.get_diff_by_pair_key(pair_key)
+                existing_diff = self.semantic_diffs_storage.get_diff_by_pair_key(
+                    pair_key
+                )
                 if existing_diff:
                     reasons = stale_reasons(
                         existing_diff,
@@ -354,7 +350,12 @@ class Worker:
                 submission_b_id,
             )
         except Exception as exc:
-            logger.error("Error processing semantic diff job %s: %s", job.get("job_id"), exc, exc_info=True)
+            logger.error(
+                "Error processing semantic diff job %s: %s",
+                job.get("job_id"),
+                exc,
+                exc_info=True,
+            )
             self._mark_diff_job_failed(job, str(exc))
 
     def _mark_diff_job_completed(self, job):
@@ -411,7 +412,13 @@ def main():
     cache_store.prepare()
     queue_store = LLMQueueStore(db)
     queue_store.prepare()
-    worker = Worker(db, llm, cache_store=cache_store, queue_store=queue_store, heartbeat_file=heartbeat_file)
+    worker = Worker(
+        db,
+        llm,
+        cache_store=cache_store,
+        queue_store=queue_store,
+        heartbeat_file=heartbeat_file,
+    )
 
     try:
         worker.run()

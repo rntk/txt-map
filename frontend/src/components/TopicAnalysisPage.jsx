@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { WordCloudDisplay } from './TopicsTagCloud';
-import './TopicAnalysisPage.css';
+import React, { useEffect, useState, useMemo } from "react";
+import { WordCloudDisplay } from "./TopicsTagCloud";
+import "./TopicAnalysisPage.css";
 
 function statusChip(label, status) {
   return (
-    <span key={label} className={`status-chip ${status || 'pending'}`}>
-      {label}: {status || 'pending'}
+    <span key={label} className={`status-chip ${status || "pending"}`}>
+      {label}: {status || "pending"}
     </span>
   );
 }
@@ -19,7 +19,7 @@ function TopicSelector({ topics, selectedIndex, onSelect }) {
       {topics.map((t, i) => (
         <button
           key={i}
-          className={`topic-selector-btn${i === selectedIndex ? ' active' : ''}`}
+          className={`topic-selector-btn${i === selectedIndex ? " active" : ""}`}
           onClick={() => onSelect(i)}
           type="button"
         >
@@ -41,10 +41,14 @@ function ClustersSection({ clusters }) {
           <div className="cluster-id">Cluster {c.cluster_id + 1}</div>
           <div className="keywords">
             {(c.keywords || []).map((kw) => (
-              <span key={kw} className="keyword-tag">{kw}</span>
+              <span key={kw} className="keyword-tag">
+                {kw}
+              </span>
             ))}
           </div>
-          <div className="cluster-meta">{c.sentence_count} sentence{c.sentence_count !== 1 ? 's' : ''}</div>
+          <div className="cluster-meta">
+            {c.sentence_count} sentence{c.sentence_count !== 1 ? "s" : ""}
+          </div>
         </div>
       ))}
     </div>
@@ -53,13 +57,17 @@ function ClustersSection({ clusters }) {
 
 function TagCloudSection({ sentences, sentenceIndices }) {
   const words = useMemo(() => {
-    if (!sentences || !sentenceIndices || sentenceIndices.length === 0) return [];
+    if (!sentences || !sentenceIndices || sentenceIndices.length === 0)
+      return [];
 
     const freq = {};
     for (const idx of sentenceIndices) {
       const text = sentences[idx - 1];
       if (!text) continue;
-      const tokens = text.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+      const tokens = text
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((w) => w.length > 2);
       for (const token of tokens) {
         freq[token] = (freq[token] || 0) + 1;
       }
@@ -84,7 +92,9 @@ function TagCloudSection({ sentences, sentenceIndices }) {
 
 function LatentTopicsSection({ topicMapping, latentTopics }) {
   if (!topicMapping || !latentTopics || latentTopics.length === 0) {
-    return <p className="not-ready">No latent topics available for this topic.</p>;
+    return (
+      <p className="not-ready">No latent topics available for this topic.</p>
+    );
   }
 
   const relevantIds = new Set(topicMapping.latent_topic_ids || []);
@@ -107,11 +117,14 @@ function LatentTopicsSection({ topicMapping, latentTopics }) {
           <div className="cluster-id">Latent topic {lt.id + 1}</div>
           <div className="keywords">
             {(lt.keywords || []).map((kw) => (
-              <span key={kw} className="keyword-tag">{kw}</span>
+              <span key={kw} className="keyword-tag">
+                {kw}
+              </span>
             ))}
           </div>
           <div className="cluster-meta">
-            Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight: {((lt.weight || 0) * 100).toFixed(1)}%
+            Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight:{" "}
+            {((lt.weight || 0) * 100).toFixed(1)}%
           </div>
         </div>
       ))}
@@ -120,7 +133,7 @@ function LatentTopicsSection({ topicMapping, latentTopics }) {
 }
 
 export default function TopicAnalysisPage() {
-  const pathParts = window.location.pathname.split('/');
+  const pathParts = window.location.pathname.split("/");
   // URL: /page/topic-analysis/{submission_id}
   const submissionId = pathParts[3] || null;
 
@@ -132,7 +145,7 @@ export default function TopicAnalysisPage() {
   useEffect(() => {
     if (data && data.topics) {
       const searchParams = new URLSearchParams(window.location.search);
-      const topicName = searchParams.get('topic');
+      const topicName = searchParams.get("topic");
       if (topicName) {
         const index = data.topics.findIndex((t) => t.name === topicName);
         if (index !== -1) {
@@ -144,7 +157,7 @@ export default function TopicAnalysisPage() {
 
   useEffect(() => {
     if (!submissionId) {
-      setError('No submission ID in URL.');
+      setError("No submission ID in URL.");
       setLoading(false);
       return;
     }
@@ -171,24 +184,32 @@ export default function TopicAnalysisPage() {
     return <div className="topic-analysis-page">Error: {error}</div>;
   }
 
-  const { topics, clusters, sentences, topic_model, task_status, source_url } = data;
+  const { topics, clusters, sentences, topic_model, task_status, source_url } =
+    data;
   const selectedTopic = (topics || [])[selectedTopicIndex] || null;
-  const topicSentenceIndices = selectedTopic ? (selectedTopic.sentences || []) : [];
+  const topicSentenceIndices = selectedTopic
+    ? selectedTopic.sentences || []
+    : [];
   const topicSentenceSet = new Set(topicSentenceIndices);
 
   // Filter clusters to those that overlap with the selected topic's sentences.
   const filteredClusters = (clusters || [])
     .map((c) => {
-      const overlapping = (c.sentence_indices || []).filter((idx) => topicSentenceSet.has(idx));
+      const overlapping = (c.sentence_indices || []).filter((idx) =>
+        topicSentenceSet.has(idx),
+      );
       if (overlapping.length === 0) return null;
       return { ...c, sentence_count: overlapping.length };
     })
     .filter(Boolean);
 
   // Find topic mapping for the selected topic.
-  const topicMapping = selectedTopic && topic_model && topic_model.topic_mapping
-    ? topic_model.topic_mapping.find((m) => m.topic_name === selectedTopic.name) || null
-    : null;
+  const topicMapping =
+    selectedTopic && topic_model && topic_model.topic_mapping
+      ? topic_model.topic_mapping.find(
+          (m) => m.topic_name === selectedTopic.name,
+        ) || null
+      : null;
 
   return (
     <div className="topic-analysis-page">
@@ -196,9 +217,9 @@ export default function TopicAnalysisPage() {
       {source_url && <div className="source-url">{source_url}</div>}
 
       <div className="status-bar">
-        {statusChip('split_topic', task_status?.split_topic_generation)}
-        {statusChip('clustering', task_status?.clustering_generation)}
-        {statusChip('topic_model', task_status?.topic_modeling_generation)}
+        {statusChip("split_topic", task_status?.split_topic_generation)}
+        {statusChip("clustering", task_status?.clustering_generation)}
+        {statusChip("topic_model", task_status?.topic_modeling_generation)}
         <a href={`/page/text/${submissionId}`} className="back-link">
           ← Back to text
         </a>
@@ -224,18 +245,23 @@ export default function TopicAnalysisPage() {
 
           <div className="topic-analysis-section">
             <h2>{selectedTopic.name} — Tags Cloud</h2>
-            <TagCloudSection sentences={sentences} sentenceIndices={topicSentenceIndices} />
+            <TagCloudSection
+              sentences={sentences}
+              sentenceIndices={topicSentenceIndices}
+            />
           </div>
 
-          {topic_model && topic_model.latent_topics && topic_model.latent_topics.length > 0 && (
-            <div className="topic-analysis-section">
-              <h2>{selectedTopic.name} — Latent Topics</h2>
-              <LatentTopicsSection
-                topicMapping={topicMapping}
-                latentTopics={topic_model.latent_topics}
-              />
-            </div>
-          )}
+          {topic_model &&
+            topic_model.latent_topics &&
+            topic_model.latent_topics.length > 0 && (
+              <div className="topic-analysis-section">
+                <h2>{selectedTopic.name} — Latent Topics</h2>
+                <LatentTopicsSection
+                  topicMapping={topicMapping}
+                  latentTopics={topic_model.latent_topics}
+                />
+              </div>
+            )}
         </>
       )}
     </div>

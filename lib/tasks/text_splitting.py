@@ -1,6 +1,7 @@
 """
 Text splitting task - extracts sentences and words from submitted HTML
 """
+
 from typing import Any, Dict
 from lib.article_splitter import split_article_with_markers
 from lib.storage.submissions import SubmissionsStorage
@@ -26,7 +27,7 @@ def process_text_splitting(submission: Dict[str, Any], db: Any, llm: Any) -> Non
         raise ValueError("No text content to process")
 
     # Split article using txt_splitt (via article_splitter wrapper)
-    max_chunk_chars = 84_000 #submission.get("max_chunk_chars", 24_000)
+    max_chunk_chars = 84_000  # submission.get("max_chunk_chars", 24_000)
     temperature = submission.get("temperature", 0.0)
     use_json = submission.get("use_json", False)
     result = split_article_with_markers(
@@ -48,7 +49,7 @@ def process_text_splitting(submission: Dict[str, Any], db: Any, llm: Any) -> Non
         {
             "sentences": sentences,
             "topics": topics,
-        }
+        },
     )
 
     print(

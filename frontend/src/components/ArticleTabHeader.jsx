@@ -1,6 +1,6 @@
-import React from 'react';
-import ReadProgress from './ReadProgress';
-import '../styles/text-reading.css';
+import React from "react";
+import ReadProgress from "./ReadProgress";
+import "../styles/text-reading.css";
 
 /**
  * @typedef {Object} ArticleTabHeaderProps
@@ -31,41 +31,44 @@ function ArticleTabHeader({
   sourceUrl,
   readPercentage = 0,
 }) {
-  const supportsMinimap = activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup';
+  const supportsMinimap =
+    activeTab === "article" ||
+    activeTab === "raw_text" ||
+    activeTab === "markup";
 
   return (
     <div className="article-header-sticky article-tab-header">
       <div className="article-tab-header__tabs">
         <button
           type="button"
-          className={`article-tab-header__tab${activeTab === 'article' ? ' article-tab-header__tab--active' : ''}`}
-          onClick={() => onTabClick('article')}
+          className={`article-tab-header__tab${activeTab === "article" ? " article-tab-header__tab--active" : ""}`}
+          onClick={() => onTabClick("article")}
         >
           Article
         </button>
         <button
           type="button"
-          className={`article-tab-header__tab${activeTab === 'article_summary' ? ' article-tab-header__tab--active' : ''}`}
-          onClick={() => onTabClick('article_summary')}
+          className={`article-tab-header__tab${activeTab === "article_summary" ? " article-tab-header__tab--active" : ""}`}
+          onClick={() => onTabClick("article_summary")}
         >
           Summary
         </button>
         <button
           type="button"
-          className={`article-tab-header__tab${activeTab === 'raw_text' ? ' article-tab-header__tab--active' : ''}`}
-          onClick={() => onTabClick('raw_text')}
+          className={`article-tab-header__tab${activeTab === "raw_text" ? " article-tab-header__tab--active" : ""}`}
+          onClick={() => onTabClick("raw_text")}
         >
           Raw Text
         </button>
         <button
           type="button"
-          className={`article-tab-header__tab${activeTab === 'markup' ? ' article-tab-header__tab--active' : ''}`}
-          onClick={() => onTabClick('markup')}
+          className={`article-tab-header__tab${activeTab === "markup" ? " article-tab-header__tab--active" : ""}`}
+          onClick={() => onTabClick("markup")}
         >
           Markup
         </button>
       </div>
-      {(activeTab === 'article' || activeTab === 'raw_text') && (
+      {(activeTab === "article" || activeTab === "raw_text") && (
         <>
           <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
             <input
@@ -77,7 +80,9 @@ function ArticleTabHeader({
           </label>
         </>
       )}
-      {(activeTab === 'article' || activeTab === 'raw_text' || activeTab === 'markup') && (
+      {(activeTab === "article" ||
+        activeTab === "raw_text" ||
+        activeTab === "markup") && (
         <>
           <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
             <input
@@ -109,14 +114,17 @@ function ArticleTabHeader({
           Show topics meta
         </label>
       )}
-      
+
       <div className="article-tab-header__progress">
         <ReadProgress percentage={readPercentage} size={45} label="" />
       </div>
 
       {sourceUrl && (
         <div className="reading-source-note article-tab-header__source">
-          Source: <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{sourceUrl}</a>
+          Source:{" "}
+          <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
+            {sourceUrl}
+          </a>
         </div>
       )}
     </div>

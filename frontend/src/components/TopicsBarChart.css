@@ -196,7 +196,9 @@
   background-color: var(--topics-bar-color);
   border: 1.5px solid #777;
   border-radius: 2px;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .topics-bar-chart__bar--hovered {
@@ -381,4 +383,10 @@
 .topics-bar-chart__modal-sentence-text {
   color: #2c2c2c;
   line-height: 1.45;
+}
+
+.gantt-chart__canvas {
+  overflow-x: auto;
+  overflow-y: auto;
+  height: 100%;
 }

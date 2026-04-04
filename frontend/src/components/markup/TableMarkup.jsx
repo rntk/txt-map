@@ -1,5 +1,5 @@
-import React from 'react';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import HighlightedText from "../shared/HighlightedText";
 
 export default function TableMarkup({ segment }) {
   const { headers = [], rows = [] } = segment.data || {};

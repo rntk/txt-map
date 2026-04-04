@@ -1,7 +1,7 @@
-import { sanitizeHTML } from './sanitize';
+import { sanitizeHTML } from "./sanitize";
 
 export function isInAnyRange(start, end, ranges) {
-  return ranges.some(r => start < r.end && end > r.start);
+  return ranges.some((r) => start < r.end && end > r.start);
 }
 
 /**
@@ -13,11 +13,21 @@ export function isInAnyRange(start, end, ranges) {
  * @param {Array<{start: number, end: number}>} allTopicRanges
  * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
  */
-export function wrapWord(htmlWord, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges, coloredRanges = []) {
+export function wrapWord(
+  htmlWord,
+  wordStart,
+  articleIndex,
+  highlightRanges,
+  fadeRanges,
+  allTopicRanges,
+  coloredRanges = [],
+) {
   const wordEnd = wordStart + htmlWord.length;
 
   if (coloredRanges.length > 0) {
-    const matchingColored = coloredRanges.find(r => wordStart < r.end && wordEnd > r.start);
+    const matchingColored = coloredRanges.find(
+      (r) => wordStart < r.end && wordEnd > r.start,
+    );
     if (matchingColored) {
       return `<span class="word-token ${matchingColored.cssClass}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
     }
@@ -28,14 +38,14 @@ export function wrapWord(htmlWord, wordStart, articleIndex, highlightRanges, fad
     return htmlWord;
   }
 
-  const classes = ['word-token'];
+  const classes = ["word-token"];
   if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
-    classes.push('highlighted');
+    classes.push("highlighted");
   } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
-    classes.push('faded');
+    classes.push("faded");
   }
 
-  return `<span class="${classes.join(' ')}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
+  return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
 }
 
 /**
@@ -46,13 +56,20 @@ export function wrapWord(htmlWord, wordStart, articleIndex, highlightRanges, fad
  * @param {Array<{start: number, end: number}>} fadeRanges
  * @param {Array<{start: number, end: number, color: string}>} [coloredRanges]
  */
-export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, highlightRanges, fadeRanges, coloredRanges = []) {
-  if (!rawHtml) return '';
+export function buildHighlightedRawHtml(
+  rawHtml,
+  articleTopics,
+  articleIndex,
+  highlightRanges,
+  fadeRanges,
+  coloredRanges = [],
+) {
+  if (!rawHtml) return "";
 
   const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
   const allTopicRanges = [];
-  safeTopics.forEach(topic => {
-    (Array.isArray(topic.ranges) ? topic.ranges : []).forEach(range => {
+  safeTopics.forEach((topic) => {
+    (Array.isArray(topic.ranges) ? topic.ranges : []).forEach((range) => {
       const s = Number(range.start);
       const e = Number(range.end);
       if (Number.isFinite(s) && Number.isFinite(e)) {
@@ -65,11 +82,11 @@ export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, hi
     return sanitizeHTML(rawHtml);
   }
 
-  let result = '';
+  let result = "";
   let inTag = false;
   let inQuote = false;
-  let quoteChar = '';
-  let wordBuffer = '';
+  let quoteChar = "";
+  let wordBuffer = "";
   let wordStart = -1;
 
   for (let i = 0; i < rawHtml.length; i++) {
@@ -81,14 +98,22 @@ export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, hi
       } else if (ch === '"' || ch === "'") {
         inQuote = true;
         quoteChar = ch;
-      } else if (ch === '>') {
+      } else if (ch === ">") {
         inTag = false;
       }
       result += ch;
-    } else if (ch === '<') {
+    } else if (ch === "<") {
       if (wordBuffer) {
-        result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges, coloredRanges);
-        wordBuffer = '';
+        result += wrapWord(
+          wordBuffer,
+          wordStart,
+          articleIndex,
+          highlightRanges,
+          fadeRanges,
+          allTopicRanges,
+          coloredRanges,
+        );
+        wordBuffer = "";
         wordStart = -1;
       }
       inTag = true;
@@ -96,8 +121,16 @@ export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, hi
     } else {
       if (/\s/.test(ch)) {
         if (wordBuffer) {
-          result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges, coloredRanges);
-          wordBuffer = '';
+          result += wrapWord(
+            wordBuffer,
+            wordStart,
+            articleIndex,
+            highlightRanges,
+            fadeRanges,
+            allTopicRanges,
+            coloredRanges,
+          );
+          wordBuffer = "";
           wordStart = -1;
         }
         result += ch;
@@ -109,7 +142,15 @@ export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, hi
   }
 
   if (wordBuffer) {
-    result += wrapWord(wordBuffer, wordStart, articleIndex, highlightRanges, fadeRanges, allTopicRanges, coloredRanges);
+    result += wrapWord(
+      wordBuffer,
+      wordStart,
+      articleIndex,
+      highlightRanges,
+      fadeRanges,
+      allTopicRanges,
+      coloredRanges,
+    );
   }
 
   return sanitizeHTML(result);

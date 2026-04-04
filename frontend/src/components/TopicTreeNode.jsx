@@ -1,6 +1,6 @@
-import React from 'react';
-import { getTopicHighlightColor } from '../utils/topicColorUtils';
-import './TopicNavigation.css';
+import React from "react";
+import { getTopicHighlightColor } from "../utils/topicColorUtils";
+import "./TopicNavigation.css";
 
 /**
  * @typedef {Object} TopicTreeNodeModel
@@ -69,13 +69,17 @@ function TopicTreeNode({
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
-  const isExpanded = searchQuery.trim() ? true : expandedNodes.has(node.fullPath);
+  const isExpanded = searchQuery.trim()
+    ? true
+    : expandedNodes.has(node.fullPath);
   const { totalTopics, totalSentences } = getSubtreeStats(treeNode);
   const isNodeSelected = isSubtreeSelected(treeNode);
   const isNodeRead = isSubtreeRead(treeNode);
 
   const topic = node.topic;
-  const isLeafSelected = Boolean(topic && safeSelectedTopics.some((t) => t.name === topic.name));
+  const isLeafSelected = Boolean(
+    topic && safeSelectedTopics.some((t) => t.name === topic.name),
+  );
   const isLeafRead = Boolean(topic && safeReadTopics.has(topic.name));
 
   const childProps = {
@@ -103,19 +107,26 @@ function TopicTreeNode({
   };
 
   const titleClassName = [
-    'topic-tree-node__title',
-    node.isLeaf ? 'topic-tree-node__title--leaf' : 'topic-tree-node__title--branch',
-    depth === 0 ? 'topic-tree-node__title--root' : 'topic-tree-node__title--nested',
-    isNodeRead || isLeafRead ? 'topic-tree-node__title--read' : '',
-    highlightAllTopics && topic ? 'topic-tree-node__title--highlighted' : '',
-  ].filter(Boolean).join(' ');
+    "topic-tree-node__title",
+    node.isLeaf
+      ? "topic-tree-node__title--leaf"
+      : "topic-tree-node__title--branch",
+    depth === 0
+      ? "topic-tree-node__title--root"
+      : "topic-tree-node__title--nested",
+    isNodeRead || isLeafRead ? "topic-tree-node__title--read" : "",
+    highlightAllTopics && topic ? "topic-tree-node__title--highlighted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const titleStyle = highlightAllTopics && topic
-    ? { '--topic-highlight-color': getTopicHighlightColor(topic.name) }
-    : undefined;
+  const titleStyle =
+    highlightAllTopics && topic
+      ? { "--topic-highlight-color": getTopicHighlightColor(topic.name) }
+      : undefined;
   const isActionMenuOpen = activeActionMenuPath === node.fullPath;
   const areActionsVisible = isActionMenuOpen;
-  const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   const handleAction = (callback) => {
     callback();
@@ -125,7 +136,7 @@ function TopicTreeNode({
   return (
     <li className="topic-tree-node">
       <div
-        className={`topic-tree-node__row${depth === 0 ? ' topic-tree-node__row--root' : ''}${isActionMenuOpen ? ' topic-tree-node__row--actions-open' : ''}`}
+        className={`topic-tree-node__row${depth === 0 ? " topic-tree-node__row--root" : ""}${isActionMenuOpen ? " topic-tree-node__row--actions-open" : ""}`}
       >
         <div className="topic-tree-node__guide" />
 
@@ -134,9 +145,11 @@ function TopicTreeNode({
             type="button"
             className="topic-tree-node__expand"
             onClick={() => toggleNode(node.fullPath)}
-            aria-label={isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+            aria-label={
+              isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`
+            }
           >
-            {isExpanded ? '▼' : '▶'}
+            {isExpanded ? "▼" : "▶"}
           </button>
         ) : (
           <div className="topic-tree-node__expand-spacer" />
@@ -174,7 +187,7 @@ function TopicTreeNode({
                     className={titleClassName}
                     style={titleStyle}
                     onClick={() => {
-                      onNavigateTopic?.(topic, 'focus');
+                      onNavigateTopic?.(topic, "focus");
                     }}
                   >
                     {node.name}
@@ -191,7 +204,7 @@ function TopicTreeNode({
 
             <button
               type="button"
-              className={`topic-tree-node__menu-trigger${isActionMenuOpen ? ' topic-tree-node__menu-trigger--active' : ''}`}
+              className={`topic-tree-node__menu-trigger${isActionMenuOpen ? " topic-tree-node__menu-trigger--active" : ""}`}
               aria-label={`Show actions for ${node.name}`}
               aria-controls={actionsId}
               aria-expanded={isActionMenuOpen}
@@ -203,20 +216,24 @@ function TopicTreeNode({
 
           <div
             id={actionsId}
-            className={`topic-tree-node__actions${areActionsVisible ? ' topic-tree-node__actions--visible' : ''}`}
+            className={`topic-tree-node__actions${areActionsVisible ? " topic-tree-node__actions--visible" : ""}`}
           >
             {node.isLeaf && topic ? (
               <>
                 <button
                   type="button"
-                  className={`topic-nav-button${isLeafRead ? ' topic-nav-button--active' : ''}`}
+                  className={`topic-nav-button${isLeafRead ? " topic-nav-button--active" : ""}`}
                   tabIndex={areActionsVisible ? 0 : -1}
                   onClick={() => {
                     handleAction(() => {
                       const ranges = topic.ranges;
-                      if (Array.isArray(ranges) && ranges.length > 1 && !isLeafRead) {
+                      if (
+                        Array.isArray(ranges) &&
+                        ranges.length > 1 &&
+                        !isLeafRead
+                      ) {
                         const ok = window.confirm(
-                          `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`
+                          `"${topic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`,
                         );
                         if (!ok) return;
                       }
@@ -224,13 +241,15 @@ function TopicTreeNode({
                     });
                   }}
                 >
-                  {isLeafRead ? 'Mark Unread' : 'Mark Read'}
+                  {isLeafRead ? "Mark Unread" : "Mark Read"}
                 </button>
                 <button
                   type="button"
                   className="topic-nav-button"
                   tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() => handleAction(() => onShowTopicSentences(topic))}
+                  onClick={() =>
+                    handleAction(() => onShowTopicSentences(topic))
+                  }
                 >
                   Show
                 </button>
@@ -238,7 +257,9 @@ function TopicTreeNode({
                   type="button"
                   className="topic-nav-button"
                   tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() => handleAction(() => onNavigateTopic?.(topic, 'prev'))}
+                  onClick={() =>
+                    handleAction(() => onNavigateTopic?.(topic, "prev"))
+                  }
                   title="Scroll to previous sentence for this topic"
                 >
                   Prev
@@ -247,7 +268,9 @@ function TopicTreeNode({
                   type="button"
                   className="topic-nav-button"
                   tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() => handleAction(() => onNavigateTopic?.(topic, 'next'))}
+                  onClick={() =>
+                    handleAction(() => onNavigateTopic?.(topic, "next"))
+                  }
                   title="Scroll to next sentence for this topic"
                 >
                   Next
@@ -257,23 +280,29 @@ function TopicTreeNode({
                     type="button"
                     className="topic-nav-button"
                     tabIndex={areActionsVisible ? 0 : -1}
-                    onClick={() => handleAction(() => onOpenVisualization(topic))}
+                    onClick={() =>
+                      handleAction(() => onOpenVisualization(topic))
+                    }
                     title="Open Topics chart"
                   >
                     Chart
                   </button>
                 )}
-                {onCompareTopicRanges && Array.isArray(topic.ranges) && topic.ranges.length > 1 && (
-                  <button
-                    type="button"
-                    className="topic-nav-button"
-                    tabIndex={areActionsVisible ? 0 : -1}
-                    onClick={() => handleAction(() => onCompareTopicRanges(topic))}
-                    title="Compare sentence ranges side by side"
-                  >
-                    Compare
-                  </button>
-                )}
+                {onCompareTopicRanges &&
+                  Array.isArray(topic.ranges) &&
+                  topic.ranges.length > 1 && (
+                    <button
+                      type="button"
+                      className="topic-nav-button"
+                      tabIndex={areActionsVisible ? 0 : -1}
+                      onClick={() =>
+                        handleAction(() => onCompareTopicRanges(topic))
+                      }
+                      title="Compare sentence ranges side by side"
+                    >
+                      Compare
+                    </button>
+                  )}
                 {onAnalyzeTopic && (
                   <button
                     type="button"
@@ -290,11 +319,13 @@ function TopicTreeNode({
               <>
                 <button
                   type="button"
-                  className={`topic-nav-button${isNodeRead ? ' topic-nav-button--active' : ''}`}
+                  className={`topic-nav-button${isNodeRead ? " topic-nav-button--active" : ""}`}
                   tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() => handleAction(() => toggleReadInSubtree(treeNode))}
+                  onClick={() =>
+                    handleAction(() => toggleReadInSubtree(treeNode))
+                  }
                 >
-                  {isNodeRead ? 'Mark Unread' : 'Mark Read'}
+                  {isNodeRead ? "Mark Unread" : "Mark Read"}
                 </button>
                 <button
                   type="button"
@@ -323,9 +354,7 @@ function TopicTreeNode({
           </div>
 
           {node.isLeaf && topic && topic.summary && (
-            <div className="topic-tree-node__summary">
-              {topic.summary}
-            </div>
+            <div className="topic-tree-node__summary">{topic.summary}</div>
           )}
         </div>
       </div>
@@ -335,7 +364,12 @@ function TopicTreeNode({
           {Array.from(children.values())
             .sort((a, b) => a.node.name.localeCompare(b.node.name))
             .map((childNode) => (
-              <TopicTreeNode key={childNode.node.fullPath} treeNode={childNode} depth={depth + 1} {...childProps} />
+              <TopicTreeNode
+                key={childNode.node.fullPath}
+                treeNode={childNode}
+                depth={depth + 1}
+                {...childProps}
+              />
             ))}
         </ul>
       )}

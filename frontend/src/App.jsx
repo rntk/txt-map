@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import CachePage from './components/CachePage';
-import DiffPage from './components/DiffPage';
-import GlobalTopicsPage from './components/GlobalTopicsPage';
-import MainPage from './components/MainPage';
-import TaskControlPage from './components/TaskControlPage';
-import LlmTaskControlPage from './components/LlmTaskControlPage';
-import TextListPage from './components/TextListPage';
-import TextPage from './components/TextPage';
-import WordPage from './components/WordPage';
-import TopicAnalysisPage from './components/TopicAnalysisPage';
+import React, { useEffect, useState } from "react";
+import CachePage from "./components/CachePage";
+import DiffPage from "./components/DiffPage";
+import GlobalTopicsPage from "./components/GlobalTopicsPage";
+import MainPage from "./components/MainPage";
+import TaskControlPage from "./components/TaskControlPage";
+import LlmTaskControlPage from "./components/LlmTaskControlPage";
+import TextListPage from "./components/TextListPage";
+import TextPage from "./components/TextPage";
+import WordPage from "./components/WordPage";
+import TopicAnalysisPage from "./components/TopicAnalysisPage";
 
 /**
  * @typedef {Object} NavigationItem
@@ -61,13 +61,48 @@ import TopicAnalysisPage from './components/TopicAnalysisPage';
 
 /** @type {readonly NavigationItem[]} */
 const navigationItems = [
-  { title: 'Home', link: '/page/menu', badge: 'HM', description: 'Dashboard and uploads' },
-  { title: 'Texts List', link: '/page/texts', badge: 'TX', description: 'Stored submissions' },
-  { title: 'Task Control', link: '/page/tasks', badge: 'TK', description: 'Queue management' },
-  { title: 'LLM Tasks', link: '/page/llm-tasks', badge: 'LT', description: 'LLM queue management' },
-  { title: 'Diff', link: '/page/diff', badge: 'DF', description: 'Semantic comparison' },
-  { title: 'LLM Cache', link: '/page/cache', badge: 'LC', description: 'Cached generations' },
-  { title: 'Global Topics', link: '/page/topics', badge: 'GT', description: 'Cross-source topics' },
+  {
+    title: "Home",
+    link: "/page/menu",
+    badge: "HM",
+    description: "Dashboard and uploads",
+  },
+  {
+    title: "Texts List",
+    link: "/page/texts",
+    badge: "TX",
+    description: "Stored submissions",
+  },
+  {
+    title: "Task Control",
+    link: "/page/tasks",
+    badge: "TK",
+    description: "Queue management",
+  },
+  {
+    title: "LLM Tasks",
+    link: "/page/llm-tasks",
+    badge: "LT",
+    description: "LLM queue management",
+  },
+  {
+    title: "Diff",
+    link: "/page/diff",
+    badge: "DF",
+    description: "Semantic comparison",
+  },
+  {
+    title: "LLM Cache",
+    link: "/page/cache",
+    badge: "LC",
+    description: "Cached generations",
+  },
+  {
+    title: "Global Topics",
+    link: "/page/topics",
+    badge: "GT",
+    description: "Cross-source topics",
+  },
 ];
 
 const PAGE_COMPONENTS = {
@@ -75,12 +110,12 @@ const PAGE_COMPONENTS = {
   diff: DiffPage,
   menu: MainPage,
   tasks: TaskControlPage,
-  'llm-tasks': LlmTaskControlPage,
+  "llm-tasks": LlmTaskControlPage,
   text: TextPage,
   texts: TextListPage,
   topics: GlobalTopicsPage,
   word: WordPage,
-  'topic-analysis': TopicAnalysisPage,
+  "topic-analysis": TopicAnalysisPage,
 };
 
 /**
@@ -88,11 +123,11 @@ const PAGE_COMPONENTS = {
  * @returns {string}
  */
 function getSaveHintText(saveState) {
-  if (saveState === 'error') {
-    return 'Save failed';
+  if (saveState === "error") {
+    return "Save failed";
   }
 
-  return '';
+  return "";
 }
 
 /**
@@ -100,13 +135,14 @@ function getSaveHintText(saveState) {
  * @returns {React.JSX.Element}
  */
 function ShellNavLink({ item, currentPath }) {
-  const isActive = currentPath === item.link || currentPath.startsWith(`${item.link}/`);
+  const isActive =
+    currentPath === item.link || currentPath.startsWith(`${item.link}/`);
 
   return (
     <a
       href={item.link}
-      className={`app-shell__nav-link${isActive ? ' active' : ''}`}
-      aria-current={isActive ? 'page' : undefined}
+      className={`app-shell__nav-link${isActive ? " active" : ""}`}
+      aria-current={isActive ? "page" : undefined}
     >
       <span className="app-shell__nav-title">{item.title}</span>
     </a>
@@ -128,9 +164,10 @@ function LlmSelector({
   onApply,
 }) {
   const providerOptions = settings?.llm_available_providers || [];
-  const selectedProvider = providerOptions.find((provider) => provider.name === draftProvider) || null;
+  const selectedProvider =
+    providerOptions.find((provider) => provider.name === draftProvider) || null;
   const modelOptions = selectedProvider?.models || [];
-  const saveHintText = settings ? getSaveHintText(saveState) : '';
+  const saveHintText = settings ? getSaveHintText(saveState) : "";
 
   if (!settings || providerOptions.length === 0) {
     return null;
@@ -166,11 +203,18 @@ function LlmSelector({
         type="button"
         className="llm-provider-badge__button"
         onClick={onApply}
-        disabled={!hasPendingChanges || saveState === 'saving' || !draftProvider || !draftModel}
+        disabled={
+          !hasPendingChanges ||
+          saveState === "saving" ||
+          !draftProvider ||
+          !draftModel
+        }
       >
-        {saveState === 'saving' ? 'Saving...' : 'Apply'}
+        {saveState === "saving" ? "Saving..." : "Apply"}
       </button>
-      {saveHintText ? <span className="llm-provider-badge__hint">{saveHintText}</span> : null}
+      {saveHintText ? (
+        <span className="llm-provider-badge__hint">{saveHintText}</span>
+      ) : null}
     </div>
   );
 }
@@ -181,21 +225,30 @@ function LlmSelector({
  */
 function AppShell({ pageKey, currentPath, content, actions }) {
   return (
-    <div className={`app-shell${pageKey === 'menu' ? ' app-shell--home' : ''}`}>
+    <div className={`app-shell${pageKey === "menu" ? " app-shell--home" : ""}`}>
       <div className="app-shell__main">
         <div className="app-shell__topbar">
           <nav className="app-shell__topnav" aria-label="Global navigation">
             {navigationItems.map((item) => (
-              <ShellNavLink key={item.link} item={item} currentPath={currentPath} />
+              <ShellNavLink
+                key={item.link}
+                item={item}
+                currentPath={currentPath}
+              />
             ))}
           </nav>
           <div className="app-shell__topbar-actions">
-            <div id="global-menu-portal-target" className="app-shell__portal-target" />
+            <div
+              id="global-menu-portal-target"
+              className="app-shell__portal-target"
+            />
             {actions}
           </div>
         </div>
         <main className="global-page-content">
-          <div className={`page-surface${pageKey === 'menu' ? ' page-surface--home' : ''}`}>
+          <div
+            className={`page-surface${pageKey === "menu" ? " page-surface--home" : ""}`}
+          >
             {content}
           </div>
         </main>
@@ -207,24 +260,25 @@ function AppShell({ pageKey, currentPath, content, actions }) {
 function App() {
   const currentPath = window.location.pathname;
   const [settings, setSettings] = useState(null);
-  const [draftProvider, setDraftProvider] = useState('');
-  const [draftModel, setDraftModel] = useState('');
-  const [saveState, setSaveState] = useState('idle');
+  const [draftProvider, setDraftProvider] = useState("");
+  const [draftModel, setDraftModel] = useState("");
+  const [saveState, setSaveState] = useState("idle");
 
   useEffect(() => {
-    fetch('/api/settings')
+    fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
         setSettings(data);
-        setDraftProvider(data.llm_provider || '');
-        setDraftModel(data.llm_model || '');
+        setDraftProvider(data.llm_provider || "");
+        setDraftModel(data.llm_model || "");
       })
       .catch(() => {});
   }, []);
 
   const hasPendingChanges = Boolean(
     settings &&
-    (draftProvider !== settings.llm_provider || draftModel !== settings.llm_model)
+    (draftProvider !== settings.llm_provider ||
+      draftModel !== settings.llm_model),
   );
 
   /**
@@ -233,10 +287,12 @@ function App() {
    */
   const handleProviderChange = (event) => {
     const nextProviderName = event.target.value;
-    const provider = settings?.llm_available_providers?.find((item) => item.name === nextProviderName);
+    const provider = settings?.llm_available_providers?.find(
+      (item) => item.name === nextProviderName,
+    );
     setDraftProvider(nextProviderName);
-    setDraftModel(provider?.default_model || '');
-    setSaveState('idle');
+    setDraftModel(provider?.default_model || "");
+    setSaveState("idle");
   };
 
   /**
@@ -245,7 +301,7 @@ function App() {
    */
   const handleModelChange = (event) => {
     setDraftModel(event.target.value);
-    setSaveState('idle');
+    setSaveState("idle");
   };
 
   /**
@@ -256,30 +312,32 @@ function App() {
       return;
     }
 
-    setSaveState('saving');
+    setSaveState("saving");
     try {
-      const response = await fetch('/api/settings/llm', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/settings/llm", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider: draftProvider, model: draftModel }),
       });
       if (!response.ok) {
-        throw new Error('Failed to update LLM settings');
+        throw new Error("Failed to update LLM settings");
       }
       const data = await response.json();
       setSettings(data);
-      setDraftProvider(data.llm_provider || '');
-      setDraftModel(data.llm_model || '');
-      setSaveState('saved');
+      setDraftProvider(data.llm_provider || "");
+      setDraftModel(data.llm_model || "");
+      setSaveState("saved");
     } catch {
-      setSaveState('error');
+      setSaveState("error");
     }
   };
 
-  const requestedPageKey = currentPath.split('/')[2] || 'menu';
-  const pageKey = PAGE_COMPONENTS[requestedPageKey] ? requestedPageKey : 'notFound';
+  const requestedPageKey = currentPath.split("/")[2] || "menu";
+  const pageKey = PAGE_COMPONENTS[requestedPageKey]
+    ? requestedPageKey
+    : "notFound";
 
-  if (pageKey === 'notFound') {
+  if (pageKey === "notFound") {
     return (
       <AppShell
         currentPath={currentPath}

@@ -1,9 +1,15 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { buildTopicTree, getSubtreeStats as getSubtreeStatsUtil } from '../utils/topicTree';
-import TopicTreeNode from './TopicTreeNode';
-import { getTopicSelectionKey } from '../utils/chartConstants';
-import { getTopicCSSClass, getTopicHighlightColor } from '../utils/topicColorUtils';
-import './TopicNavigation.css';
+import React, { useState, useMemo, useCallback } from "react";
+import {
+  buildTopicTree,
+  getSubtreeStats as getSubtreeStatsUtil,
+} from "../utils/topicTree";
+import TopicTreeNode from "./TopicTreeNode";
+import { getTopicSelectionKey } from "../utils/chartConstants";
+import {
+  getTopicCSSClass,
+  getTopicHighlightColor,
+} from "../utils/topicColorUtils";
+import "./TopicNavigation.css";
 
 /**
  * @typedef {Object} TopicListTopic
@@ -63,7 +69,7 @@ function TopicList({
   topics = [],
   selectedTopics = [],
   insights = [],
-  sidebarTab = 'topics',
+  sidebarTab = "topics",
   onToggleTopic = () => {},
   onHoverTopic: _onHoverTopic = () => {},
   readTopics = new Set(),
@@ -83,31 +89,34 @@ function TopicList({
   onAnalyzeTopic,
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [insightSearchQuery, setInsightSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [insightSearchQuery, setInsightSearchQuery] = useState("");
   const [activeActionMenuPath, setActiveActionMenuPath] = useState(null);
 
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
-    [selectedTopics]
+    [selectedTopics],
   );
   const safeReadTopics = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
-    [readTopics]
+    [readTopics],
   );
   const safeInsights = useMemo(
     () => (Array.isArray(insights) ? insights : []),
-    [insights]
+    [insights],
   );
   const hasInsights = safeInsights.length > 0;
-  const currentSidebarTab = hasInsights ? sidebarTab : 'topics';
+  const currentSidebarTab = hasInsights ? sidebarTab : "topics";
 
   const topicTree = useMemo(() => buildTopicTree(topics), [topics]);
-  const getSubtreeStats = useCallback((treeNode) => getSubtreeStatsUtil(treeNode), []);
+  const getSubtreeStats = useCallback(
+    (treeNode) => getSubtreeStatsUtil(treeNode),
+    [],
+  );
 
   const selectedNamesSet = useMemo(
     () => new Set(safeSelectedTopics.map((topic) => topic.name)),
-    [safeSelectedTopics]
+    [safeSelectedTopics],
   );
 
   const subtreeStateMap = useMemo(() => {
@@ -144,8 +153,9 @@ function TopicList({
   }, [topicTree, selectedNamesSet, safeReadTopics]);
 
   const isSubtreeSelected = useCallback(
-    (treeNode) => subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false,
-    [subtreeStateMap]
+    (treeNode) =>
+      subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false,
+    [subtreeStateMap],
   );
 
   const isSubtreeRead = useCallback(
@@ -153,98 +163,106 @@ function TopicList({
       const entry = subtreeStateMap.get(treeNode.node.fullPath);
       return entry ? entry.hasLeaves && entry.allRead : false;
     },
-    [subtreeStateMap]
+    [subtreeStateMap],
   );
 
-  const toggleAllInSubtree = useCallback((treeNode) => {
-    const allSelected = isSubtreeSelected(treeNode);
-    const shouldNavigateToFirstLeaf = !allSelected;
+  const toggleAllInSubtree = useCallback(
+    (treeNode) => {
+      const allSelected = isSubtreeSelected(treeNode);
+      const shouldNavigateToFirstLeaf = !allSelected;
 
-    const traverse = (node) => {
-      if (node.node.isLeaf && node.node.topic) {
-        const isSelected = safeSelectedTopics.some((topic) => topic.name === node.node.topic.name);
-        if (allSelected && isSelected) {
-          onToggleTopic(node.node.topic);
-        } else if (!allSelected && !isSelected) {
-          onToggleTopic(node.node.topic);
-        }
-      }
-      node.children.forEach((child) => traverse(child));
-    };
-
-    traverse(treeNode);
-
-    const findFirstLeaf = (node) => {
-      if (node.node.isLeaf && node.node.topic) {
-        return node.node.topic;
-      }
-      for (const child of node.children.values()) {
-        const found = findFirstLeaf(child);
-        if (found) return found;
-      }
-      return null;
-    };
-
-    const firstLeaf = findFirstLeaf(treeNode);
-    if (shouldNavigateToFirstLeaf && onNavigateTopic && firstLeaf) {
-      onNavigateTopic(firstLeaf, 'focus');
-    }
-  }, [safeSelectedTopics, onToggleTopic, onNavigateTopic, isSubtreeSelected]);
-
-  const toggleReadInSubtree = useCallback((treeNode) => {
-    const allRead = isSubtreeRead(treeNode);
-
-    const hasSplitRanges = (() => {
-      let found = false;
-      const check = (node) => {
+      const traverse = (node) => {
         if (node.node.isLeaf && node.node.topic) {
-          const ranges = node.node.topic.ranges;
-          if (Array.isArray(ranges) && ranges.length > 1) found = true;
+          const isSelected = safeSelectedTopics.some(
+            (topic) => topic.name === node.node.topic.name,
+          );
+          if (allSelected && isSelected) {
+            onToggleTopic(node.node.topic);
+          } else if (!allSelected && !isSelected) {
+            onToggleTopic(node.node.topic);
+          }
         }
-        if (!found) node.children.forEach((child) => check(child));
+        node.children.forEach((child) => traverse(child));
       };
-      check(treeNode);
-      return found;
-    })();
 
-    if (hasSplitRanges) {
-      const action = allRead ? 'unread' : 'read';
-      const ok = window.confirm(
-        `Some topics in this group have multiple separate ranges. Mark all as ${action}?`
-      );
-      if (!ok) return;
-    }
+      traverse(treeNode);
 
-    const traverse = (node) => {
-      if (node.node.isLeaf && node.node.topic) {
-        const isRead = safeReadTopics.has(node.node.topic.name);
-        if (allRead && isRead) {
-          onToggleRead(node.node.topic);
-        } else if (!allRead && !isRead) {
-          onToggleRead(node.node.topic);
+      const findFirstLeaf = (node) => {
+        if (node.node.isLeaf && node.node.topic) {
+          return node.node.topic;
         }
-      }
-      node.children.forEach((child) => traverse(child));
-    };
+        for (const child of node.children.values()) {
+          const found = findFirstLeaf(child);
+          if (found) return found;
+        }
+        return null;
+      };
 
-    traverse(treeNode);
-
-    const findFirstLeaf = (node) => {
-      if (node.node.isLeaf && node.node.topic) {
-        return node.node.topic;
+      const firstLeaf = findFirstLeaf(treeNode);
+      if (shouldNavigateToFirstLeaf && onNavigateTopic && firstLeaf) {
+        onNavigateTopic(firstLeaf, "focus");
       }
-      for (const child of node.children.values()) {
-        const found = findFirstLeaf(child);
-        if (found) return found;
-      }
-      return null;
-    };
+    },
+    [safeSelectedTopics, onToggleTopic, onNavigateTopic, isSubtreeSelected],
+  );
 
-    const firstLeaf = findFirstLeaf(treeNode);
-    if (onNavigateTopic && firstLeaf) {
-      onNavigateTopic(firstLeaf, 'focus');
-    }
-  }, [safeReadTopics, onToggleRead, onNavigateTopic, isSubtreeRead]);
+  const toggleReadInSubtree = useCallback(
+    (treeNode) => {
+      const allRead = isSubtreeRead(treeNode);
+
+      const hasSplitRanges = (() => {
+        let found = false;
+        const check = (node) => {
+          if (node.node.isLeaf && node.node.topic) {
+            const ranges = node.node.topic.ranges;
+            if (Array.isArray(ranges) && ranges.length > 1) found = true;
+          }
+          if (!found) node.children.forEach((child) => check(child));
+        };
+        check(treeNode);
+        return found;
+      })();
+
+      if (hasSplitRanges) {
+        const action = allRead ? "unread" : "read";
+        const ok = window.confirm(
+          `Some topics in this group have multiple separate ranges. Mark all as ${action}?`,
+        );
+        if (!ok) return;
+      }
+
+      const traverse = (node) => {
+        if (node.node.isLeaf && node.node.topic) {
+          const isRead = safeReadTopics.has(node.node.topic.name);
+          if (allRead && isRead) {
+            onToggleRead(node.node.topic);
+          } else if (!allRead && !isRead) {
+            onToggleRead(node.node.topic);
+          }
+        }
+        node.children.forEach((child) => traverse(child));
+      };
+
+      traverse(treeNode);
+
+      const findFirstLeaf = (node) => {
+        if (node.node.isLeaf && node.node.topic) {
+          return node.node.topic;
+        }
+        for (const child of node.children.values()) {
+          const found = findFirstLeaf(child);
+          if (found) return found;
+        }
+        return null;
+      };
+
+      const firstLeaf = findFirstLeaf(treeNode);
+      if (onNavigateTopic && firstLeaf) {
+        onNavigateTopic(firstLeaf, "focus");
+      }
+    },
+    [safeReadTopics, onToggleRead, onNavigateTopic, isSubtreeRead],
+  );
 
   const toggleNode = (path) => {
     setExpandedNodes((prev) => {
@@ -276,7 +294,9 @@ function TopicList({
 
     const filterNode = (treeNode) => {
       if (treeNode.node.isLeaf) {
-        return treeNode.node.fullPath.toLowerCase().includes(q) ? treeNode : null;
+        return treeNode.node.fullPath.toLowerCase().includes(q)
+          ? treeNode
+          : null;
       }
       const filteredChildren = new Map();
       treeNode.children.forEach((child, key) => {
@@ -300,29 +320,39 @@ function TopicList({
       const haystacks = [
         insight.name,
         ...(Array.isArray(insight.topicNames) ? insight.topicNames : []),
-        ...(Array.isArray(insight.sourceSentences) ? insight.sourceSentences : []),
+        ...(Array.isArray(insight.sourceSentences)
+          ? insight.sourceSentences
+          : []),
       ];
-      return haystacks.some((value) => String(value || '').toLowerCase().includes(query));
+      return haystacks.some((value) =>
+        String(value || "")
+          .toLowerCase()
+          .includes(query),
+      );
     });
   }, [insightSearchQuery, safeInsights]);
   const insightTopicStyleSheet = useMemo(() => {
     if (!highlightInsightTopics) {
-      return '';
+      return "";
     }
 
     const seen = new Set();
     const lines = [];
     safeInsights.forEach((insight) => {
-      (Array.isArray(insight.topicNames) ? insight.topicNames : []).forEach((topicName) => {
-        const cssClass = getTopicCSSClass(topicName);
-        if (seen.has(cssClass)) {
-          return;
-        }
-        seen.add(cssClass);
-        lines.push(`.${cssClass} { --topic-highlight-color: ${getTopicHighlightColor(topicName)}; }`);
-      });
+      (Array.isArray(insight.topicNames) ? insight.topicNames : []).forEach(
+        (topicName) => {
+          const cssClass = getTopicCSSClass(topicName);
+          if (seen.has(cssClass)) {
+            return;
+          }
+          seen.add(cssClass);
+          lines.push(
+            `.${cssClass} { --topic-highlight-color: ${getTopicHighlightColor(topicName)}; }`,
+          );
+        },
+      );
     });
-    return lines.join('\n');
+    return lines.join("\n");
   }, [highlightInsightTopics, safeInsights]);
 
   const [allExpanded, setAllExpanded] = useState(false);
@@ -344,7 +374,9 @@ function TopicList({
       treeNode.children.forEach((child) => collect(child));
     };
     topicTree.forEach((root) => collect(root));
-    return leaves.length > 0 && leaves.every((name) => safeReadTopics.has(name));
+    return (
+      leaves.length > 0 && leaves.every((name) => safeReadTopics.has(name))
+    );
   }, [topicTree, safeReadTopics]);
 
   const toggleActionMenu = useCallback((path) => {
@@ -382,13 +414,17 @@ function TopicList({
   return (
     <>
       <div className="topic-nav-panel">
-        <div className="topic-nav-sidebar-tabs" role="tablist" aria-label="Sidebar navigation tabs">
+        <div
+          className="topic-nav-sidebar-tabs"
+          role="tablist"
+          aria-label="Sidebar navigation tabs"
+        >
           <button
             type="button"
             role="tab"
-            aria-selected={currentSidebarTab === 'topics'}
-            className={`topic-nav-sidebar-tab${currentSidebarTab === 'topics' ? ' topic-nav-sidebar-tab--active' : ''}`}
-            onClick={() => onSidebarTabChange('topics')}
+            aria-selected={currentSidebarTab === "topics"}
+            className={`topic-nav-sidebar-tab${currentSidebarTab === "topics" ? " topic-nav-sidebar-tab--active" : ""}`}
+            onClick={() => onSidebarTabChange("topics")}
           >
             Topics ({topics.length})
           </button>
@@ -396,9 +432,9 @@ function TopicList({
             <button
               type="button"
               role="tab"
-              aria-selected={currentSidebarTab === 'insights'}
-              className={`topic-nav-sidebar-tab${currentSidebarTab === 'insights' ? ' topic-nav-sidebar-tab--active' : ''}`}
-              onClick={() => onSidebarTabChange('insights')}
+              aria-selected={currentSidebarTab === "insights"}
+              className={`topic-nav-sidebar-tab${currentSidebarTab === "insights" ? " topic-nav-sidebar-tab--active" : ""}`}
+              onClick={() => onSidebarTabChange("insights")}
             >
               Insights ({safeInsights.length})
             </button>
@@ -406,26 +442,30 @@ function TopicList({
         </div>
       </div>
 
-      {currentSidebarTab === 'topics' && topicTree.length > 0 && (
+      {currentSidebarTab === "topics" && topicTree.length > 0 && (
         <div className="topic-nav-panel">
           <div className="topic-nav-toolbar">
             <div className="topic-nav-toolbar__group">
-              <button type="button" onClick={toggleExpandAll} className="topic-nav-button">
-                {allExpanded ? 'Fold All' : 'Unfold All'}
+              <button
+                type="button"
+                onClick={toggleExpandAll}
+                className="topic-nav-button"
+              >
+                {allExpanded ? "Fold All" : "Unfold All"}
               </button>
               <button
                 type="button"
                 onClick={onToggleReadAll}
-                className={`topic-nav-button${allRead ? ' topic-nav-button--active' : ''}`}
+                className={`topic-nav-button${allRead ? " topic-nav-button--active" : ""}`}
               >
-                {allRead ? 'Unread All' : 'Read All'}
+                {allRead ? "Unread All" : "Read All"}
               </button>
               <button
                 type="button"
                 onClick={onToggleHighlightAll}
-                className={`topic-nav-button${highlightAllTopics ? ' topic-nav-button--active' : ''}`}
+                className={`topic-nav-button${highlightAllTopics ? " topic-nav-button--active" : ""}`}
               >
-                {highlightAllTopics ? 'Clear Colors' : 'Color Topics'}
+                {highlightAllTopics ? "Clear Colors" : "Color Topics"}
               </button>
             </div>
             <input
@@ -439,16 +479,18 @@ function TopicList({
         </div>
       )}
 
-      {currentSidebarTab === 'insights' && hasInsights && (
+      {currentSidebarTab === "insights" && hasInsights && (
         <div className="topic-nav-panel">
           <div className="topic-nav-toolbar">
             <div className="topic-nav-toolbar__group">
               <button
                 type="button"
                 onClick={onToggleHighlightInsightTopics}
-                className={`topic-nav-button${highlightInsightTopics ? ' topic-nav-button--active' : ''}`}
+                className={`topic-nav-button${highlightInsightTopics ? " topic-nav-button--active" : ""}`}
               >
-                {highlightInsightTopics ? 'Clear Colors' : 'Color Insight Topics'}
+                {highlightInsightTopics
+                  ? "Clear Colors"
+                  : "Color Insight Topics"}
               </button>
             </div>
             <input
@@ -463,18 +505,25 @@ function TopicList({
       )}
 
       <div className="topic-nav-results">
-        {insightTopicStyleSheet ? <style>{insightTopicStyleSheet}</style> : null}
-        {currentSidebarTab === 'topics' ? (
+        {insightTopicStyleSheet ? (
+          <style>{insightTopicStyleSheet}</style>
+        ) : null}
+        {currentSidebarTab === "topics" ? (
           topicTree.length === 0 ? (
-          <div className="topic-nav-empty">No topics yet.</div>
-        ) : filteredTree.length === 0 ? (
-          <div className="topic-nav-empty">No matching topics.</div>
-        ) : (
-          <ul className="topic-nav-list">
-            {filteredTree.map((treeNode) => (
-              <TopicTreeNode key={treeNode.node.fullPath} treeNode={treeNode} depth={0} {...nodeProps} />
-            ))}
-          </ul>
+            <div className="topic-nav-empty">No topics yet.</div>
+          ) : filteredTree.length === 0 ? (
+            <div className="topic-nav-empty">No matching topics.</div>
+          ) : (
+            <ul className="topic-nav-list">
+              {filteredTree.map((treeNode) => (
+                <TopicTreeNode
+                  key={treeNode.node.fullPath}
+                  treeNode={treeNode}
+                  depth={0}
+                  {...nodeProps}
+                />
+              ))}
+            </ul>
           )
         ) : !hasInsights ? (
           <div className="topic-nav-empty">No insights yet.</div>
@@ -483,22 +532,28 @@ function TopicList({
         ) : (
           <ul className="topic-nav-list topic-nav-list--insights">
             {filteredInsights.map((insight) => {
-              const topicNames = Array.isArray(insight.topicNames) ? insight.topicNames : [];
-              const sentenceCount = Array.isArray(insight.sourceSentenceIndices) && insight.sourceSentenceIndices.length > 0
-                ? insight.sourceSentenceIndices.length
-                : Array.isArray(insight.sourceSentences)
-                  ? insight.sourceSentences.length
-                  : 0;
+              const topicNames = Array.isArray(insight.topicNames)
+                ? insight.topicNames
+                : [];
+              const sentenceCount =
+                Array.isArray(insight.sourceSentenceIndices) &&
+                insight.sourceSentenceIndices.length > 0
+                  ? insight.sourceSentenceIndices.length
+                  : Array.isArray(insight.sourceSentences)
+                    ? insight.sourceSentences.length
+                    : 0;
 
               return (
                 <li key={insight.id} className="topic-nav-insight">
                   <button
                     type="button"
-                    className={`topic-nav-insight__card${activeInsightId === insight.id ? ' topic-nav-insight__card--active' : ''}`}
+                    className={`topic-nav-insight__card${activeInsightId === insight.id ? " topic-nav-insight__card--active" : ""}`}
                     onClick={() => onSelectInsight(insight)}
                   >
                     <div className="topic-nav-insight__header">
-                      <span className="topic-nav-insight__title">{insight.name}</span>
+                      <span className="topic-nav-insight__title">
+                        {insight.name}
+                      </span>
                       <span className="topic-nav-insight__meta">
                         {sentenceCount} sent.
                       </span>
@@ -508,14 +563,16 @@ function TopicList({
                         {topicNames.map((topicName) => (
                           <span
                             key={topicName}
-                            className={`topic-nav-insight__topic${highlightInsightTopics ? ` ${getTopicCSSClass(topicName)}` : ''}`}
+                            className={`topic-nav-insight__topic${highlightInsightTopics ? ` ${getTopicCSSClass(topicName)}` : ""}`}
                           >
-                            {topicName.split('>').pop().trim()}
+                            {topicName.split(">").pop().trim()}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <div className="topic-nav-insight__empty">No linked topics</div>
+                      <div className="topic-nav-insight__empty">
+                        No linked topics
+                      </div>
                     )}
                   </button>
                 </li>

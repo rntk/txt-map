@@ -3,6 +3,7 @@ Unit tests for the subtopics_generation task handler.
 
 Tests generate_subtopics_for_topic and process_subtopics_generation functions.
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from lib.tasks.subtopics_generation import (
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -42,7 +44,7 @@ def mock_llm():
 @pytest.fixture
 def mock_submissions_storage():
     """Mock the SubmissionsStorage class."""
-    with patch('lib.tasks.subtopics_generation.SubmissionsStorage') as mock_storage:
+    with patch("lib.tasks.subtopics_generation.SubmissionsStorage") as mock_storage:
         yield mock_storage
 
 
@@ -58,14 +60,14 @@ def sample_submission():
                 "Sentence two about data structures.",
                 "Sentence three about algorithms.",
                 "Sentence four about machine learning.",
-                "Sentence five about neural networks."
+                "Sentence five about neural networks.",
             ],
             "topics": [
                 {"name": "Programming", "sentences": [1, 2, 3]},
-                {"name": "Machine Learning", "sentences": [4, 5]}
+                {"name": "Machine Learning", "sentences": [4, 5]},
             ],
-            "subtopics": []
-        }
+            "subtopics": [],
+        },
     }
 
 
@@ -82,23 +84,20 @@ def mock_cache_collection():
 # Test: generate_subtopics_for_topic - Basic Functionality
 # =============================================================================
 
+
 class TestGenerateSubtopicsForTopicBasic:
     """Test basic functionality of generate_subtopics_for_topic."""
 
     def test_returns_empty_list_for_empty_sentences(self, mock_llm):
         """Function returns [] when sentences list is empty."""
-        result = generate_subtopics_for_topic(
-            "Test Topic", [], [], mock_llm
-        )
+        result = generate_subtopics_for_topic("Test Topic", [], [], mock_llm)
         assert result == []
 
     def test_returns_empty_list_for_no_topic(self, mock_llm):
         """Function returns [] when topic_name is 'no_topic'."""
         sentences = ["Sentence one.", "Sentence two."]
         indices = [1, 2]
-        result = generate_subtopics_for_topic(
-            "no_topic", sentences, indices, mock_llm
-        )
+        result = generate_subtopics_for_topic("no_topic", sentences, indices, mock_llm)
         assert result == []
 
     def test_constructs_prompt_with_numbered_sentences(self, mock_llm):
@@ -106,9 +105,7 @@ class TestGenerateSubtopicsForTopicBasic:
         sentences = ["First sentence.", "Second sentence."]
         indices = [1, 2]
 
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm
-        )
+        generate_subtopics_for_topic("Test Topic", sentences, indices, mock_llm)
 
         # Verify LLM was called
         mock_llm.call.assert_called_once()
@@ -117,7 +114,7 @@ class TestGenerateSubtopicsForTopicBasic:
         # Check prompt contains numbered sentences
         assert "1. First sentence." in prompt
         assert "2. Second sentence." in prompt
-        assert 'Topic: Test Topic' in prompt
+        assert "Topic: Test Topic" in prompt
 
     def test_calls_llm_when_not_cached(self, mock_llm):
         """Function calls LLM when response not in cache."""
@@ -126,9 +123,7 @@ class TestGenerateSubtopicsForTopicBasic:
 
         mock_llm.call.return_value = "Subtopic: 1"
 
-        generate_subtopics_for_topic(
-            "Test Topic", sentences, indices, mock_llm
-        )
+        generate_subtopics_for_topic("Test Topic", sentences, indices, mock_llm)
 
         # Verify LLM was called
         mock_llm.call.assert_called_once()
@@ -229,6 +224,7 @@ class TestGenerateSubtopicsForTopicBasic:
 # Test: process_subtopics_generation - Basic Functionality
 # =============================================================================
 
+
 class TestProcessSubtopicsGenerationBasic:
     """Test basic functionality of process_subtopics_generation."""
 
@@ -238,12 +234,12 @@ class TestProcessSubtopicsGenerationBasic:
         """Function raises ValueError when sentences are missing."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "topics": [{"name": "Topic", "sentences": [1, 2]}]
-            }
+            "results": {"topics": [{"name": "Topic", "sentences": [1, 2]}]},
         }
 
-        with pytest.raises(ValueError, match="Split/topic generation must be completed first"):
+        with pytest.raises(
+            ValueError, match="Split/topic generation must be completed first"
+        ):
             process_subtopics_generation(submission, mock_db, mock_llm)
 
     def test_raises_value_error_when_sentences_empty(
@@ -254,11 +250,13 @@ class TestProcessSubtopicsGenerationBasic:
             "submission_id": "test-123",
             "results": {
                 "sentences": [],
-                "topics": [{"name": "Topic", "sentences": [1, 2]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1, 2]}],
+            },
         }
 
-        with pytest.raises(ValueError, match="Split/topic generation must be completed first"):
+        with pytest.raises(
+            ValueError, match="Split/topic generation must be completed first"
+        ):
             process_subtopics_generation(submission, mock_db, mock_llm)
 
     def test_creates_empty_subtopics_when_no_topics(
@@ -267,9 +265,7 @@ class TestProcessSubtopicsGenerationBasic:
         """Function creates empty subtopics result when no topics."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "sentences": ["Sentence one."]
-            }
+            "results": {"sentences": ["Sentence one."]},
         }
 
         mock_storage_instance = MagicMock()
@@ -281,7 +277,9 @@ class TestProcessSubtopicsGenerationBasic:
             "test-123", {"subtopics": []}
         )
 
-    def test_iterates_over_all_topics(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_iterates_over_all_topics(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function iterates over all topics in submission."""
         submission = {
             "submission_id": "test-123",
@@ -289,15 +287,17 @@ class TestProcessSubtopicsGenerationBasic:
                 "sentences": ["S1", "S2", "S3"],
                 "topics": [
                     {"name": "Topic A", "sentences": [1]},
-                    {"name": "Topic B", "sentences": [2, 3]}
-                ]
-            }
+                    {"name": "Topic B", "sentences": [2, 3]},
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             process_subtopics_generation(submission, mock_db, mock_llm)
@@ -313,15 +313,17 @@ class TestProcessSubtopicsGenerationBasic:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"name": "no_topic", "sentences": [1]},
-                    {"name": "Valid Topic", "sentences": [2]}
-                ]
-            }
+                    {"name": "Valid Topic", "sentences": [2]},
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             process_subtopics_generation(submission, mock_db, mock_llm)
@@ -329,22 +331,24 @@ class TestProcessSubtopicsGenerationBasic:
             # Should only be called for valid topic
             assert mock_gen.call_count == 1
 
-    def test_fetches_topic_sentences_correctly(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_fetches_topic_sentences_correctly(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function fetches correct sentences for each topic."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["First sentence.", "Second sentence.", "Third sentence."],
-                "topics": [
-                    {"name": "Topic A", "sentences": [1, 3]}
-                ]
-            }
+                "topics": [{"name": "Topic A", "sentences": [1, 3]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             process_subtopics_generation(submission, mock_db, mock_llm)
@@ -353,8 +357,9 @@ class TestProcessSubtopicsGenerationBasic:
             call_args = mock_gen.call_args
             topic_sentences = call_args[0][1]
             # Assert exact expected sentences list (sentences at indices 1 and 3 are 0-indexed as 0 and 2)
-            assert topic_sentences == ["First sentence.", "Third sentence."], \
+            assert topic_sentences == ["First sentence.", "Third sentence."], (
                 f"Expected ['First sentence.', 'Third sentence.'] but got {topic_sentences}"
+            )
 
     def test_collects_all_subtopics(self, mock_db, mock_llm, mock_submissions_storage):
         """Function collects all subtopics from all topics."""
@@ -364,18 +369,23 @@ class TestProcessSubtopicsGenerationBasic:
                 "sentences": ["S1", "S2", "S3", "S4"],
                 "topics": [
                     {"name": "Topic A", "sentences": [1, 2]},
-                    {"name": "Topic B", "sentences": [3, 4]}
-                ]
-            }
+                    {"name": "Topic B", "sentences": [3, 4]},
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.side_effect = [
                 [{"name": "Sub A1", "sentences": [1]}],
-                [{"name": "Sub B1", "sentences": [3]}, {"name": "Sub B2", "sentences": [4]}]
+                [
+                    {"name": "Sub B1", "sentences": [3]},
+                    {"name": "Sub B2", "sentences": [4]},
+                ],
             ]
 
             process_subtopics_generation(submission, mock_db, mock_llm)
@@ -384,21 +394,27 @@ class TestProcessSubtopicsGenerationBasic:
             subtopics = update_call[0][1]["subtopics"]
             assert len(subtopics) == 3
 
-    def test_updates_results_with_subtopics(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_updates_results_with_subtopics(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function updates results with generated subtopics."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
-            mock_gen.return_value = [{"name": "Subtopic", "sentences": [1], "parent_topic": "Topic"}]
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
+            mock_gen.return_value = [
+                {"name": "Subtopic", "sentences": [1], "parent_topic": "Topic"}
+            ]
 
             process_subtopics_generation(submission, mock_db, mock_llm)
 
@@ -416,6 +432,7 @@ class TestProcessSubtopicsGenerationBasic:
 # Test: process_subtopics_generation - Completion Message
 # =============================================================================
 
+
 class TestProcessSubtopicsGenerationCompletionMessage:
     """Test completion message functionality."""
 
@@ -427,15 +444,20 @@ class TestProcessSubtopicsGenerationCompletionMessage:
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1", "S2"],
-                "topics": [{"name": "Topic", "sentences": [1, 2]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1, 2]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
-            mock_gen.return_value = [{"name": "Sub1", "sentences": [1]}, {"name": "Sub2", "sentences": [2]}]
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
+            mock_gen.return_value = [
+                {"name": "Sub1", "sentences": [1]},
+                {"name": "Sub2", "sentences": [2]},
+            ]
 
             process_subtopics_generation(submission, mock_db, mock_llm)
 
@@ -449,10 +471,13 @@ class TestProcessSubtopicsGenerationCompletionMessage:
 # Test: process_subtopics_generation - Edge Cases
 # =============================================================================
 
+
 class TestProcessSubtopicsGenerationEdgeCases:
     """Test edge cases for process_subtopics_generation."""
 
-    def test_handles_missing_topic_name(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_handles_missing_topic_name(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function handles topics with missing name."""
         submission = {
             "submission_id": "test-123",
@@ -460,21 +485,25 @@ class TestProcessSubtopicsGenerationEdgeCases:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"sentences": [1]},  # Missing name
-                    {"name": "Valid", "sentences": [2]}
-                ]
-            }
+                    {"name": "Valid", "sentences": [2]},
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             # Should not raise
             process_subtopics_generation(submission, mock_db, mock_llm)
 
-    def test_handles_missing_topic_sentences(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_handles_missing_topic_sentences(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function handles topics with missing sentences."""
         submission = {
             "submission_id": "test-123",
@@ -482,20 +511,24 @@ class TestProcessSubtopicsGenerationEdgeCases:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"name": "Topic"},  # Missing sentences
-                ]
-            }
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             # Should not raise
             process_subtopics_generation(submission, mock_db, mock_llm)
 
-    def test_handles_empty_topic_sentences(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_handles_empty_topic_sentences(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function handles topics with empty sentences list."""
         submission = {
             "submission_id": "test-123",
@@ -503,14 +536,16 @@ class TestProcessSubtopicsGenerationEdgeCases:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"name": "Topic", "sentences": []},
-                ]
-            }
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             process_subtopics_generation(submission, mock_db, mock_llm)
@@ -518,7 +553,9 @@ class TestProcessSubtopicsGenerationEdgeCases:
             # Should skip empty topics
             mock_gen.assert_not_called()
 
-    def test_handles_sentence_index_out_of_bounds(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_handles_sentence_index_out_of_bounds(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function handles sentence indices out of bounds."""
         submission = {
             "submission_id": "test-123",
@@ -526,34 +563,40 @@ class TestProcessSubtopicsGenerationEdgeCases:
                 "sentences": ["S1", "S2"],
                 "topics": [
                     {"name": "Topic", "sentences": [1, 100]}  # 100 is out of bounds
-                ]
-            }
+                ],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             # Should not raise
             process_subtopics_generation(submission, mock_db, mock_llm)
 
-    def test_handles_subtopics_none_in_results(self, mock_db, mock_llm, mock_submissions_storage):
+    def test_handles_subtopics_none_in_results(
+        self, mock_db, mock_llm, mock_submissions_storage
+    ):
         """Function handles subtopics=None in results."""
         submission = {
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
                 "topics": [{"name": "Topic", "sentences": [1]}],
-                "subtopics": None
-            }
+                "subtopics": None,
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.return_value = []
 
             # Should not raise
@@ -563,6 +606,7 @@ class TestProcessSubtopicsGenerationEdgeCases:
 # =============================================================================
 # Test: process_subtopics_generation - LLM Unavailable
 # =============================================================================
+
 
 class TestProcessSubtopicsGenerationLLMUnavailable:
     """Test behavior when LLM is unavailable."""
@@ -576,14 +620,16 @@ class TestProcessSubtopicsGenerationLLMUnavailable:
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.side_effect = Exception("LLM service unavailable")
 
             with pytest.raises(Exception, match="LLM service unavailable"):
@@ -597,14 +643,16 @@ class TestProcessSubtopicsGenerationLLMUnavailable:
             "submission_id": "test-123",
             "results": {
                 "sentences": ["S1"],
-                "topics": [{"name": "Topic", "sentences": [1]}]
-            }
+                "topics": [{"name": "Topic", "sentences": [1]}],
+            },
         }
 
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch('lib.tasks.subtopics_generation.generate_subtopics_for_topic') as mock_gen:
+        with patch(
+            "lib.tasks.subtopics_generation.generate_subtopics_for_topic"
+        ) as mock_gen:
             mock_gen.side_effect = TimeoutError("LLM timeout")
 
             with pytest.raises(TimeoutError):

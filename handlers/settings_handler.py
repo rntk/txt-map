@@ -25,7 +25,9 @@ def _serialize_settings(storage: AppSettingsStorage) -> Dict[str, Any]:
 
 
 @router.get("/settings")
-def get_settings(storage: AppSettingsStorage = Depends(get_app_settings_storage)) -> Dict[str, Any]:
+def get_settings(
+    storage: AppSettingsStorage = Depends(get_app_settings_storage),
+) -> Dict[str, Any]:
     return _serialize_settings(storage)
 
 
@@ -35,14 +37,21 @@ def update_llm_settings(
     storage: AppSettingsStorage = Depends(get_app_settings_storage),
 ) -> Dict[str, Any]:
     active = get_active_llm_settings(db=storage.db)
-    
+
     # Quick lookup for provider info
-    provider = next((p for p in active["available_providers"] if p["name"] == payload.provider), None)
-    
+    provider = next(
+        (p for p in active["available_providers"] if p["name"] == payload.provider),
+        None,
+    )
+
     if provider is None:
-        raise HTTPException(status_code=400, detail="Selected LLM provider is not available")
+        raise HTTPException(
+            status_code=400, detail="Selected LLM provider is not available"
+        )
     if payload.model not in provider["models"]:
-        raise HTTPException(status_code=400, detail="Selected model is not allowed for this provider")
+        raise HTTPException(
+            status_code=400, detail="Selected model is not allowed for this provider"
+        )
 
     storage.set_llm_runtime_config(provider=payload.provider, model=payload.model)
     return _serialize_settings(storage)

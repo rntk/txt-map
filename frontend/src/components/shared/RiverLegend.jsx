@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 /**
  * @typedef {Object} RiverLegendItem
@@ -21,51 +21,57 @@ import React from 'react';
  * @returns {React.ReactElement | null}
  */
 function RiverLegend({
-    items,
-    activeItem,
-    setActiveItem,
-    colorScale,
-    nameKey = 'name',
-    variant = 'default',
+  items,
+  activeItem,
+  setActiveItem,
+  colorScale,
+  nameKey = "name",
+  variant = "default",
 }) {
-    if (!items || items.length === 0) return null;
+  if (!items || items.length === 0) return null;
 
-    return (
-        <div className={`chart-legend river-legend river-legend--${variant}`}>
-            {items.map((item) => {
-                const name = typeof item === 'string' ? item : item[nameKey] || '';
-                const isActive = activeItem === name;
-                const isDimmed = Boolean(activeItem) && activeItem !== name;
-                const itemClassName = [
-                    'chart-legend-item',
-                    'chart-legend-item--interactive',
-                    'river-legend__item',
-                    variant === 'pill' ? 'river-legend__item--pill' : 'river-legend__item--default',
-                    isActive ? 'chart-legend-item--active' : '',
-                    isDimmed ? 'chart-legend-item--dimmed' : '',
-                ].filter(Boolean).join(' ');
+  return (
+    <div className={`chart-legend river-legend river-legend--${variant}`}>
+      {items.map((item) => {
+        const name = typeof item === "string" ? item : item[nameKey] || "";
+        const isActive = activeItem === name;
+        const isDimmed = Boolean(activeItem) && activeItem !== name;
+        const itemClassName = [
+          "chart-legend-item",
+          "chart-legend-item--interactive",
+          "river-legend__item",
+          variant === "pill"
+            ? "river-legend__item--pill"
+            : "river-legend__item--default",
+          isActive ? "chart-legend-item--active" : "",
+          isDimmed ? "chart-legend-item--dimmed" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
 
-                return (
-                    <button
-                        key={name}
-                        type="button"
-                        className={itemClassName}
-                        onMouseEnter={() => setActiveItem?.(name)}
-                        onMouseLeave={() => setActiveItem?.(null)}
-                    >
-                        <span
-                            className={`chart-legend-swatch${variant === 'pill' ? ' chart-legend-swatch--square' : ''}`}
-                            style={{ '--chart-legend-swatch': colorScale(name) }}
-                            aria-hidden="true"
-                        />
-                        <span className={`chart-legend-label${variant === 'pill' ? ' river-legend__label--pill' : ''}`}>
-                            {name}
-                        </span>
-                    </button>
-                );
-            })}
-        </div>
-    );
+        return (
+          <button
+            key={name}
+            type="button"
+            className={itemClassName}
+            onMouseEnter={() => setActiveItem?.(name)}
+            onMouseLeave={() => setActiveItem?.(null)}
+          >
+            <span
+              className={`chart-legend-swatch${variant === "pill" ? " chart-legend-swatch--square" : ""}`}
+              style={{ "--chart-legend-swatch": colorScale(name) }}
+              aria-hidden="true"
+            />
+            <span
+              className={`chart-legend-label${variant === "pill" ? " river-legend__label--pill" : ""}`}
+            >
+              {name}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default RiverLegend;

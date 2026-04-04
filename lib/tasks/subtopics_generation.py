@@ -1,6 +1,7 @@
 """
 Subtopics generation task - generates subtopics for existing topics.
 """
+
 import logging
 import re
 from typing import Any
@@ -139,7 +140,9 @@ def process_subtopics_generation(
 
     if not topics:
         SubmissionsStorage(db).update_results(submission_id, {"subtopics": []})
-        print(f"Subtopics generation completed for submission {submission_id}: 0 subtopics")
+        print(
+            f"Subtopics generation completed for submission {submission_id}: 0 subtopics"
+        )
         return
 
     # Collect valid topics with their data up-front.
@@ -167,13 +170,16 @@ def process_subtopics_generation(
         # Note: subtopics use temperature=0.5, so cache is bypassed by design.
         futures_and_topics: list[tuple[Any, str]] = []
         for topic_name, topic_sentences, topic_sentence_indices in valid_topics:
-            prompt = _build_subtopic_prompt(topic_name, topic_sentences, topic_sentence_indices)
+            prompt = _build_subtopic_prompt(
+                topic_name, topic_sentences, topic_sentence_indices
+            )
             future = llm.submit(prompt, 0.5)
             futures_and_topics.append((future, topic_name))
 
         logger.info(
             "[%s] subtopics_generation: submitted %d topics in parallel",
-            submission_id, len(futures_and_topics),
+            submission_id,
+            len(futures_and_topics),
         )
 
         for future, topic_name in futures_and_topics:
@@ -183,7 +189,9 @@ def process_subtopics_generation(
     else:
         # ── Sequential path (legacy LLMClient or test mocks) ─────────────────
         llm_adapter = _LLMAdapter(llm)
-        llm_with_retry = RetryingLLMCallable(llm_adapter, max_retries=3, backoff_factor=1.0)
+        llm_with_retry = RetryingLLMCallable(
+            llm_adapter, max_retries=3, backoff_factor=1.0
+        )
         if cache_store is not None:
             cached_llm = CachingLLMCallable(
                 llm_with_retry,

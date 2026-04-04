@@ -24,7 +24,14 @@ PROVIDER_DEFINITIONS: tuple[ProviderDefinition, ...] = (
     ProviderDefinition(
         key="openai",
         display_name="OpenAI",
-        models=("", "gpt-5-mini", "gpt-5-nano", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4"),
+        models=(
+            "",
+            "gpt-5-mini",
+            "gpt-5-nano",
+            "gpt-5.4-mini",
+            "gpt-5.4-nano",
+            "gpt-5.4",
+        ),
         default_model="gpt-5.4-nano",
     ),
     ProviderDefinition(
@@ -58,7 +65,9 @@ def get_provider_definition_by_name(provider_name: str) -> ProviderDefinition:
 
 
 class LLMClient(ABC):
-    def __init__(self, max_context_tokens: int, max_retries: int = 3, retry_delay: float = 1.0):
+    def __init__(
+        self, max_context_tokens: int, max_retries: int = 3, retry_delay: float = 1.0
+    ):
         self._max_context_tokens = max_context_tokens
         self._max_retries = max_retries
         self._retry_delay = retry_delay
@@ -90,7 +99,12 @@ class LLMClient(ABC):
         """Rough estimation: ~4 characters per token on average"""
         return len(text) // 4
 
-    def call(self, user_msgs: List[str], temperature: float = 0.0, retries: Optional[int] = None) -> str:
+    def call(
+        self,
+        user_msgs: List[str],
+        temperature: float = 0.0,
+        retries: Optional[int] = None,
+    ) -> str:
         """Call the LLM with retry logic and exponential backoff."""
         max_retries = retries if retries is not None else self._max_retries
 
@@ -99,14 +113,16 @@ class LLMClient(ABC):
                 return self._call_single(user_msgs, temperature)
             except RuntimeError as e:
                 if attempt < max_retries:
-                    delay = self._retry_delay * (2 ** attempt) + random.uniform(0, 0.5)
+                    delay = self._retry_delay * (2**attempt) + random.uniform(0, 0.5)
                     logging.warning(
                         f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
                         f"Retrying in {delay:.2f}s..."
                     )
                     time.sleep(delay)
                 else:
-                    logging.error(f"LLM call failed after {max_retries + 1} attempts: {e}")
+                    logging.error(
+                        f"LLM call failed after {max_retries + 1} attempts: {e}"
+                    )
                     raise
 
     @abstractmethod

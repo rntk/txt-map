@@ -113,7 +113,10 @@ class LLMWorker:
 
         logger.info(
             "Worker %s executing request %s (temp=%.2f, namespace=%s)",
-            self._worker_id, request_id, temperature, cache_namespace,
+            self._worker_id,
+            request_id,
+            temperature,
+            cache_namespace,
         )
 
         try:
@@ -140,13 +143,18 @@ class LLMWorker:
                     )
                 except Exception:
                     logger.warning(
-                        "Failed to write cache entry for request %s", request_id, exc_info=True
+                        "Failed to write cache entry for request %s",
+                        request_id,
+                        exc_info=True,
                     )
 
         except Exception as exc:
             error_msg = str(exc)
             logger.error(
-                "Worker %s failed request %s: %s", self._worker_id, request_id, error_msg
+                "Worker %s failed request %s: %s",
+                self._worker_id,
+                request_id,
+                error_msg,
             )
             self._queue_store.fail(request_id, error_msg)
 
@@ -180,7 +188,9 @@ def main() -> None:
 
     # Log the initial LLM provider so the operator can confirm the right model.
     llm = create_llm_client(db=db)
-    logger.info("Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name)
+    logger.info(
+        "Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name
+    )
 
     workers = [
         LLMWorker(
@@ -194,7 +204,9 @@ def main() -> None:
     ]
 
     def handle_stop(signum: int, frame: FrameType | None) -> None:  # noqa: ARG001
-        logger.info("Received signal %s, stopping %s LLM worker(s)", signum, len(workers))
+        logger.info(
+            "Received signal %s, stopping %s LLM worker(s)", signum, len(workers)
+        )
         for worker in workers:
             worker.stop()
 

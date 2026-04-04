@@ -104,15 +104,19 @@ class LLMQueueStore:
 
     def get_results(self, request_ids: list[str]) -> list[dict[str, Any]]:
         """Batch fetch multiple request documents."""
-        docs = self._col.find(
-            {"request_id": {"$in": request_ids}}, {"_id": 0}
-        )
+        docs = self._col.find({"request_id": {"$in": request_ids}}, {"_id": 0})
         by_id = {d["request_id"]: d for d in docs}
         return [by_id.get(rid) for rid in request_ids]
 
-    def list(self, filters: Optional[dict[str, Any]] = None, limit: int = 100) -> list[dict[str, Any]]:
+    def list(
+        self, filters: Optional[dict[str, Any]] = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """List LLM queue entries with optional filters, sorted by created_at desc."""
-        return list(self._col.find(filters or {}, {"_id": 0}).sort("created_at", -1).limit(limit))
+        return list(
+            self._col.find(filters or {}, {"_id": 0})
+            .sort("created_at", -1)
+            .limit(limit)
+        )
 
     def delete_by_id(self, request_id: str) -> bool:
         """Delete an LLM request queue entry by its request_id. Returns True if deleted."""
@@ -126,7 +130,9 @@ class LLMQueueStore:
     ) -> int:
         """Delete old requests for the given terminal statuses."""
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
-        statuses_to_delete = list(statuses) if statuses is not None else ["completed", "failed"]
+        statuses_to_delete = (
+            list(statuses) if statuses is not None else ["completed", "failed"]
+        )
         result = self._col.delete_many(
             {
                 "status": {"$in": statuses_to_delete},

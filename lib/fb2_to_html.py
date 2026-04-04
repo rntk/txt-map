@@ -4,6 +4,7 @@ FB2 (FictionBook 2) to Semantic HTML converter using stdlib only.
 FB2 is an XML-based e-book format. This module parses the XML and produces
 semantic HTML with headings and paragraphs, plus a plain-text extraction.
 """
+
 import xml.etree.ElementTree as ET
 from html import escape
 from typing import List, Optional, Tuple

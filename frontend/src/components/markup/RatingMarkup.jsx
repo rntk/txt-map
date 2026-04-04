@@ -1,5 +1,5 @@
-import React from 'react';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * Parses a score string and extracts numeric value and max
@@ -8,8 +8,8 @@ import HighlightedText from '../shared/HighlightedText';
  * @returns {object} - Parsed score info
  */
 function parseScore(score) {
-  if (!score || typeof score !== 'string') {
-    return { value: 0, max: 10, display: score || '' };
+  if (!score || typeof score !== "string") {
+    return { value: 0, max: 10, display: score || "" };
   }
 
   // Try to match patterns like "8/10", "4/5", "7.5/10"
@@ -51,13 +51,13 @@ function generateStars(value, max) {
 
   const stars = [];
   for (let i = 0; i < fullStars; i++) {
-    stars.push('full');
+    stars.push("full");
   }
   if (hasHalfStar) {
-    stars.push('half');
+    stars.push("half");
   }
   for (let i = 0; i < emptyStars; i++) {
-    stars.push('empty');
+    stars.push("empty");
   }
   return stars;
 }
@@ -106,10 +106,10 @@ export default function RatingMarkup({ segment }) {
           {stars.map((star, i) => (
             <span
               key={i}
-              className={`markup-rating__star ${star === 'empty' ? 'markup-rating__star--empty' : ''}`}
+              className={`markup-rating__star ${star === "empty" ? "markup-rating__star--empty" : ""}`}
               aria-hidden="true"
             >
-              {star === 'full' ? '★' : star === 'half' ? '½' : '☆'}
+              {star === "full" ? "★" : star === "half" ? "½" : "☆"}
             </span>
           ))}
         </div>

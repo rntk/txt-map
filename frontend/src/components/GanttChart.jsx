@@ -149,6 +149,63 @@ const GanttChart = ({
       .style("pointer-events", "none")
       .style("font-size", "12px");
 
+    // Row highlight backgrounds (rendered before bars so bars appear on top)
+    const rowHighlights = g
+      .selectAll(".gantt-row-highlight")
+      .data(scopedData)
+      .enter()
+      .append("rect")
+      .attr("class", "gantt-row-highlight")
+      .attr("x", -margin.left)
+      .attr("y", (d) => y(d.name))
+      .attr("width", width)
+      .attr("height", y.bandwidth())
+      .attr("fill", "transparent");
+
+    // Invisible full-width row overlay for hover detection
+    g.selectAll(".gantt-row-overlay")
+      .data(scopedData)
+      .enter()
+      .append("rect")
+      .attr("class", "gantt-row-overlay")
+      .attr("x", -margin.left)
+      .attr("y", (d) => y(d.name))
+      .attr("width", width)
+      .attr("height", y.bandwidth())
+      .attr("fill", "transparent")
+      .attr("cursor", "default")
+      .on("mouseover", function (event, d) {
+        setActiveTopic(d.name);
+        rowHighlights
+          .filter((rd) => rd.name === d.name)
+          .attr("fill", "rgba(0,0,0,0.07)");
+        tooltip
+          .style("opacity", 1)
+          .html(`<strong>${d.displayName || d.name}</strong>`)
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY - 28 + "px");
+      })
+      .on("mousemove", function (event) {
+        tooltip
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY - 28 + "px");
+      })
+      .on("mouseout", function (event, d) {
+        setActiveTopic(null);
+        rowHighlights
+          .filter((rd) => rd.name === d.name)
+          .attr("fill", "transparent");
+        tooltip.style("opacity", 0);
+      })
+      .on("click", function (event, d) {
+        setSelectedTopicForModal({
+          name: d.fullPath || d.name,
+          displayName: d.displayName || d.name,
+          fullPath: d.fullPath || d.name,
+          sentenceIndices: d.sentences,
+        });
+      });
+
     g.selectAll(".gantt-bar")
       .data(chartData)
       .enter()

@@ -3,6 +3,7 @@ Unit tests for the prefix_tree task handler.
 
 Tests build_compressed_trie, _compress_node, and process_prefix_tree functions.
 """
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from lib.tasks.prefix_tree import (
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_db():
@@ -43,7 +45,7 @@ def sample_sentences():
         "Python is a programming language.",
         "Python is popular for data science.",
         "Java is also a programming language.",
-        "Machine learning uses Python."
+        "Machine learning uses Python.",
     ]
 
 
@@ -58,16 +60,17 @@ def sample_submission():
                 "Python is a programming language.",
                 "Python is popular for data science.",
                 "Java is also a programming language.",
-                "Machine learning uses Python."
+                "Machine learning uses Python.",
             ],
-            "prefix_tree": {}
-        }
+            "prefix_tree": {},
+        },
     }
 
 
 # =============================================================================
 # Test: build_compressed_trie - Basic Functionality
 # =============================================================================
+
 
 class TestBuildCompressedTrieBasic:
     """Test basic functionality of build_compressed_trie."""
@@ -215,6 +218,7 @@ class TestBuildCompressedTrieBasic:
 # Helper functions for tree traversal
 def find_word_in_tree(tree, word):
     """Find a word in the trie and return its count."""
+
     def traverse(node, remaining_word):
         if not remaining_word:
             # We've matched the entire word
@@ -232,7 +236,7 @@ def find_word_in_tree(tree, word):
 
         for key, child in children.items():
             if remaining_word.startswith(key):
-                new_remaining = remaining_word[len(key):]
+                new_remaining = remaining_word[len(key) :]
                 if not new_remaining:
                     # The key exactly matches the remaining word
                     # Check if this node is a word endpoint
@@ -249,6 +253,7 @@ def find_word_in_tree(tree, word):
 
 def find_word_in_tree_sentences(tree, word):
     """Find a word in the trie and return its sentence positions."""
+
     def traverse(node, remaining_word):
         if not remaining_word:
             if isinstance(node, dict) and node.get("count", 0) > 0:
@@ -265,7 +270,7 @@ def find_word_in_tree_sentences(tree, word):
 
         for key, child in children.items():
             if remaining_word.startswith(key):
-                new_remaining = remaining_word[len(key):]
+                new_remaining = remaining_word[len(key) :]
                 if not new_remaining:
                     # The key exactly matches the remaining word
                     if child.get("count", 0) > 0:
@@ -281,6 +286,7 @@ def find_word_in_tree_sentences(tree, word):
 # =============================================================================
 # Test: build_compressed_trie - Word Extraction
 # =============================================================================
+
 
 class TestBuildCompressedTrieWordExtraction:
     """Test word extraction functionality."""
@@ -339,6 +345,7 @@ class TestBuildCompressedTrieWordExtraction:
 # =============================================================================
 # Test: build_compressed_trie - Compression
 # =============================================================================
+
 
 class TestBuildCompressedTrieCompression:
     """Test trie compression functionality."""
@@ -422,6 +429,7 @@ class TestBuildCompressedTrieCompression:
 # Test: _compress_node - Basic Functionality
 # =============================================================================
 
+
 class TestCompressNodeBasic:
     """Test basic functionality of _compress_node."""
 
@@ -436,15 +444,15 @@ class TestCompressNodeBasic:
                                 "c": {"children": {}, "count": 1, "sentences": [1]}
                             },
                             "count": 0,
-                            "sentences": []
+                            "sentences": [],
                         }
                     },
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -457,15 +465,13 @@ class TestCompressNodeBasic:
         node = {
             "children": {
                 "a": {
-                    "children": {
-                        "b": {"children": {}, "count": 1, "sentences": [1]}
-                    },
+                    "children": {"b": {"children": {}, "count": 1, "sentences": [1]}},
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -482,11 +488,11 @@ class TestCompressNodeBasic:
                         "thon": {"children": {}, "count": 1, "sentences": [1]}
                     },
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -499,15 +505,13 @@ class TestCompressNodeBasic:
         node = {
             "children": {
                 "cat": {
-                    "children": {
-                        "s": {"children": {}, "count": 1, "sentences": [1]}
-                    },
+                    "children": {"s": {"children": {}, "count": 1, "sentences": [1]}},
                     "count": 1,  # This is a word endpoint
-                    "sentences": [1]
+                    "sentences": [1],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -522,14 +526,14 @@ class TestCompressNodeBasic:
                 "a": {
                     "children": {
                         "b": {"children": {}, "count": 1, "sentences": [1]},
-                        "c": {"children": {}, "count": 1, "sentences": [2]}
+                        "c": {"children": {}, "count": 1, "sentences": [2]},
                     },
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -542,16 +546,13 @@ class TestCompressNodeBasic:
 # Test: _compress_node - Edge Cases
 # =============================================================================
 
+
 class TestCompressNodeEdgeCases:
     """Test edge cases for _compress_node."""
 
     def test_handles_empty_children(self):
         """Function handles nodes with empty children."""
-        node = {
-            "children": {},
-            "count": 0,
-            "sentences": []
-        }
+        node = {"children": {}, "count": 0, "sentences": []}
 
         # Should not raise
         _compress_node(node)
@@ -559,11 +560,7 @@ class TestCompressNodeEdgeCases:
 
     def test_handles_leaf_nodes(self):
         """Function handles leaf nodes (word endpoints)."""
-        node = {
-            "children": {},
-            "count": 5,
-            "sentences": [1, 2, 3]
-        }
+        node = {"children": {}, "count": 5, "sentences": [1, 2, 3]}
 
         # Should not raise
         _compress_node(node)
@@ -580,22 +577,26 @@ class TestCompressNodeEdgeCases:
                             "children": {
                                 "c": {
                                     "children": {
-                                        "d": {"children": {}, "count": 1, "sentences": [1]}
+                                        "d": {
+                                            "children": {},
+                                            "count": 1,
+                                            "sentences": [1],
+                                        }
                                     },
                                     "count": 0,
-                                    "sentences": []
+                                    "sentences": [],
                                 }
                             },
                             "count": 0,
-                            "sentences": []
+                            "sentences": [],
                         }
                     },
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -610,14 +611,14 @@ class TestCompressNodeEdgeCases:
                 "app": {
                     "children": {
                         "le": {"children": {}, "count": 1, "sentences": [1]},
-                        "ly": {"children": {}, "count": 1, "sentences": [2]}
+                        "ly": {"children": {}, "count": 1, "sentences": [2]},
                     },
                     "count": 0,
-                    "sentences": []
+                    "sentences": [],
                 }
             },
             "count": 0,
-            "sentences": []
+            "sentences": [],
         }
 
         _compress_node(node)
@@ -630,12 +631,13 @@ class TestCompressNodeEdgeCases:
 # Test: process_prefix_tree - Basic Functionality
 # =============================================================================
 
+
 class TestProcessPrefixTreeBasic:
     """Test basic functionality of process_prefix_tree."""
 
     def test_reads_sentences_from_results(self, mock_db, mock_llm, sample_submission):
         """Function reads sentences from submission results."""
-        with patch('lib.tasks.prefix_tree.build_compressed_trie') as mock_build:
+        with patch("lib.tasks.prefix_tree.build_compressed_trie") as mock_build:
             mock_build.return_value = {}
 
             process_prefix_tree(sample_submission, mock_db, mock_llm)
@@ -646,18 +648,22 @@ class TestProcessPrefixTreeBasic:
 
     def test_calls_build_compressed_trie(self, mock_db, mock_llm, sample_submission):
         """Function calls build_compressed_trie with sentences."""
-        with patch('lib.tasks.prefix_tree.build_compressed_trie') as mock_build:
+        with patch("lib.tasks.prefix_tree.build_compressed_trie") as mock_build:
             mock_build.return_value = {}
 
             process_prefix_tree(sample_submission, mock_db, mock_llm)
 
             mock_build.assert_called_once()
 
-    def test_updates_results_with_prefix_tree(self, mock_db, mock_llm, sample_submission):
+    def test_updates_results_with_prefix_tree(
+        self, mock_db, mock_llm, sample_submission
+    ):
         """Function updates results with prefix_tree via direct DB call."""
         mock_tree = {"p": {"children": {}, "count": 0, "sentences": []}}
 
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value=mock_tree):
+        with patch(
+            "lib.tasks.prefix_tree.build_compressed_trie", return_value=mock_tree
+        ):
             process_prefix_tree(sample_submission, mock_db, mock_llm)
 
         mock_db.submissions.update_one.assert_called_once()
@@ -669,7 +675,7 @@ class TestProcessPrefixTreeBasic:
 
     def test_uses_submission_id_for_update(self, mock_db, mock_llm, sample_submission):
         """Function uses submission_id for database update."""
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}):
+        with patch("lib.tasks.prefix_tree.build_compressed_trie", return_value={}):
             process_prefix_tree(sample_submission, mock_db, mock_llm)
 
         query = mock_db.submissions.update_one.call_args[0][0]
@@ -680,12 +686,13 @@ class TestProcessPrefixTreeBasic:
 # Test: process_prefix_tree - LLM Parameter
 # =============================================================================
 
+
 class TestProcessPrefixTreeLLMParameter:
     """Test LLM parameter handling."""
 
     def test_llm_parameter_unused(self, mock_db, mock_llm, sample_submission):
         """LLM parameter is unused (interface compatibility)."""
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}):
+        with patch("lib.tasks.prefix_tree.build_compressed_trie", return_value={}):
             process_prefix_tree(sample_submission, mock_db, mock_llm)
 
         # LLM should not be called
@@ -697,40 +704,35 @@ class TestProcessPrefixTreeLLMParameter:
 # Test: process_prefix_tree - Edge Cases
 # =============================================================================
 
+
 class TestProcessPrefixTreeEdgeCases:
     """Test edge cases for process_prefix_tree."""
 
     def test_handles_empty_sentences(self, mock_db, mock_llm):
         """Function handles empty sentences list."""
-        submission = {
-            "submission_id": "test-123",
-            "results": {
-                "sentences": []
-            }
-        }
+        submission = {"submission_id": "test-123", "results": {"sentences": []}}
 
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}) as mock_build:
+        with patch(
+            "lib.tasks.prefix_tree.build_compressed_trie", return_value={}
+        ) as mock_build:
             process_prefix_tree(submission, mock_db, mock_llm)
 
         mock_build.assert_called_once_with([])
 
     def test_handles_missing_sentences_key(self, mock_db, mock_llm):
         """Function handles missing sentences key in results."""
-        submission = {
-            "submission_id": "test-123",
-            "results": {}
-        }
+        submission = {"submission_id": "test-123", "results": {}}
 
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}) as mock_build:
+        with patch(
+            "lib.tasks.prefix_tree.build_compressed_trie", return_value={}
+        ) as mock_build:
             process_prefix_tree(submission, mock_db, mock_llm)
 
         mock_build.assert_called_once_with([])
 
     def test_handles_missing_results_key(self, mock_db, mock_llm):
         """Function raises KeyError when results key is missing."""
-        submission = {
-            "submission_id": "test-123"
-        }
+        submission = {"submission_id": "test-123"}
 
         # Source code does submission["results"].get(...) which raises KeyError
         with pytest.raises(KeyError):
@@ -742,10 +744,10 @@ class TestProcessPrefixTreeEdgeCases:
             "submission_id": "test-123",
             "results": {
                 "sentences": ["Hello! World?", "Test@email.com", "123 numbers"]
-            }
+            },
         }
 
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}):
+        with patch("lib.tasks.prefix_tree.build_compressed_trie", return_value={}):
             # Should not raise
             process_prefix_tree(submission, mock_db, mock_llm)
 
@@ -754,12 +756,10 @@ class TestProcessPrefixTreeEdgeCases:
         long_sentence = "word " * 1000
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "sentences": [long_sentence]
-            }
+            "results": {"sentences": [long_sentence]},
         }
 
-        with patch('lib.tasks.prefix_tree.build_compressed_trie', return_value={}):
+        with patch("lib.tasks.prefix_tree.build_compressed_trie", return_value={}):
             # Should not raise
             process_prefix_tree(submission, mock_db, mock_llm)
 
@@ -768,6 +768,7 @@ class TestProcessPrefixTreeEdgeCases:
 # Test: process_prefix_tree - Trie Structure Verification
 # =============================================================================
 
+
 class TestProcessPrefixTreeStructure:
     """Test prefix tree structure verification."""
 
@@ -775,9 +776,7 @@ class TestProcessPrefixTreeStructure:
         """Function produces valid trie structure by actually building the trie."""
         submission = {
             "submission_id": "test-123",
-            "results": {
-                "sentences": ["hello world", "hello there"]
-            }
+            "results": {"sentences": ["hello world", "hello there"]},
         }
 
         def validate_trie(node):
@@ -812,7 +811,9 @@ class TestProcessPrefixTreeStructure:
 
         # Verify sentences are tracked correctly
         hello_sentences = find_word_in_tree_sentences(tree, "hello")
-        assert sorted(hello_sentences) == [1, 2], f"Expected 'hello' in sentences [1, 2], got {hello_sentences}"
+        assert sorted(hello_sentences) == [1, 2], (
+            f"Expected 'hello' in sentences [1, 2], got {hello_sentences}"
+        )
 
         # Also verify process_prefix_tree stores the result correctly
         process_prefix_tree(submission, mock_db, mock_llm)

@@ -26,18 +26,26 @@ class DiffCalculateRequest(BaseModel):
 
 
 def _ensure_submissions(
-    submissions_storage: SubmissionsStorage, left_submission_id: str, right_submission_id: str
+    submissions_storage: SubmissionsStorage,
+    left_submission_id: str,
+    right_submission_id: str,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if left_submission_id == right_submission_id:
-        raise HTTPException(status_code=400, detail="Please select two different submissions")
+        raise HTTPException(
+            status_code=400, detail="Please select two different submissions"
+        )
 
     left_submission = submissions_storage.get_by_id(left_submission_id)
     right_submission = submissions_storage.get_by_id(right_submission_id)
 
     if not left_submission:
-        raise HTTPException(status_code=404, detail=f"Submission not found: {left_submission_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Submission not found: {left_submission_id}"
+        )
     if not right_submission:
-        raise HTTPException(status_code=404, detail=f"Submission not found: {right_submission_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Submission not found: {right_submission_id}"
+        )
 
     return left_submission, right_submission
 
@@ -67,7 +75,9 @@ def get_diff(
         submissions_storage, left_submission_id, right_submission_id
     )
 
-    pair_key, sub_a_id, sub_b_id = canonical_pair(left_submission_id, right_submission_id)
+    pair_key, sub_a_id, sub_b_id = canonical_pair(
+        left_submission_id, right_submission_id
+    )
     diff_doc = semantic_diffs_storage.get_diff_by_pair_key(pair_key)
     latest_job = semantic_diffs_storage.get_latest_job(pair_key)
     active_job = semantic_diffs_storage.get_active_job(pair_key)
@@ -75,7 +85,7 @@ def get_diff(
     left_prereq = check_submission_topic_readiness(left_sub)
     right_prereq = check_submission_topic_readiness(right_sub)
     prereq = {"left": left_prereq, "right": right_prereq}
-    
+
     pair_info = {
         "left_submission_id": left_submission_id,
         "right_submission_id": right_submission_id,
@@ -94,10 +104,14 @@ def get_diff(
             "diff": None,
         }
 
-    reasons = stale_reasons(
-        diff_doc, left_sub, right_sub, algorithm_version=ALGORITHM_VERSION
-    ) if diff_doc else []
-    
+    reasons = (
+        stale_reasons(
+            diff_doc, left_sub, right_sub, algorithm_version=ALGORITHM_VERSION
+        )
+        if diff_doc
+        else []
+    )
+
     # Determine state
     if active_job:
         state = "processing" if active_job.get("status") == "processing" else "queued"
@@ -153,7 +167,7 @@ def post_diff_calculate(
     pair_key, sub_a_id, sub_b_id = canonical_pair(
         payload.left_submission_id, payload.right_submission_id
     )
-    
+
     active_job = semantic_diffs_storage.get_active_job(pair_key)
     if active_job:
         if payload.force and not bool(active_job.get("force_recalculate")):
@@ -193,11 +207,11 @@ def post_diff_calculate(
         requested_right_id=payload.right_submission_id,
         force_recalculate=payload.force,
     )
-    
+
     if not created and payload.force and not bool(job.get("force_recalculate")):
         semantic_diffs_storage.set_job_force_recalculate(job["_id"], True)
         job["force_recalculate"] = True
-        
+
     return {
         "job_id": job["job_id"],
         "status": job["status"],
@@ -215,10 +229,16 @@ def delete_diff_data(
     semantic_diffs_storage: SemanticDiffsStorage = Depends(get_semantic_diffs_storage),
 ) -> Dict[str, Any]:
     if left_submission_id == right_submission_id:
-        raise HTTPException(status_code=400, detail="Please select two different submissions")
+        raise HTTPException(
+            status_code=400, detail="Please select two different submissions"
+        )
 
-    pair_key, sub_a_id, sub_b_id = canonical_pair(left_submission_id, right_submission_id)
-    deleted_diff_count, deleted_job_count = semantic_diffs_storage.delete_by_pair_key(pair_key)
+    pair_key, sub_a_id, sub_b_id = canonical_pair(
+        left_submission_id, right_submission_id
+    )
+    deleted_diff_count, deleted_job_count = semantic_diffs_storage.delete_by_pair_key(
+        pair_key
+    )
 
     return {
         "deleted": True,

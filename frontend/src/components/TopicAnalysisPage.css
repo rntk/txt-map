@@ -33,10 +33,22 @@
   color: #444;
 }
 
-.topic-analysis-page .status-chip.completed { background: #d4edda; color: #155724; }
-.topic-analysis-page .status-chip.processing { background: #fff3cd; color: #856404; }
-.topic-analysis-page .status-chip.pending    { background: #e2e3e5; color: #383d41; }
-.topic-analysis-page .status-chip.failed     { background: #f8d7da; color: #721c24; }
+.topic-analysis-page .status-chip.completed {
+  background: #d4edda;
+  color: #155724;
+}
+.topic-analysis-page .status-chip.processing {
+  background: #fff3cd;
+  color: #856404;
+}
+.topic-analysis-page .status-chip.pending {
+  background: #e2e3e5;
+  color: #383d41;
+}
+.topic-analysis-page .status-chip.failed {
+  background: #f8d7da;
+  color: #721c24;
+}
 
 .topic-analysis-section {
   margin-bottom: 40px;
@@ -150,7 +162,9 @@
   background: #fff;
   cursor: pointer;
   font-size: 0.84rem;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .topic-selector-btn:hover {

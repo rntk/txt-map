@@ -4,22 +4,22 @@ export function buildMindmapHierarchy(data) {
   const roots = [];
 
   Object.entries(data).forEach(([topicKey, topicData]) => {
-    const buildChildren = (nodeData, parentPath = '', key = '') => {
+    const buildChildren = (nodeData, parentPath = "", key = "") => {
       const children = nodeData.children || {};
       const currentPath = parentPath ? `${parentPath}/${key}` : key;
       return Object.entries(children).map(([childKey, childData]) => ({
         name: childKey,
         sentences: childData.sentences || [],
         children: buildChildren(childData, currentPath, childKey),
-        path: `${currentPath}/${childKey}`
+        path: `${currentPath}/${childKey}`,
       }));
     };
 
     roots.push({
       name: topicKey,
       sentences: topicData.sentences || [],
-      children: buildChildren(topicData, '', topicKey),
-      path: topicKey
+      children: buildChildren(topicData, "", topicKey),
+      path: topicKey,
     });
   });
 
@@ -31,7 +31,7 @@ export function buildPrefixTreeHierarchy(data) {
 
   const roots = [];
 
-  const buildNode = (label, nodeData, parentPath = '') => {
+  const buildNode = (label, nodeData, parentPath = "") => {
     const fullWord = nodeData.fullWord || label;
     const currentPath = parentPath ? `${parentPath}/${label}` : label;
     return {
@@ -40,14 +40,15 @@ export function buildPrefixTreeHierarchy(data) {
       count: nodeData.count || 0,
       sentences: nodeData.sentences || [],
       path: currentPath,
-      children: Object.entries(nodeData.children || {}).map(([childLabel, childData]) =>
-        buildNode(childLabel, childData, currentPath)
-      )
+      children: Object.entries(nodeData.children || {}).map(
+        ([childLabel, childData]) =>
+          buildNode(childLabel, childData, currentPath),
+      ),
     };
   };
 
   Object.entries(data).forEach(([label, nodeData]) => {
-    roots.push(buildNode(label, nodeData, ''));
+    roots.push(buildNode(label, nodeData, ""));
   });
 
   return roots;

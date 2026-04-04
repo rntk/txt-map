@@ -4,6 +4,7 @@ Unit tests for the PDF to HTML module.
 Tests PDFToSemanticHTML class, convert_pdf_to_html, and extract_text_from_pdf functions.
 Tests PyMuPDF (fitz) integration and edge cases.
 """
+
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 import pymupdf
@@ -20,6 +21,7 @@ from lib.pdf_to_html import (
 # =============================================================================
 # Fixtures: PDF Test Data
 # =============================================================================
+
 
 @pytest.fixture
 def valid_pdf_bytes():
@@ -493,6 +495,7 @@ startxref
 # Test: FontThresholds Dataclass
 # =============================================================================
 
+
 class TestFontThresholds:
     """Tests for FontThresholds dataclass."""
 
@@ -525,6 +528,7 @@ class TestFontThresholds:
 # Test: PDFToSemanticHTML Class Initialization
 # =============================================================================
 
+
 class TestPDFToSemanticHTMLInit:
     """Tests for PDFToSemanticHTML.__init__ method."""
 
@@ -540,7 +544,7 @@ class TestPDFToSemanticHTMLInit:
         converter = PDFToSemanticHTML(valid_pdf_bytes)
 
         # Document should be a pymupdf.Document
-        assert hasattr(converter, 'doc')
+        assert hasattr(converter, "doc")
 
     def test_analyzes_font_sizes_on_init(self, valid_pdf_with_headings):
         """Analyzes font sizes during initialization."""
@@ -568,6 +572,7 @@ class TestPDFToSemanticHTMLInit:
 # =============================================================================
 # Test: PDFToSemanticHTML._analyze_font_sizes
 # =============================================================================
+
 
 class TestAnalyzeFontSizes:
     """Tests for PDFToSemanticHTML._analyze_font_sizes method."""
@@ -602,6 +607,7 @@ class TestAnalyzeFontSizes:
 # =============================================================================
 # Test: PDFToSemanticHTML._get_heading_tag
 # =============================================================================
+
 
 class TestGetHeadingTag:
     """Tests for PDFToSemanticHTML._get_heading_tag method."""
@@ -653,6 +659,7 @@ class TestGetHeadingTag:
 # Test: PDFToSemanticHTML._wrap_text_with_style
 # =============================================================================
 
+
 class TestWrapTextWithStyle:
     """Tests for PDFToSemanticHTML._wrap_text_with_style method."""
 
@@ -684,8 +691,10 @@ startxref
         except Exception:
             # If PDF creation fails, create a mock converter
             self.converter = Mock()
-            self.converter._wrap_text_with_style = PDFToSemanticHTML._wrap_text_with_style.__get__(
-                self.converter, PDFToSemanticHTML
+            self.converter._wrap_text_with_style = (
+                PDFToSemanticHTML._wrap_text_with_style.__get__(
+                    self.converter, PDFToSemanticHTML
+                )
             )
 
     def test_returns_plain_text_when_no_flags(self):
@@ -699,7 +708,9 @@ startxref
         """Wraps text with <strong> for bold flag."""
         import pymupdf
 
-        result = self.converter._wrap_text_with_style("bold text", pymupdf.TEXT_FONT_BOLD)
+        result = self.converter._wrap_text_with_style(
+            "bold text", pymupdf.TEXT_FONT_BOLD
+        )
 
         assert result == "<strong>bold text</strong>"
 
@@ -707,7 +718,9 @@ startxref
         """Wraps text with <em> for italic flag."""
         import pymupdf
 
-        result = self.converter._wrap_text_with_style("italic text", pymupdf.TEXT_FONT_ITALIC)
+        result = self.converter._wrap_text_with_style(
+            "italic text", pymupdf.TEXT_FONT_ITALIC
+        )
 
         assert result == "<em>italic text</em>"
 
@@ -732,6 +745,7 @@ startxref
 # =============================================================================
 # Test: PDFToSemanticHTML._escape_html
 # =============================================================================
+
 
 class TestEscapeHtml:
     """Tests for PDFToSemanticHTML._escape_html method."""
@@ -786,7 +800,7 @@ startxref
         """Escapes double quote character."""
         result = self.converter._escape_html('say "hello"')
 
-        assert result == 'say &quot;hello&quot;'
+        assert result == "say &quot;hello&quot;"
 
     def test_escapes_single_quote(self):
         """Escapes single quote character."""
@@ -813,6 +827,7 @@ startxref
 # =============================================================================
 # Test: PDFToSemanticHTML.convert
 # =============================================================================
+
 
 class TestConvert:
     """Tests for PDFToSemanticHTML.convert method."""
@@ -896,6 +911,7 @@ class TestConvert:
 # Test: convert_pdf_to_html Function
 # =============================================================================
 
+
 class TestConvertPdfToHtml:
     """Tests for the convert_pdf_to_html convenience function."""
 
@@ -924,7 +940,7 @@ class TestConvertPdfToHtml:
     def test_closes_converter_after_conversion(self, valid_pdf_bytes):
         """Closes converter after successful conversion."""
         # This tests that the finally block closes the converter
-        with patch.object(PDFToSemanticHTML, 'close') as mock_close:
+        with patch.object(PDFToSemanticHTML, "close") as mock_close:
             result = convert_pdf_to_html(valid_pdf_bytes)
 
             assert result is not None
@@ -945,7 +961,7 @@ class TestConvertPdfToHtml:
         assert "<!-- Page 1 -->" in result
         assert "<!-- Page 2 -->" in result
 
-    @patch('pymupdf.open')
+    @patch("pymupdf.open")
     def test_handles_pymupdf_errors_gracefully(self, mock_open):
         """Handles PyMuPDF errors gracefully."""
         mock_open.side_effect = Exception("PyMuPDF error")
@@ -957,6 +973,7 @@ class TestConvertPdfToHtml:
 # =============================================================================
 # Test: extract_text_from_pdf Function
 # =============================================================================
+
 
 class TestExtractTextFromPdf:
     """Tests for the extract_text_from_pdf function."""
@@ -991,7 +1008,7 @@ class TestExtractTextFromPdf:
     def test_closes_document_after_extraction(self, valid_pdf_bytes):
         """Closes document after text extraction."""
         # Tests that the finally block closes the document
-        with patch('pymupdf.open') as mock_open:
+        with patch("pymupdf.open") as mock_open:
             mock_doc = MagicMock()
             mock_doc.__iter__ = MagicMock(return_value=iter([]))
             mock_open.return_value = mock_doc
@@ -1014,7 +1031,7 @@ class TestExtractTextFromPdf:
         # Note: This depends on the implementation
         assert isinstance(result, str)
 
-    @patch('pymupdf.open')
+    @patch("pymupdf.open")
     def test_handles_pymupdf_errors_gracefully(self, mock_open):
         """Handles PyMuPDF errors gracefully."""
         mock_open.side_effect = Exception("PyMuPDF error")
@@ -1026,6 +1043,7 @@ class TestExtractTextFromPdf:
 # =============================================================================
 # Test: Edge Cases and Error Handling
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases and error handling."""
@@ -1077,6 +1095,7 @@ class TestEdgeCases:
 # Test: PyMuPDF Integration
 # =============================================================================
 
+
 class TestPyMuPdfIntegration:
     """Tests for PyMuPDF (fitz) integration."""
 
@@ -1118,6 +1137,7 @@ class TestPyMuPdfIntegration:
 # Test: HTML Output Validation
 # =============================================================================
 
+
 class TestHtmlOutputValidation:
     """Tests for HTML output validation."""
 
@@ -1143,13 +1163,17 @@ class TestHtmlOutputValidation:
         result = convert_pdf_to_html(valid_pdf_with_headings)
 
         # Should contain heading tags based on font sizes
-        assert "<h1>" in result or "<h2>" in result or "<h3>" in result or "<p>" in result
+        assert (
+            "<h1>" in result or "<h2>" in result or "<h3>" in result or "<p>" in result
+        )
 
     def test_html_contains_paragraph_tags(self, valid_pdf_bytes):
         """HTML contains paragraph tags for body text."""
         result = convert_pdf_to_html(valid_pdf_bytes)
 
-        assert isinstance(result, str) and len(result) > 0  # Result should be a non-empty string
+        assert (
+            isinstance(result, str) and len(result) > 0
+        )  # Result should be a non-empty string
 
     def test_html_charset_is_utf8(self, valid_pdf_bytes):
         """HTML specifies UTF-8 charset."""
@@ -1162,12 +1186,13 @@ class TestHtmlOutputValidation:
         result = convert_pdf_to_html(valid_pdf_bytes)
 
         assert 'name="viewport"' in result
-        assert 'width=device-width' in result
+        assert "width=device-width" in result
 
 
 # =============================================================================
 # Test: Font Size Threshold Detection
 # =============================================================================
+
 
 class TestFontSizeThresholdDetection:
     """Tests for font size threshold detection logic."""
@@ -1220,6 +1245,7 @@ class TestFontSizeThresholdDetection:
 # Test: Inline Formatting
 # =============================================================================
 
+
 class TestInlineFormatting:
     """Tests for inline text formatting (bold, italic)."""
 
@@ -1228,10 +1254,11 @@ class TestInlineFormatting:
         # Import PDF specific exceptions
         try:
             import fitz
+
             PdfException = fitz.DocumentError
         except (ImportError, AttributeError):
             PdfException = (OSError, RuntimeError)
-        
+
         try:
             result = convert_pdf_to_html(valid_pdf_with_formatting)
             # Should contain strong tags if bold text detected
@@ -1245,10 +1272,11 @@ class TestInlineFormatting:
         # Import PDF specific exceptions
         try:
             import fitz
+
             PdfException = fitz.DocumentError
         except (ImportError, AttributeError):
             PdfException = (OSError, RuntimeError)
-        
+
         try:
             result = convert_pdf_to_html(valid_pdf_with_formatting)
             # Should contain em tags if italic text detected
@@ -1271,6 +1299,7 @@ class TestInlineFormatting:
 # =============================================================================
 # Test: Large PDF Handling
 # =============================================================================
+
 
 class TestLargePdfHandling:
     """Tests for handling large PDFs."""
@@ -1301,6 +1330,7 @@ class TestLargePdfHandling:
 # =============================================================================
 # Test: Error Messages
 # =============================================================================
+
 
 class TestErrorMessages:
     """Tests for error messages and exception handling."""

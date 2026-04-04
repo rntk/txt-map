@@ -68,11 +68,15 @@ class MongoLLMCacheStore:
 
     # --- Management API methods ---
 
-    def list_entries(self, namespace: str | None = None, limit: int = 100, skip: int = 0) -> list[dict[str, Any]]:
+    def list_entries(
+        self, namespace: str | None = None, limit: int = 100, skip: int = 0
+    ) -> list[dict[str, Any]]:
         query: dict[str, Any] = {}
         if namespace:
             query["namespace"] = namespace
-        cursor = self._collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        cursor = (
+            self._collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        )
         result = []
         for doc in cursor:
             doc_copy = {k: v for k, v in doc.items() if k != "_id"}
@@ -88,6 +92,7 @@ class MongoLLMCacheStore:
 
     def delete_entry_by_id(self, entry_id: str) -> bool:
         from bson import ObjectId
+
         try:
             obj_id = ObjectId(entry_id)
         except Exception:
@@ -111,4 +116,7 @@ class MongoLLMCacheStore:
             {"$group": {"_id": "$namespace", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
         ]
-        return [{"namespace": r["_id"], "count": r["count"]} for r in self._collection.aggregate(pipeline)]
+        return [
+            {"namespace": r["_id"], "count": r["count"]}
+            for r in self._collection.aggregate(pipeline)
+        ]

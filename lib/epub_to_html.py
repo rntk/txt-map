@@ -5,6 +5,7 @@ EPUB is a ZIP archive containing XHTML chapter files and an OPF manifest.
 This module reads chapters in spine order and produces semantic HTML,
 plus a plain-text extraction.
 """
+
 import io
 import re
 import zipfile
@@ -60,7 +61,11 @@ def _get_spine_items(zf: zipfile.ZipFile, opf_path: str) -> List[Tuple[str, str]
             item_id = item.get("id", "")
             href = item.get("href", "")
             media_type = item.get("media-type", "")
-            if media_type in ("application/xhtml+xml", "text/html") and item_id and href:
+            if (
+                media_type in ("application/xhtml+xml", "text/html")
+                and item_id
+                and href
+            ):
                 manifest[item_id] = href
 
     # Get spine order
@@ -109,7 +114,12 @@ def _extract_body_text(xhtml_bytes: bytes) -> str:
     except Exception:
         return ""
     # Remove script/style blocks first
-    text = re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(
+        r"<(script|style)[^>]*>.*?</(script|style)>",
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     # Strip all tags
     text = _TAG_RE.sub(" ", text)
     # Collapse whitespace

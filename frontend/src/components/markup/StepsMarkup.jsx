@@ -1,6 +1,6 @@
-import React from 'react';
-import { getItemIndex, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getItemIndex, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * StepsMarkup - Displays procedural steps with visual connector
@@ -20,20 +20,21 @@ export default function StepsMarkup({ segment, sentences }) {
       aria-label="Procedure steps"
     >
       {items.map((item, index) => {
-        const text = item.text || getTextByIndex(sentences, getItemIndex(item)) || '';
+        const text =
+          item.text || getTextByIndex(sentences, getItemIndex(item)) || "";
         const stepNumber = item.step_number ?? index + 1;
         const isLast = index === items.length - 1;
         const isFirst = index === 0;
 
         // Determine step state for styling
-        let stepState = '';
-        if (isFirst) stepState = 'active';
+        let stepState = "";
+        if (isFirst) stepState = "active";
         // Could be extended to support 'completed' state based on user interaction
 
         return (
           <div
             key={index}
-            className={`markup-steps__item ${stepState ? `markup-steps__item--${stepState}` : ''}`}
+            className={`markup-steps__item ${stepState ? `markup-steps__item--${stepState}` : ""}`}
             role="listitem"
             aria-posinset={stepNumber}
             aria-setsize={items.length}
@@ -44,7 +45,9 @@ export default function StepsMarkup({ segment, sentences }) {
             >
               {stepNumber}
             </span>
-            {!isLast && <div className="markup-steps__connector" aria-hidden="true" />}
+            {!isLast && (
+              <div className="markup-steps__connector" aria-hidden="true" />
+            )}
             <span className="markup-steps__text">
               <HighlightedText text={text} />
             </span>

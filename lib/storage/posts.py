@@ -38,7 +38,11 @@ class PostsStorage:
         else:
             sort = [("unix_date", DESCENDING)]
 
-        return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort)
+        return (
+            self._db.posts.find(query, projection=projection)
+            .allow_disk_use(True)
+            .sort(sort)
+        )
 
     def get_all(
         self,
@@ -87,7 +91,11 @@ class PostsStorage:
             query["read"] = not only_unread
         sort_data = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
 
-        return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort_data)
+        return (
+            self._db.posts.find(query, projection=projection)
+            .allow_disk_use(True)
+            .sort(sort_data)
+        )
 
     def get_by_bi_grams(
         self,
@@ -101,7 +109,11 @@ class PostsStorage:
             query["read"] = not only_unread
         sort_data = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
 
-        return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort_data)
+        return (
+            self._db.posts.find(query, projection=projection)
+            .allow_disk_use(True)
+            .sort(sort_data)
+        )
 
     def get_by_feed_id(
         self,
@@ -117,7 +129,11 @@ class PostsStorage:
         else:
             sort = [("unix_date", DESCENDING)]
 
-        return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort)
+        return (
+            self._db.posts.find(query, projection=projection)
+            .allow_disk_use(True)
+            .sort(sort)
+        )
 
     def get_by_pid(
         self, owner: str, pid: int, projection: Optional[dict[str, Any]] = None
@@ -127,7 +143,7 @@ class PostsStorage:
         return self._db.posts.find_one(query, projection=projection)
 
     def get_by_id(
-            self, owner: str, pid: int, projection: Optional[dict[str, Any]] = None
+        self, owner: str, pid: int, projection: Optional[dict[str, Any]] = None
     ) -> Optional[dict[str, Any]]:
         query = {"owner": owner, "id": pid}
 
@@ -192,7 +208,11 @@ class PostsStorage:
             query["read"] = not only_unread
         sort_data = [("feed_id", DESCENDING), ("unix_date", DESCENDING)]
 
-        return self._db.posts.find(query, projection=projection).allow_disk_use(True).sort(sort_data)
+        return (
+            self._db.posts.find(query, projection=projection)
+            .allow_disk_use(True)
+            .sort(sort_data)
+        )
 
     def get_clusters(self, posts: List[dict[str, Any]]) -> Set[Any]:
         result: Set[Any] = set()

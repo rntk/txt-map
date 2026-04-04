@@ -1,10 +1,10 @@
-import React from 'react';
+import React from "react";
 
 const CENTER = 50;
 const INNER_RADIUS = 35;
 const OUTER_RADIUS = 45;
 const STROKE_WIDTH = 1.5;
-const VIEWBOX = '0 0 100 55';
+const VIEWBOX = "0 0 100 55";
 const LINE_COUNT = 40;
 
 function buildGaugeLines(percentage) {
@@ -19,23 +19,35 @@ function buildGaugeLines(percentage) {
       y1: CENTER + OUTER_RADIUS * Math.sin(angle),
       x2: CENTER + INNER_RADIUS * Math.cos(angle),
       y2: CENTER + INNER_RADIUS * Math.sin(angle),
-      stroke: isFilled ? '#333' : '#ddd',
+      stroke: isFilled ? "#333" : "#ddd",
     };
   });
 }
 
-export default function ReadProgress({ percentage = 0, label = '', size = 150, hint = '' }) {
+export default function ReadProgress({
+  percentage = 0,
+  label = "",
+  size = 150,
+  hint = "",
+}) {
   const safePercentage = Math.min(100, Math.max(0, percentage));
   const gaugeLines = buildGaugeLines(safePercentage);
   const labelFontSize = size * 0.09;
   const tooltip = hint || label;
 
   return (
-    <div 
+    <div
       title={tooltip}
-      style={{ width: size, display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif', cursor: 'help' }}
+      style={{
+        width: size,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        fontFamily: "sans-serif",
+        cursor: "help",
+      }}
     >
-      <svg viewBox={VIEWBOX} style={{ width: '100%', display: 'block' }}>
+      <svg viewBox={VIEWBOX} style={{ width: "100%", display: "block" }}>
         {gaugeLines.map(function renderLine(line) {
           return (
             <line
@@ -62,7 +74,14 @@ export default function ReadProgress({ percentage = 0, label = '', size = 150, h
         </text>
       </svg>
       {label && (
-        <div style={{ fontSize: labelFontSize, color: '#666', marginTop: 4, textAlign: 'center' }}>
+        <div
+          style={{
+            fontSize: labelFontSize,
+            color: "#666",
+            marginTop: 4,
+            textAlign: "center",
+          }}
+        >
           {label}
         </div>
       )}

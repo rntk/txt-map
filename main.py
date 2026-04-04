@@ -4,7 +4,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from handlers import submission_handler, task_queue_handler, diff_handler, llm_cache_handler, settings_handler, extension_handler, llm_queue_handler
+from handlers import (
+    submission_handler,
+    task_queue_handler,
+    diff_handler,
+    llm_cache_handler,
+    settings_handler,
+    extension_handler,
+    llm_queue_handler,
+)
 from lifespan import lifespan
 
 app = FastAPI(
@@ -58,6 +66,8 @@ FRONTEND_INDEX = "frontend/build/index.html"
 def serve_frontend_page():
     return FileResponse(FRONTEND_INDEX)
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

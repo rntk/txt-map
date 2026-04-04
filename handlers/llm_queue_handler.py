@@ -6,6 +6,7 @@ from handlers.dependencies import get_llm_queue_store
 
 router = APIRouter()
 
+
 @router.get("/llm-queue")
 def list_llm_queue(
     status: Optional[str] = None,
@@ -31,6 +32,7 @@ def list_llm_queue(
         serialized.append(t)
 
     return {"tasks": serialized}
+
 
 @router.delete("/llm-queue/{request_id}")
 def delete_llm_queue_entry(

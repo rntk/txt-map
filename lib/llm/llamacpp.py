@@ -24,7 +24,11 @@ class LLamaCPP(LLMClient):
         max_retries: int = 3,
         retry_delay: float = 1.0,
     ) -> None:
-        super().__init__(max_context_tokens=max_context_tokens, max_retries=max_retries, retry_delay=retry_delay)
+        super().__init__(
+            max_context_tokens=max_context_tokens,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
         u = urlparse(host)
         self.__host = u.netloc
         self.__is_https = u.scheme.lower() == "https"
@@ -85,12 +89,12 @@ class LLamaCPP(LLMClient):
                     "model": self.__model,
                     "messages": [{"role": "user", "content": user_msgs[0]}],
                     "temperature": temperature,
-                    "cache_prompt": True
+                    "cache_prompt": True,
                 }
             )
-            headers = {'Content-type': 'application/json'}
+            headers = {"Content-type": "application/json"}
             if self.__token:
-                headers['Authorization'] = f"Bearer {self.__token}"
+                headers["Authorization"] = f"Bearer {self.__token}"
             conn.request("POST", "/v1/chat/completions", body, headers)
             res = conn.getresponse()
             resp_body = res.read()
@@ -135,12 +139,12 @@ class LLamaCPP(LLMClient):
                 {
                     "model": "text-embedding-3-small",
                     "encoding_format": "float",
-                    "input": texts
+                    "input": texts,
                 }
             )
-            headers = {'Content-type': 'application/json'}
+            headers = {"Content-type": "application/json"}
             if self.__token:
-                headers['Authorization'] = f"Bearer {self.__token}"
+                headers["Authorization"] = f"Bearer {self.__token}"
             conn.request("POST", "/v1/embeddings", body, headers)
             res = conn.getresponse()
             resp_body = res.read()
@@ -161,7 +165,9 @@ class LLamaCPP(LLMClient):
         finally:
             conn.close()
 
-    def rerank(self, query: str, documents: List[str], top_n: Optional[int] = None) -> Optional[List[Dict[str, Any]]]:
+    def rerank(
+        self, query: str, documents: List[str], top_n: Optional[int] = None
+    ) -> Optional[List[Dict[str, Any]]]:
         """
         Reranks documents according to their relevance to the query.
 
@@ -179,18 +185,15 @@ class LLamaCPP(LLMClient):
         """
         conn = self.get_connection()
         try:
-            request_body = {
-                "query": query,
-                "documents": documents
-            }
+            request_body = {"query": query, "documents": documents}
 
             if top_n is not None:
                 request_body["top_n"] = top_n
 
             body = json.dumps(request_body)
-            headers = {'Content-type': 'application/json'}
+            headers = {"Content-type": "application/json"}
             if self.__token:
-                headers['Authorization'] = f"Bearer {self.__token}"
+                headers["Authorization"] = f"Bearer {self.__token}"
 
             conn.request("POST", "/v1/rerank", body, headers)
             res = conn.getresponse()

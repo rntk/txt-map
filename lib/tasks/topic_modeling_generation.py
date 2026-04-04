@@ -2,6 +2,7 @@
 Topic modeling task - discovers latent topics using NMF on TF-IDF sentence vectors.
 Maps LLM-assigned topics to latent topics.  No LLM required.
 """
+
 from typing import Any
 
 from sklearn.decomposition import NMF
@@ -9,7 +10,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 def process_topic_modeling_generation(
-    submission: dict[str, Any], db: Any, llm: Any  # noqa: ARG001
+    submission: dict[str, Any],
+    db: Any,
+    llm: Any,  # noqa: ARG001
 ) -> None:
     sentences: list[str] = submission["results"].get("sentences", [])
     topics: list[dict] = submission["results"].get("topics", [])
@@ -38,7 +41,9 @@ def process_topic_modeling_generation(
     # Normalize topic weights by total activation.
     topic_weights_raw = W.sum(axis=0)
     total = topic_weights_raw.sum()
-    topic_weights = (topic_weights_raw / total).tolist() if total > 0 else [0.0] * n_components
+    topic_weights = (
+        (topic_weights_raw / total).tolist() if total > 0 else [0.0] * n_components
+    )
 
     latent_topics: list[dict[str, Any]] = []
     for i in range(n_components):
@@ -57,9 +62,13 @@ def process_topic_modeling_generation(
     for topic in topics:
         name = topic.get("name", "")
         # sentence indices are 1-based; convert to 0-based for W lookup.
-        indices_0based = [idx - 1 for idx in topic.get("sentences", []) if 1 <= idx <= len(sentences)]
+        indices_0based = [
+            idx - 1 for idx in topic.get("sentences", []) if 1 <= idx <= len(sentences)
+        ]
         if not indices_0based:
-            topic_mapping.append({"topic_name": name, "latent_topic_ids": [], "scores": []})
+            topic_mapping.append(
+                {"topic_name": name, "latent_topic_ids": [], "scores": []}
+            )
             continue
 
         avg_scores = W[indices_0based].mean(axis=0)
@@ -83,5 +92,12 @@ def process_topic_modeling_generation(
 
     db.submissions.update_one(
         {"submission_id": submission_id},
-        {"$set": {"results.topic_model": {"latent_topics": latent_topics, "topic_mapping": topic_mapping}}},
+        {
+            "$set": {
+                "results.topic_model": {
+                    "latent_topics": latent_topics,
+                    "topic_mapping": topic_mapping,
+                }
+            }
+        },
     )

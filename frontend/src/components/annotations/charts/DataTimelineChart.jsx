@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useMemo } from 'react';
-import * as d3 from 'd3';
-import { BASE_COLORS } from '../../../utils/chartConstants';
+import React, { useRef, useEffect, useMemo } from "react";
+import * as d3 from "d3";
+import { BASE_COLORS } from "../../../utils/chartConstants";
 
 const MARGIN = { top: 10, right: 16, bottom: 28, left: 130 };
-const MARKER_COLOR = '#7ba3cc';
+const MARKER_COLOR = "#7ba3cc";
 const GANTT_COLORS = BASE_COLORS;
 const ROW_HEIGHT = 28;
 const MIN_HEIGHT = 80;
@@ -20,7 +20,7 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
   const svgRef = useRef(null);
 
   const { values = [], visualization, label } = extraction || {};
-  const chartType = visualization?.chart_type || 'timeline'; // 'timeline' or 'gantt'
+  const chartType = visualization?.chart_type || "timeline"; // 'timeline' or 'gantt'
   const _config = visualization?.config || {};
 
   // Build chart items — try to parse dates, fall back to sequential positions
@@ -33,7 +33,7 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
       return {
         index: i,
         key: v.key || v.date || v.start || String(i + 1),
-        value: v.value || '',
+        value: v.value || "",
         startDate: startDate && !isNaN(startDate) ? startDate : null,
         endDate: endDate && !isNaN(endDate) ? endDate : null,
         startRaw: v.start || v.date || null,
@@ -43,14 +43,17 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
   }, [values]);
 
   const hasDates = items.some((d) => d.startDate !== null);
-  const isGantt = chartType === 'gantt';
+  const isGantt = chartType === "gantt";
 
   // Dynamic height based on number of rows
-  const height = Math.max(MIN_HEIGHT, items.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom + 10);
+  const height = Math.max(
+    MIN_HEIGHT,
+    items.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom + 10,
+  );
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
+    svg.selectAll("*").remove();
 
     if (!items.length) return;
 
@@ -58,16 +61,16 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
     const innerHeight = height - MARGIN.top - MARGIN.bottom;
 
     const g = svg
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
 
     // Build x scale — date-based if we have dates, otherwise positional (index-based)
     let xScale;
     if (hasDates) {
       const allDates = items.flatMap((d) =>
-        [d.startDate, d.endDate].filter(Boolean)
+        [d.startDate, d.endDate].filter(Boolean),
       );
       const [minDate, maxDate] = d3.extent(allDates);
       // Add some padding
@@ -93,12 +96,13 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
 
     // Horizontal grid lines
     items.forEach((_, i) => {
-      g.append('line')
-        .attr('x1', 0).attr('x2', innerWidth)
-        .attr('y1', yBand(i) + yBand.bandwidth() / 2)
-        .attr('y2', yBand(i) + yBand.bandwidth() / 2)
-        .attr('stroke', '#f0f0f0')
-        .attr('stroke-width', 1);
+      g.append("line")
+        .attr("x1", 0)
+        .attr("x2", innerWidth)
+        .attr("y1", yBand(i) + yBand.bandwidth() / 2)
+        .attr("y2", yBand(i) + yBand.bandwidth() / 2)
+        .attr("stroke", "#f0f0f0")
+        .attr("stroke-width", 1);
     });
 
     if (isGantt) {
@@ -119,25 +123,28 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
         }
         const barWidth = Math.max(x2 - x1, 4);
 
-        g.append('rect')
-          .attr('x', x1)
-          .attr('y', y)
-          .attr('width', barWidth)
-          .attr('height', bh)
-          .attr('fill', fill)
-          .attr('rx', 3)
-          .attr('opacity', 0.85);
+        g.append("rect")
+          .attr("x", x1)
+          .attr("y", y)
+          .attr("width", barWidth)
+          .attr("height", bh)
+          .attr("fill", fill)
+          .attr("rx", 3)
+          .attr("opacity", 0.85);
 
         // Label inside or after bar
         const textX = x1 + barWidth + 4;
         if (textX + 10 < innerWidth) {
-          g.append('text')
-            .attr('x', textX)
-            .attr('y', y + bh / 2)
-            .attr('dy', '0.35em')
-            .attr('font-size', 10)
-            .attr('fill', '#555')
-            .text(d.value || (d.startRaw && d.endRaw ? `${d.startRaw} – ${d.endRaw}` : ''));
+          g.append("text")
+            .attr("x", textX)
+            .attr("y", y + bh / 2)
+            .attr("dy", "0.35em")
+            .attr("font-size", 10)
+            .attr("fill", "#555")
+            .text(
+              d.value ||
+                (d.startRaw && d.endRaw ? `${d.startRaw} – ${d.endRaw}` : ""),
+            );
         }
       });
     } else {
@@ -145,56 +152,61 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
       const lineY = innerHeight / 2;
 
       // Axis line
-      g.append('line')
-        .attr('x1', 0).attr('x2', innerWidth)
-        .attr('y1', lineY).attr('y2', lineY)
-        .attr('stroke', '#ccc')
-        .attr('stroke-width', 1.5);
+      g.append("line")
+        .attr("x1", 0)
+        .attr("x2", innerWidth)
+        .attr("y1", lineY)
+        .attr("y2", lineY)
+        .attr("stroke", "#ccc")
+        .attr("stroke-width", 1.5);
 
       items.forEach((d, i) => {
-        const cx = hasDates && d.startDate
-          ? xScale(d.startDate)
-          : xScale(i);
+        const cx = hasDates && d.startDate ? xScale(d.startDate) : xScale(i);
 
         const row = i % 2 === 0 ? lineY - 28 : lineY + 12;
 
         // Connector
-        g.append('line')
-          .attr('x1', cx).attr('x2', cx)
-          .attr('y1', lineY).attr('y2', row + (i % 2 === 0 ? 16 : 0))
-          .attr('stroke', '#ccc').attr('stroke-width', 1);
+        g.append("line")
+          .attr("x1", cx)
+          .attr("x2", cx)
+          .attr("y1", lineY)
+          .attr("y2", row + (i % 2 === 0 ? 16 : 0))
+          .attr("stroke", "#ccc")
+          .attr("stroke-width", 1);
 
         // Marker
-        g.append('circle')
-          .attr('cx', cx).attr('cy', lineY)
-          .attr('r', 5)
-          .attr('fill', MARKER_COLOR);
+        g.append("circle")
+          .attr("cx", cx)
+          .attr("cy", lineY)
+          .attr("r", 5)
+          .attr("fill", MARKER_COLOR);
 
         // Event label
-        const textAnchor = cx < 30 ? 'start' : cx > innerWidth - 30 ? 'end' : 'middle';
+        const textAnchor =
+          cx < 30 ? "start" : cx > innerWidth - 30 ? "end" : "middle";
         const labelY = i % 2 === 0 ? row : row + 14;
 
-        g.append('text')
-          .attr('x', cx)
-          .attr('y', labelY)
-          .attr('text-anchor', textAnchor)
-          .attr('font-size', 10)
-          .attr('fill', '#444')
+        g.append("text")
+          .attr("x", cx)
+          .attr("y", labelY)
+          .attr("text-anchor", textAnchor)
+          .attr("font-size", 10)
+          .attr("fill", "#444")
           .text(() => {
             const txt = d.key;
-            return txt.length > 16 ? txt.slice(0, 14) + '…' : txt;
+            return txt.length > 16 ? txt.slice(0, 14) + "…" : txt;
           });
 
         if (d.value && d.value !== d.key) {
-          g.append('text')
-            .attr('x', cx)
-            .attr('y', labelY + 12)
-            .attr('text-anchor', textAnchor)
-            .attr('font-size', 9)
-            .attr('fill', '#888')
+          g.append("text")
+            .attr("x", cx)
+            .attr("y", labelY + 12)
+            .attr("text-anchor", textAnchor)
+            .attr("font-size", 9)
+            .attr("fill", "#888")
             .text(() => {
               const txt = d.value;
-              return txt.length > 14 ? txt.slice(0, 12) + '…' : txt;
+              return txt.length > 14 ? txt.slice(0, 12) + "…" : txt;
             });
         }
       });
@@ -202,35 +214,39 @@ export default function DataTimelineChart({ extraction, width = 340 }) {
 
     // X axis
     const xAxisG = g
-      .append('g')
-      .attr('transform', `translate(0,${innerHeight})`)
+      .append("g")
+      .attr("transform", `translate(0,${innerHeight})`)
       .call(
         hasDates
           ? d3.axisBottom(xScale).ticks(4)
-          : d3.axisBottom(xScale).ticks(items.length).tickFormat((i) => {
-              const item = items[Math.round(i)];
-              return item ? item.startRaw || item.key || '' : '';
-            })
+          : d3
+              .axisBottom(xScale)
+              .ticks(items.length)
+              .tickFormat((i) => {
+                const item = items[Math.round(i)];
+                return item ? item.startRaw || item.key || "" : "";
+              }),
       );
-    xAxisG.select('.domain').attr('stroke', '#ccc');
-    xAxisG.selectAll('line').attr('stroke', '#ccc');
-    xAxisG.selectAll('text').attr('font-size', 9).attr('fill', '#888');
+    xAxisG.select(".domain").attr("stroke", "#ccc");
+    xAxisG.selectAll("line").attr("stroke", "#ccc");
+    xAxisG.selectAll("text").attr("font-size", 9).attr("fill", "#888");
 
     // Y axis — key labels (for gantt)
     if (isGantt) {
-      const yAxis = g.append('g').call(
-        d3.axisLeft(yBand)
+      const yAxis = g.append("g").call(
+        d3
+          .axisLeft(yBand)
           .tickFormat((i) => {
             const item = items[i];
-            if (!item) return '';
+            if (!item) return "";
             const txt = item.key;
-            return txt.length > 16 ? txt.slice(0, 14) + '…' : txt;
+            return txt.length > 16 ? txt.slice(0, 14) + "…" : txt;
           })
           .tickSize(0)
-          .tickPadding(6)
+          .tickPadding(6),
       );
-      yAxis.select('.domain').remove();
-      yAxis.selectAll('text').attr('font-size', 11).attr('fill', '#444');
+      yAxis.select(".domain").remove();
+      yAxis.selectAll("text").attr("font-size", 11).attr("fill", "#444");
     }
   }, [items, isGantt, hasDates, width, height]);
 

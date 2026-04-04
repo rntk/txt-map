@@ -1,5 +1,5 @@
-import React from 'react';
-import './WordSelectionPopup.css';
+import React from "react";
+import "./WordSelectionPopup.css";
 
 /**
  * @typedef {Object} WordSelectionPopupProps
@@ -13,8 +13,8 @@ function WordSelectionPopup({ selectionData, submissionId }) {
     <div
       className="word-selection-popup"
       style={{
-        '--word-selection-popup-left': `${selectionData.position.x}px`,
-        '--word-selection-popup-top': `${selectionData.position.y}px`,
+        "--word-selection-popup-left": `${selectionData.position.x}px`,
+        "--word-selection-popup-top": `${selectionData.position.y}px`,
       }}
     >
       <button

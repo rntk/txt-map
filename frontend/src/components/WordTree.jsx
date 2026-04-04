@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useRef } from 'react';
-import * as d3 from 'd3';
+import React, { useMemo, useEffect, useRef } from "react";
+import * as d3 from "d3";
 
 /**
  * @typedef {Object} WordTreeToken
@@ -26,7 +26,7 @@ import * as d3 from 'd3';
  * @returns {string}
  */
 function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -34,15 +34,18 @@ function escapeRegExp(value) {
  * @returns {string}
  */
 export function sentenceToPlainText(sentence) {
-  const raw = String(sentence || '');
+  const raw = String(sentence || "");
 
-  if (typeof document === 'undefined') {
-    return raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (typeof document === "undefined") {
+    return raw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
-  const template = document.createElement('template');
+  const template = document.createElement("template");
   template.innerHTML = raw;
-  return (template.content.textContent || '').replace(/\s+/g, ' ').trim();
+  return (template.content.textContent || "").replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -50,13 +53,13 @@ export function sentenceToPlainText(sentence) {
  * @returns {WordTreeToken[]}
  */
 export function tokenizeWordTreeText(text) {
-  const source = String(text || '');
+  const source = String(text || "");
   if (!source.trim()) {
     return [];
   }
 
-  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-    const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
     return Array.from(segmenter.segment(source))
       .filter((part) => part.isWordLike)
       .map((part) => ({
@@ -78,7 +81,7 @@ export function tokenizeWordTreeText(text) {
  * @returns {RegExp|null}
  */
 export function buildWordTreeMatchRegex(target) {
-  const normalizedTarget = String(target || '').trim();
+  const normalizedTarget = String(target || "").trim();
   if (!normalizedTarget) {
     return null;
   }
@@ -86,9 +89,9 @@ export function buildWordTreeMatchRegex(target) {
   const pattern = normalizedTarget
     .split(/\s+/)
     .map((part) => escapeRegExp(part))
-    .join('\\s+');
+    .join("\\s+");
 
-  return new RegExp(`(?<![\\p{L}\\p{N}_])${pattern}(?![\\p{L}\\p{N}_])`, 'giu');
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${pattern}(?![\\p{L}\\p{N}_])`, "giu");
 }
 
 /**
@@ -97,12 +100,17 @@ export function buildWordTreeMatchRegex(target) {
  * @param {Set<number>|number[]} [readSentenceIndices]
  * @returns {WordTreeEntry[]}
  */
-export function buildWordTreeEntries(sentences, target, readSentenceIndices = new Set()) {
+export function buildWordTreeEntries(
+  sentences,
+  target,
+  readSentenceIndices = new Set(),
+) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
   const regex = buildWordTreeMatchRegex(target);
-  const readSentenceIndexSet = readSentenceIndices instanceof Set
-    ? readSentenceIndices
-    : new Set(readSentenceIndices || []);
+  const readSentenceIndexSet =
+    readSentenceIndices instanceof Set
+      ? readSentenceIndices
+      : new Set(readSentenceIndices || []);
 
   if (!regex) {
     return [];
@@ -160,19 +168,28 @@ export function buildWordTreeEntries(sentences, target, readSentenceIndices = ne
  * @returns {TrieNode}
  */
 function buildTrie(entries, side) {
-  const root = { name: "", children: new Map(), count: entries.length, sentenceIndices: new Set() };
+  const root = {
+    name: "",
+    children: new Map(),
+    count: entries.length,
+    sentenceIndices: new Set(),
+  };
 
   entries.forEach((entry) => {
     root.sentenceIndices.add(entry.sentenceIndex);
     let current = root;
-    const tokens = side === "left"
-      ? [...entry.leftTokens].reverse()
-      : entry.rightTokens;
+    const tokens =
+      side === "left" ? [...entry.leftTokens].reverse() : entry.rightTokens;
 
     tokens.forEach((token) => {
       const key = token.normalized;
       if (!current.children.has(key)) {
-        current.children.set(key, { name: token.text, children: new Map(), count: 0, sentenceIndices: new Set() });
+        current.children.set(key, {
+          name: token.text,
+          children: new Map(),
+          count: 0,
+          sentenceIndices: new Set(),
+        });
       }
       current = current.children.get(key);
       current.count++;
@@ -192,24 +209,24 @@ function trieToHierarchy(node) {
     name: node.name,
     count: node.count,
     sentenceIndices: Array.from(node.sentenceIndices || []),
-    children: Array.from(node.children.values()).map(trieToHierarchy)
+    children: Array.from(node.children.values()).map(trieToHierarchy),
   };
 }
 
 // ── Layout constants ───────────────────────────────────────────────────────────
 const FONT_MIN = 13;
 const FONT_MAX = 34;
-const H_GAP = 16;           // horizontal gap between words (px)
-const V_GAP = 8;            // vertical gap between sibling branches (px)
+const H_GAP = 16; // horizontal gap between words (px)
+const V_GAP = 8; // vertical gap between sibling branches (px)
 const LINE_HEIGHT_FACTOR = 1.6;
 const PADDING = 24;
-const FONT_FAMILY = 'sans-serif';
-const MAX_DEPTH = 12;       // truncate very deep branches
+const FONT_FAMILY = "sans-serif";
+const MAX_DEPTH = 12; // truncate very deep branches
 
 // ── Highlight colors ───────────────────────────────────────────────────────────
-const COLOR_HIGHLIGHT  = '#d84315'; // active sentence path
-const COLOR_DIM        = '#d0d0d0'; // non-active nodes when something is highlighted
-const COLOR_LINK_DIM   = 0.08;
+const COLOR_HIGHLIGHT = "#d84315"; // active sentence path
+const COLOR_DIM = "#d0d0d0"; // non-active nodes when something is highlighted
+const COLOR_LINK_DIM = 0.08;
 const COLOR_LINK_ACTIVE = 0.75;
 
 // ── Text measurement ───────────────────────────────────────────────────────────
@@ -218,9 +235,9 @@ let _canvasCtx = null;
 
 function getMeasureCtx() {
   if (_canvasCtx) return _canvasCtx;
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    _canvasCtx = canvas.getContext('2d');
+  if (typeof document !== "undefined") {
+    const canvas = document.createElement("canvas");
+    _canvasCtx = canvas.getContext("2d");
   }
   return _canvasCtx;
 }
@@ -245,7 +262,7 @@ function measureTextWidth(text, fontSize) {
 
 function findMaxCount(node) {
   let max = node.count || 0;
-  (node.children || []).forEach(child => {
+  (node.children || []).forEach((child) => {
     max = Math.max(max, findMaxCount(child));
   });
   return max;
@@ -263,9 +280,9 @@ function annotateNode(node, maxCount, depth) {
   node.lineHeight = node.fontSize * LINE_HEIGHT_FACTOR;
   node._depth = depth;
 
-  const children = depth < MAX_DEPTH ? (node.children || []) : [];
+  const children = depth < MAX_DEPTH ? node.children || [] : [];
   node._visibleChildren = children;
-  children.forEach(child => annotateNode(child, maxCount, depth + 1));
+  children.forEach((child) => annotateNode(child, maxCount, depth + 1));
 }
 
 /** Bottom-up pass: compute subtreeHeight for each node. */
@@ -295,11 +312,12 @@ function assignPositions(node, x, y, parent, direction) {
   if (children.length === 0) return;
 
   let yOffset = y - node.subtreeHeight / 2;
-  children.forEach(child => {
+  children.forEach((child) => {
     const childY = yOffset + child.subtreeHeight / 2;
-    const childX = direction === 'right'
-      ? x + node.textWidth + H_GAP
-      : x - H_GAP - child.textWidth;
+    const childX =
+      direction === "right"
+        ? x + node.textWidth + H_GAP
+        : x - H_GAP - child.textWidth;
     assignPositions(child, childX, childY, node, direction);
     yOffset += child.subtreeHeight + V_GAP;
   });
@@ -308,7 +326,7 @@ function assignPositions(node, x, y, parent, direction) {
 /** Flatten tree into array (pre-order). */
 function flattenTree(node, result = []) {
   result.push(node);
-  (node._visibleChildren || []).forEach(child => flattenTree(child, result));
+  (node._visibleChildren || []).forEach((child) => flattenTree(child, result));
   return result;
 }
 
@@ -324,7 +342,7 @@ function computeOneSideLayout(hierarchy, pivotTextWidth, direction) {
 
   // Virtual root standing in for the pivot
   const pivotRoot = {
-    name: '__pivot__',
+    name: "__pivot__",
     textWidth: pivotTextWidth,
     fontSize: FONT_MAX,
     lineHeight: FONT_MAX * LINE_HEIGHT_FACTOR,
@@ -332,7 +350,7 @@ function computeOneSideLayout(hierarchy, pivotTextWidth, direction) {
     _depth: 0,
   };
 
-  children.forEach(child => annotateNode(child, maxCount, 1));
+  children.forEach((child) => annotateNode(child, maxCount, 1));
 
   const totalH = children.reduce((s, c) => s + computeSubtreeHeight(c), 0);
   pivotRoot.subtreeHeight = totalH + Math.max(0, children.length - 1) * V_GAP;
@@ -342,7 +360,7 @@ function computeOneSideLayout(hierarchy, pivotTextWidth, direction) {
 
   // Return only the real nodes (not the virtual root)
   const nodes = [];
-  children.forEach(c => flattenTree(c, nodes));
+  children.forEach((c) => flattenTree(c, nodes));
   return nodes;
 }
 
@@ -357,7 +375,7 @@ export default function WordTree({ entries, pivotLabel }) {
 
   const safeEntries = useMemo(
     () => (Array.isArray(entries) ? entries : []),
-    [entries]
+    [entries],
   );
 
   useEffect(() => {
@@ -368,27 +386,52 @@ export default function WordTree({ entries, pivotLabel }) {
     const pivotLineHeight = pivotFontSize * LINE_HEIGHT_FACTOR;
 
     // Build both tries
-    const rightTrie = buildTrie(safeEntries, 'right');
-    const leftTrie  = buildTrie(safeEntries, 'left');
+    const rightTrie = buildTrie(safeEntries, "right");
+    const leftTrie = buildTrie(safeEntries, "left");
 
     // Compute positioned nodes for each side (relative to pivot at 0,0)
-    const rightNodes = computeOneSideLayout(trieToHierarchy(rightTrie), pivotTextWidth, 'right');
-    const leftNodes  = computeOneSideLayout(trieToHierarchy(leftTrie),  pivotTextWidth, 'left');
+    const rightNodes = computeOneSideLayout(
+      trieToHierarchy(rightTrie),
+      pivotTextWidth,
+      "right",
+    );
+    const leftNodes = computeOneSideLayout(
+      trieToHierarchy(leftTrie),
+      pivotTextWidth,
+      "left",
+    );
     const allSideNodes = [...rightNodes, ...leftNodes];
 
     // ── Compute SVG bounds ─────────────────────────────────────────────────────
-    const xs    = allSideNodes.map(n => n.x);
-    const xEnds = allSideNodes.map(n => n.x + n.textWidth);
-    const ys    = allSideNodes.map(n => n.y);
+    const xs = allSideNodes.map((n) => n.x);
+    const xEnds = allSideNodes.map((n) => n.x + n.textWidth);
+    const ys = allSideNodes.map((n) => n.y);
 
-    const minX = xs.length    > 0 ? Math.min(0, ...xs)             : 0;
-    const maxX = xEnds.length > 0 ? Math.max(pivotTextWidth, ...xEnds) : pivotTextWidth;
-    const minY = ys.length    > 0 ? Math.min(-pivotLineHeight / 2, ...ys.map((_, i) => allSideNodes[i].y - allSideNodes[i].lineHeight / 2)) : -pivotLineHeight / 2;
-    const maxY = ys.length    > 0 ? Math.max( pivotLineHeight / 2, ...ys.map((_, i) => allSideNodes[i].y + allSideNodes[i].lineHeight / 2)) :  pivotLineHeight / 2;
+    const minX = xs.length > 0 ? Math.min(0, ...xs) : 0;
+    const maxX =
+      xEnds.length > 0 ? Math.max(pivotTextWidth, ...xEnds) : pivotTextWidth;
+    const minY =
+      ys.length > 0
+        ? Math.min(
+            -pivotLineHeight / 2,
+            ...ys.map(
+              (_, i) => allSideNodes[i].y - allSideNodes[i].lineHeight / 2,
+            ),
+          )
+        : -pivotLineHeight / 2;
+    const maxY =
+      ys.length > 0
+        ? Math.max(
+            pivotLineHeight / 2,
+            ...ys.map(
+              (_, i) => allSideNodes[i].y + allSideNodes[i].lineHeight / 2,
+            ),
+          )
+        : pivotLineHeight / 2;
 
     const offsetX = PADDING - minX;
     const offsetY = PADDING - minY;
-    const svgWidth  = maxX - minX + PADDING * 2;
+    const svgWidth = maxX - minX + PADDING * 2;
     const svgHeight = maxY - minY + PADDING * 2;
 
     // Pivot in SVG coordinates
@@ -396,7 +439,7 @@ export default function WordTree({ entries, pivotLabel }) {
     const pivotSvgY = offsetY;
 
     // Apply offset to all side nodes
-    allSideNodes.forEach(n => {
+    allSideNodes.forEach((n) => {
       n.x += offsetX;
       n.y += offsetY;
     });
@@ -404,53 +447,56 @@ export default function WordTree({ entries, pivotLabel }) {
     // ── Compute connector data ─────────────────────────────────────────────────
     // Draw connector only when the node's parent has 2+ siblings (branching).
     const connectors = allSideNodes
-      .filter(n => n.parent && (n.parent._visibleChildren || []).length > 1)
-      .map(n => {
+      .filter((n) => n.parent && (n.parent._visibleChildren || []).length > 1)
+      .map((n) => {
         const dir = n.direction;
-        const isPivotParent = n.parent.name === '__pivot__';
+        const isPivotParent = n.parent.name === "__pivot__";
 
         // Parent edge toward the gap (after offset)
         let x1, y1;
         if (isPivotParent) {
-          x1 = dir === 'right' ? pivotSvgX + pivotTextWidth : pivotSvgX;
+          x1 = dir === "right" ? pivotSvgX + pivotTextWidth : pivotSvgX;
           y1 = pivotSvgY;
         } else {
-          x1 = dir === 'right' ? n.parent.x + n.parent.textWidth : n.parent.x;
+          x1 = dir === "right" ? n.parent.x + n.parent.textWidth : n.parent.x;
           y1 = n.parent.y;
         }
 
         // Child edge toward the gap (after offset)
-        const x2 = dir === 'right' ? n.x : n.x + n.textWidth;
+        const x2 = dir === "right" ? n.x : n.x + n.textWidth;
         const y2 = n.y;
 
         return { x1, y1, x2, y2, count: n.count, _node: n };
       });
 
     // ── Render ─────────────────────────────────────────────────────────────────
-    const svg = d3.select(svgRef.current)
-      .attr('width', svgWidth)
-      .attr('height', svgHeight)
-      .html('');
+    const svg = d3
+      .select(svgRef.current)
+      .attr("width", svgWidth)
+      .attr("height", svgHeight)
+      .html("");
 
     // Connectors
-    const linkSel = svg.append('g')
-      .attr('class', 'word-tree-graph__links')
-      .selectAll('path')
+    const linkSel = svg
+      .append("g")
+      .attr("class", "word-tree-graph__links")
+      .selectAll("path")
       .data(connectors)
       .enter()
-      .append('path')
-      .attr('class', 'word-tree-graph__link')
-      .attr('d', d => {
+      .append("path")
+      .attr("class", "word-tree-graph__link")
+      .attr("d", (d) => {
         const midX = (d.x1 + d.x2) / 2;
         return `M${d.x1},${d.y1} C${midX},${d.y1} ${midX},${d.y2} ${d.x2},${d.y2}`;
       })
-      .attr('stroke-width', d => Math.max(0.8, Math.min(3, d.count * 0.4)));
+      .attr("stroke-width", (d) => Math.max(0.8, Math.min(3, d.count * 0.4)));
 
     // Color scale (shared across both sides)
-    const maxCount = Math.max(...allSideNodes.map(n => n.count || 0), 1);
-    const colorScale = d3.scaleLinear()
+    const maxCount = Math.max(...allSideNodes.map((n) => n.count || 0), 1);
+    const colorScale = d3
+      .scaleLinear()
       .domain([0, maxCount])
-      .range(['#aaa', '#222'])
+      .range(["#aaa", "#222"])
       .clamp(true);
 
     // Pivot node descriptor (for unified data array)
@@ -467,22 +513,25 @@ export default function WordTree({ entries, pivotLabel }) {
     const allTextData = [pivotDescriptor, ...allSideNodes];
 
     // Text nodes
-    const textSel = svg.append('g')
-      .attr('class', 'word-tree-graph__nodes')
-      .selectAll('text')
+    const textSel = svg
+      .append("g")
+      .attr("class", "word-tree-graph__nodes")
+      .selectAll("text")
       .data(allTextData)
       .enter()
-      .append('text')
-      .attr('class', d => d._isPivot
-        ? 'word-tree-graph__pivot-text'
-        : 'word-tree-graph__node-text')
-      .attr('x', d => d.x)
-      .attr('y', d => d.y)
-      .attr('dominant-baseline', 'central')
-      .attr('text-anchor', 'start')
-      .attr('font-size', d => d.fontSize)
-      .attr('fill', d => d._isPivot ? '#222' : colorScale(d.count))
-      .text(d => d.name);
+      .append("text")
+      .attr("class", (d) =>
+        d._isPivot
+          ? "word-tree-graph__pivot-text"
+          : "word-tree-graph__node-text",
+      )
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y)
+      .attr("dominant-baseline", "central")
+      .attr("text-anchor", "start")
+      .attr("font-size", (d) => d.fontSize)
+      .attr("fill", (d) => (d._isPivot ? "#222" : colorScale(d.count)))
+      .text((d) => d.name);
 
     // ── Interaction: hover/click highlights all nodes belonging to the same sentence ──
     // Each node carries sentenceIndices (the sentences that pass through it).
@@ -491,8 +540,8 @@ export default function WordTree({ entries, pivotLabel }) {
     function sentenceNodes(node) {
       const targetSentences = new Set(node.sentenceIndices || []);
       const result = new Set();
-      allSideNodes.forEach(n => {
-        if ((n.sentenceIndices || []).some(si => targetSentences.has(si))) {
+      allSideNodes.forEach((n) => {
+        if ((n.sentenceIndices || []).some((si) => targetSentences.has(si))) {
           result.add(n);
         }
       });
@@ -503,35 +552,46 @@ export default function WordTree({ entries, pivotLabel }) {
 
     function applyHighlight(chain) {
       const active = chain !== null;
-      textSel.attr('fill', d => {
-        if (d._isPivot) return active ? COLOR_HIGHLIGHT : '#222';
+      textSel.attr("fill", (d) => {
+        if (d._isPivot) return active ? COLOR_HIGHLIGHT : "#222";
         return active
-          ? (chain.has(d) ? COLOR_HIGHLIGHT : COLOR_DIM)
+          ? chain.has(d)
+            ? COLOR_HIGHLIGHT
+            : COLOR_DIM
           : colorScale(d.count);
       });
       linkSel
-        .attr('stroke-opacity', d => active
-          ? (chain.has(d._node) ? COLOR_LINK_ACTIVE : COLOR_LINK_DIM)
-          : 0.45)
-        .attr('stroke', d => (active && chain.has(d._node)) ? COLOR_HIGHLIGHT : null);
+        .attr("stroke-opacity", (d) =>
+          active
+            ? chain.has(d._node)
+              ? COLOR_LINK_ACTIVE
+              : COLOR_LINK_DIM
+            : 0.45,
+        )
+        .attr("stroke", (d) =>
+          active && chain.has(d._node) ? COLOR_HIGHLIGHT : null,
+        );
     }
 
     textSel
-      .on('mouseover', function(event, d) {
+      .on("mouseover", function (event, d) {
         if (stickyChain || d._isPivot) return;
         applyHighlight(sentenceNodes(d));
       })
-      .on('mouseout', function() {
+      .on("mouseout", function () {
         if (stickyChain) return;
         applyHighlight(null);
       })
-      .on('click', function(event, d) {
+      .on("click", function (event, d) {
         if (d._isPivot) return;
         event.stopPropagation();
         const newChain = sentenceNodes(d);
         // Toggle off if the same chain is already locked
-        if (stickyChain && stickyChain.size === newChain.size &&
-            [...newChain].every(n => stickyChain.has(n))) {
+        if (
+          stickyChain &&
+          stickyChain.size === newChain.size &&
+          [...newChain].every((n) => stickyChain.has(n))
+        ) {
           stickyChain = null;
           applyHighlight(null);
         } else {
@@ -541,17 +601,18 @@ export default function WordTree({ entries, pivotLabel }) {
       });
 
     // Click on SVG background clears sticky selection
-    svg.on('click', function() {
+    svg.on("click", function () {
       stickyChain = null;
       applyHighlight(null);
     });
-
   }, [safeEntries, pivotLabel]);
 
   if (safeEntries.length === 0) {
     return (
       <div className="word-tree word-tree--empty">
-        <p className="word-page-no-occurrences">No occurrences of this word were found.</p>
+        <p className="word-page-no-occurrences">
+          No occurrences of this word were found.
+        </p>
       </div>
     );
   }

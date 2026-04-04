@@ -1,11 +1,22 @@
-import React, { useRef, useMemo, useCallback, useState, useEffect } from 'react';
-import ReadingOrderBar from './ReadingOrderBar';
-import TopicCard from './TopicCard';
-import DataExtractionTable from './DataExtractionTable';
-import ArticleTreeNav from './ArticleTreeNav';
-import KeyInsightsCard from './KeyInsightsCard';
-import { COMPONENT_REGISTRY, assembleChartProps, TOPIC_CHART_NAMES, DATA_CHART_NAMES } from './componentRegistry';
-import { buildExtractionKey } from '../../utils/extractionHighlight';
+import React, {
+  useRef,
+  useMemo,
+  useCallback,
+  useState,
+  useEffect,
+} from "react";
+import ReadingOrderBar from "./ReadingOrderBar";
+import TopicCard from "./TopicCard";
+import DataExtractionTable from "./DataExtractionTable";
+import ArticleTreeNav from "./ArticleTreeNav";
+import KeyInsightsCard from "./KeyInsightsCard";
+import {
+  COMPONENT_REGISTRY,
+  assembleChartProps,
+  TOPIC_CHART_NAMES,
+  DATA_CHART_NAMES,
+} from "./componentRegistry";
+import { buildExtractionKey } from "../../utils/extractionHighlight";
 
 /**
  * ReadingGuideLayout — overview page driven by content annotations.
@@ -33,7 +44,9 @@ export default function ReadingGuideLayout({
   const [lockedExtractionKey, setLockedExtractionKey] = useState(null);
   const [activeTopic, setActiveTopic] = useState(null);
   const [highlightedTopic, setHighlightedTopic] = useState(null);
-  const [topicChartIdx, setTopicChartIdx] = useState(() => Math.floor(Math.random() * TOPIC_CHART_NAMES.length));
+  const [topicChartIdx, setTopicChartIdx] = useState(() =>
+    Math.floor(Math.random() * TOPIC_CHART_NAMES.length),
+  );
 
   const {
     sentence_annotations: sentenceAnnotations = {},
@@ -44,8 +57,11 @@ export default function ReadingGuideLayout({
 
   const recommendedCharts = structuralSuggestions.recommended_charts || [];
   const readingOrder = useMemo(
-    () => (Array.isArray(structuralSuggestions.reading_order) ? structuralSuggestions.reading_order : []),
-    [structuralSuggestions.reading_order]
+    () =>
+      Array.isArray(structuralSuggestions.reading_order)
+        ? structuralSuggestions.reading_order
+        : [],
+    [structuralSuggestions.reading_order],
   );
   const extractionByKey = useMemo(() => {
     const entries = new Map();
@@ -58,8 +74,12 @@ export default function ReadingGuideLayout({
     return entries;
   }, [dataExtractions]);
   const activeExtractionKey = lockedExtractionKey || hoveredExtractionKey;
-  const activeExtraction = activeExtractionKey ? extractionByKey.get(activeExtractionKey) || null : null;
-  const lockedExtraction = lockedExtractionKey ? extractionByKey.get(lockedExtractionKey) || null : null;
+  const activeExtraction = activeExtractionKey
+    ? extractionByKey.get(activeExtractionKey) || null
+    : null;
+  const lockedExtraction = lockedExtractionKey
+    ? extractionByKey.get(lockedExtractionKey) || null
+    : null;
   const extractionHints = useMemo(() => {
     const hints = {};
 
@@ -67,30 +87,45 @@ export default function ReadingGuideLayout({
       const extractionKey = buildExtractionKey(extraction);
       if (!extractionKey) return;
 
-      const sourceSentences = Array.isArray(extraction.source_sentences) ? extraction.source_sentences : [];
+      const sourceSentences = Array.isArray(extraction.source_sentences)
+        ? extraction.source_sentences
+        : [];
       let hiddenCount = 0;
 
       safeTopics.forEach((topic) => {
         const topicName = topic?.name;
-        const topicSentenceIndices = Array.isArray(topic?.sentences) ? topic.sentences : [];
-        const matchingSourceIndices = sourceSentences.filter((idx) => topicSentenceIndices.includes(idx));
+        const topicSentenceIndices = Array.isArray(topic?.sentences)
+          ? topic.sentences
+          : [];
+        const matchingSourceIndices = sourceSentences.filter((idx) =>
+          topicSentenceIndices.includes(idx),
+        );
         if (matchingSourceIndices.length === 0) return;
 
         const topicAnnotation = topicAnnotations[topicName] || {};
-        const recommendedSentences = Array.isArray(topicAnnotation.recommended_sentences)
+        const recommendedSentences = Array.isArray(
+          topicAnnotation.recommended_sentences,
+        )
           ? topicAnnotation.recommended_sentences
           : [];
-        const defaultVisibleSentences = recommendedSentences.length > 0
-          ? recommendedSentences.slice(0, 5)
-          : topicSentenceIndices
-              .filter((idx) => sentenceAnnotations?.[String(idx)]?.importance === 'high')
-              .slice(0, 5);
+        const defaultVisibleSentences =
+          recommendedSentences.length > 0
+            ? recommendedSentences.slice(0, 5)
+            : topicSentenceIndices
+                .filter(
+                  (idx) =>
+                    sentenceAnnotations?.[String(idx)]?.importance === "high",
+                )
+                .slice(0, 5);
 
-        hiddenCount += matchingSourceIndices.filter((idx) => !defaultVisibleSentences.includes(idx)).length;
+        hiddenCount += matchingSourceIndices.filter(
+          (idx) => !defaultVisibleSentences.includes(idx),
+        ).length;
       });
 
       if (hiddenCount > 0) {
-        hints[extractionKey] = `${hiddenCount} hidden source sentence${hiddenCount === 1 ? '' : 's'}. Click to reveal.`;
+        hints[extractionKey] =
+          `${hiddenCount} hidden source sentence${hiddenCount === 1 ? "" : "s"}. Click to reveal.`;
       }
     });
 
@@ -101,9 +136,13 @@ export default function ReadingGuideLayout({
   const orderedTopics = useMemo(() => {
     return [...safeTopics].sort((a, b) => {
       const aMin =
-        Array.isArray(a.sentences) && a.sentences.length ? Math.min(...a.sentences) : Infinity;
+        Array.isArray(a.sentences) && a.sentences.length
+          ? Math.min(...a.sentences)
+          : Infinity;
       const bMin =
-        Array.isArray(b.sentences) && b.sentences.length ? Math.min(...b.sentences) : Infinity;
+        Array.isArray(b.sentences) && b.sentences.length
+          ? Math.min(...b.sentences)
+          : Infinity;
       return aMin - bMin;
     });
   }, [safeTopics]);
@@ -112,10 +151,15 @@ export default function ReadingGuideLayout({
   const groupedTopics = useMemo(() => {
     const groups = [];
     for (const topic of orderedTopics) {
-      const parts = topic.name.split('>').map(s => s.trim());
-      const parentPath = parts.length > 1 ? parts.slice(0, -1).join(' > ') : null;
+      const parts = topic.name.split(">").map((s) => s.trim());
+      const parentPath =
+        parts.length > 1 ? parts.slice(0, -1).join(" > ") : null;
       const lastGroup = groups[groups.length - 1];
-      if (lastGroup && lastGroup.parentPath === parentPath && parentPath !== null) {
+      if (
+        lastGroup &&
+        lastGroup.parentPath === parentPath &&
+        parentPath !== null
+      ) {
         lastGroup.topics.push(topic);
       } else {
         groups.push({ parentPath, topics: [topic] });
@@ -124,26 +168,28 @@ export default function ReadingGuideLayout({
     return groups;
   }, [orderedTopics]);
 
-
   // Nav bar shows must_read + recommended; skip/optional topics are still in the cards below
   const navTopicNames = useMemo(() => {
     return readingOrder.filter((name) => {
       const priority = topicAnnotations[name]?.reading_priority;
-      return priority === 'must_read' || priority === 'recommended';
+      return priority === "must_read" || priority === "recommended";
     });
   }, [readingOrder, topicAnnotations]);
 
   const scrollToTopic = useCallback((name) => {
     const el = cardRefs.current[name];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const handleInsightTopicClick = useCallback((topicName) => {
-    setHighlightedTopic(topicName);
-    scrollToTopic(topicName);
-    // Clear highlight after 3 seconds
-    setTimeout(() => setHighlightedTopic(null), 3000);
-  }, [scrollToTopic]);
+  const handleInsightTopicClick = useCallback(
+    (topicName) => {
+      setHighlightedTopic(topicName);
+      scrollToTopic(topicName);
+      // Clear highlight after 3 seconds
+      setTimeout(() => setHighlightedTopic(null), 3000);
+    },
+    [scrollToTopic],
+  );
 
   // Track which topic card is currently in view to highlight it in the tree
   useEffect(() => {
@@ -158,7 +204,7 @@ export default function ReadingGuideLayout({
           if (name) setActiveTopic(name);
         }
       },
-      { rootMargin: '-10% 0px -55% 0px' }
+      { rootMargin: "-10% 0px -55% 0px" },
     );
 
     Object.entries(cardRefs.current).forEach(([, el]) => {
@@ -171,22 +217,26 @@ export default function ReadingGuideLayout({
     setHoveredExtractionKey(extractionKey);
   }, []);
   const handleExtractionHoverEnd = useCallback((extractionKey) => {
-    setHoveredExtractionKey((currentKey) => (currentKey === extractionKey ? null : currentKey));
+    setHoveredExtractionKey((currentKey) =>
+      currentKey === extractionKey ? null : currentKey,
+    );
   }, []);
   const handleExtractionToggle = useCallback((extractionKey) => {
-    setLockedExtractionKey((currentKey) => (currentKey === extractionKey ? null : extractionKey));
+    setLockedExtractionKey((currentKey) =>
+      currentKey === extractionKey ? null : extractionKey,
+    );
   }, []);
 
   const handleRegenerate = async () => {
     try {
       await fetch(`/api/submission/${submissionId}/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks: ['markup_generation'] }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasks: ["markup_generation"] }),
       });
       window.location.reload();
     } catch (e) {
-      console.error('Regenerate failed', e);
+      console.error("Regenerate failed", e);
     }
   };
 
@@ -199,25 +249,31 @@ export default function ReadingGuideLayout({
   };
 
   const hasMindmapData = Object.keys(results.topic_mindmaps || {}).length > 0;
-  const dataCharts = recommendedCharts.filter(c => DATA_CHART_NAMES.has(c.component));
+  const dataCharts = recommendedCharts.filter((c) =>
+    DATA_CHART_NAMES.has(c.component),
+  );
 
   // All charts in one list: data-driven first (LLM-selected), then topic structure charts
   const allCharts = useMemo(() => {
-    const topic = TOPIC_CHART_NAMES
-      .filter(name => name !== 'MindmapResults' || hasMindmapData)
-      .map(name => ({ type: 'topic', component: name }));
-    const data = dataCharts.map(spec => ({ type: 'data', component: spec.component, spec }));
+    const topic = TOPIC_CHART_NAMES.filter(
+      (name) => name !== "MindmapResults" || hasMindmapData,
+    ).map((name) => ({ type: "topic", component: name }));
+    const data = dataCharts.map((spec) => ({
+      type: "data",
+      component: spec.component,
+      spec,
+    }));
     return [...data, ...topic];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMindmapData, recommendedCharts]);
 
   const currentChart = allCharts[topicChartIdx % allCharts.length];
 
   const mustReadCount = Object.values(topicAnnotations).filter(
-    (a) => a.reading_priority === 'must_read'
+    (a) => a.reading_priority === "must_read",
   ).length;
   const highSentenceCount = Object.values(sentenceAnnotations).filter(
-    (a) => a.importance === 'high'
+    (a) => a.importance === "high",
   ).length;
   const readCount = readTopics ? readTopics.size : 0;
 
@@ -226,8 +282,12 @@ export default function ReadingGuideLayout({
       {/* Header */}
       <div className="rg-header">
         <div className="rg-header__stats">
-          <span className="rg-stat"><strong>{safeSentences.length}</strong> sentences</span>
-          <span className="rg-stat"><strong>{safeTopics.length}</strong> topics</span>
+          <span className="rg-stat">
+            <strong>{safeSentences.length}</strong> sentences
+          </span>
+          <span className="rg-stat">
+            <strong>{safeTopics.length}</strong> topics
+          </span>
           {mustReadCount > 0 && (
             <span className="rg-stat rg-stat--accent">
               <strong>{mustReadCount}</strong> must-read
@@ -255,7 +315,11 @@ export default function ReadingGuideLayout({
           )}
         </div>
         <div className="rg-header__actions">
-          <button className="storytelling-regen-btn" onClick={handleRegenerate} title="Re-annotate with AI">
+          <button
+            className="storytelling-regen-btn"
+            onClick={handleRegenerate}
+            title="Re-annotate with AI"
+          >
             Re-annotate
           </button>
           <a className="overview-exit-link" href={`/page/text/${submissionId}`}>
@@ -291,36 +355,52 @@ export default function ReadingGuideLayout({
         {/* Right: charts + cards + dashboard */}
         <div className="rg-main-panel">
           {/* Single chart — full width, cycle through all available */}
-          {safeTopics.length > 0 && currentChart && (() => {
-            const entry = COMPONENT_REGISTRY[currentChart.component];
-            if (!entry) return null;
-            const props = assembleChartProps(currentChart.component, dataCtx, currentChart.spec || null);
-            const ChartComponent = entry.component;
-            return (
-              <div className="rg-chart-block">
-                <div className="rg-chart-block__header">
-                  <span className="rg-chart-block__title">Article structure</span>
-                  {allCharts.length > 1 && (
-                    <button
-                      className="action-btn rg-chart-cycle-btn"
-                      onClick={() => setTopicChartIdx(i => (i + 1) % allCharts.length)}
-                    >↻ Switch view</button>
-                  )}
+          {safeTopics.length > 0 &&
+            currentChart &&
+            (() => {
+              const entry = COMPONENT_REGISTRY[currentChart.component];
+              if (!entry) return null;
+              const props = assembleChartProps(
+                currentChart.component,
+                dataCtx,
+                currentChart.spec || null,
+              );
+              const ChartComponent = entry.component;
+              return (
+                <div className="rg-chart-block">
+                  <div className="rg-chart-block__header">
+                    <span className="rg-chart-block__title">
+                      Article structure
+                    </span>
+                    {allCharts.length > 1 && (
+                      <button
+                        className="action-btn rg-chart-cycle-btn"
+                        onClick={() =>
+                          setTopicChartIdx((i) => (i + 1) % allCharts.length)
+                        }
+                      >
+                        ↻ Switch view
+                      </button>
+                    )}
+                  </div>
+                  <div className="storytelling-chart__container">
+                    <ChartComponent {...props} />
+                  </div>
                 </div>
-                <div className="storytelling-chart__container">
-                  <ChartComponent {...props} />
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* Key Insights card */}
-              <KeyInsightsCard keyInsights={insights} onTopicClick={handleInsightTopicClick} />
+          <KeyInsightsCard
+            keyInsights={insights}
+            onTopicClick={handleInsightTopicClick}
+          />
 
           {/* Topic cards — ALL topics, optional/skip/read start folded */}
           <div className="rg-topics">
             {groupedTopics.map((group, gi) => {
-              const isGrouped = group.parentPath !== null && group.topics.length >= 2;
+              const isGrouped =
+                group.parentPath !== null && group.topics.length >= 2;
               const cards = group.topics.map((topic) => (
                 <TopicCard
                   key={topic.name}
@@ -352,7 +432,7 @@ export default function ReadingGuideLayout({
               return (
                 <div key={`group-${gi}`} className="rg-topic-group">
                   <div className="rg-topic-group__header">
-                    {group.parentPath.replace(/\s*>\s*/g, ' › ')}
+                    {group.parentPath.replace(/\s*>\s*/g, " › ")}
                   </div>
                   <div className="rg-topic-group__cards">{cards}</div>
                 </div>

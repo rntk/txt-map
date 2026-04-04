@@ -17,6 +17,7 @@ Also tests constants:
 - task_names
 - task_dependencies
 """
+
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 
@@ -26,6 +27,7 @@ from lib.storage.submissions import SubmissionsStorage
 # =============================================================================
 # Test: Constants
 # =============================================================================
+
 
 class TestConstants:
     """Tests for class-level constants."""
@@ -72,6 +74,7 @@ class TestConstants:
 # Test: __init__
 # =============================================================================
 
+
 class TestInit:
     """Tests for SubmissionsStorage.__init__."""
 
@@ -104,19 +107,30 @@ class TestInit:
         """task_dependencies correctly defined."""
         storage = SubmissionsStorage(mock_db)
         assert storage.task_dependencies["split_topic_generation"] == []
-        assert storage.task_dependencies["subtopics_generation"] == ["split_topic_generation"]
+        assert storage.task_dependencies["subtopics_generation"] == [
+            "split_topic_generation"
+        ]
         assert storage.task_dependencies["summarization"] == ["split_topic_generation"]
         assert storage.task_dependencies["mindmap"] == ["subtopics_generation"]
         assert storage.task_dependencies["prefix_tree"] == ["split_topic_generation"]
-        assert storage.task_dependencies["insights_generation"] == ["split_topic_generation"]
-        assert storage.task_dependencies["markup_generation"] == ["split_topic_generation"]
-        assert storage.task_dependencies["clustering_generation"] == ["split_topic_generation"]
-        assert storage.task_dependencies["topic_modeling_generation"] == ["split_topic_generation"]
+        assert storage.task_dependencies["insights_generation"] == [
+            "split_topic_generation"
+        ]
+        assert storage.task_dependencies["markup_generation"] == [
+            "split_topic_generation"
+        ]
+        assert storage.task_dependencies["clustering_generation"] == [
+            "split_topic_generation"
+        ]
+        assert storage.task_dependencies["topic_modeling_generation"] == [
+            "split_topic_generation"
+        ]
 
 
 # =============================================================================
 # Test: prepare
 # =============================================================================
+
 
 class TestPrepare:
     """Tests for SubmissionsStorage.prepare."""
@@ -147,7 +161,7 @@ class TestPrepare:
         mock_db.submissions.create_index.side_effect = Exception("Index already exists")
 
         storage = SubmissionsStorage(mock_db)
-        with patch.object(storage._log, 'warning') as mock_warning:
+        with patch.object(storage._log, "warning") as mock_warning:
             # Act: should not raise
             storage.prepare()
 
@@ -159,6 +173,7 @@ class TestPrepare:
 # Test: create
 # =============================================================================
 
+
 class TestCreate:
     """Tests for SubmissionsStorage.create."""
 
@@ -166,22 +181,22 @@ class TestCreate:
         """Generates unique UUID for submission_id."""
         storage = SubmissionsStorage(mock_db)
 
-        with patch('lib.storage.submissions.uuid.uuid4') as mock_uuid:
-            mock_uuid.return_value = MagicMock(hex='abc123')
-            mock_uuid.return_value.__str__ = lambda self: 'test-uuid-123'
+        with patch("lib.storage.submissions.uuid.uuid4") as mock_uuid:
+            mock_uuid.return_value = MagicMock(hex="abc123")
+            mock_uuid.return_value.__str__ = lambda self: "test-uuid-123"
 
             storage.create(html_content="<p>Test</p>")
 
             # Check the submission_id was set from uuid
             inserted_doc = mock_db.submissions.insert_one.call_args[0][0]
-            assert inserted_doc["submission_id"] == 'test-uuid-123'
+            assert inserted_doc["submission_id"] == "test-uuid-123"
 
     def test_sets_created_at_and_updated_at_timestamps(self, mock_db):
         """Sets created_at and updated_at timestamps."""
         storage = SubmissionsStorage(mock_db)
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
@@ -217,8 +232,7 @@ class TestCreate:
 
         # Test with explicit source_url
         result = storage.create(
-            html_content="<p>Test</p>",
-            source_url="https://example.com/article"
+            html_content="<p>Test</p>", source_url="https://example.com/article"
         )
         assert result["source_url"] == "https://example.com/article"
 
@@ -260,10 +274,7 @@ class TestCreate:
             "sentences": [],
             "topics": [],
             "topic_summaries": {},
-            "article_summary": {
-                "text": "",
-                "bullets": []
-            },
+            "article_summary": {"text": "", "bullets": []},
             "topic_mindmaps": {},
             "mindmap_results": [],
             "subtopics": [],
@@ -302,7 +313,7 @@ class TestCreate:
         result = storage.create(
             html_content="<html>Full</html>",
             text_content="Full text",
-            source_url="https://example.com/full"
+            source_url="https://example.com/full",
         )
 
         assert result["html_content"] == "<html>Full</html>"
@@ -314,6 +325,7 @@ class TestCreate:
 # Test: get_by_id
 # =============================================================================
 
+
 class TestGetById:
     """Tests for SubmissionsStorage.get_by_id."""
 
@@ -322,7 +334,7 @@ class TestGetById:
         storage = SubmissionsStorage(mock_db)
         expected_submission = {
             "submission_id": "test-id-123",
-            "html_content": "<p>Test</p>"
+            "html_content": "<p>Test</p>",
         }
         mock_db.submissions.find_one.return_value = expected_submission
 
@@ -353,6 +365,7 @@ class TestGetById:
 # Test: update_task_status
 # =============================================================================
 
+
 class TestUpdateTaskStatus:
     """Tests for SubmissionsStorage.update_task_status."""
 
@@ -362,14 +375,19 @@ class TestUpdateTaskStatus:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
-            storage.update_task_status("sub-123", "split_topic_generation", "processing")
+            storage.update_task_status(
+                "sub-123", "split_topic_generation", "processing"
+            )
 
             update_doc = mock_db.submissions.update_one.call_args[0][1]
-            assert update_doc["$set"]["tasks.split_topic_generation.started_at"] == mock_now
+            assert (
+                update_doc["$set"]["tasks.split_topic_generation.started_at"]
+                == mock_now
+            )
 
     def test_status_completed_sets_completed_at_to_now(self, mock_db):
         """status='completed' sets completed_at to now."""
@@ -377,14 +395,17 @@ class TestUpdateTaskStatus:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
             storage.update_task_status("sub-123", "split_topic_generation", "completed")
 
             update_doc = mock_db.submissions.update_one.call_args[0][1]
-            assert update_doc["$set"]["tasks.split_topic_generation.completed_at"] == mock_now
+            assert (
+                update_doc["$set"]["tasks.split_topic_generation.completed_at"]
+                == mock_now
+            )
 
     def test_status_failed_sets_completed_at_to_now(self, mock_db):
         """status='failed' sets completed_at to now."""
@@ -392,14 +413,17 @@ class TestUpdateTaskStatus:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
             storage.update_task_status("sub-123", "split_topic_generation", "failed")
 
             update_doc = mock_db.submissions.update_one.call_args[0][1]
-            assert update_doc["$set"]["tasks.split_topic_generation.completed_at"] == mock_now
+            assert (
+                update_doc["$set"]["tasks.split_topic_generation.completed_at"]
+                == mock_now
+            )
 
     def test_error_message_stored_when_provided(self, mock_db):
         """error message stored when provided."""
@@ -407,14 +431,14 @@ class TestUpdateTaskStatus:
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
         storage.update_task_status(
-            "sub-123",
-            "split_topic_generation",
-            "failed",
-            error="Test error message"
+            "sub-123", "split_topic_generation", "failed", error="Test error message"
         )
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
-        assert update_doc["$set"]["tasks.split_topic_generation.error"] == "Test error message"
+        assert (
+            update_doc["$set"]["tasks.split_topic_generation.error"]
+            == "Test error message"
+        )
 
     def test_updated_at_timestamp_updated(self, mock_db):
         """updated_at timestamp updated."""
@@ -422,11 +446,13 @@ class TestUpdateTaskStatus:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
-            storage.update_task_status("sub-123", "split_topic_generation", "processing")
+            storage.update_task_status(
+                "sub-123", "split_topic_generation", "processing"
+            )
 
             update_doc = mock_db.submissions.update_one.call_args[0][1]
             assert update_doc["$set"]["updated_at"] == mock_now
@@ -436,7 +462,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        result = storage.update_task_status("sub-123", "split_topic_generation", "processing")
+        result = storage.update_task_status(
+            "sub-123", "split_topic_generation", "processing"
+        )
 
         assert result is True
 
@@ -445,7 +473,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=0)
 
-        result = storage.update_task_status("non-existent", "split_topic_generation", "processing")
+        result = storage.update_task_status(
+            "non-existent", "split_topic_generation", "processing"
+        )
 
         assert result is False
 
@@ -454,7 +484,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        result = storage.update_task_status("sub-123", "split_topic_generation", "pending")
+        result = storage.update_task_status(
+            "sub-123", "split_topic_generation", "pending"
+        )
 
         assert result is True
         update_doc = mock_db.submissions.update_one.call_args[0][1]
@@ -465,7 +497,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        result = storage.update_task_status("sub-123", "split_topic_generation", "processing")
+        result = storage.update_task_status(
+            "sub-123", "split_topic_generation", "processing"
+        )
 
         assert result is True
 
@@ -474,7 +508,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        result = storage.update_task_status("sub-123", "split_topic_generation", "completed")
+        result = storage.update_task_status(
+            "sub-123", "split_topic_generation", "completed"
+        )
 
         assert result is True
 
@@ -483,7 +519,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        result = storage.update_task_status("sub-123", "split_topic_generation", "failed")
+        result = storage.update_task_status(
+            "sub-123", "split_topic_generation", "failed"
+        )
 
         assert result is True
 
@@ -492,7 +530,9 @@ class TestUpdateTaskStatus:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        storage.update_task_status("test-sub-id", "split_topic_generation", "processing")
+        storage.update_task_status(
+            "test-sub-id", "split_topic_generation", "processing"
+        )
 
         mock_db.submissions.update_one.assert_called_once()
         query = mock_db.submissions.update_one.call_args[0][0]
@@ -502,6 +542,7 @@ class TestUpdateTaskStatus:
 # =============================================================================
 # Test: update_results
 # =============================================================================
+
 
 class TestUpdateResults:
     """Tests for SubmissionsStorage.update_results."""
@@ -534,7 +575,7 @@ class TestUpdateResults:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
@@ -566,9 +607,7 @@ class TestUpdateResults:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        nested_data = {
-            "topic1": {"summary": "Summary text", "sentences": [1, 2, 3]}
-        }
+        nested_data = {"topic1": {"summary": "Summary text", "sentences": [1, 2, 3]}}
         storage.update_results("sub-123", {"topic_summaries": nested_data})
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
@@ -590,11 +629,14 @@ class TestUpdateResults:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        storage.update_results("sub-123", {
-            "sentences": ["S1"],
-            "topics": [{"name": "T1"}],
-            "summary": ["Summary text"]
-        })
+        storage.update_results(
+            "sub-123",
+            {
+                "sentences": ["S1"],
+                "topics": [{"name": "T1"}],
+                "summary": ["Summary text"],
+            },
+        )
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         assert update_doc["$set"]["results.sentences"] == ["S1"]
@@ -615,6 +657,7 @@ class TestUpdateResults:
 # =============================================================================
 # Test: clear_results
 # =============================================================================
+
 
 class TestClearResults:
     """Tests for SubmissionsStorage.clear_results."""
@@ -733,7 +776,9 @@ class TestClearResults:
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         assert update_doc["$set"]["results.subtopics"] == []
 
-    def test_summarization_clears_topic_summaries_summary_summary_mappings(self, mock_db):
+    def test_summarization_clears_topic_summaries_summary_summary_mappings(
+        self, mock_db
+    ):
         """summarization clears topic_summaries, summary, summary_mappings."""
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
@@ -742,11 +787,16 @@ class TestClearResults:
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         assert update_doc["$set"]["results.topic_summaries"] == {}
-        assert update_doc["$set"]["results.article_summary"] == {"text": "", "bullets": []}
+        assert update_doc["$set"]["results.article_summary"] == {
+            "text": "",
+            "bullets": [],
+        }
         assert update_doc["$set"]["results.summary"] == []
         assert update_doc["$set"]["results.summary_mappings"] == []
 
-    def test_mindmap_clears_topic_mindmaps_mindmap_results_mindmap_metadata(self, mock_db):
+    def test_mindmap_clears_topic_mindmaps_mindmap_results_mindmap_metadata(
+        self, mock_db
+    ):
         """mindmap clears topic_mindmaps, mindmap_results, mindmap_metadata."""
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
@@ -784,7 +834,7 @@ class TestClearResults:
         mock_now = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        with patch('lib.storage.submissions.datetime') as mock_datetime:
+        with patch("lib.storage.submissions.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
 
@@ -815,6 +865,7 @@ class TestClearResults:
 # =============================================================================
 # Test: expand_recalculation_tasks
 # =============================================================================
+
 
 class TestExpandRecalculationTasks:
     """Tests for SubmissionsStorage.expand_recalculation_tasks."""
@@ -915,10 +966,14 @@ class TestExpandRecalculationTasks:
         storage = SubmissionsStorage(mock_db)
 
         # Request in non-canonical order
-        result = storage.expand_recalculation_tasks(["prefix_tree", "summarization", "mindmap"])
+        result = storage.expand_recalculation_tasks(
+            ["prefix_tree", "summarization", "mindmap"]
+        )
 
         # Should be returned in task_names order
-        expected_order = [name for name in SubmissionsStorage.task_names if name in result]
+        expected_order = [
+            name for name in SubmissionsStorage.task_names if name in result
+        ]
         assert result == expected_order
 
     def test_empty_list_returns_empty_list(self, mock_db):
@@ -934,6 +989,7 @@ class TestExpandRecalculationTasks:
 # Test: get_overall_status
 # =============================================================================
 
+
 class TestGetOverallStatus:
     """Tests for SubmissionsStorage.get_overall_status."""
 
@@ -946,7 +1002,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "failed"},
                 "summarization": {"status": "pending"},
                 "mindmap": {"status": "pending"},
-                "prefix_tree": {"status": "pending"}
+                "prefix_tree": {"status": "pending"},
             }
         }
 
@@ -963,7 +1019,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "completed"},
                 "summarization": {"status": "completed"},
                 "mindmap": {"status": "completed"},
-                "prefix_tree": {"status": "completed"}
+                "prefix_tree": {"status": "completed"},
             }
         }
 
@@ -980,7 +1036,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "processing"},
                 "summarization": {"status": "pending"},
                 "mindmap": {"status": "pending"},
-                "prefix_tree": {"status": "pending"}
+                "prefix_tree": {"status": "pending"},
             }
         }
 
@@ -997,7 +1053,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "pending"},
                 "summarization": {"status": "pending"},
                 "mindmap": {"status": "pending"},
-                "prefix_tree": {"status": "pending"}
+                "prefix_tree": {"status": "pending"},
             }
         }
 
@@ -1014,7 +1070,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "processing"},
                 "summarization": {"status": "pending"},
                 "mindmap": {"status": "pending"},
-                "prefix_tree": {"status": "pending"}
+                "prefix_tree": {"status": "pending"},
             }
         }
 
@@ -1031,7 +1087,7 @@ class TestGetOverallStatus:
                 "subtopics_generation": {"status": "completed"},
                 "summarization": {"status": "failed"},
                 "mindmap": {"status": "completed"},
-                "prefix_tree": {"status": "completed"}
+                "prefix_tree": {"status": "completed"},
             }
         }
 
@@ -1097,6 +1153,7 @@ class TestGetOverallStatus:
 # Edge Cases
 # =============================================================================
 
+
 class TestEdgeCases:
     """Edge case tests for SubmissionsStorage."""
 
@@ -1152,7 +1209,9 @@ class TestEdgeCases:
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        storage.update_task_status("sub-123", "split_topic_generation", "failed", error=None)
+        storage.update_task_status(
+            "sub-123", "split_topic_generation", "failed", error=None
+        )
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
         # error should not be in the update when None
@@ -1201,7 +1260,7 @@ class TestEdgeCases:
                 "subtopics_generation": {"status": "pending"},
                 "summarization": {"status": "pending"},
                 "mindmap": {"status": "pending"},
-                "prefix_tree": {"status": "pending"}
+                "prefix_tree": {"status": "pending"},
             }
         }
 

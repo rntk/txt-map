@@ -1,24 +1,34 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
-import FullScreenGraph from './FullScreenGraph';
-import HierarchicalTree, { buildPrefixTreeHierarchy } from './shared/HierarchicalTree';
-import '../styles/App.css';
+import React, { useState, useRef, useMemo, useCallback } from "react";
+import FullScreenGraph from "./FullScreenGraph";
+import HierarchicalTree, {
+  buildPrefixTreeHierarchy,
+} from "./shared/HierarchicalTree";
+import "../styles/App.css";
 
-function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFullscreen }) {
-  const [expandMode, setExpandMode] = useState('default');
+function PrefixTreeResults({
+  treeData,
+  sentences,
+  fullscreen = false,
+  onCloseFullscreen,
+}) {
+  const [expandMode, setExpandMode] = useState("default");
   const [foldDepth, setFoldDepth] = useState(null);
   const foldDepthRef = useRef(0);
   const [selectedPanels, setSelectedPanels] = useState([]);
-  const safeTreeData = useMemo(() => (treeData || {}), [treeData]);
+  const safeTreeData = useMemo(() => treeData || {}, [treeData]);
 
   const handleLegendClick = (depth) => {
     foldDepthRef.current += 1;
-    setFoldDepth(prev => {
+    setFoldDepth((prev) => {
       const wasCollapsed = prev && prev.depth === depth && prev.collapse;
       return { depth, key: foldDepthRef.current, collapse: !wasCollapsed };
     });
   };
 
-  const hierarchyData = useMemo(() => buildPrefixTreeHierarchy(safeTreeData), [safeTreeData]);
+  const hierarchyData = useMemo(
+    () => buildPrefixTreeHierarchy(safeTreeData),
+    [safeTreeData],
+  );
 
   const handleNodeClick = useCallback((name, sentenceIndices, path) => {
     if (!path) return;
@@ -105,13 +115,47 @@ function PrefixTreeResults({ treeData, sentences, fullscreen = false, onCloseFul
         toolbar={
           <>
             <div className="toolbar-legend">
-              <div className="legend-item" onClick={() => handleLegendClick(1)} style={{cursor:'pointer'}} title="Toggle Root level fold"><span className="legend-dot root"></span><span>Root</span></div>
-              <div className="legend-item" onClick={() => handleLegendClick(2)} style={{cursor:'pointer'}} title="Toggle Prefix level fold"><span className="legend-dot internal"></span><span>Prefix</span></div>
-              <div className="legend-item" onClick={() => handleLegendClick(3)} style={{cursor:'pointer'}} title="Toggle Word level fold"><span className="legend-dot leaf"></span><span>Word</span></div>
+              <div
+                className="legend-item"
+                onClick={() => handleLegendClick(1)}
+                style={{ cursor: "pointer" }}
+                title="Toggle Root level fold"
+              >
+                <span className="legend-dot root"></span>
+                <span>Root</span>
+              </div>
+              <div
+                className="legend-item"
+                onClick={() => handleLegendClick(2)}
+                style={{ cursor: "pointer" }}
+                title="Toggle Prefix level fold"
+              >
+                <span className="legend-dot internal"></span>
+                <span>Prefix</span>
+              </div>
+              <div
+                className="legend-item"
+                onClick={() => handleLegendClick(3)}
+                style={{ cursor: "pointer" }}
+                title="Toggle Word level fold"
+              >
+                <span className="legend-dot leaf"></span>
+                <span>Word</span>
+              </div>
             </div>
             <div className="tree-controls">
-              <button className="tree-control-btn" onClick={() => setExpandMode('none')}>Fold All</button>
-              <button className="tree-control-btn" onClick={() => setExpandMode('all')}>Unfold All</button>
+              <button
+                className="tree-control-btn"
+                onClick={() => setExpandMode("none")}
+              >
+                Fold All
+              </button>
+              <button
+                className="tree-control-btn"
+                onClick={() => setExpandMode("all")}
+              >
+                Unfold All
+              </button>
             </div>
           </>
         }

@@ -1,6 +1,6 @@
-import React from 'react';
-import { getItemIndex, getTextByIndex } from './markupUtils';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import { getItemIndex, getTextByIndex } from "./markupUtils";
+import HighlightedText from "../shared/HighlightedText";
 
 /**
  * Generates a consistent avatar initial from a speaker name
@@ -8,7 +8,7 @@ import HighlightedText from '../shared/HighlightedText';
  * @returns {string} - First letter or fallback
  */
 function getAvatarInitial(name) {
-  if (!name || typeof name !== 'string') return '?';
+  if (!name || typeof name !== "string") return "?";
   return name.trim().charAt(0).toUpperCase();
 }
 
@@ -19,8 +19,8 @@ function getAvatarInitial(name) {
  * @returns {string} - CSS gradient string
  */
 function getSpeakerColor(name) {
-  if (!name || typeof name !== 'string') {
-    return 'linear-gradient(135deg, #1976d2, #0d47a1)';
+  if (!name || typeof name !== "string") {
+    return "linear-gradient(135deg, #1976d2, #0d47a1)";
   }
   // Generate hue from name hash (0-360)
   let hash = 0;
@@ -53,7 +53,7 @@ export default function DialogMarkup({ segment, sentences }) {
   // Build a flat ordered list of lines sorted by sentence_index
   const allLines = [];
   speakers.forEach((speaker, speakerIdx) => {
-    (speaker.lines || []).forEach(line => {
+    (speaker.lines || []).forEach((line) => {
       allLines.push({
         speakerIdx,
         name: speaker.name || `Speaker ${speakerIdx + 1}`,
@@ -64,10 +64,13 @@ export default function DialogMarkup({ segment, sentences }) {
   allLines.sort((a, b) => (getItemIndex(a) ?? 0) - (getItemIndex(b) ?? 0));
 
   // Get unique speakers for aria-label
-  const uniqueSpeakerNames = [...new Set(speakers.map(s => s.name).filter(Boolean))];
-  const dialogLabel = uniqueSpeakerNames.length > 0
-    ? `Conversation between ${uniqueSpeakerNames.join(' and ')}`
-    : 'Conversation';
+  const uniqueSpeakerNames = [
+    ...new Set(speakers.map((s) => s.name).filter(Boolean)),
+  ];
+  const dialogLabel =
+    uniqueSpeakerNames.length > 0
+      ? `Conversation between ${uniqueSpeakerNames.join(" and ")}`
+      : "Conversation";
 
   return (
     <div
@@ -76,9 +79,10 @@ export default function DialogMarkup({ segment, sentences }) {
       aria-label={dialogLabel}
     >
       {allLines.map((line, i) => {
-        const side = line.speakerIdx % 2 === 0 ? 'even' : 'odd';
-        const text = line.text || getTextByIndex(sentences, getItemIndex(line)) || '';
-        const speakerName = line.name || 'Unknown';
+        const side = line.speakerIdx % 2 === 0 ? "even" : "odd";
+        const text =
+          line.text || getTextByIndex(sentences, getItemIndex(line)) || "";
+        const speakerName = line.name || "Unknown";
         const avatarInitial = getAvatarInitial(speakerName);
         const avatarColor = getSpeakerColor(speakerName);
 
@@ -91,7 +95,7 @@ export default function DialogMarkup({ segment, sentences }) {
             <span className="markup-dialog__speaker">
               <span
                 className="markup-dialog__speaker-avatar"
-                style={{ '--markup-dialog-avatar-background': avatarColor }}
+                style={{ "--markup-dialog-avatar-background": avatarColor }}
                 aria-hidden="true"
               >
                 {avatarInitial}

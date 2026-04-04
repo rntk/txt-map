@@ -42,7 +42,9 @@ def test_aligns_source_sentences_to_canonical_results_sentences():
     source_sentences = ["Sentence B.", "Sentence D."]
     results_sentences = ["Sentence A.", "Sentence B.", "Sentence C.", "Sentence D."]
 
-    result = _align_source_sentences_to_results_sentences(source_sentences, results_sentences)
+    result = _align_source_sentences_to_results_sentences(
+        source_sentences, results_sentences
+    )
 
     assert result == [2, 4]
 
@@ -55,7 +57,9 @@ def test_maps_topics_from_source_sentences_when_indices_are_unavailable():
         {"name": "Topic B", "sentences": [4]},
     ]
 
-    result = _map_insight_source_sentences_to_topics(source_sentences, results_sentences, topics)
+    result = _map_insight_source_sentences_to_topics(
+        source_sentences, results_sentences, topics
+    )
 
     assert result == ["Topic A", "Topic B"]
 
@@ -80,12 +84,17 @@ def test_build_compatible_insight_llm_binds_legacy_builder_client_and_retry_poli
     retry_policy = MagicMock()
     chunker = MagicMock()
 
-    def _legacy_build_insight_llm(*, temperature: float = 0.0, chunker: object | None = None) -> MagicMock:
+    def _legacy_build_insight_llm(
+        *, temperature: float = 0.0, chunker: object | None = None
+    ) -> MagicMock:
         assert temperature == 0.0
         assert chunker is not None
         return legacy_insight_llm
 
-    with patch("lib.tasks.insights_generation.build_insight_llm", side_effect=_legacy_build_insight_llm):
+    with patch(
+        "lib.tasks.insights_generation.build_insight_llm",
+        side_effect=_legacy_build_insight_llm,
+    ):
         result = _build_compatible_insight_llm(
             llm_callable,
             temperature=0.0,
@@ -106,8 +115,14 @@ def test_build_compatible_insight_parser_uses_legacy_zero_arg_constructor():
             pass
 
     with patch("lib.tasks.insights_generation.InsightParser", _LegacyInsightParser):
-        with patch("lib.tasks.insights_generation.inspect.signature", return_value=MagicMock(parameters={})):
-            with patch("lib.tasks.insights_generation.InsightParser", return_value=legacy_parser) as mock_parser:
+        with patch(
+            "lib.tasks.insights_generation.inspect.signature",
+            return_value=MagicMock(parameters={}),
+        ):
+            with patch(
+                "lib.tasks.insights_generation.InsightParser",
+                return_value=legacy_parser,
+            ) as mock_parser:
                 result = _build_compatible_insight_parser(input_mode="text")
 
     assert result is legacy_parser
@@ -126,7 +141,10 @@ def test_process_insights_generation_stores_insights(mock_db):
     mock_llm = MagicMock()
     mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-    with patch("lib.tasks.insights_generation._generate_insights", return_value=[{"name": "Insight A"}]):
+    with patch(
+        "lib.tasks.insights_generation._generate_insights",
+        return_value=[{"name": "Insight A"}],
+    ):
         process_insights_generation(submission, mock_db, mock_llm)
 
     update_call = mock_db.submissions.update_one.call_args

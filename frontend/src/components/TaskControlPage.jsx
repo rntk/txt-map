@@ -1,7 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { formatDate } from '../utils/chartConstants';
-import { appendPositiveIntegerParam, appendStringParam, buildQueryString, readErrorMessage } from '../utils/requestUtils';
-import '../styles/App.css';
+import React, { useCallback, useEffect, useState } from "react";
+import { formatDate } from "../utils/chartConstants";
+import {
+  appendPositiveIntegerParam,
+  appendStringParam,
+  buildQueryString,
+  readErrorMessage,
+} from "../utils/requestUtils";
+import "../styles/App.css";
 
 /**
  * @typedef {Object} TaskFilterState
@@ -19,11 +24,11 @@ import '../styles/App.css';
 
 /** @type {readonly string[]} */
 const TASK_TYPES = [
-  'split_topic_generation',
-  'subtopics_generation',
-  'summarization',
-  'mindmap',
-  'prefix_tree'
+  "split_topic_generation",
+  "subtopics_generation",
+  "summarization",
+  "mindmap",
+  "prefix_tree",
 ];
 
 function TaskControlPage() {
@@ -31,16 +36,16 @@ function TaskControlPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    submissionId: '',
-    status: '',
-    limit: '100'
+    submissionId: "",
+    status: "",
+    limit: "100",
   });
   const [newTask, setNewTask] = useState({
-    submissionId: '',
-    taskType: 'split_topic_generation',
-    priority: ''
+    submissionId: "",
+    taskType: "split_topic_generation",
+    priority: "",
   });
-  const [actionMessage, setActionMessage] = useState('');
+  const [actionMessage, setActionMessage] = useState("");
 
   /**
    * @param {string} field
@@ -69,9 +74,9 @@ function TaskControlPage() {
    */
   const buildQuery = useCallback(() => {
     return buildQueryString(function configureParams(params) {
-      appendStringParam(params, 'submission_id', filters.submissionId);
-      appendStringParam(params, 'status', filters.status);
-      appendPositiveIntegerParam(params, 'limit', filters.limit);
+      appendStringParam(params, "submission_id", filters.submissionId);
+      appendStringParam(params, "status", filters.status);
+      appendPositiveIntegerParam(params, "limit", filters.limit);
     });
   }, [filters.submissionId, filters.status, filters.limit]);
 
@@ -85,12 +90,14 @@ function TaskControlPage() {
       const query = buildQuery();
       const response = await fetch(`/api/task-queue?${query}`);
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to load tasks'));
+        throw new Error(
+          await readErrorMessage(response, "Failed to load tasks"),
+        );
       }
       const data = await response.json();
       setTasks(data.tasks || []);
     } catch (err) {
-      setError(err.message || 'Failed to load tasks');
+      setError(err.message || "Failed to load tasks");
     } finally {
       setLoading(false);
     }
@@ -105,15 +112,15 @@ function TaskControlPage() {
    * @returns {Promise<void>}
    */
   const handleDelete = async (taskId) => {
-    setActionMessage('');
+    setActionMessage("");
     try {
       const response = await fetch(`/api/task-queue/${taskId}`, {
-        method: 'DELETE'
+        method: "DELETE",
       });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Delete failed'));
+        throw new Error(await readErrorMessage(response, "Delete failed"));
       }
-      setActionMessage('Task deleted.');
+      setActionMessage("Task deleted.");
       fetchTasks();
     } catch (err) {
       setActionMessage(`Delete failed: ${err.message}`);
@@ -125,15 +132,15 @@ function TaskControlPage() {
    * @returns {Promise<void>}
    */
   const handleRepeat = async (taskId) => {
-    setActionMessage('');
+    setActionMessage("");
     try {
       const response = await fetch(`/api/task-queue/${taskId}/repeat`, {
-        method: 'POST'
+        method: "POST",
       });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Repeat failed'));
+        throw new Error(await readErrorMessage(response, "Repeat failed"));
       }
-      setActionMessage('Task re-queued.');
+      setActionMessage("Task re-queued.");
       fetchTasks();
     } catch (err) {
       setActionMessage(`Repeat failed: ${err.message}`);
@@ -146,16 +153,16 @@ function TaskControlPage() {
    */
   const handleAdd = async (event) => {
     event.preventDefault();
-    setActionMessage('');
+    setActionMessage("");
 
     if (!newTask.submissionId || !newTask.taskType) {
-      setActionMessage('Submission ID and task type are required.');
+      setActionMessage("Submission ID and task type are required.");
       return;
     }
 
     const payload = {
       submission_id: newTask.submissionId,
-      task_type: newTask.taskType
+      task_type: newTask.taskType,
     };
 
     if (newTask.priority) {
@@ -163,16 +170,16 @@ function TaskControlPage() {
     }
 
     try {
-      const response = await fetch('/api/task-queue/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const response = await fetch("/api/task-queue/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Add failed'));
+        throw new Error(await readErrorMessage(response, "Add failed"));
       }
-      setActionMessage('Task added to queue.');
-      updateNewTask('priority', '');
+      setActionMessage("Task added to queue.");
+      updateNewTask("priority", "");
       fetchTasks();
     } catch (err) {
       setActionMessage(`Add failed: ${err.message}`);
@@ -193,9 +200,13 @@ function TaskControlPage() {
       <div className="task-page-header">
         <div>
           <h1>Task Control</h1>
-          <p className="task-page-subtitle">Manage queue tasks: delete, repeat, or add new ones.</p>
+          <p className="task-page-subtitle">
+            Manage queue tasks: delete, repeat, or add new ones.
+          </p>
         </div>
-        <button type="button" className="task-refresh" onClick={fetchTasks}>Refresh</button>
+        <button type="button" className="task-refresh" onClick={fetchTasks}>
+          Refresh
+        </button>
       </div>
 
       <div className="task-panels">
@@ -206,7 +217,9 @@ function TaskControlPage() {
             <input
               type="text"
               value={filters.submissionId}
-              onChange={(event) => updateFilters('submissionId', event.target.value)}
+              onChange={(event) =>
+                updateFilters("submissionId", event.target.value)
+              }
               placeholder="e.g. 8e0a..."
             />
           </label>
@@ -214,7 +227,7 @@ function TaskControlPage() {
             Status
             <select
               value={filters.status}
-              onChange={(event) => updateFilters('status', event.target.value)}
+              onChange={(event) => updateFilters("status", event.target.value)}
             >
               <option value="">Any</option>
               <option value="pending">pending</option>
@@ -230,10 +243,12 @@ function TaskControlPage() {
               min="1"
               max="500"
               value={filters.limit}
-              onChange={(event) => updateFilters('limit', event.target.value)}
+              onChange={(event) => updateFilters("limit", event.target.value)}
             />
           </label>
-          <button type="submit" className="task-primary">Apply Filters</button>
+          <button type="submit" className="task-primary">
+            Apply Filters
+          </button>
         </form>
 
         <form className="task-panel" onSubmit={handleAdd}>
@@ -243,7 +258,9 @@ function TaskControlPage() {
             <input
               type="text"
               value={newTask.submissionId}
-              onChange={(event) => updateNewTask('submissionId', event.target.value)}
+              onChange={(event) =>
+                updateNewTask("submissionId", event.target.value)
+              }
               placeholder="Paste submission ID"
             />
           </label>
@@ -251,10 +268,14 @@ function TaskControlPage() {
             Task Type
             <select
               value={newTask.taskType}
-              onChange={(event) => updateNewTask('taskType', event.target.value)}
+              onChange={(event) =>
+                updateNewTask("taskType", event.target.value)
+              }
             >
               {TASK_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </label>
@@ -265,17 +286,19 @@ function TaskControlPage() {
               min="1"
               max="10"
               value={newTask.priority}
-              onChange={(event) => updateNewTask('priority', event.target.value)}
+              onChange={(event) =>
+                updateNewTask("priority", event.target.value)
+              }
               placeholder="Default priority"
             />
           </label>
-          <button type="submit" className="task-primary">Queue Task</button>
+          <button type="submit" className="task-primary">
+            Queue Task
+          </button>
         </form>
       </div>
 
-      {actionMessage && (
-        <div className="task-message">{actionMessage}</div>
-      )}
+      {actionMessage && <div className="task-message">{actionMessage}</div>}
 
       {loading ? (
         <div className="task-state loading-text">Loading queue...</div>
@@ -298,7 +321,9 @@ function TaskControlPage() {
             <tbody>
               {tasks.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="task-empty">No tasks match the filters.</td>
+                  <td colSpan="7" className="task-empty">
+                    No tasks match the filters.
+                  </td>
                 </tr>
               ) : (
                 tasks.map((task) => (
@@ -309,13 +334,20 @@ function TaskControlPage() {
                       </span>
                     </td>
                     <td className="task-mono">
-                      <a href={`/page/text/${task.submission_id}`} className="task-link">
+                      <a
+                        href={`/page/text/${task.submission_id}`}
+                        className="task-link"
+                      >
                         {task.submission_id}
                       </a>
                     </td>
                     <td>{task.task_type}</td>
                     <td>
-                      <span className={`task-status task-status-${task.status}`}>{task.status}</span>
+                      <span
+                        className={`task-status task-status-${task.status}`}
+                      >
+                        {task.status}
+                      </span>
                     </td>
                     <td>{task.priority}</td>
                     <td>{formatDate(task.created_at)}</td>

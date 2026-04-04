@@ -1,5 +1,5 @@
-import React from 'react';
-import HighlightedText from '../shared/HighlightedText';
+import React from "react";
+import HighlightedText from "../shared/HighlightedText";
 
 export default function KeyValueMarkup({ segment }) {
   const pairs = segment.data?.pairs || [];

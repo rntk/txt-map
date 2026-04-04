@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import '../styles/GlobalTopics.css';
+import React, { useEffect, useRef } from "react";
+import "../styles/GlobalTopics.css";
 
 /**
  * @typedef {Object} GlobalTopicsCompareTopic
@@ -51,7 +51,12 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
               <div className="global-topics-compare__column-header">
                 <div className="global-topics-compare__column-meta">
                   {source_url ? (
-                    <a href={source_url} target="_blank" rel="noopener noreferrer" title={source_url}>
+                    <a
+                      href={source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={source_url}
+                    >
                       {formatSourceLabel(source_url, submission_id)}
                     </a>
                   ) : (
@@ -60,10 +65,17 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
                 </div>
               </div>
               <div className="global-topics-compare__context">
-                <p className="global-topics-compare__context-empty">Context not available. Sentences:</p>
+                <p className="global-topics-compare__context-empty">
+                  Context not available. Sentences:
+                </p>
                 <ul className="global-topics-compare__context-inner">
                   {safeSentences.map((s, i) => (
-                    <li key={i} className="global-topics-compare__match-sentence">{s}</li>
+                    <li
+                      key={i}
+                      className="global-topics-compare__match-sentence"
+                    >
+                      {s}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -77,31 +89,37 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
 
         const sentenceToTopics = buildSentenceTopicMap(topics);
 
-        const topContext = all_sentences.slice(0, firstMatch).map((text, i) => ({
-          text,
-          index: i,
-          topics: sentenceToTopics[i] || [],
-        }));
-
-        const middleContent = all_sentences.slice(firstMatch, lastMatch + 1).map((text, idx) => {
-          const actualIndex = firstMatch + idx;
-          const isMatch = matchIndices.includes(actualIndex);
-          return {
+        const topContext = all_sentences
+          .slice(0, firstMatch)
+          .map((text, i) => ({
             text,
-            index: actualIndex,
-            isMatch,
-            topics: sentenceToTopics[actualIndex] || [],
-          };
-        });
+            index: i,
+            topics: sentenceToTopics[i] || [],
+          }));
 
-        const bottomContext = all_sentences.slice(lastMatch + 1).map((text, idx) => {
-          const actualIndex = lastMatch + 1 + idx;
-          return {
-            text,
-            index: actualIndex,
-            topics: sentenceToTopics[actualIndex] || [],
-          };
-        });
+        const middleContent = all_sentences
+          .slice(firstMatch, lastMatch + 1)
+          .map((text, idx) => {
+            const actualIndex = firstMatch + idx;
+            const isMatch = matchIndices.includes(actualIndex);
+            return {
+              text,
+              index: actualIndex,
+              isMatch,
+              topics: sentenceToTopics[actualIndex] || [],
+            };
+          });
+
+        const bottomContext = all_sentences
+          .slice(lastMatch + 1)
+          .map((text, idx) => {
+            const actualIndex = lastMatch + 1 + idx;
+            return {
+              text,
+              index: actualIndex,
+              topics: sentenceToTopics[actualIndex] || [],
+            };
+          });
 
         return (
           <CompareColumn
@@ -145,7 +163,10 @@ function buildSentenceTopicMap(groups) {
 }
 
 function formatSourceLabel(sourceUrl, submissionId) {
-  return sourceUrl.replace(/^https?:\/\//, '').substring(0, 50) || submissionId.substring(0, 8);
+  return (
+    sourceUrl.replace(/^https?:\/\//, "").substring(0, 50) ||
+    submissionId.substring(0, 8)
+  );
 }
 
 function CompareColumn({
@@ -172,7 +193,12 @@ function CompareColumn({
       <div className="global-topics-compare__column-header">
         <div className="global-topics-compare__column-meta">
           {sourceUrl ? (
-            <a href={sourceUrl} target="_blank" rel="noopener noreferrer" title={sourceUrl}>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={sourceUrl}
+            >
               {formatSourceLabel(sourceUrl, submissionId)}
             </a>
           ) : (
@@ -189,7 +215,9 @@ function CompareColumn({
             ))}
           </div>
         ) : (
-          <div className="global-topics-compare__context-empty">No prior context</div>
+          <div className="global-topics-compare__context-empty">
+            No prior context
+          </div>
         )}
       </div>
 
@@ -197,7 +225,7 @@ function CompareColumn({
         {middleContent.map((item) => (
           <div
             key={item.index}
-            className={`global-topics-compare__match-sentence${item.isMatch ? ' global-topics-compare__match-sentence--highlighted' : ''}`}
+            className={`global-topics-compare__match-sentence${item.isMatch ? " global-topics-compare__match-sentence--highlighted" : ""}`}
           >
             {item.text}
           </div>
@@ -207,10 +235,14 @@ function CompareColumn({
       <div className="global-topics-compare__context">
         {bottomContext.length > 0 ? (
           <div className="global-topics-compare__context-inner">
-            {bottomContext.map((item) => <ContextSentence key={item.index} item={item} />)}
+            {bottomContext.map((item) => (
+              <ContextSentence key={item.index} item={item} />
+            ))}
           </div>
         ) : (
-          <div className="global-topics-compare__context-empty">No subsequent context</div>
+          <div className="global-topics-compare__context-empty">
+            No subsequent context
+          </div>
         )}
       </div>
     </div>

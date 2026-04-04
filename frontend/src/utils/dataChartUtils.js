@@ -10,44 +10,54 @@
  * @returns {{ raw: string, numeric: number, unit: string } | null}
  */
 export function parseNumericValue(str) {
-  if (!str || typeof str !== 'string') return null;
+  if (!str || typeof str !== "string") return null;
 
   const raw = str.trim();
   if (!raw) return null;
 
-  let unit = '';
+  let unit = "";
   let working = raw;
 
   // Strip leading currency symbols
-  if (working.startsWith('$')) { unit = '$'; working = working.slice(1); }
-  else if (working.startsWith('€')) { unit = '€'; working = working.slice(1); }
-  else if (working.startsWith('£')) { unit = '£'; working = working.slice(1); }
+  if (working.startsWith("$")) {
+    unit = "$";
+    working = working.slice(1);
+  } else if (working.startsWith("€")) {
+    unit = "€";
+    working = working.slice(1);
+  } else if (working.startsWith("£")) {
+    unit = "£";
+    working = working.slice(1);
+  }
 
   // Strip trailing percent
-  if (working.endsWith('%')) { unit = '%'; working = working.slice(0, -1); }
+  if (working.endsWith("%")) {
+    unit = "%";
+    working = working.slice(0, -1);
+  }
 
   // Strip commas used as thousands separators
-  working = working.replace(/,/g, '');
+  working = working.replace(/,/g, "");
 
   // Handle magnitude suffixes (case-insensitive)
   let multiplier = 1;
   const lower = working.toLowerCase();
-  if (lower.endsWith(' billion') || lower.endsWith('b')) {
+  if (lower.endsWith(" billion") || lower.endsWith("b")) {
     multiplier = 1e9;
-    working = lower.endsWith(' billion')
-      ? working.slice(0, -' billion'.length)
+    working = lower.endsWith(" billion")
+      ? working.slice(0, -" billion".length)
       : working.slice(0, -1);
-  } else if (lower.endsWith(' million') || lower.endsWith('m')) {
+  } else if (lower.endsWith(" million") || lower.endsWith("m")) {
     multiplier = 1e6;
-    working = lower.endsWith(' million')
-      ? working.slice(0, -' million'.length)
+    working = lower.endsWith(" million")
+      ? working.slice(0, -" million".length)
       : working.slice(0, -1);
-  } else if (lower.endsWith(' trillion') || lower.endsWith('t')) {
+  } else if (lower.endsWith(" trillion") || lower.endsWith("t")) {
     multiplier = 1e12;
-    working = lower.endsWith(' trillion')
-      ? working.slice(0, -' trillion'.length)
+    working = lower.endsWith(" trillion")
+      ? working.slice(0, -" trillion".length)
       : working.slice(0, -1);
-  } else if (lower.endsWith('k')) {
+  } else if (lower.endsWith("k")) {
     multiplier = 1e3;
     working = working.slice(0, -1);
   }
@@ -59,20 +69,20 @@ export function parseNumericValue(str) {
 }
 
 const CHART_TYPE_FROM_DISPLAY = {
-  chart_bar: 'bar',
-  table: 'table',
-  inline: 'inline',
+  chart_bar: "bar",
+  table: "table",
+  inline: "inline",
 };
 
 const CHART_TYPE_FROM_EXTRACTION_TYPE = {
-  statistic: 'inline',
-  comparison: 'bar',
-  timeline_event: 'timeline',
-  ranking: 'bar',
-  trend: 'line',
-  proportion: 'bar',
-  process_flow: 'gantt',
-  overlap: 'table',
+  statistic: "inline",
+  comparison: "bar",
+  timeline_event: "timeline",
+  ranking: "bar",
+  trend: "line",
+  proportion: "bar",
+  process_flow: "gantt",
+  overlap: "table",
 };
 
 /**
@@ -89,9 +99,11 @@ export function inferChartType(extraction) {
   if (display_suggestion && CHART_TYPE_FROM_DISPLAY[display_suggestion]) {
     const mapped = CHART_TYPE_FROM_DISPLAY[display_suggestion];
     // Only use bar if there are actually 2+ numeric values
-    if (mapped === 'bar') {
-      const numericCount = (values || []).filter((v) => parseNumericValue(v?.value)).length;
-      if (numericCount < 2) return 'inline';
+    if (mapped === "bar") {
+      const numericCount = (values || []).filter((v) =>
+        parseNumericValue(v?.value),
+      ).length;
+      if (numericCount < 2) return "inline";
     }
     return mapped;
   }
@@ -101,7 +113,7 @@ export function inferChartType(extraction) {
     return CHART_TYPE_FROM_EXTRACTION_TYPE[type];
   }
 
-  return 'inline';
+  return "inline";
 }
 
 /**
@@ -118,7 +130,7 @@ export function getChartType(extraction) {
 }
 
 /** Chart types that render as actual visual charts (not table or inline text). */
-export const VISUAL_CHART_TYPES = new Set(['bar', 'line', 'timeline', 'gantt']);
+export const VISUAL_CHART_TYPES = new Set(["bar", "line", "timeline", "gantt"]);
 
 /**
  * Returns true if the extraction should be rendered as a visual chart.

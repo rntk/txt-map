@@ -17,9 +17,13 @@ class SemanticDiffsStorage:
         except Exception as exc:
             self._log.warning("Can't create semantic_diffs index pair_key: %s", exc)
         try:
-            self._db.semantic_diff_jobs.create_index([("pair_key", 1), ("created_at", -1)])
+            self._db.semantic_diff_jobs.create_index(
+                [("pair_key", 1), ("created_at", -1)]
+            )
         except Exception as exc:
-            self._log.warning("Can't create semantic_diff_jobs pair_key/created_at index: %s", exc)
+            self._log.warning(
+                "Can't create semantic_diff_jobs pair_key/created_at index: %s", exc
+            )
         try:
             self._db.semantic_diff_jobs.create_index(
                 [("pair_key", 1)],
@@ -27,7 +31,9 @@ class SemanticDiffsStorage:
                 partialFilterExpression={"status": {"$in": ["pending", "processing"]}},
             )
         except Exception as exc:
-            self._log.warning("Can't create semantic_diff_jobs active pair_key unique index: %s", exc)
+            self._log.warning(
+                "Can't create semantic_diff_jobs active pair_key unique index: %s", exc
+            )
         try:
             self._db.semantic_diff_jobs.create_index("status")
         except Exception as exc:
@@ -37,13 +43,17 @@ class SemanticDiffsStorage:
                 [("status", 1), ("force_recalculate", -1), ("created_at", 1)]
             )
         except Exception as exc:
-            self._log.warning("Can't create semantic_diff_jobs status/force/created_at index: %s", exc)
+            self._log.warning(
+                "Can't create semantic_diff_jobs status/force/created_at index: %s", exc
+            )
 
     def get_diff_by_pair_key(self, pair_key: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diffs.find_one({"pair_key": pair_key})
 
     def get_latest_job(self, pair_key: str) -> Optional[dict[str, Any]]:
-        return self._db.semantic_diff_jobs.find_one({"pair_key": pair_key}, sort=[("created_at", -1)])
+        return self._db.semantic_diff_jobs.find_one(
+            {"pair_key": pair_key}, sort=[("created_at", -1)]
+        )
 
     def get_active_job(self, pair_key: str) -> Optional[dict[str, Any]]:
         return self._db.semantic_diff_jobs.find_one(
@@ -190,6 +200,10 @@ class SemanticDiffsStorage:
 
     def delete_by_pair_key(self, pair_key: str) -> tuple[int, int]:
         """Delete all diffs and jobs for a pair key. Returns (deleted_diff_count, deleted_job_count)."""
-        deleted_diff_count = self._db.semantic_diffs.delete_many({"pair_key": pair_key}).deleted_count
-        deleted_job_count = self._db.semantic_diff_jobs.delete_many({"pair_key": pair_key}).deleted_count
+        deleted_diff_count = self._db.semantic_diffs.delete_many(
+            {"pair_key": pair_key}
+        ).deleted_count
+        deleted_job_count = self._db.semantic_diff_jobs.delete_many(
+            {"pair_key": pair_key}
+        ).deleted_count
         return deleted_diff_count, deleted_job_count

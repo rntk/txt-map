@@ -1,4 +1,5 @@
 """Shared constants for the application."""
+
 from typing import Any, Dict, List
 
 

@@ -14,6 +14,7 @@ def mock_env(monkeypatch):
 @pytest.fixture
 def app():
     from main import app
+
     return app
 
 
@@ -52,7 +53,9 @@ def test_get_settings_returns_active_llm_state(client, mock_settings_storage):
         ],
     }
 
-    with patch("handlers.settings_handler.get_active_llm_settings", return_value=payload):
+    with patch(
+        "handlers.settings_handler.get_active_llm_settings", return_value=payload
+    ):
         response = client.get("/api/settings")
 
     assert response.status_code == 200

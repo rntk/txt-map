@@ -5,6 +5,7 @@ Extracts text with font information and generates semantic HTML
 with proper headings (<h1>, <h2>, <h3>), paragraphs (<p>),
 and inline formatting (<strong>, <em>).
 """
+
 import pymupdf
 from typing import List, Optional
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 @dataclass
 class FontThresholds:
     """Font size thresholds for heading detection."""
+
     h1: float
     h2: float
     h3: float
@@ -54,15 +56,11 @@ class PDFToSemanticHTML:
         # Determine thresholds based on size distribution
         if len(unique_sizes) >= 3:
             return FontThresholds(
-                h1=unique_sizes[0],
-                h2=unique_sizes[1],
-                h3=unique_sizes[2]
+                h1=unique_sizes[0], h2=unique_sizes[1], h3=unique_sizes[2]
             )
         elif len(unique_sizes) == 2:
             return FontThresholds(
-                h1=unique_sizes[0],
-                h2=unique_sizes[1],
-                h3=unique_sizes[1] - 1
+                h1=unique_sizes[0], h2=unique_sizes[1], h3=unique_sizes[1] - 1
             )
         else:
             return FontThresholds(h1=24.0, h2=18.0, h3=14.0)
@@ -91,17 +89,18 @@ class PDFToSemanticHTML:
 
     def _escape_html(self, text: str) -> str:
         """Escape HTML special characters."""
-        return (text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&#39;"))
+        return (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;")
+        )
 
     def convert(self) -> str:
         """
         Convert entire PDF to semantic HTML.
-        
+
         Returns a complete HTML document with semantic structure.
         """
         html_parts: List[str] = []
@@ -137,18 +136,21 @@ class PDFToSemanticHTML:
                     if heading_tag:
                         # Combine all spans for heading
                         heading_text = "".join(
-                            self._escape_html(span["text"])
-                            for span in spans
+                            self._escape_html(span["text"]) for span in spans
                         )
                         if heading_text.strip():
-                            page_html.append(f"<{heading_tag}>{heading_text}</{heading_tag}>")
+                            page_html.append(
+                                f"<{heading_tag}>{heading_text}</{heading_tag}>"
+                            )
                     else:
                         # Build paragraph content with inline formatting
                         line_parts: List[str] = []
                         for span in spans:
                             escaped_text = self._escape_html(span.get("text", ""))
                             flags = span.get("flags", 0)
-                            styled_text = self._wrap_text_with_style(escaped_text, flags)
+                            styled_text = self._wrap_text_with_style(
+                                escaped_text, flags
+                            )
                             line_parts.append(styled_text)
 
                         if line_parts:
@@ -161,7 +163,9 @@ class PDFToSemanticHTML:
                     page_html.append(f"<p>{para_text}</p>")
 
             if page_html:
-                html_parts.append(f"<!-- Page {page_num + 1} -->\n" + "\n".join(page_html))
+                html_parts.append(
+                    f"<!-- Page {page_num + 1} -->\n" + "\n".join(page_html)
+                )
 
         # Wrap in basic HTML document structure
         body_content = "\n".join(html_parts)
@@ -196,10 +200,10 @@ class PDFToSemanticHTML:
 def convert_pdf_to_html(pdf_bytes: bytes) -> str:
     """
     Convenience function to convert PDF bytes to semantic HTML.
-    
+
     Args:
         pdf_bytes: Raw PDF file bytes
-        
+
     Returns:
         Semantic HTML string
     """
@@ -213,10 +217,10 @@ def convert_pdf_to_html(pdf_bytes: bytes) -> str:
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     """
     Extract plain text from PDF (fallback for text_content).
-    
+
     Args:
         pdf_bytes: Raw PDF file bytes
-        
+
     Returns:
         Plain text string
     """

@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
-import RawTextDisplay from './shared/RawTextDisplay';
-import '../styles/text-reading.css';
+import React, { useMemo, useEffect } from "react";
+import RawTextDisplay from "./shared/RawTextDisplay";
+import "../styles/text-reading.css";
 
 /**
  * @typedef {Object} RawTextViewProps
@@ -11,9 +11,16 @@ import '../styles/text-reading.css';
  * @property {Array} fadeRanges
  * @property {Array<{start: number, end: number, color: string}>} [coloredRanges]
  */
-function RawTextView({ rawText, submissionId, sourceUrl, highlightRanges, fadeRanges, coloredRanges = [] }) {
+function RawTextView({
+  rawText,
+  submissionId,
+  sourceUrl,
+  highlightRanges,
+  fadeRanges,
+  coloredRanges = [],
+}) {
   const downloadUrl = useMemo(() => {
-    const blob = new Blob([rawText], { type: 'text/plain' });
+    const blob = new Blob([rawText], { type: "text/plain" });
     return URL.createObjectURL(blob);
   }, [rawText]);
 

@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as d3 from 'd3';
-export { buildMindmapHierarchy, buildPrefixTreeHierarchy } from '../../utils/hierarchyBuilders';
+import React, { useState, useEffect, useRef } from "react";
+import * as d3 from "d3";
+export {
+  buildMindmapHierarchy,
+  buildPrefixTreeHierarchy,
+} from "../../utils/hierarchyBuilders";
 
 function HierarchicalTree({
   hierarchyData,
@@ -12,7 +15,7 @@ function HierarchicalTree({
   expandMode,
   foldDepth,
   nodeSpacing = 250,
-  emptyPanelMessage = 'No sentences for this topic.',
+  emptyPanelMessage = "No sentences for this topic.",
 }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
@@ -31,7 +34,7 @@ function HierarchicalTree({
     const updates = {};
     const traverse = (node) => {
       if (node.path && node.children && node.children.length > 0) {
-        const depth = node.path.split('/').filter(Boolean).length;
+        const depth = node.path.split("/").filter(Boolean).length;
         if (depth === targetDepth) {
           updates[node.path] = shouldCollapse;
         } else {
@@ -40,16 +43,16 @@ function HierarchicalTree({
       }
     };
     hierarchyData.forEach(traverse);
-    setExpandState(prev => ({ ...prev, ...updates }));
+    setExpandState((prev) => ({ ...prev, ...updates }));
   }, [foldDepth, hierarchyData]);
 
   // Handle expandMode changes
   useEffect(() => {
-    if (!hierarchyData || expandMode === 'default') return;
+    if (!hierarchyData || expandMode === "default") return;
 
-    if (expandMode === 'all') {
+    if (expandMode === "all") {
       setExpandState({});
-    } else if (expandMode === 'none') {
+    } else if (expandMode === "none") {
       const collapsed = {};
       const traverse = (node) => {
         if (node.path && node.children && node.children.length > 0) {
@@ -63,9 +66,9 @@ function HierarchicalTree({
   }, [expandMode, hierarchyData]);
 
   const toggleNode = (nodePath) => {
-    setExpandState(prev => ({
+    setExpandState((prev) => ({
       ...prev,
-      [nodePath]: !prev[nodePath]
+      [nodePath]: !prev[nodePath],
     }));
   };
 
@@ -75,7 +78,7 @@ function HierarchicalTree({
     const updateDimensions = () => {
       setDimensions({
         width: Math.max(1200, containerRef.current.clientWidth),
-        height: Math.max(800, containerRef.current.clientHeight)
+        height: Math.max(800, containerRef.current.clientHeight),
       });
     };
     updateDimensions();
@@ -84,10 +87,10 @@ function HierarchicalTree({
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(updateDimensions, 150);
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     return () => {
       clearTimeout(resizeTimer);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -96,65 +99,110 @@ function HierarchicalTree({
     if (!svgRef.current || isInitialized) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
+    svg.selectAll("*").remove();
 
-    const g = svg.append('g').attr('class', 'tree-content');
+    const g = svg.append("g").attr("class", "tree-content");
     gRef.current = g;
 
-    const zoom = d3.zoom()
+    const zoom = d3
+      .zoom()
       .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
       });
     zoomBehaviorRef.current = zoom;
 
     svg.call(zoom);
 
     const margin = { top: 100, right: 200, bottom: 100, left: 200 };
-    g.append('g').attr('class', 'tree-links').attr('transform', `translate(${margin.left},${margin.top})`);
-    g.append('g').attr('class', 'tree-nodes').attr('transform', `translate(${margin.left},${margin.top})`);
+    g.append("g")
+      .attr("class", "tree-links")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+    g.append("g")
+      .attr("class", "tree-nodes")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const zoomGroup = svg.append('g').attr('class', 'zoom-controls');
+    const zoomGroup = svg.append("g").attr("class", "zoom-controls");
 
-    zoomGroup.append('circle')
-      .attr('r', 40)
-      .attr('fill', 'rgba(255, 255, 255, 0.9)')
-      .attr('stroke', '#d1d5db')
-      .attr('stroke-width', 1);
+    zoomGroup
+      .append("circle")
+      .attr("r", 40)
+      .attr("fill", "rgba(255, 255, 255, 0.9)")
+      .attr("stroke", "#d1d5db")
+      .attr("stroke-width", 1);
 
-    zoomGroup.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '-10')
-      .attr('fill', '#6b7280')
-      .style('font-size', '10px')
-      .text('Zoom');
+    zoomGroup
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "-10")
+      .attr("fill", "#6b7280")
+      .style("font-size", "10px")
+      .text("Zoom");
 
-    const zoomInBtn = zoomGroup.append('g')
-      .attr('class', 'zoom-btn')
-      .attr('transform', 'translate(-10, 5)')
-      .on('click', () => svg.transition().duration(300).call(zoom.scaleBy, 1.3));
+    const zoomInBtn = zoomGroup
+      .append("g")
+      .attr("class", "zoom-btn")
+      .attr("transform", "translate(-10, 5)")
+      .on("click", () =>
+        svg.transition().duration(300).call(zoom.scaleBy, 1.3),
+      );
 
-    zoomInBtn.append('circle').attr('r', 14).attr('fill', '#3b82f6').attr('stroke', '#2563eb');
-    zoomInBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
-      .style('font-size', '16px').style('font-weight', 'bold').text('+');
+    zoomInBtn
+      .append("circle")
+      .attr("r", 14)
+      .attr("fill", "#3b82f6")
+      .attr("stroke", "#2563eb");
+    zoomInBtn
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "4")
+      .attr("fill", "white")
+      .style("font-size", "16px")
+      .style("font-weight", "bold")
+      .text("+");
 
-    const zoomOutBtn = zoomGroup.append('g')
-      .attr('class', 'zoom-btn')
-      .attr('transform', 'translate(10, 5)')
-      .on('click', () => svg.transition().duration(300).call(zoom.scaleBy, 0.7));
+    const zoomOutBtn = zoomGroup
+      .append("g")
+      .attr("class", "zoom-btn")
+      .attr("transform", "translate(10, 5)")
+      .on("click", () =>
+        svg.transition().duration(300).call(zoom.scaleBy, 0.7),
+      );
 
-    zoomOutBtn.append('circle').attr('r', 14).attr('fill', '#3b82f6').attr('stroke', '#2563eb');
-    zoomOutBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
-      .style('font-size', '16px').style('font-weight', 'bold').text('−');
+    zoomOutBtn
+      .append("circle")
+      .attr("r", 14)
+      .attr("fill", "#3b82f6")
+      .attr("stroke", "#2563eb");
+    zoomOutBtn
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "4")
+      .attr("fill", "white")
+      .style("font-size", "16px")
+      .style("font-weight", "bold")
+      .text("−");
 
-    const resetBtn = zoomGroup.append('g')
-      .attr('class', 'zoom-btn')
-      .attr('transform', 'translate(0, 30)')
-      .on('click', () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity));
+    const resetBtn = zoomGroup
+      .append("g")
+      .attr("class", "zoom-btn")
+      .attr("transform", "translate(0, 30)")
+      .on("click", () =>
+        svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity),
+      );
 
-    resetBtn.append('circle').attr('r', 12).attr('fill', '#6b7280').attr('stroke', '#4b5563');
-    resetBtn.append('text').attr('text-anchor', 'middle').attr('dy', '4').attr('fill', 'white')
-      .style('font-size', '10px').text('Reset');
+    resetBtn
+      .append("circle")
+      .attr("r", 12)
+      .attr("fill", "#6b7280")
+      .attr("stroke", "#4b5563");
+    resetBtn
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "4")
+      .attr("fill", "white")
+      .style("font-size", "10px")
+      .text("Reset");
 
     setIsInitialized(true);
   }, [isInitialized]);
@@ -163,8 +211,9 @@ function HierarchicalTree({
   useEffect(() => {
     if (!svgRef.current || !isInitialized) return;
     const svg = d3.select(svgRef.current);
-    svg.select('.zoom-controls')
-      .attr('transform', `translate(${dimensions.width - 60}, 20)`);
+    svg
+      .select(".zoom-controls")
+      .attr("transform", `translate(${dimensions.width - 60}, 20)`);
   }, [dimensions, isInitialized]);
 
   // Main Render Loop
@@ -172,19 +221,20 @@ function HierarchicalTree({
     if (!hierarchyData || !isInitialized || !gRef.current) return;
 
     const g = gRef.current;
-    const gNodes = g.select('.tree-nodes');
-    const gLinks = g.select('.tree-links');
+    const gNodes = g.select(".tree-nodes");
+    const gLinks = g.select(".tree-links");
 
-      const treeLayout = d3.tree()
+    const treeLayout = d3
+      .tree()
       .nodeSize([50, nodeSpacing])
       .separation((a, b) => {
-        return (a.parent === b.parent ? 1 : 1.2);
+        return a.parent === b.parent ? 1 : 1.2;
       });
 
     const updateGraph = () => {
       const duration = 300;
 
-      const rootData = { name: '__virtual_root__', children: hierarchyData };
+      const rootData = { name: "__virtual_root__", children: hierarchyData };
       const root = d3.hierarchy(rootData);
 
       root.descendants().forEach((node, i) => {
@@ -193,12 +243,14 @@ function HierarchicalTree({
         node._fullWord = node.data.fullWord;
         node._count = node.data.count;
         node._sentences = node.data.sentences;
-        node._path = node.data.path || (node.data.name === '__virtual_root__' ? '' : node.data.name);
+        node._path =
+          node.data.path ||
+          (node.data.name === "__virtual_root__" ? "" : node.data.name);
       });
 
       treeLayout(root);
 
-      root.each(node => {
+      root.each((node) => {
         if (node.depth === 0) {
           node._isVisible = true;
         } else {
@@ -207,132 +259,171 @@ function HierarchicalTree({
         }
       });
 
-      const nodes = root.descendants().filter(d => d.data.name !== '__virtual_root__' && d._isVisible);
-      const links = root.links().filter(d => d.source.data.name !== '__virtual_root__' && d.target._isVisible);
+      const nodes = root
+        .descendants()
+        .filter((d) => d.data.name !== "__virtual_root__" && d._isVisible);
+      const links = root
+        .links()
+        .filter(
+          (d) =>
+            d.source.data.name !== "__virtual_root__" && d.target._isVisible,
+        );
 
       // --- Nodes ---
-      const nodeSelection = gNodes.selectAll('.tree-node-group')
-        .data(nodes, d => d._path);
+      const nodeSelection = gNodes
+        .selectAll(".tree-node-group")
+        .data(nodes, (d) => d._path);
 
-      const nodeEnter = nodeSelection.enter()
-        .append('g')
-        .attr('class', 'tree-node-group')
-        .attr('transform', d => `translate(${d.y},${d.x})`)
-        .on('click', (event, d) => {
+      const nodeEnter = nodeSelection
+        .enter()
+        .append("g")
+        .attr("class", "tree-node-group")
+        .attr("transform", (d) => `translate(${d.y},${d.x})`)
+        .on("click", (event, d) => {
           event.stopPropagation();
           if (onNodeSelect) onNodeSelect(d._name, d._sentences, d._path);
         });
 
-      nodeEnter.append('title')
-        .text(d => d._path ? d._path.split('/').join(' > ') : d._name);
+      nodeEnter
+        .append("title")
+        .text((d) => (d._path ? d._path.split("/").join(" > ") : d._name));
 
-      nodeEnter.append('circle')
-        .attr('class', 'tree-node-circle')
-        .attr('r', 1e-6)
-        .attr('fill', d => d.depth === 1 ? '#ef4444' : (d.children ? '#3b82f6' : '#14b8a6'));
+      nodeEnter
+        .append("circle")
+        .attr("class", "tree-node-circle")
+        .attr("r", 1e-6)
+        .attr("fill", (d) =>
+          d.depth === 1 ? "#ef4444" : d.children ? "#3b82f6" : "#14b8a6",
+        );
 
-      const label = nodeEnter.append('text')
-        .attr('class', 'tree-node-label')
-        .attr('dy', '-1.8em')
-        .attr('text-anchor', 'middle')
-        .style('fill-opacity', 1e-6);
+      const label = nodeEnter
+        .append("text")
+        .attr("class", "tree-node-label")
+        .attr("dy", "-1.8em")
+        .attr("text-anchor", "middle")
+        .style("fill-opacity", 1e-6);
 
-      label.append('tspan')
-        .attr('class', 'tree-node-name')
-        .text(d => d._name);
+      label
+        .append("tspan")
+        .attr("class", "tree-node-name")
+        .text((d) => d._name);
 
-      label.append('tspan')
-        .attr('class', 'tree-node-count')
-        .attr('dx', '0.5em')
-        .attr('fill', '#6b7280')
-        .style('font-size', '0.85em')
-        .text(d => {
-          const displayCount = d._count != null ? d._count : (d._sentences?.length ?? 0);
-          return displayCount > 0 ? `(${displayCount})` : '';
+      label
+        .append("tspan")
+        .attr("class", "tree-node-count")
+        .attr("dx", "0.5em")
+        .attr("fill", "#6b7280")
+        .style("font-size", "0.85em")
+        .text((d) => {
+          const displayCount =
+            d._count != null ? d._count : (d._sentences?.length ?? 0);
+          return displayCount > 0 ? `(${displayCount})` : "";
         });
 
       // Full word label (only rendered for prefix tree nodes that have _fullWord)
-      nodeEnter.append('text')
-        .attr('class', 'tree-node-fullword')
-        .attr('dy', '-0.3em')
-        .attr('text-anchor', 'middle')
-        .style('font-size', '9px')
-        .style('font-style', 'italic')
-        .text(d => d.depth > 1 && d._fullWord ? d._fullWord : '')
-        .style('fill-opacity', 0);
+      nodeEnter
+        .append("text")
+        .attr("class", "tree-node-fullword")
+        .attr("dy", "-0.3em")
+        .attr("text-anchor", "middle")
+        .style("font-size", "9px")
+        .style("font-style", "italic")
+        .text((d) => (d.depth > 1 && d._fullWord ? d._fullWord : ""))
+        .style("fill-opacity", 0);
 
-      const toggleGroup = nodeEnter.append('g')
-        .attr('class', 'node-toggle-btn')
-        .style('cursor', 'pointer')
-        .on('click', (event, d) => {
+      const toggleGroup = nodeEnter
+        .append("g")
+        .attr("class", "node-toggle-btn")
+        .style("cursor", "pointer")
+        .on("click", (event, d) => {
           event.stopPropagation();
           const path = d._path || d.data.path;
           if (path) toggleNode(path);
         });
 
-      toggleGroup.append('circle')
-        .attr('class', 'toggle-btn-bg')
-        .attr('r', 0)
-        .attr('cx', 20)
-        .attr('fill', '#f9fafb')
-        .attr('stroke', '#9ca3af')
-        .attr('stroke-width', 1.5);
+      toggleGroup
+        .append("circle")
+        .attr("class", "toggle-btn-bg")
+        .attr("r", 0)
+        .attr("cx", 20)
+        .attr("fill", "#f9fafb")
+        .attr("stroke", "#9ca3af")
+        .attr("stroke-width", 1.5);
 
-      toggleGroup.append('text')
-        .attr('class', 'toggle-btn-icon')
-        .attr('text-anchor', 'middle')
-        .attr('x', 20)
-        .attr('dy', '0.38em')
-        .style('font-size', '14px')
-        .style('font-weight', 'bold')
-        .text('');
+      toggleGroup
+        .append("text")
+        .attr("class", "toggle-btn-icon")
+        .attr("text-anchor", "middle")
+        .attr("x", 20)
+        .attr("dy", "0.38em")
+        .style("font-size", "14px")
+        .style("font-weight", "bold")
+        .text("");
 
       // UPDATE
       const nodeUpdate = nodeEnter.merge(nodeSelection);
 
-      nodeUpdate.transition().duration(duration)
-        .attr('transform', d => `translate(${d.y},${d.x})`);
+      nodeUpdate
+        .transition()
+        .duration(duration)
+        .attr("transform", (d) => `translate(${d.y},${d.x})`);
 
-      nodeUpdate.select('.tree-node-circle')
-        .attr('class', d => {
-          const classes = ['tree-node-circle'];
-          if (selectedPanels.some((panel) => panel.path === d._path)) classes.push('selected');
-          if (!d.children) classes.push('leaf');
-          if (d.depth === 1) classes.push('root');
-          return classes.join(' ');
+      nodeUpdate
+        .select(".tree-node-circle")
+        .attr("class", (d) => {
+          const classes = ["tree-node-circle"];
+          if (selectedPanels.some((panel) => panel.path === d._path))
+            classes.push("selected");
+          if (!d.children) classes.push("leaf");
+          if (d.depth === 1) classes.push("root");
+          return classes.join(" ");
         })
-        .transition().duration(duration)
-        .attr('r', d => d.depth === 1 ? 14 : (d.children ? 10 : 7))
-        .attr('fill', d => {
-          if (d.depth === 1) return '#ef4444';
-          if (d.children) return '#3b82f6';
-          return '#14b8a6';
+        .transition()
+        .duration(duration)
+        .attr("r", (d) => (d.depth === 1 ? 14 : d.children ? 10 : 7))
+        .attr("fill", (d) => {
+          if (d.depth === 1) return "#ef4444";
+          if (d.children) return "#3b82f6";
+          return "#14b8a6";
         });
 
-      nodeUpdate.select('.tree-node-label')
-        .attr('dy', '-1.8em')
-        .style('font-size', d => d.depth === 1 ? '16px' : (d.depth === 2 ? '13px' : '11px'))
-        .style('font-weight', d => d.children ? '600' : '400')
-        .transition().duration(duration)
-        .style('fill-opacity', 1);
+      nodeUpdate
+        .select(".tree-node-label")
+        .attr("dy", "-1.8em")
+        .style("font-size", (d) =>
+          d.depth === 1 ? "16px" : d.depth === 2 ? "13px" : "11px",
+        )
+        .style("font-weight", (d) => (d.children ? "600" : "400"))
+        .transition()
+        .duration(duration)
+        .style("fill-opacity", 1);
 
-      nodeUpdate.select('.tree-node-fullword')
-        .attr('dy', '-0.3em')
-        .transition().duration(duration)
-        .style('fill-opacity', 0.7);
+      nodeUpdate
+        .select(".tree-node-fullword")
+        .attr("dy", "-0.3em")
+        .transition()
+        .duration(duration)
+        .style("fill-opacity", 0.7);
 
-      nodeUpdate.select('.toggle-btn-bg')
-        .attr('r', d => d.children ? 9 : 0)
-        .attr('cx', d => d.depth === 1 ? 26 : 20);
+      nodeUpdate
+        .select(".toggle-btn-bg")
+        .attr("r", (d) => (d.children ? 9 : 0))
+        .attr("cx", (d) => (d.depth === 1 ? 26 : 20));
 
-      nodeUpdate.select('.toggle-btn-icon')
-        .attr('x', d => d.depth === 1 ? 26 : 20)
-        .text(d => !d.children ? '' : (expandState[d._path] ? '+' : '−'));
+      nodeUpdate
+        .select(".toggle-btn-icon")
+        .attr("x", (d) => (d.depth === 1 ? 26 : 20))
+        .text((d) => (!d.children ? "" : expandState[d._path] ? "+" : "−"));
 
       // EXIT
-      nodeSelection.exit().transition().duration(duration)
-        .attr('transform', function () { return d3.select(this).attr('transform'); })
-        .style('opacity', 0)
+      nodeSelection
+        .exit()
+        .transition()
+        .duration(duration)
+        .attr("transform", function () {
+          return d3.select(this).attr("transform");
+        })
+        .style("opacity", 0)
         .remove();
 
       // --- Links ---
@@ -343,36 +434,47 @@ function HierarchicalTree({
                   ${t.y} ${t.x}`;
       };
 
-      const linkSelection = gLinks.selectAll('.tree-link')
-        .data(links, d => d.target._path);
+      const linkSelection = gLinks
+        .selectAll(".tree-link")
+        .data(links, (d) => d.target._path);
 
-      const linkEnter = linkSelection.enter().append('path')
-        .attr('class', 'tree-link')
-        .attr('fill', 'none')
-        .attr('stroke', '#9ca3af')
-        .attr('stroke-width', '2px')
-        .attr('stroke-opacity', 0.6)
-        .attr('d', d => {
+      const linkEnter = linkSelection
+        .enter()
+        .append("path")
+        .attr("class", "tree-link")
+        .attr("fill", "none")
+        .attr("stroke", "#9ca3af")
+        .attr("stroke-width", "2px")
+        .attr("stroke-opacity", 0.6)
+        .attr("d", (d) => {
           const o = { x: d.source.x, y: d.source.y };
           return diagonal(o, o);
         });
 
-      linkEnter.merge(linkSelection).transition().duration(duration)
-        .attr('d', d => diagonal(d.source, d.target));
+      linkEnter
+        .merge(linkSelection)
+        .transition()
+        .duration(duration)
+        .attr("d", (d) => diagonal(d.source, d.target));
 
-      linkSelection.exit().transition().duration(duration)
-        .attr('d', d => {
+      linkSelection
+        .exit()
+        .transition()
+        .duration(duration)
+        .attr("d", (d) => {
           const o = { x: d.source.x, y: d.source.y };
           return diagonal(o, o);
         })
         .remove();
 
       // --- Selected Panels Connections ---
-      gLinks.selectAll('.selected-topic-link').remove();
-      gNodes.selectAll('.selected-topic-panel').remove();
+      gLinks.selectAll(".selected-topic-link").remove();
+      gNodes.selectAll(".selected-topic-panel").remove();
 
       selectedPanels.forEach((panelData, panelIndex) => {
-        const selectedTreeNode = nodes.find((node) => node._path === panelData.path);
+        const selectedTreeNode = nodes.find(
+          (node) => node._path === panelData.path,
+        );
         if (!selectedTreeNode) return;
 
         const panelWidth = 390;
@@ -388,7 +490,8 @@ function HierarchicalTree({
         let currentX = panelData.x !== undefined ? panelData.x : defaultX;
         let currentY = panelData.y !== undefined ? panelData.y : defaultY;
 
-        const connectorTargetX = currentX > selectedTreeNode.y ? currentX : currentX + panelWidth;
+        const connectorTargetX =
+          currentX > selectedTreeNode.y ? currentX : currentX + panelWidth;
 
         const updateConnector = (x, y) => {
           const targetX = x > selectedTreeNode.y ? x : x + panelWidth;
@@ -396,98 +499,136 @@ function HierarchicalTree({
               C ${(selectedTreeNode.y + targetX) / 2} ${selectedTreeNode.x},
                 ${(selectedTreeNode.y + targetX) / 2} ${y + panelHeight / 2},
                 ${targetX} ${y + panelHeight / 2}`;
-          link.attr('d', newPath);
+          link.attr("d", newPath);
         };
 
-        const link = gLinks.append('path')
-          .attr('class', 'selected-topic-link')
-          .attr('d', `M ${selectedTreeNode.y} ${selectedTreeNode.x}
+        const link = gLinks
+          .append("path")
+          .attr("class", "selected-topic-link")
+          .attr(
+            "d",
+            `M ${selectedTreeNode.y} ${selectedTreeNode.x}
               C ${(selectedTreeNode.y + connectorTargetX) / 2} ${selectedTreeNode.x},
                 ${(selectedTreeNode.y + connectorTargetX) / 2} ${currentY + panelHeight / 2},
-                ${connectorTargetX} ${currentY + panelHeight / 2}`)
-          .attr('fill', 'none')
-          .attr('stroke', '#667eea')
-          .attr('stroke-width', 3)
-          .attr('stroke-opacity', 0.8)
-          .attr('stroke-dasharray', '8,6');
+                ${connectorTargetX} ${currentY + panelHeight / 2}`,
+          )
+          .attr("fill", "none")
+          .attr("stroke", "#667eea")
+          .attr("stroke-width", 3)
+          .attr("stroke-opacity", 0.8)
+          .attr("stroke-dasharray", "8,6");
 
-        const panel = gNodes.append('g').attr('class', 'selected-topic-panel');
+        const panel = gNodes.append("g").attr("class", "selected-topic-panel");
 
-        const drag = d3.drag()
+        const drag = d3
+          .drag()
           .subject(() => ({ x: currentX, y: currentY }))
           .filter((event) => {
-            return event.target.tagName.toLowerCase() === 'h3';
+            return event.target.tagName.toLowerCase() === "h3";
           })
-          .on('start', function () {
+          .on("start", function () {
             d3.select(this).raise();
-            d3.select(this).select('h3').style('cursor', 'grabbing');
+            d3.select(this).select("h3").style("cursor", "grabbing");
           })
-          .on('drag', function (event) {
+          .on("drag", function (event) {
             const newX = event.x;
             const newY = event.y;
-            d3.select(this).attr('x', newX).attr('y', newY);
+            d3.select(this).attr("x", newX).attr("y", newY);
             updateConnector(newX, newY);
             currentX = newX;
             currentY = newY;
           })
-          .on('end', function (event) {
-            d3.select(this).select('h3').style('cursor', 'grab');
+          .on("end", function (event) {
+            d3.select(this).select("h3").style("cursor", "grab");
             if (onPanelDrag) onPanelDrag(panelData.path, event.x, event.y);
           });
 
-        const panelObject = panel.append('foreignObject')
-          .attr('x', currentX)
-          .attr('y', currentY)
-          .attr('width', panelWidth)
-          .attr('height', panelHeight)
+        const panelObject = panel
+          .append("foreignObject")
+          .attr("x", currentX)
+          .attr("y", currentY)
+          .attr("width", panelWidth)
+          .attr("height", panelHeight)
           .call(drag);
 
-        panelObject.on('wheel', (e) => e.stopPropagation());
-        panelObject.on('mousedown', (e) => {
-          if (e.target.tagName.toLowerCase() !== 'h3') {
+        panelObject.on("wheel", (e) => e.stopPropagation());
+        panelObject.on("mousedown", (e) => {
+          if (e.target.tagName.toLowerCase() !== "h3") {
             e.stopPropagation();
           }
         });
 
-        const panelHtml = panelObject.append('xhtml:div')
-          .attr('class', 'topic-sentences-panel topic-sentences-panel-inline');
+        const panelHtml = panelObject
+          .append("xhtml:div")
+          .attr("class", "topic-sentences-panel topic-sentences-panel-inline");
 
-        panelHtml.append('h3')
+        panelHtml
+          .append("h3")
           .text(`"${panelData.name}"`)
-          .style('cursor', 'grab')
-          .style('user-select', 'none');
+          .style("cursor", "grab")
+          .style("user-select", "none");
 
-        panelHtml.append('button')
-          .attr('class', 'close-panel-btn')
-          .text('×')
-          .on('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
+        panelHtml
+          .append("button")
+          .attr("class", "close-panel-btn")
+          .text("×")
+          .on("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             if (onClosePanel) onClosePanel(panelData.path);
           });
 
-        const list = panelHtml.append('div').attr('class', 'topic-sentences-list');
+        const list = panelHtml
+          .append("div")
+          .attr("class", "topic-sentences-list");
         if (sentenceIndices.length > 0) {
           sentenceIndices.forEach((idx) => {
             const text = sentences[idx - 1];
             if (!text) return;
-            const item = list.append('div').attr('class', 'topic-sentence-item');
-            const content = item.append('div').attr('class', 'sentence-main-content');
-            content.append('div').attr('class', 'sentence-number').text(`Sentence ${idx}`);
-            content.append('div').attr('class', 'sentence-text').text(text);
+            const item = list
+              .append("div")
+              .attr("class", "topic-sentence-item");
+            const content = item
+              .append("div")
+              .attr("class", "sentence-main-content");
+            content
+              .append("div")
+              .attr("class", "sentence-number")
+              .text(`Sentence ${idx}`);
+            content.append("div").attr("class", "sentence-text").text(text);
           });
         } else {
-          list.append('div').attr('class', 'no-sentences').text(emptyPanelMessage);
+          list
+            .append("div")
+            .attr("class", "no-sentences")
+            .text(emptyPanelMessage);
         }
       });
     };
 
     updateGraph();
-
-  }, [hierarchyData, expandState, selectedPanels, isInitialized, onNodeSelect, onClosePanel, sentences, onPanelDrag, nodeSpacing, emptyPanelMessage]);
+  }, [
+    hierarchyData,
+    expandState,
+    selectedPanels,
+    isInitialized,
+    onNodeSelect,
+    onClosePanel,
+    sentences,
+    onPanelDrag,
+    nodeSpacing,
+    emptyPanelMessage,
+  ]);
 
   // Initial Centering Logic
   useEffect(() => {
-    if (!hierarchyData || !isInitialized || !gRef.current || !zoomBehaviorRef.current) return;
+    if (
+      !hierarchyData ||
+      !isInitialized ||
+      !gRef.current ||
+      !zoomBehaviorRef.current
+    )
+      return;
 
     const timeout = setTimeout(() => {
       const svg = d3.select(svgRef.current);
@@ -500,27 +641,44 @@ function HierarchicalTree({
         const initialScale = Math.min(
           (dimensions.width - 100) / fullWidth,
           (dimensions.height - 100) / fullHeight,
-          0.5
+          0.5,
         );
 
-        const tx = (dimensions.width - fullWidth * initialScale) / 2 - bounds.x * initialScale;
-        const ty = (dimensions.height - fullHeight * initialScale) / 2 - bounds.y * initialScale;
+        const tx =
+          (dimensions.width - fullWidth * initialScale) / 2 -
+          bounds.x * initialScale;
+        const ty =
+          (dimensions.height - fullHeight * initialScale) / 2 -
+          bounds.y * initialScale;
 
-        svg.transition().duration(750)
-          .call(zoomBehaviorRef.current.transform,
-            d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+        svg
+          .transition()
+          .duration(750)
+          .call(
+            zoomBehaviorRef.current.transform,
+            d3.zoomIdentity.translate(tx, ty).scale(initialScale),
+          );
       }
     }, 300);
     return () => clearTimeout(timeout);
   }, [dimensions.height, dimensions.width, hierarchyData, isInitialized]);
 
   if (!hierarchyData) {
-    return <div className="tree-visualization-empty"><p>No hierarchy data available</p></div>;
+    return (
+      <div className="tree-visualization-empty">
+        <p>No hierarchy data available</p>
+      </div>
+    );
   }
 
   return (
     <div className="hierarchical-tree-container" ref={containerRef}>
-      <svg ref={svgRef} width={dimensions.width} height={dimensions.height} className="hierarchical-tree-svg" />
+      <svg
+        ref={svgRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        className="hierarchical-tree-svg"
+      />
     </div>
   );
 }
