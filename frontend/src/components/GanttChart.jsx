@@ -100,14 +100,31 @@ const GanttChart = ({
     )
       return;
 
-    const container = containerRef.current || svgRef.current.parentElement;
-    const containerWidth = container.clientWidth || 800;
+    const canvasEl = svgRef.current.parentElement;
+    const containerWidth = canvasEl ? canvasEl.clientWidth || 800 : 800;
 
     d3.select(svgRef.current).selectAll("*").remove();
 
     const rowHeight = 25;
-    const width = Math.max(containerWidth, 600);
-    const margin = { top: 30, right: 30, bottom: 50, left: 150 };
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    context.font = "11px sans-serif";
+
+    const maxLabelPixelWidth = scopedData.reduce((max, d) => {
+      const text = d.displayName || d.name || "";
+      const width = context.measureText(text).width;
+      return Math.max(max, width);
+    }, 0);
+
+    const leftMargin = Math.max(150, maxLabelPixelWidth + 30);
+    const minWidthForSentences = Math.max(effectiveLength * 8, 600);
+    const width = Math.max(
+      containerWidth,
+      minWidthForSentences + leftMargin + 30,
+      600,
+    );
+    const margin = { top: 30, right: 30, bottom: 50, left: leftMargin };
     const height = scopedData.length * rowHeight + margin.top + margin.bottom;
 
     const innerWidth = width - margin.left - margin.right;
@@ -116,9 +133,7 @@ const GanttChart = ({
     const svg = d3
       .select(svgRef.current)
       .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", `0 0 ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet");
+      .attr("height", height);
 
     const g = svg
       .append("g")
@@ -286,7 +301,15 @@ const GanttChart = ({
     // Y Axis
     g.append("g")
       .attr("class", "y-axis")
-      .call(d3.axisLeft(y).tickSize(0))
+      .call(
+        d3
+          .axisLeft(y)
+          .tickSize(0)
+          .tickFormat((d) => {
+            const topicObj = scopedData.find((t) => t.name === d);
+            return topicObj ? (topicObj.displayName || topicObj.name) : String(d || "");
+          }),
+      )
       .selectAll("text")
       .style("font-size", "11px")
       .style("fill", "#333")
@@ -327,10 +350,7 @@ const GanttChart = ({
       />
 
       <div className="gantt-chart__canvas chart-scroll-area">
-        <svg
-          ref={svgRef}
-          className="gantt-chart__svg chart-svg chart-svg--full-width"
-        ></svg>
+        <svg ref={svgRef} className="gantt-chart__svg chart-svg"></svg>
       </div>
 
       {selectedTopicForModal && (

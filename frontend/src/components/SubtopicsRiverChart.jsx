@@ -134,9 +134,13 @@ const SubtopicsRiverChart = ({
     )
       return;
 
-    const container = containerRef.current || svgRef.current.parentElement;
-    const containerWidth = container.clientWidth || 800;
-    const width = Math.max(containerWidth, 800);
+    const canvasEl = svgRef.current.parentElement;
+    const containerWidth = canvasEl ? canvasEl.clientWidth || 800 : 800;
+    const minWidthForSubtopics = Math.max(
+      effectiveLength * 8,
+      orderedSubtopics.length * 120,
+    );
+    const width = Math.max(containerWidth, minWidthForSubtopics, 800);
     const height = 600;
     const margin = { top: 60, right: 40, bottom: 80, left: 80 };
     const innerWidth = width - margin.left - margin.right;
@@ -148,7 +152,6 @@ const SubtopicsRiverChart = ({
       .select(svgRef.current)
       .attr("width", width)
       .attr("height", height)
-      .attr("viewBox", `0 0 ${width} ${height}`)
       .style("background", "#fff");
 
     const g = svg
@@ -182,7 +185,11 @@ const SubtopicsRiverChart = ({
     const area = d3
       .area()
       .curve(d3.curveBasis)
-      .x((d) => x((d.data.rangeStart + d.data.rangeEnd) / 2))
+      .x((d, i) => {
+        if (i === 0) return x(0);
+        if (i === bins.length - 1) return x(effectiveLength);
+        return x((d.data.rangeStart + d.data.rangeEnd) / 2);
+      })
       .y0((d) => y(d[0]))
       .y1((d) => y(d[1]));
 
@@ -377,10 +384,10 @@ const SubtopicsRiverChart = ({
       ref={containerRef}
       className="subtopics-river-chart chart-surface chart-surface--river"
     >
-      <div className="subtopics-river-chart__canvas">
+      <div className="subtopics-river-chart__canvas chart-scroll-area">
         <svg
           ref={svgRef}
-          className="subtopics-river-chart__svg chart-svg chart-svg--centered"
+          className="subtopics-river-chart__svg chart-svg"
         ></svg>
       </div>
 

@@ -110,8 +110,8 @@ const TopicsRiverChart = ({
     )
       return;
 
-    const container = containerRef.current || svgRef.current.parentElement;
-    const containerWidth = container.clientWidth || 800;
+    const canvasEl = svgRef.current.parentElement;
+    const containerWidth = canvasEl ? canvasEl.clientWidth || 800 : 800;
 
     // Use shared utils for data processing
     const binCount = Math.max(
@@ -126,7 +126,11 @@ const TopicsRiverChart = ({
 
     d3.select(svgRef.current).selectAll("*").remove();
 
-    const width = Math.max(containerWidth, 600);
+    const minWidthForTopics = Math.max(
+      effectiveLength * 8,
+      scopedData.length * 120,
+    );
+    const width = Math.max(containerWidth, minWidthForTopics, 600);
     const height = 500;
     const margin = { top: 30, right: 30, bottom: 50, left: 60 };
     const innerWidth = width - margin.left - margin.right;
@@ -135,9 +139,7 @@ const TopicsRiverChart = ({
     const svg = d3
       .select(svgRef.current)
       .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", `0 0 ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet");
+      .attr("height", height);
 
     const g = svg
       .append("g")
@@ -169,7 +171,11 @@ const TopicsRiverChart = ({
     const area = d3
       .area()
       .curve(d3.curveBasis)
-      .x((d) => x((d.data.rangeStart + d.data.rangeEnd) / 2))
+      .x((d, i) => {
+        if (i === 0) return x(0);
+        if (i === data.length - 1) return x(effectiveLength);
+        return x((d.data.rangeStart + d.data.rangeEnd) / 2);
+      })
       .y0((d) => y(d[0]))
       .y1((d) => y(d[1]));
 
@@ -349,11 +355,8 @@ const TopicsRiverChart = ({
         onChange={setSelectedLevel}
       />
 
-      <div className="topics-river-chart__canvas">
-        <svg
-          ref={svgRef}
-          className="topics-river-chart__svg chart-svg chart-svg--full-width"
-        ></svg>
+      <div className="topics-river-chart__canvas chart-scroll-area">
+        <svg ref={svgRef} className="topics-river-chart__svg chart-svg"></svg>
       </div>
 
       <RiverLegend

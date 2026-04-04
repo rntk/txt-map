@@ -2047,7 +2047,7 @@
 
 .fullscreen-graph-content {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
 }
 
@@ -2059,7 +2059,8 @@
 
 .fullscreen-graph-content .chart-surface.chart-scroll-area {
   height: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .fullscreen-graph-content .marimekko-container {

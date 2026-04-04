@@ -260,7 +260,8 @@
 
 .chart-scroll-area {
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .article-structure-chart,
@@ -452,7 +453,7 @@
 .topics-river-chart__svg,
 .subtopics-river-chart__svg {
   display: block;
-  width: 100%;
+  min-width: max-content;
 }
 
 .subtopics-river-chart {
