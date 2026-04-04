@@ -1,22 +1,23 @@
-import React from 'react';
-import FullScreenGraph from './FullScreenGraph';
-import TopicsRiverChart from './TopicsRiverChart';
-import SubtopicsRiverChart from './SubtopicsRiverChart';
-import MarimekkoChartTab from './MarimekkoChartTab';
-import MindmapResults from './MindmapResults';
-import PrefixTreeResults from './PrefixTreeResults';
-import TopicsTagCloud from './TopicsTagCloud';
-import CircularPackingChart from './CircularPackingChart';
-import GridView from './GridView';
-import TopicsBarChart from './TopicsBarChart';
-import RadarChart from './RadarChart';
-import ArticleStructureChart from './ArticleStructureChart';
-import TreemapChart from './TreemapChart';
-import TopicsVennChart from './TopicsVennChart';
+import React from "react";
+import FullScreenGraph from "./FullScreenGraph";
+import TopicsRiverChart from "./TopicsRiverChart";
+import SubtopicsRiverChart from "./SubtopicsRiverChart";
+import MarimekkoChartTab from "./MarimekkoChartTab";
+import MindmapResults from "./MindmapResults";
+import PrefixTreeResults from "./PrefixTreeResults";
+import TopicsTagCloud from "./TopicsTagCloud";
+import CircularPackingChart from "./CircularPackingChart";
+import GanttChart from "./GanttChart";
+import GridView from "./GridView";
+import TopicsBarChart from "./TopicsBarChart";
+import RadarChart from "./RadarChart";
+import ArticleStructureChart from "./ArticleStructureChart";
+import TreemapChart from "./TreemapChart";
+import TopicsVennChart from "./TopicsVennChart";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -47,7 +48,7 @@ function VisualizationPanels({
 }) {
   return (
     <>
-      {fullscreenGraph === 'venn_chart' && (
+      {fullscreenGraph === "venn_chart" && (
         <FullScreenGraph title="Topics Venn" onClose={onClose}>
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body chart-surface__panel-body--scroll">
@@ -64,7 +65,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'topics' && (
+      {fullscreenGraph === "topics" && (
         <FullScreenGraph title="Topics" onClose={onClose}>
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body">
@@ -81,12 +82,14 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'topics_river' && (
+      {fullscreenGraph === "topics_river" && (
         <FullScreenGraph title="Topics River" onClose={onClose}>
           <div className="chart-surface chart-surface--embedded chart-scroll-area">
             <section className="chart-section">
               <h2 className="chart-section__title">Topics River</h2>
-              <p className="chart-section__copy">Visualization of topic density across the article.</p>
+              <p className="chart-section__copy">
+                Visualization of topic density across the article.
+              </p>
               <TopicsRiverChart
                 topics={safeTopics}
                 sentences={safeSentences}
@@ -99,7 +102,10 @@ function VisualizationPanels({
             </section>
             <section className="chart-section">
               <h2 className="chart-section__title">Subtopics River</h2>
-              <p className="chart-section__copy">Visualization of subtopics for each chapter. X axis: Global sentence index. Y axis: Chapters.</p>
+              <p className="chart-section__copy">
+                Visualization of subtopics for each chapter. X axis: Global
+                sentence index. Y axis: Chapters.
+              </p>
               {results.subtopics ? (
                 <SubtopicsRiverChart
                   topics={safeTopics}
@@ -112,14 +118,39 @@ function VisualizationPanels({
                   markup={markup}
                 />
               ) : (
-                <p className="chart-empty-state chart-empty-state--compact">No subtopics data available.</p>
+                <p className="chart-empty-state chart-empty-state--compact">
+                  No subtopics data available.
+                </p>
               )}
             </section>
           </div>
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'marimekko' && (
+      {fullscreenGraph === "gantt_chart" && (
+        <FullScreenGraph title="Gantt Chart" onClose={onClose}>
+          <div className="chart-surface chart-surface--embedded chart-scroll-area">
+            <section className="chart-section">
+              <h2 className="chart-section__title">Topics Gantt Chart</h2>
+              <p className="chart-section__copy">
+                Visualization of topic presence across sentences using a Gantt
+                diagram.
+              </p>
+              <GanttChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                articleLength={safeSentences.length}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
+            </section>
+          </div>
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === "marimekko" && (
         <FullScreenGraph title="Marimekko" onClose={onClose}>
           <div className="marimekko-container">
             <MarimekkoChartTab
@@ -134,7 +165,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'mindmap' && (
+      {fullscreenGraph === "mindmap" && (
         <MindmapResults
           mindmapData={{
             topic_mindmaps: results.topic_mindmaps || {},
@@ -145,7 +176,7 @@ function VisualizationPanels({
         />
       )}
 
-      {fullscreenGraph === 'prefix_tree' && (
+      {fullscreenGraph === "prefix_tree" && (
         <PrefixTreeResults
           treeData={results.prefix_tree || {}}
           sentences={safeSentences}
@@ -154,7 +185,7 @@ function VisualizationPanels({
         />
       )}
 
-      {fullscreenGraph === 'tags_cloud' && (
+      {fullscreenGraph === "tags_cloud" && (
         <FullScreenGraph title="Tags Cloud" onClose={onClose}>
           <TopicsTagCloud
             submissionId={submissionId}
@@ -168,7 +199,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'circular_packing' && (
+      {fullscreenGraph === "circular_packing" && (
         <FullScreenGraph title="Topic Circles" onClose={onClose}>
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body">
@@ -185,7 +216,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'radar_chart' && (
+      {fullscreenGraph === "radar_chart" && (
         <FullScreenGraph title="Radar Chart" onClose={onClose}>
           <div className="chart-surface__panel-body chart-surface__panel-body--padded">
             <RadarChart
@@ -199,7 +230,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'grid_view' && (
+      {fullscreenGraph === "grid_view" && (
         <GridView
           topics={safeTopics}
           topicSummaries={results.topic_summaries || {}}
@@ -211,7 +242,7 @@ function VisualizationPanels({
         />
       )}
 
-      {fullscreenGraph === 'article_structure' && (
+      {fullscreenGraph === "article_structure" && (
         <FullScreenGraph title="Article Structure" onClose={onClose}>
           <div className="chart-surface__panel-body chart-surface__panel-body--padded">
             <ArticleStructureChart
@@ -226,7 +257,7 @@ function VisualizationPanels({
         </FullScreenGraph>
       )}
 
-      {fullscreenGraph === 'treemap' && (
+      {fullscreenGraph === "treemap" && (
         <FullScreenGraph title="Treemap" onClose={onClose}>
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body">
