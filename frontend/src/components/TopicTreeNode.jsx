@@ -24,7 +24,7 @@ import './TopicNavigation.css';
  * @property {(treeNode: TopicTreeNodeModel) => void} toggleReadInSubtree
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} onToggleTopic
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} onToggleRead
- * @property {(topics: Array<{ name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }>) => void} onToggleShowPanel
+ * @property {(topic: { name: string } | Array<{ name: string }>) => void} onShowTopicSentences
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }, mode: 'focus' | 'prev' | 'next') => void} [onNavigateTopic]
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => boolean} isPanelSelection
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onOpenVisualization]
@@ -56,9 +56,8 @@ function TopicTreeNode({
   toggleReadInSubtree,
   onToggleTopic,
   onToggleRead,
-  onToggleShowPanel,
+  onShowTopicSentences,
   onNavigateTopic,
-  isPanelSelection,
   onOpenVisualization,
   onCompareTopicRanges,
   highlightAllTopics = false,
@@ -90,9 +89,8 @@ function TopicTreeNode({
     toggleReadInSubtree,
     onToggleTopic,
     onToggleRead,
-    onToggleShowPanel,
+    onShowTopicSentences,
     onNavigateTopic,
-    isPanelSelection,
     onOpenVisualization,
     onCompareTopicRanges,
     highlightAllTopics,
@@ -229,9 +227,9 @@ function TopicTreeNode({
                   type="button"
                   className="topic-nav-button"
                   tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() => handleAction(() => onToggleShowPanel(topic))}
+                  onClick={() => handleAction(() => onShowTopicSentences(topic))}
                 >
-                  {isPanelSelection(topic) ? 'Hide' : 'Show'}
+                  Show
                 </button>
                 <button
                   type="button"
@@ -299,7 +297,7 @@ function TopicTreeNode({
                       };
                       collectLeaves(treeNode);
                       if (leaves.length > 0) {
-                        onToggleShowPanel(leaves);
+                        onShowTopicSentences(leaves);
                       }
                     });
                   }}

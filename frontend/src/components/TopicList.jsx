@@ -28,9 +28,7 @@ import './TopicNavigation.css';
  * @property {(topic: TopicListTopic) => void} [onHoverTopic]
  * @property {Set<string> | Iterable<string>} [readTopics]
  * @property {(topic: TopicListTopic) => void} [onToggleRead]
- * @property {boolean} [showPanel]
- * @property {TopicListTopic | null} [panelTopic]
- * @property {(topic: TopicListTopic | Array<TopicListTopic>) => void} [onToggleShowPanel]
+ * @property {(topic: TopicListTopic | Array<TopicListTopic>) => void} [onShowTopicSentences]
  * @property {(topic: TopicListTopic, mode: 'focus' | 'prev' | 'next') => void} [onNavigateTopic]
  * @property {() => void} [onToggleReadAll]
  * @property {() => void} [onOpenVisualization]
@@ -69,9 +67,7 @@ function TopicList({
   onHoverTopic: _onHoverTopic = () => {},
   readTopics = new Set(),
   onToggleRead = () => {},
-  showPanel = false,
-  panelTopic = null,
-  onToggleShowPanel = () => {},
+  onShowTopicSentences = () => {},
   onNavigateTopic,
   onToggleReadAll = () => {},
   onOpenVisualization,
@@ -374,9 +370,8 @@ function TopicList({
     toggleReadInSubtree,
     onToggleTopic,
     onToggleRead,
-    onToggleShowPanel,
+    onShowTopicSentences,
     onNavigateTopic,
-    isPanelSelection,
     onOpenVisualization,
     highlightAllTopics,
     activeActionMenuPath,

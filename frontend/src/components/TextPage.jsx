@@ -9,7 +9,6 @@ import VisualizationPanels from './VisualizationPanels';
 import GlobalTopicsCompareView from './GlobalTopicsCompareView';
 import FullScreenGraph from './FullScreenGraph';
 import SummaryTimeline from './SummaryTimeline';
-import TopicSentencePanel from './TopicSentencePanel';
 import TextPageToolbar from './TextPageToolbar';
 import ArticleTabHeader from './ArticleTabHeader';
 import ArticleSummaryView from './ArticleSummaryView';
@@ -186,17 +185,38 @@ function TextPage() {
     toggleReadAllBase(allTopicNames);
   }, [submission, toggleReadAllBase]);
 
-  const toggleShowPanel = useCallback((topicOrTopics) => {
-    const isSameSelection = getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topicOrTopics);
+  const handleOpenTopicSentences = useCallback((topicOrTopics) => {
+    const results = submission?.results || {};
+    const localSafeSentences = Array.isArray(results.sentences) ? results.sentences : [];
 
-    if (showPanel && isSameSelection) {
-      setShowPanel(false);
-      setPanelTopic(null);
+    if (Array.isArray(topicOrTopics)) {
+      const topicNames = topicOrTopics.map(t => t.name);
+      const displayName = `${topicOrTopics[0].name.split(/[\s_>]/)[0]} Group (${topicOrTopics.length} topics)`;
+      const relatedTopics = (submission?.results?.topics || []).filter(t => topicNames.includes(t.name));
+      const allIndices = new Set();
+      const allRanges = [];
+      relatedTopics.forEach(t => {
+        (t.sentences || []).forEach(idx => allIndices.add(idx));
+        if (t.ranges) {
+            allRanges.push(...t.ranges);
+        }
+      });
+      setSummaryModalTopic({
+        name: displayName,
+        displayName: displayName,
+        fullPath: displayName,
+        sentenceIndices: Array.from(allIndices).sort((a,b) => a-b),
+        ranges: allRanges,
+        _sentences: localSafeSentences,
+      });
     } else {
-      setShowPanel(true);
-      setPanelTopic(topicOrTopics);
+      const fullTopic = (submission?.results?.topics || []).find(t => t.name === topicOrTopics.name) || topicOrTopics;
+      setSummaryModalTopic({
+        ...fullTopic,
+        _sentences: localSafeSentences,
+      });
     }
-  }, [showPanel, panelTopic]);
+  }, [submission?.results]);
 
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
@@ -803,9 +823,7 @@ function TextPage() {
                 onHoverTopic={handleHoverTopic}
                 readTopics={readTopics}
                 onToggleRead={toggleRead}
-                showPanel={showPanel}
-                panelTopic={panelTopic}
-                onToggleShowPanel={toggleShowPanel}
+                onShowTopicSentences={handleOpenTopicSentences}
                 onNavigateTopic={navigateTopicSentence}
                 onToggleReadAll={toggleReadAll}
                 onOpenVisualization={handleOpenVisualization}
@@ -820,15 +838,6 @@ function TextPage() {
               />
             </div>
             <div className="right-column" ref={rightColumnRef}>
-              <div className={`reading-page__panel-shell${showPanel && panelTopic ? ' reading-page__panel-shell--visible' : ' reading-page__panel-shell--hidden'}`}>
-                {panelTopic && (
-                  <TopicSentencePanel
-                    panelTopic={panelTopic}
-                    articles={articles}
-                    onClose={() => toggleShowPanel(panelTopic)}
-                  />
-                )}
-              </div>
               <div className="article-section">
                 <ArticleTabHeader
                   activeTab={activeTab}
