@@ -832,6 +832,28 @@ describe('TextDisplay', () => {
 
       expect(screen.getByRole('link', { name: /Go to:/ })).toBeInTheDocument();
     });
+
+    it('opens topic summaries from the tooltip and closes it', () => {
+      const handleOpenTopicSummaries = vi.fn();
+
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[{ name: 'Topic1', sentences: [1], ranges: [] }]}
+          onOpenTopicSummaries={handleOpenTopicSummaries}
+        />
+      );
+
+      const sentenceToken = document.getElementById('sentence-0-0');
+      fireEvent.click(sentenceToken);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Topic Summaries' }));
+
+      expect(handleOpenTopicSummaries).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Topic1' })
+      );
+      expect(document.querySelector('.text-topic-tooltip')).not.toBeInTheDocument();
+    });
   });
 
   describe('edge cases and defensive programming', () => {

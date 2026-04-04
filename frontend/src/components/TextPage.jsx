@@ -63,7 +63,9 @@ function TextPage() {
   const [activeInsightId, setActiveInsightId] = useState(null);
   const [activeInsightSentenceIndices, setActiveInsightSentenceIndices] = useState([]);
   const [activeInsightRanges, setActiveInsightRanges] = useState([]);
+  const [focusedSummaryTopicName, setFocusedSummaryTopicName] = useState(null);
   const pendingMinimapSentenceRef = useRef(null);
+  const pendingSummaryTopicRef = useRef(null);
   const rightColumnRef = useRef(null);
 
   const toggleHighlightAll = useCallback(() => {
@@ -83,12 +85,18 @@ function TextPage() {
   const closeFullscreenGraph = useCallback(() => {
     setFullscreenGraph(null);
     setActiveTab('article');
+    setFocusedSummaryTopicName(null);
+    pendingSummaryTopicRef.current = null;
   }, []);
 
   const handleTabClick = useCallback((tabKey) => {
     const isFullscreen = FULLSCREEN_TABS.some(t => t.key === tabKey);
     setActiveTab(tabKey);
     setFullscreenGraph(isFullscreen ? tabKey : null);
+    if (tabKey !== 'topic_summary_timeline') {
+      setFocusedSummaryTopicName(null);
+      pendingSummaryTopicRef.current = null;
+    }
   }, []);
 
   const submissionId = window.location.pathname.split('/')[3];
@@ -241,6 +249,89 @@ function TextPage() {
   const handleOpenVisualization = useCallback(() => {
     handleTabClick('topics');
   }, [handleTabClick]);
+
+  const focusedSummaryParas = useMemo(() => {
+    if (!focusedSummaryTopicName) {
+      return [];
+    }
+
+    return Array.isArray(_topicSummaryParaMap[focusedSummaryTopicName])
+      ? _topicSummaryParaMap[focusedSummaryTopicName]
+      : [];
+  }, [_topicSummaryParaMap, focusedSummaryTopicName]);
+
+  const effectiveHighlightedSummaryParas = useMemo(() => {
+    if (focusedSummaryParas.length === 0) {
+      return highlightedSummaryParas;
+    }
+
+    const merged = new Set(highlightedSummaryParas);
+    focusedSummaryParas.forEach((index) => merged.add(index));
+    return merged;
+  }, [focusedSummaryParas, highlightedSummaryParas]);
+
+  const handleOpenTopicSummaries = useCallback((topic) => {
+    const topicName = typeof topic?.name === 'string' ? topic.name : '';
+    if (!topicName) {
+      return;
+    }
+
+    pendingSummaryTopicRef.current = { name: topicName };
+    setFocusedSummaryTopicName(topicName);
+    setGroupedByTopics(false);
+    setActiveTab('topic_summary_timeline');
+    setFullscreenGraph('topic_summary_timeline');
+  }, []);
+
+  useEffect(() => {
+    if (
+      fullscreenGraph !== 'topic_summary_timeline'
+      || activeTab !== 'topic_summary_timeline'
+      || !pendingSummaryTopicRef.current
+      || focusedSummaryParas.length === 0
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let attemptCount = 0;
+    let timeoutId = null;
+
+    const attemptScroll = () => {
+      if (cancelled) {
+        return;
+      }
+
+      attemptCount += 1;
+      const pendingTopic = pendingSummaryTopicRef.current;
+      if (!pendingTopic) {
+        return;
+      }
+
+      const targetEl = document.getElementById(`summary-para-${focusedSummaryParas[0]}`);
+      if (targetEl) {
+        pendingSummaryTopicRef.current = null;
+        navigateTopicSentence(pendingTopic, 'focus');
+        return;
+      }
+
+      if (attemptCount >= 8) {
+        pendingSummaryTopicRef.current = null;
+        return;
+      }
+
+      timeoutId = window.setTimeout(attemptScroll, 120);
+    };
+
+    timeoutId = window.setTimeout(attemptScroll, 0);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [activeTab, focusedSummaryParas, fullscreenGraph, navigateTopicSentence]);
 
   const results = submission?.results || {};
   const safeSentences = useMemo(
@@ -742,6 +833,7 @@ function TextPage() {
                         onToggleTopic={toggleTopic}
                         onNavigateTopic={navigateTopicSentence}
                         onShowSentences={handleShowTopicSentences}
+                        onOpenTopicSummaries={handleOpenTopicSummaries}
                         tooltipEnabled={tooltipEnabled}
                         coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
                         coloredTopicNames={coloredTopicNames}
@@ -788,6 +880,7 @@ function TextPage() {
                             onToggleTopic={toggleTopic}
                             onNavigateTopic={navigateTopicSentence}
                             onShowSentences={handleShowTopicSentences}
+                            onOpenTopicSummaries={handleOpenTopicSummaries}
                             tooltipEnabled={tooltipEnabled}
                             submissionId={submissionId}
                             coloredHighlightMode={highlightAllTopics || highlightInsightTopics}
@@ -824,7 +917,7 @@ function TextPage() {
               mode="summary"
               title="Topic Summaries"
               summaryTimelineItems={summaryTimelineItems}
-              highlightedSummaryParas={highlightedSummaryParas}
+              highlightedSummaryParas={effectiveHighlightedSummaryParas}
               summaryModalTopic={summaryModalTopic}
               closeSummaryModal={closeSummaryModal}
               handleSummaryClick={handleSummaryClick}

@@ -166,6 +166,7 @@ function ArticleMarkupPlainBlock({ sentences, startSentenceIndex, sentenceColorM
  * @property {(topic: Object) => void} onToggleTopic
  * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} onNavigateTopic
  * @property {(topic: Object) => void} onShowSentences
+ * @property {(topic: Object) => void} [onOpenTopicSummaries]
  * @property {boolean} tooltipEnabled
  */
 function MarkupTopicBlock({
@@ -176,6 +177,7 @@ function MarkupTopicBlock({
   onToggleTopic,
   onNavigateTopic,
   onShowSentences,
+  onOpenTopicSummaries,
   tooltipEnabled,
   coloredHighlightMode = false,
 }) {
@@ -323,6 +325,18 @@ function MarkupTopicBlock({
               >
                 View sentences
               </button>
+              {onOpenTopicSummaries && (
+                <button
+                  className="text-topic-tooltip-btn"
+                  onClick={() => {
+                    onOpenTopicSummaries(topic);
+                    hideTooltip();
+                  }}
+                  title="Open topic summaries for this topic"
+                >
+                  Topic Summaries
+                </button>
+              )}
             </div>
           </div>
         );
@@ -364,6 +378,7 @@ function MarkupTopicBlock({
  * @property {(topic: Object) => void} onToggleTopic
  * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} onNavigateTopic
  * @property {(topic: Object) => void} onShowSentences
+ * @property {(topic: Object) => void} [onOpenTopicSummaries]
  * @property {boolean} tooltipEnabled
  * @property {boolean} [coloredHighlightMode]
  * @property {Set<string>|string[]} [coloredTopicNames]
@@ -378,6 +393,7 @@ function ArticleMarkupView({
   onToggleTopic,
   onNavigateTopic,
   onShowSentences,
+  onOpenTopicSummaries,
   tooltipEnabled,
   coloredHighlightMode = false,
   coloredTopicNames = null,
@@ -424,6 +440,7 @@ function ArticleMarkupView({
               onToggleTopic={onToggleTopic}
               onNavigateTopic={onNavigateTopic}
               onShowSentences={onShowSentences}
+              onOpenTopicSummaries={onOpenTopicSummaries}
               tooltipEnabled={tooltipEnabled}
               coloredHighlightMode={coloredHighlightMode}
             />

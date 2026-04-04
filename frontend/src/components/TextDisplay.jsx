@@ -28,6 +28,7 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {(topic: Object) => void} [onToggleRead]
  * @property {(topic: Object) => void} [onToggleTopic]
  * @property {(topic: Object, direction: 'prev'|'next'|'focus') => void} [onNavigateTopic]
+ * @property {(topic: Object) => void} [onOpenTopicSummaries]
  * @property {boolean} [tooltipEnabled]
  * @property {string} [submissionId]
  * @property {(topic: Object) => void} [onShowSentences]
@@ -41,7 +42,7 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
 /**
  * @param {TextDisplayProps} props
  */
-function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, tooltipEnabled = true, submissionId, onShowSentences, highlightWords, coloredHighlightMode = false, activeInsightSentenceIndices = [], activeInsightRanges = [], coloredTopicNames = null }) {
+function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, articleTopics, articleIndex, paragraphMap, topicSummaries, onShowTopicSummary, rawHtml, onToggleRead, onToggleTopic, onNavigateTopic, onOpenTopicSummaries, tooltipEnabled = true, submissionId, onShowSentences, highlightWords, coloredHighlightMode = false, activeInsightSentenceIndices = [], activeInsightRanges = [], coloredTopicNames = null }) {
   const safeSentences = useMemo(() => (Array.isArray(sentences) ? sentences : []), [sentences]);
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -557,6 +558,18 @@ function TextDisplay({ sentences, selectedTopics, hoveredTopic, readTopics, arti
                     title="Open sentences modal for this topic"
                   >
                     View sentences
+                  </button>
+                )}
+                {onOpenTopicSummaries && (
+                  <button
+                    className="text-topic-tooltip-btn"
+                    onClick={() => {
+                      onOpenTopicSummaries(topic);
+                      hideTooltip();
+                    }}
+                    title="Open topic summaries for this topic"
+                  >
+                    Topic Summaries
                   </button>
                 )}
               </div>

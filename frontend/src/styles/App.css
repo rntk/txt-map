@@ -83,12 +83,12 @@
 }
 
 .left-column {
-  flex: 0 0 252px;
-  /* Fixed width of 252px, won't grow or shrink */
-  min-width: 220px;
+  flex: 0 0 320px;
+  /* Fixed width of 320px, won't grow or shrink */
+  min-width: 260px;
   min-height: 0;
   /* Minimum width to ensure readability */
-  max-width: 300px;
+  max-width: 380px;
   /* Maximum width to prevent it from being too wide */
   border-right: 1px solid #ccc;
   padding-right: 4px;

@@ -21,7 +21,7 @@
 
 .reading-page__workspace {
   display: flex;
-  gap: 12px;
+  gap: 2px;
   flex: 1;
   min-height: 0;
   overflow: hidden;

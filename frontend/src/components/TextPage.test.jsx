@@ -2,6 +2,7 @@ import React from 'react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import TextPage from './TextPage';
+import { buildSummaryTimelineItems } from '../utils/summaryTimeline';
 import { matchSummaryToTopics } from '../utils/summaryMatcher';
 
 vi.mock('./TopicsRiverChart', () => ({ default: () => <div data-testid="topics-river-chart" /> }));
@@ -17,7 +18,7 @@ vi.mock('./TopicsBarChart', () => ({ default: () => <div data-testid="topics-bar
 vi.mock('./RadarChart', () => ({ default: () => <div data-testid="radar-chart" /> }));
 vi.mock('./ArticleStructureChart', () => ({ default: () => <div data-testid="article-structure-chart" /> }));
 vi.mock('../utils/summaryTimeline', () => ({
-  buildSummaryTimelineItems: () => [],
+  buildSummaryTimelineItems: vi.fn(() => []),
 }));
 
 vi.mock('../utils/summaryMatcher', () => ({
@@ -69,8 +70,14 @@ describe('TextPage raw text navigation', () => {
         bullets: ['Important detail one', 'Important detail two'],
       },
       paragraph_map: null,
-      summary: [],
-      summary_mappings: [],
+      summary: ['Topic 1 summary paragraph'],
+      summary_mappings: [
+        {
+          summary_index: 0,
+          source_sentences: [1],
+          summary_sentence: 'Topic 1 summary paragraph',
+        },
+      ],
       insights: [
         {
           name: 'Important connection',
@@ -87,6 +94,8 @@ describe('TextPage raw text navigation', () => {
 
   beforeEach(() => {
     window.history.pushState({}, '', '/page/text/test-submission-id');
+    vi.mocked(buildSummaryTimelineItems).mockReturnValue([]);
+    vi.mocked(matchSummaryToTopics).mockReturnValue([]);
 
     if (typeof navigator.sendBeacon === 'undefined') {
       navigator.sendBeacon = vi.fn();
@@ -745,5 +754,65 @@ describe('TextPage raw text navigation', () => {
     expect(within(tooltip).getByText('Topic1')).toBeInTheDocument();
     expect(within(tooltip).getByRole('button', { name: 'Mark Read' })).toBeInTheDocument();
     expect(within(tooltip).getByRole('button', { name: 'View sentences' })).toBeInTheDocument();
+  });
+
+  it('opens topic summaries from the article tooltip without selecting the topic', async () => {
+    vi.mocked(buildSummaryTimelineItems).mockReturnValue([
+      {
+        index: 0,
+        summaryText: 'Topic 1 summary paragraph',
+        mapping: mockSubmission.results.summary_mappings[0],
+        topLevelLabel: 'Topic1',
+        subtopicLabel: 'Topic1',
+        showSectionLabel: true,
+        topicColor: null,
+        topicName: 'Topic1',
+      },
+    ]);
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+
+    const topicCheckbox = screen.getAllByRole('checkbox').find(
+      (element) => element.closest('li') !== null
+    );
+    expect(topicCheckbox).not.toBeChecked();
+
+    fireEvent.click(screen.getByText('Alpha Beta Gamma'));
+
+    const tooltip = await waitFor(() => document.querySelector('.text-topic-tooltip'));
+    fireEvent.click(within(tooltip).getByRole('button', { name: 'Topic Summaries' }));
+
+    expect(await screen.findByText('Topic 1 summary paragraph')).toBeInTheDocument();
+    expect(document.getElementById('summary-para-0')).toHaveClass('summary-paragraph-highlighted');
+    expect(topicCheckbox).not.toBeChecked();
+  });
+
+  it('opens topic summaries from the markup tooltip and highlights the current topic', async () => {
+    vi.mocked(buildSummaryTimelineItems).mockReturnValue([
+      {
+        index: 0,
+        summaryText: 'Topic 1 summary paragraph',
+        mapping: mockSubmission.results.summary_mappings[0],
+        topLevelLabel: 'Topic1',
+        subtopicLabel: 'Topic1',
+        showSectionLabel: true,
+        topicColor: null,
+        topicName: 'Topic1',
+      },
+    ]);
+
+    render(<TextPage />);
+
+    await screen.findByText('Source:');
+    fireEvent.click(screen.getByRole('button', { name: 'Markup' }));
+    fireEvent.click(screen.getByText('Alpha Beta Gamma'));
+
+    const tooltip = await waitFor(() => document.querySelector('.text-topic-tooltip'));
+    fireEvent.click(within(tooltip).getByRole('button', { name: 'Topic Summaries' }));
+
+    expect(await screen.findByText('Topic 1 summary paragraph')).toBeInTheDocument();
+    expect(document.getElementById('summary-para-0')).toHaveClass('summary-paragraph-highlighted');
   });
 });
