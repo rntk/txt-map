@@ -1,7 +1,7 @@
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, cast
 import logging
 
 from lib.llm_queue.client import QueuedLLMClient
@@ -9,6 +9,7 @@ from txt_splitt import RetryConfig, RetryingLLMCallable, Tracer, TracingLLMCalla
 from txt_splitt.cache import CacheEntry, CachingLLMCallable, _build_cache_key
 from txt_splitt.errors import ParseError
 from txt_splitt.html_cleaners import HTMLParserTagStripCleaner
+from txt_splitt.protocols import LLMRequest, LLMResponse
 from txt_splitt.sentences import (
     AdjacentSameTopicJoiner,
     BracketMarker,
@@ -24,12 +25,24 @@ from txt_splitt.sentences import (
 logger = logging.getLogger(__name__)
 _PROMPT_CONTENT_PATTERN = re.compile(r"<content>\s*(.*?)\s*</content>", re.DOTALL)
 _PROMPT_MARKER_PATTERN = re.compile(r"^\{(\d+)\}", re.MULTILINE)
+_TEXT_RESPONSE_FORMAT = "text"
+_JSON_RESPONSE_FORMAT = "json"
+_DEFERRED_BATCH_ERROR = "run() cannot execute deferred batches; use start() and drive the session"
 
 
 @dataclass
 class ArticleSplitResult:
     sentences: List[str]
     topics: List[Dict]
+
+
+class _TopicRangeParserProtocol(Protocol):
+    @property
+    def supported_response_formats(self) -> frozenset[str]:
+        ...
+
+    def parse(self, response: str, sentence_count: int) -> list[Any]:
+        ...
 
 
 class _ValidatedCachingLLMCallable(CachingLLMCallable):
@@ -145,12 +158,47 @@ def _response_has_valid_topic_ranges(
         return False
 
     try:
-        parser = TopicRangeParser(input_mode=parser_mode)
+        parser = _build_topic_range_parser(parser_mode)
         parsed_groups = parser.parse(response, sentence_count)
     except (ParseError, ValueError):
         return False
 
     return bool(parsed_groups)
+
+
+def _build_topic_range_parser(
+    parser_mode: Literal["text", "json", "auto"],
+) -> _TopicRangeParserProtocol:
+    try:
+        parser = TopicRangeParser(input_mode=parser_mode)
+    except TypeError:
+        parser = TopicRangeParser()
+    return cast(_TopicRangeParserProtocol, parser)
+
+
+def _resolve_response_modes(
+    use_json: bool,
+) -> tuple[Literal["text", "json"], Literal["text", "json", "auto"]]:
+    requested_output_mode: Literal["text", "json"] = (
+        _JSON_RESPONSE_FORMAT if use_json else _TEXT_RESPONSE_FORMAT
+    )
+    requested_parser_mode: Literal["text", "json", "auto"] = (
+        _JSON_RESPONSE_FORMAT if requested_output_mode == _JSON_RESPONSE_FORMAT else "auto"
+    )
+    parser = _build_topic_range_parser(requested_parser_mode)
+    supported_formats = getattr(
+        parser,
+        "supported_response_formats",
+        frozenset({_TEXT_RESPONSE_FORMAT}),
+    )
+    if requested_output_mode in supported_formats:
+        return requested_output_mode, requested_parser_mode
+
+    logger.warning(
+        "TopicRangeParser does not support %s responses; falling back to text mode",
+        requested_output_mode,
+    )
+    return _TEXT_RESPONSE_FORMAT, _TEXT_RESPONSE_FORMAT
 
 
 def _groups_to_topics(groups: List[Any], sentence_objects: List[Any]) -> List[Dict[str, Any]]:
@@ -207,6 +255,43 @@ def _groups_to_topics(groups: List[Any], sentence_objects: List[Any]) -> List[Di
         )
 
     return topics
+
+
+def _execute_request(
+    llm_callable: Any,
+    request: LLMRequest,
+) -> LLMResponse:
+    response = llm_callable.call(request.prompt, temperature=request.temperature)
+    return LLMResponse(content=response)
+
+
+def _run_pipeline_session(
+    pipeline: Any,
+    article: str,
+    llm_callable: Any,
+) -> Any:
+    session = pipeline.start(article)
+    while not session.is_complete():
+        requests = session.pending_requests()
+        responses = [
+            _execute_request(llm_callable, request)
+            for request in requests
+        ]
+        session.submit_responses(responses)
+    return session.result()
+
+
+def _execute_pipeline(
+    pipeline: Any,
+    article: str,
+    llm_callable: Any,
+) -> Any:
+    try:
+        return pipeline.run(article)
+    except RuntimeError as exc:
+        if str(exc) != _DEFERRED_BATCH_ERROR:
+            raise
+        return _run_pipeline_session(pipeline, article, llm_callable)
 
 
 def split_article(
@@ -271,8 +356,7 @@ def split_article(
             ],
         )
 
-    output_mode: Literal["text", "json"] = "json" if use_json else "text"
-    parser_mode: Literal["text", "json", "auto"] = "json" if output_mode == "json" else "auto"
+    output_mode, parser_mode = _resolve_response_modes(use_json)
     cached_adapter = (
         _ValidatedCachingLLMCallable(
             llm_with_retry,
@@ -299,7 +383,7 @@ def split_article(
             output_mode=output_mode,
             retry_policy=retry_policy,
         ),
-        parser=TopicRangeParser(input_mode=parser_mode),
+        parser=_build_topic_range_parser(parser_mode),
         gap_handler=LLMRepairingGapHandler(
             llm_callable, temperature=temperature, tracer=tracer
         ),
@@ -312,7 +396,7 @@ def split_article(
     article_preview = article[:500] + "..." if len(article) > 500 else article
     logger.info(f"Running pipeline on article ({len(article)} chars): {article_preview}")
     
-    split_result = pipeline.run(article)
+    split_result = _execute_pipeline(pipeline, article, llm_callable)
     sentences = [s.text for s in split_result.sentences]
     topics = _groups_to_topics(split_result.groups, split_result.sentences)
 

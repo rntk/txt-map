@@ -5,10 +5,14 @@ Tests ArticleSplitResult dataclass, _groups_to_topics, _LLMCallableAdapter,
 split_article, and split_article_with_markers functions.
 """
 from unittest.mock import MagicMock, patch
+from txt_splitt.protocols import LLMRequest
 
 # Import module under test
 from lib.article_splitter import (
     ArticleSplitResult,
+    _build_topic_range_parser,
+    _execute_pipeline,
+    _resolve_response_modes,
     _response_has_valid_topic_ranges,
     _ValidatedCachingLLMCallable,
     _groups_to_topics,
@@ -348,6 +352,123 @@ class TestArticleSplitCacheValidation:
         assert response == "No numeric ranges here"
         assert inner.call.call_count == 1
         assert cache_store.entries == {}
+
+
+class TestTopicRangeParserCompatibility:
+    """Test compatibility with multiple txt_splitt parser APIs."""
+
+    @patch("lib.article_splitter.TopicRangeParser")
+    def test_build_topic_range_parser_falls_back_to_zero_arg_constructor(
+        self,
+        mock_parser_class,
+    ):
+        """Fallback to zero-argument constructor when input_mode is unsupported."""
+        parser_instance = MagicMock()
+        mock_parser_class.side_effect = [TypeError("no args"), parser_instance]
+
+        parser = _build_topic_range_parser("auto")
+
+        assert parser is parser_instance
+        assert mock_parser_class.call_args_list[0].kwargs == {"input_mode": "auto"}
+        assert mock_parser_class.call_args_list[1].kwargs == {}
+
+    @patch("lib.article_splitter._build_topic_range_parser")
+    def test_resolve_response_modes_falls_back_to_text_when_json_unsupported(
+        self,
+        mock_build_parser,
+    ):
+        """JSON requests fall back to text mode when parser only supports text."""
+        parser = MagicMock()
+        parser.supported_response_formats = frozenset({"text"})
+        mock_build_parser.return_value = parser
+
+        output_mode, parser_mode = _resolve_response_modes(True)
+
+        assert output_mode == "text"
+        assert parser_mode == "text"
+
+    @patch("lib.article_splitter.TopicRangeLLM")
+    @patch("lib.article_splitter.build_pipeline")
+    @patch("lib.article_splitter._build_topic_range_parser")
+    @patch("lib.article_splitter.SparseRegexSentenceSplitter")
+    @patch("lib.article_splitter.HTMLParserTagStripCleaner")
+    @patch("lib.article_splitter.MappingOffsetRestorer")
+    def test_split_article_uses_text_mode_when_json_parser_unsupported(
+        self,
+        mock_restorer_class,
+        mock_cleaner_class,
+        mock_splitter_class,
+        mock_build_parser,
+        mock_pipeline_class,
+        mock_topic_llm_class,
+    ):
+        """Pipeline config downgrades to text output when parser lacks JSON support."""
+        mock_llm = MockLLMClient()
+        mock_splitter_class.return_value = MagicMock()
+        mock_cleaner_class.return_value = MagicMock()
+        mock_restorer_class.return_value = MagicMock()
+
+        parser = MagicMock()
+        parser.supported_response_formats = frozenset({"text"})
+        mock_build_parser.return_value = parser
+
+        mock_result = MagicMock()
+        mock_result.sentences = []
+        mock_result.groups = []
+        mock_pipeline = MagicMock()
+        mock_pipeline.run.return_value = mock_result
+        mock_pipeline_class.return_value = mock_pipeline
+
+        split_article("Test", llm=mock_llm, use_json=True)
+
+        assert mock_topic_llm_class.call_args.kwargs["output_mode"] == "text"
+        assert mock_pipeline_class.call_args.kwargs["parser"] is parser
+
+
+class TestPipelineExecutionCompatibility:
+    """Test compatibility with deferred txt_splitt pipeline execution."""
+
+    def test_execute_pipeline_falls_back_to_session_for_deferred_batches(self):
+        """Deferred-batch runtime errors switch execution to session driving."""
+        pipeline = MagicMock()
+        pipeline.run.side_effect = RuntimeError(
+            "run() cannot execute deferred batches; use start() and drive the session"
+        )
+
+        request = LLMRequest(prompt="Prompt text", temperature=0.2)
+        session = MagicMock()
+        session.is_complete.side_effect = [False, True]
+        session.pending_requests.return_value = (request,)
+        expected_result = MagicMock()
+        session.result.return_value = expected_result
+        pipeline.start.return_value = session
+
+        llm_callable = MagicMock()
+        llm_callable.call.return_value = "LLM output"
+
+        result = _execute_pipeline(pipeline, "Article body", llm_callable)
+
+        assert result is expected_result
+        pipeline.start.assert_called_once_with("Article body")
+        llm_callable.call.assert_called_once_with("Prompt text", temperature=0.2)
+        submitted_responses = session.submit_responses.call_args.args[0]
+        assert len(submitted_responses) == 1
+        assert submitted_responses[0].content == "LLM output"
+
+    def test_execute_pipeline_reraises_other_runtime_errors(self):
+        """Unrelated runtime errors are not swallowed."""
+        pipeline = MagicMock()
+        pipeline.run.side_effect = RuntimeError("different pipeline failure")
+
+        with patch("lib.article_splitter._run_pipeline_session") as mock_run_session:
+            try:
+                _execute_pipeline(pipeline, "Article body", MagicMock())
+            except RuntimeError as exc:
+                assert str(exc) == "different pipeline failure"
+            else:
+                raise AssertionError("Expected RuntimeError to be raised")
+
+        assert mock_run_session.called is False
 
 
 # =============================================================================
