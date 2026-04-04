@@ -347,10 +347,6 @@ function TopicList({
     return leaves.length > 0 && leaves.every((name) => safeReadTopics.has(name));
   }, [topicTree, safeReadTopics]);
 
-  const isPanelSelection = (topic) => (
-    showPanel && panelTopic && getTopicSelectionKey(panelTopic) === getTopicSelectionKey(topic)
-  );
-
   const toggleActionMenu = useCallback((path) => {
     setActiveActionMenuPath((prev) => (prev === path ? null : path));
   }, []);

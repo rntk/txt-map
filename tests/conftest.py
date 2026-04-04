@@ -9,6 +9,41 @@ import uuid
 # Note: main.py mocks are set up in test_main_app.py module-level code
 
 
+# =============================================================================
+# NLTK Mocking - applied via pytest_configure hook before any imports
+# =============================================================================
+
+# Create mock NLTK corpus objects
+_mock_stopwords = MagicMock()
+_mock_stopwords.words.return_value = [
+    'the', 'a', 'an', 'and', 'is', 'are', 'was', 'were', 'be', 'has',
+    'he', 'in', 'it', 'its', 'of', 'on', 'that', 'to', 'will', 'with'
+]
+_mock_wordnet = MagicMock()
+
+# Global patchers that will be started in pytest_configure
+_nltk_stopwords_patcher = None
+_nltk_wordnet_patcher = None
+
+
+def pytest_configure(config):
+    """Start NLTK mocks before any test modules are imported."""
+    global _nltk_stopwords_patcher, _nltk_wordnet_patcher
+    _nltk_stopwords_patcher = patch('nltk.corpus.stopwords', _mock_stopwords)
+    _nltk_wordnet_patcher = patch('nltk.corpus.wordnet', _mock_wordnet)
+    _nltk_stopwords_patcher.start()
+    _nltk_wordnet_patcher.start()
+
+
+def pytest_unconfigure(config):
+    """Stop NLTK mocks when pytest session ends."""
+    global _nltk_stopwords_patcher, _nltk_wordnet_patcher
+    if _nltk_stopwords_patcher:
+        _nltk_stopwords_patcher.stop()
+    if _nltk_wordnet_patcher:
+        _nltk_wordnet_patcher.stop()
+
+
 @pytest.fixture
 def mock_db():
     """Create a mock MongoDB database."""
@@ -31,6 +66,8 @@ def mock_submissions_storage(mock_db):
         "prefix_tree",
         "insights_generation",
         "markup_generation",
+        "clustering_generation",
+        "topic_modeling_generation",
     ]
     storage.task_dependencies = {
         "split_topic_generation": [],
@@ -40,6 +77,8 @@ def mock_submissions_storage(mock_db):
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "markup_generation": ["split_topic_generation"],
+        "clustering_generation": ["split_topic_generation"],
+        "topic_modeling_generation": ["split_topic_generation"],
     }
     return storage
 
@@ -92,6 +131,18 @@ def sample_submission():
                 "error": None
             },
             "markup_generation": {
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "error": None
+            },
+            "clustering_generation": {
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "error": None
+            },
+            "topic_modeling_generation": {
                 "status": "pending",
                 "started_at": None,
                 "completed_at": None,

@@ -387,7 +387,7 @@ describe('TextPage raw text navigation', () => {
 
     await screen.findByText('Source:');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('button', { name: /Insights/ }));
 
     expect(screen.getByText('Important connection')).toBeInTheDocument();
     expect(screen.getAllByText('Alpha Beta Gamma').length).toBeGreaterThan(0);
@@ -398,7 +398,7 @@ describe('TextPage raw text navigation', () => {
 
     await screen.findByText('Source:');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
     fireEvent.click(screen.getByRole('button', { name: /Important connection/i }));
 
     await waitFor(() => {
@@ -453,7 +453,7 @@ describe('TextPage raw text navigation', () => {
 
     await screen.findByText('Source:');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Color Insight Topics' }));
     fireEvent.click(screen.getByRole('button', { name: 'Raw Text' }));
 
@@ -502,7 +502,7 @@ describe('TextPage raw text navigation', () => {
 
     await screen.findByText('Source:');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
     fireEvent.click(screen.getByRole('button', { name: /Later insight/i }));
 
     await waitFor(() => {
@@ -544,7 +544,7 @@ describe('TextPage raw text navigation', () => {
 
     await screen.findByText('Source:');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
     fireEvent.click(screen.getByRole('button', { name: /Later insight/i }));
 
     await waitFor(() => {
@@ -591,7 +591,7 @@ describe('TextPage raw text navigation', () => {
     render(<TextPage />);
 
     await screen.findByText('Source:');
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
 
     const insightTitles = Array.from(document.querySelectorAll('.topic-nav-insight__title'));
 
@@ -647,7 +647,7 @@ describe('TextPage raw text navigation', () => {
     render(<TextPage />);
 
     await screen.findByText('Source:');
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Insights/ }));
 
     const insightTitles = Array.from(document.querySelectorAll('.topic-nav-insight__title'));
     expect(insightTitles.map((element) => element.textContent)).toEqual([

@@ -308,7 +308,7 @@ describe('TopicList general rendering', () => {
 
   it('renders sidebar tabs only when insights are provided', () => {
     const { rerender } = render(<TopicList topics={[makeTopic('Art')]} />);
-    expect(screen.queryByRole('tab', { name: 'Insights' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Insights/ })).toBeNull();
 
     rerender(
       <TopicList
@@ -317,8 +317,8 @@ describe('TopicList general rendering', () => {
       />
     );
 
-    expect(screen.getByRole('tab', { name: 'Topics' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Insights' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Topics/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Insights/ })).toBeInTheDocument();
   });
 
   it('renders a flat insights list and calls onSelectInsight for the clicked row', () => {

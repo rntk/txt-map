@@ -553,7 +553,7 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None, None, None]
 
         worker.claim_task()
 
@@ -566,7 +566,7 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123"
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None]
+        worker.db.task_queue.find_one_and_update.side_effect = [None, mock_task, None, None, None, None, None, None, None]
         worker._dependencies_met.return_value = False
 
         result = worker.claim_task()
