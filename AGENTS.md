@@ -56,5 +56,12 @@ These instructions are intended for AI agents working on this project.
       - `cd /app/frontend && npm run lint`                # JavaScript/TypeScript
       - `cd /app/frontend && npm run format`              # Prettier formatting
 
-7.  **LLM Changes**:
+7.  **Linting and Formatting**:
+    - After making any changes to backend or frontend files, always run the linter/formatter on the changed/touched files before submitting.
+    - Run `./lint.sh format` to format both backend and frontend code.
+    - Run `./lint.sh fix frontend` to auto-fix frontend lint issues.
+    - Run `./lint.sh check backend` to check backend lint issues.
+    - Ensure all lint checks pass with `./lint.sh` before considering the task complete.
+
+8.  **LLM Changes**:
     - If you need to add or modify any LLM related features (client creation, prompt engineering, caching, or settings), you **MUST** consult the [LLM Architecture Guide](docs/llm_handler.md) first to ensure consistency with the existing design patterns and dynamic runtime switching.
