@@ -8,6 +8,7 @@ import LlmTaskControlPage from './components/LlmTaskControlPage';
 import TextListPage from './components/TextListPage';
 import TextPage from './components/TextPage';
 import WordPage from './components/WordPage';
+import TopicAnalysisPage from './components/TopicAnalysisPage';
 
 /**
  * @typedef {Object} NavigationItem
@@ -79,6 +80,7 @@ const PAGE_COMPONENTS = {
   texts: TextListPage,
   topics: GlobalTopicsPage,
   word: WordPage,
+  'topic-analysis': TopicAnalysisPage,
 };
 
 /**

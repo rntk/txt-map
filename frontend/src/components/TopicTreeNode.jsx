@@ -29,6 +29,7 @@ import './TopicNavigation.css';
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => boolean} isPanelSelection
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onOpenVisualization]
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onCompareTopicRanges]
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onAnalyzeTopic]
  * @property {boolean} [highlightAllTopics]
  * @property {string | null} [activeActionMenuPath]
  * @property {(path: string) => void} [onToggleActionMenu]
@@ -60,6 +61,7 @@ function TopicTreeNode({
   onNavigateTopic,
   onOpenVisualization,
   onCompareTopicRanges,
+  onAnalyzeTopic,
   highlightAllTopics = false,
   activeActionMenuPath = null,
   onToggleActionMenu = () => {},
@@ -93,6 +95,7 @@ function TopicTreeNode({
     onNavigateTopic,
     onOpenVisualization,
     onCompareTopicRanges,
+    onAnalyzeTopic,
     highlightAllTopics,
     activeActionMenuPath,
     onToggleActionMenu,
@@ -269,6 +272,17 @@ function TopicTreeNode({
                     title="Compare sentence ranges side by side"
                   >
                     Compare
+                  </button>
+                )}
+                {onAnalyzeTopic && (
+                  <button
+                    type="button"
+                    className="topic-nav-button"
+                    tabIndex={areActionsVisible ? 0 : -1}
+                    onClick={() => handleAction(() => onAnalyzeTopic(topic))}
+                    title="Open Topic Analysis page"
+                  >
+                    Analyze
                   </button>
                 )}
               </>

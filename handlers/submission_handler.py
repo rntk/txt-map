@@ -502,6 +502,27 @@ def get_submission_read_progress(
     return {"read_count": len(read_indices), "total_count": total_sentences}
 
 
+@router.get("/submission/{submission_id}/topic-analysis")
+def get_topic_analysis(
+    submission: dict = Depends(require_submission),
+) -> Dict[str, Any]:
+    results = submission.get("results") or {}
+    tasks = submission.get("tasks") or {}
+    return {
+        "submission_id": submission["submission_id"],
+        "source_url": submission.get("source_url", ""),
+        "topics": results.get("topics", []),
+        "sentences": results.get("sentences", []),
+        "clusters": results.get("clusters", []),
+        "topic_model": results.get("topic_model", {}),
+        "task_status": {
+            "clustering_generation": tasks.get("clustering_generation", {}).get("status"),
+            "topic_modeling_generation": tasks.get("topic_modeling_generation", {}).get("status"),
+            "split_topic_generation": tasks.get("split_topic_generation", {}).get("status"),
+        },
+    }
+
+
 @router.get("/submissions")
 def list_submissions(
     submission_id: Optional[str] = None,

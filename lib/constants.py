@@ -10,6 +10,8 @@ TASK_NAMES: List[str] = [
     "prefix_tree",
     "insights_generation",
     "markup_generation",
+    "clustering_generation",
+    "topic_modeling_generation",
 ]
 
 # Task types allowed for queue operations.
@@ -24,6 +26,8 @@ TASK_PRIORITIES: Dict[str, int] = {
     "prefix_tree": 3,
     "insights_generation": 4,
     "markup_generation": 4,
+    "clustering_generation": 4,
+    "topic_modeling_generation": 4,
 }
 
 

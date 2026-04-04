@@ -424,4 +424,5 @@ function TopicsTagCloud({
   );
 }
 
+export { WordCloudDisplay };
 export default TopicsTagCloud;

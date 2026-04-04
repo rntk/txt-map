@@ -673,6 +673,14 @@ function TextPage() {
     setActiveInsightRanges(Array.isArray(insight.matchingRanges) ? insight.matchingRanges : []);
   }, [closeFullscreenGraph]);
 
+  const handleAnalyzeTopic = useCallback((topic) => {
+    if (!topic || !submissionId) {
+      return;
+    }
+    const topicParam = encodeURIComponent(topic.name);
+    window.location.href = `/page/topic-analysis/${submissionId}?topic=${topicParam}`;
+  }, [submissionId]);
+
   useEffect(() => {
     if (!activeInsight || activeTab !== 'article' || groupedByTopics || fullscreenGraph) {
       return undefined;
@@ -822,6 +830,7 @@ function TextPage() {
                 onToggleReadAll={toggleReadAll}
                 onOpenVisualization={handleOpenVisualization}
                 onCompareTopicRanges={handleCompareTopicRanges}
+                onAnalyzeTopic={handleAnalyzeTopic}
                 highlightAllTopics={highlightAllTopics}
                 onToggleHighlightAll={toggleHighlightAll}
                 onSidebarTabChange={handleSidebarTabChange}

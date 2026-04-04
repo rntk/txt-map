@@ -29,6 +29,8 @@ from lib.tasks.mindmap import process_mindmap
 from lib.tasks.prefix_tree import process_prefix_tree
 from lib.tasks.insights_generation import process_insights_generation
 from lib.tasks.markup_generation import process_markup_generation
+from lib.tasks.clustering_generation import process_clustering_generation
+from lib.tasks.topic_modeling_generation import process_topic_modeling_generation
 
 # Configure logging
 logging.basicConfig(
@@ -46,6 +48,8 @@ TASK_DEPENDENCIES = {
     "prefix_tree": ["split_topic_generation"],
     "insights_generation": ["split_topic_generation"],
     "markup_generation": ["split_topic_generation"],
+    "clustering_generation": ["split_topic_generation"],
+    "topic_modeling_generation": ["split_topic_generation"],
 }
 
 # Task priorities (lower = higher priority)
@@ -57,6 +61,8 @@ TASK_PRIORITIES = {
     "prefix_tree": 3,
     "insights_generation": 4,
     "markup_generation": 4,
+    "clustering_generation": 4,
+    "topic_modeling_generation": 4,
 }
 
 # Task handlers mapping
@@ -68,6 +74,8 @@ TASK_HANDLERS = {
     "prefix_tree": process_prefix_tree,
     "insights_generation": process_insights_generation,
     "markup_generation": process_markup_generation,
+    "clustering_generation": process_clustering_generation,
+    "topic_modeling_generation": process_topic_modeling_generation,
 }
 
 

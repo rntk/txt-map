@@ -18,6 +18,8 @@ class SubmissionsStorage:
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "markup_generation": ["split_topic_generation"],
+        "clustering_generation": ["split_topic_generation"],
+        "topic_modeling_generation": ["split_topic_generation"],
     }
 
     def __init__(self, db: Database) -> None:
@@ -92,6 +94,18 @@ class SubmissionsStorage:
                     "started_at": None,
                     "completed_at": None,
                     "error": None
+                },
+                "clustering_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
+                },
+                "topic_modeling_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None
                 }
             },
             "read_topics": [],
@@ -111,7 +125,9 @@ class SubmissionsStorage:
                 "prefix_tree": {},
                 "insights": [],
                 "annotations": {},
-                "markup": {}
+                "markup": {},
+                "clusters": [],
+                "topic_model": {}
             }
         }
 
@@ -220,6 +236,12 @@ class SubmissionsStorage:
 
         if "markup_generation" in names:
             update_fields["results.markup"] = {}
+
+        if "clustering_generation" in names:
+            update_fields["results.clusters"] = []
+
+        if "topic_modeling_generation" in names:
+            update_fields["results.topic_model"] = {}
 
         result = self._db.submissions.update_one(
             {"submission_id": submission_id},

@@ -37,6 +37,8 @@ const RECALCULATE_ACTIONS = [
   { label: 'Prefix Tree', tasks: ['prefix_tree'], message: 'Prefix tree queued.' },
   { label: 'Insights', tasks: ['insights_generation'], message: 'Insights queued.' },
   { label: 'Markup', tasks: ['markup_generation'], message: 'Markup generation queued.' },
+  { label: 'Clustering', tasks: ['clustering_generation'], message: 'Clustering queued.' },
+  { label: 'Topic Modeling', tasks: ['topic_modeling_generation'], message: 'Topic modeling queued.' },
 ];
 
 /**
