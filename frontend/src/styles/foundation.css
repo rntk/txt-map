@@ -55,7 +55,11 @@ a {
   border: 1px solid var(--shell-border);
   border-radius: var(--radius-xl);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(244, 244, 240, 0.94)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.88),
+      rgba(244, 244, 240, 0.94)
+    ),
     var(--shell-surface-strong);
   box-shadow: var(--shell-shadow-soft);
 }

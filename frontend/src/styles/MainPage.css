@@ -100,13 +100,20 @@
   border: 1px solid var(--shell-border);
   border-radius: 1.25rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(244, 244, 240, 0.94)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.88),
+      rgba(244, 244, 240, 0.94)
+    ),
     var(--shell-surface-strong);
   color: inherit;
   text-align: left;
   text-decoration: none;
   box-shadow: var(--shell-shadow-soft);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .main-page-card:hover {
@@ -154,8 +161,16 @@
   cursor: pointer;
   border-style: dashed;
   background:
-    radial-gradient(circle at top right, rgba(31, 32, 29, 0.08), transparent 36%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 244, 240, 0.96)),
+    radial-gradient(
+      circle at top right,
+      rgba(31, 32, 29, 0.08),
+      transparent 36%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.9),
+      rgba(244, 244, 240, 0.96)
+    ),
     var(--shell-surface-strong);
 }
 
@@ -233,7 +248,10 @@
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
 }
 
 .main-page-extension-tab:hover {
@@ -316,7 +334,9 @@
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .main-page-extension-download:hover {
@@ -350,7 +370,9 @@
   color: var(--shell-ink);
   font-size: 0.85rem;
   outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .main-page-url-input:focus {
@@ -378,7 +400,9 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
 }
 
 .main-page-url-submit:hover:not(:disabled) {
