@@ -58,7 +58,6 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
                     submission_id.substring(0, 8)
                   )}
                 </div>
-                <div className="global-topics-compare__column-title">{topic_name}</div>
               </div>
               <div className="global-topics-compare__context">
                 <p className="global-topics-compare__context-empty">Context not available. Sentences:</p>
@@ -109,7 +108,6 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
             key={`${submission_id}-${topic_name}-${groupIdx}`}
             sourceUrl={source_url}
             submissionId={submission_id}
-            topicName={topic_name}
             topContext={topContext}
             middleContent={middleContent}
             bottomContext={bottomContext}
@@ -153,7 +151,6 @@ function formatSourceLabel(sourceUrl, submissionId) {
 function CompareColumn({
   sourceUrl,
   submissionId,
-  topicName,
   topContext,
   middleContent,
   bottomContext,
@@ -181,9 +178,6 @@ function CompareColumn({
           ) : (
             submissionId.substring(0, 8)
           )}
-        </div>
-        <div className="global-topics-compare__column-title">
-          {topicName}
         </div>
       </div>
 

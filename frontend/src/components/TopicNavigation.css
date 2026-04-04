@@ -37,7 +37,7 @@
   color: var(--shell-muted-strong, #3d3e3a);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1.2;
   padding: 0.45rem 0.85rem;
@@ -57,7 +57,7 @@
   color: var(--shell-muted-strong, #3d3e3a);
   cursor: pointer;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.2;
   padding: 0.35rem 0.6rem;
@@ -93,7 +93,7 @@
   background: var(--shell-surface-strong, #ffffff);
   color: var(--shell-ink, #181916);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 1.2rem;
   outline: none;
   padding: 0.5rem 0.65rem;
 }
@@ -109,13 +109,13 @@
   overflow-y: auto;
   padding-bottom: 6px;
   padding-right: 2px;
-  font-size: 0.8125rem;
+  font-size: 1.25rem;
   line-height: 1.4;
 }
 
 .topic-nav-empty {
   color: var(--shell-muted, #595b56);
-  font-size: 0.8125rem;
+  font-size: 1.25rem;
 }
 
 .topic-nav-list {
@@ -236,7 +236,7 @@
 }
 
 .topic-tree-node__expand-spacer {
-  width: 12px;
+  width: 1.5rem;
   flex-shrink: 0;
 }
 
@@ -247,11 +247,11 @@
   color: var(--shell-muted-strong, #3d3e3a);
   cursor: pointer;
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 1rem;
   line-height: 1;
   padding: 2px 0 0;
   text-align: center;
-  width: 12px;
+  width: 1.5rem;
 }
 
 .topic-tree-node__expand:focus-visible {
@@ -308,12 +308,12 @@
 }
 
 .topic-tree-node__title--root {
-  font-size: 13px;
+  font-size: 1.3rem;
   font-weight: 600;
 }
 
 .topic-tree-node__title--nested {
-  font-size: 12px;
+  font-size: 1.2rem;
   font-weight: 500;
 }
 
@@ -328,7 +328,7 @@
 
 .topic-tree-node__stats {
   color: #888;
-  font-size: 11px;
+  font-size: 1rem;
 }
 
 .topic-tree-node__menu-trigger {
@@ -336,8 +336,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.9rem;
-  height: 1.9rem;
+  min-width: 2.4rem;
+  height: 2.4rem;
   border: 1px solid rgba(29, 30, 27, 0.08);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
@@ -345,7 +345,7 @@
   cursor: pointer;
   flex-shrink: 0;
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 1.4rem;
   font-weight: 700;
   line-height: 1;
   padding: 0;
@@ -402,7 +402,7 @@
 .topic-tree-node__summary {
   margin-top: 6px;
   color: #666;
-  font-size: 11px;
+  font-size: 1.05rem;
   font-style: italic;
 }
 

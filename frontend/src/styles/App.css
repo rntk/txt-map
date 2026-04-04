@@ -2140,6 +2140,13 @@
   height: 100%;
 }
 
+.fullscreen-graph-content .global-topics-compare {
+  overflow-x: auto;
+  overflow-y: auto;
+  height: 100%;
+  min-height: 0;
+}
+
 
 .hierarchical-tree-wrapper {
   position: relative;

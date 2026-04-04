@@ -6,6 +6,8 @@ import GroupedByTopicsView from './GroupedByTopicsView';
 import TopicSentencesModal from './shared/TopicSentencesModal';
 import TextPageActionsPortal from './TextPageActionsPortal';
 import VisualizationPanels from './VisualizationPanels';
+import GlobalTopicsCompareView from './GlobalTopicsCompareView';
+import FullScreenGraph from './FullScreenGraph';
 import SummaryTimeline from './SummaryTimeline';
 import TopicSentencePanel from './TopicSentencePanel';
 import TextPageToolbar from './TextPageToolbar';
@@ -58,6 +60,7 @@ function TextPage() {
   const [showPanel, setShowPanel] = useState(false);
   const [panelTopic, setPanelTopic] = useState(null);
   const [fullscreenGraph, setFullscreenGraph] = useState(null);
+  const [compareTopicData, setCompareTopicData] = useState(null);
   const [highlightAllTopics, setHighlightAllTopics] = useState(false);
   const [highlightInsightTopics, setHighlightInsightTopics] = useState(false);
   const [activeInsightId, setActiveInsightId] = useState(null);
@@ -338,6 +341,34 @@ function TextPage() {
     () => (Array.isArray(results.sentences) ? results.sentences : []),
     [results.sentences]
   );
+
+  const handleCompareTopicRanges = useCallback((topic) => {
+    const ranges = topic.ranges;
+    if (!Array.isArray(ranges) || ranges.length < 1) return;
+
+    const topicsFormatted = allTopics.map(t => ({
+      name: t.name,
+      sentences: t.sentences,
+    }));
+
+    const groups = ranges.map((range, idx) => {
+      const indices = [];
+      for (let i = range.sentence_start; i <= range.sentence_end; i++) {
+        indices.push(i);
+      }
+      return {
+        submission_id: `Range ${idx + 1}`,
+        topic_name: topic.name,
+        sentences: indices.map(i => safeSentences[i - 1]).filter(Boolean),
+        all_sentences: safeSentences,
+        topics: topicsFormatted,
+        indices,
+      };
+    });
+
+    setCompareTopicData({ topic, groups });
+  }, [allTopics, safeSentences]);
+
   const safeTopics = _safeTopics;
   const rawText = _rawText;
   const coloredTopicNames = useMemo(() => {
@@ -778,6 +809,7 @@ function TextPage() {
                 onNavigateTopic={navigateTopicSentence}
                 onToggleReadAll={toggleReadAll}
                 onOpenVisualization={handleOpenVisualization}
+                onCompareTopicRanges={handleCompareTopicRanges}
                 highlightAllTopics={highlightAllTopics}
                 onToggleHighlightAll={toggleHighlightAll}
                 onSidebarTabChange={handleSidebarTabChange}
@@ -977,6 +1009,18 @@ function TextPage() {
           readTopics={readTopics}
           onToggleRead={toggleRead}
         />
+      )}
+
+      {compareTopicData && (
+        <FullScreenGraph
+          title={`Compare Ranges: ${compareTopicData.topic.name}`}
+          onClose={() => setCompareTopicData(null)}
+        >
+          <GlobalTopicsCompareView
+            groups={compareTopicData.groups}
+            groupRefs={{ current: {} }}
+          />
+        </FullScreenGraph>
       )}
 
       <WordSelectionPopup selectionData={selectionData} submissionId={submissionId} />

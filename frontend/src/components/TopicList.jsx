@@ -41,6 +41,7 @@ import './TopicNavigation.css';
  * @property {(insight: InsightListItem) => void} [onSelectInsight]
  * @property {boolean} [highlightInsightTopics]
  * @property {() => void} [onToggleHighlightInsightTopics]
+ * @property {(topic: TopicListTopic) => void} [onCompareTopicRanges]
  */
 
 /**
@@ -81,6 +82,7 @@ function TopicList({
   onSelectInsight = () => {},
   highlightInsightTopics = false,
   onToggleHighlightInsightTopics = () => {},
+  onCompareTopicRanges,
 }) {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -392,6 +394,7 @@ function TopicList({
     onCloseActionMenu: closeActionMenu,
     onActionRowFocus: focusActionRow,
     onActionRowBlur: blurActionRow,
+    onCompareTopicRanges,
   };
 
   return (

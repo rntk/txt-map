@@ -28,6 +28,7 @@ import './TopicNavigation.css';
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }, mode: 'focus' | 'prev' | 'next') => void} [onNavigateTopic]
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => boolean} isPanelSelection
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onOpenVisualization]
+ * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onCompareTopicRanges]
  * @property {boolean} [highlightAllTopics]
  * @property {string | null} [activeActionMenuPath]
  * @property {string | null} [focusedActionRowPath]
@@ -62,6 +63,7 @@ function TopicTreeNode({
   onNavigateTopic,
   isPanelSelection,
   onOpenVisualization,
+  onCompareTopicRanges,
   highlightAllTopics = false,
   activeActionMenuPath = null,
   focusedActionRowPath = null,
@@ -98,6 +100,7 @@ function TopicTreeNode({
     onNavigateTopic,
     isPanelSelection,
     onOpenVisualization,
+    onCompareTopicRanges,
     highlightAllTopics,
     activeActionMenuPath,
     focusedActionRowPath,
@@ -273,6 +276,17 @@ function TopicTreeNode({
                     title="Open Topics chart"
                   >
                     Chart
+                  </button>
+                )}
+                {onCompareTopicRanges && Array.isArray(topic.ranges) && topic.ranges.length > 1 && (
+                  <button
+                    type="button"
+                    className="topic-nav-button"
+                    tabIndex={areActionsVisible ? 0 : -1}
+                    onClick={() => handleAction(() => onCompareTopicRanges(topic))}
+                    title="Compare sentence ranges side by side"
+                  >
+                    Compare
                   </button>
                 )}
               </>
