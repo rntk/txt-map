@@ -382,8 +382,6 @@ function TopicList({
     activeActionMenuPath,
     onToggleActionMenu: toggleActionMenu,
     onCloseActionMenu: closeActionMenu,
-    onActionRowFocus: focusActionRow,
-    onActionRowBlur: blurActionRow,
     onCompareTopicRanges,
   };
 
