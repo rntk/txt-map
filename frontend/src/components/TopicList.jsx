@@ -88,7 +88,6 @@ function TopicList({
   const [searchQuery, setSearchQuery] = useState('');
   const [insightSearchQuery, setInsightSearchQuery] = useState('');
   const [activeActionMenuPath, setActiveActionMenuPath] = useState(null);
-  const [focusedActionRowPath, setFocusedActionRowPath] = useState(null);
 
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -362,14 +361,6 @@ function TopicList({
     setActiveActionMenuPath((prev) => (prev === path ? null : prev));
   }, []);
 
-  const focusActionRow = useCallback((path) => {
-    setFocusedActionRowPath(path);
-  }, []);
-
-  const blurActionRow = useCallback((path) => {
-    setFocusedActionRowPath((prev) => (prev === path ? null : prev));
-  }, []);
-
   const nodeProps = {
     searchQuery,
     expandedNodes,
@@ -389,7 +380,6 @@ function TopicList({
     onOpenVisualization,
     highlightAllTopics,
     activeActionMenuPath,
-    focusedActionRowPath,
     onToggleActionMenu: toggleActionMenu,
     onCloseActionMenu: closeActionMenu,
     onActionRowFocus: focusActionRow,

@@ -382,21 +382,11 @@
 }
 
 .topic-tree-node__actions--visible,
-.topic-tree-node__row--actions-open .topic-tree-node__actions,
-.topic-tree-node__row:focus-within .topic-tree-node__actions {
+.topic-tree-node__row--actions-open .topic-tree-node__actions {
   max-height: 8rem;
   opacity: 1;
   pointer-events: auto;
   margin-top: 6px;
-}
-
-@media (hover: hover) {
-  .topic-tree-node__row:hover .topic-tree-node__actions {
-    max-height: 8rem;
-    opacity: 1;
-    pointer-events: auto;
-    margin-top: 6px;
-  }
 }
 
 .topic-tree-node__summary {
@@ -418,14 +408,7 @@
   }
 
   .topic-tree-node__actions--visible,
-  .topic-tree-node__row--actions-open .topic-tree-node__actions,
-  .topic-tree-node__row:focus-within .topic-tree-node__actions {
-    max-height: 12rem;
-  }
-}
-
-@media (hover: hover) and (max-width: 640px) {
-  .topic-tree-node__row:hover .topic-tree-node__actions {
+  .topic-tree-node__row--actions-open .topic-tree-node__actions {
     max-height: 12rem;
   }
 }

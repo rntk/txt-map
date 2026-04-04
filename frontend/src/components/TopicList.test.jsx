@@ -282,18 +282,6 @@ describe('TopicList general rendering', () => {
     expect(nextButton).toHaveAttribute('tabindex', '-1');
   });
 
-  it('reveals row actions when the overflow trigger receives keyboard focus', () => {
-    render(<TopicList topics={[makeTopic('Science')]} />);
-
-    const row = getRowForText('Science');
-    const trigger = within(row).getByRole('button', { name: 'Show actions for Science' });
-    const nextButton = within(row).getByRole('button', { name: 'Next' });
-
-    fireEvent.focus(trigger);
-
-    expect(nextButton).toHaveAttribute('tabindex', '0');
-  });
-
   it('marks read controls as active when a leaf topic is read', () => {
     render(
       <TopicList

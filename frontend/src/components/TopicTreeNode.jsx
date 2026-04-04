@@ -31,11 +31,8 @@ import './TopicNavigation.css';
  * @property {(topic: { name: string, totalSentences?: number, ranges?: Array<unknown>, summary?: string }) => void} [onCompareTopicRanges]
  * @property {boolean} [highlightAllTopics]
  * @property {string | null} [activeActionMenuPath]
- * @property {string | null} [focusedActionRowPath]
  * @property {(path: string) => void} [onToggleActionMenu]
  * @property {(path: string) => void} [onCloseActionMenu]
- * @property {(path: string) => void} [onActionRowFocus]
- * @property {(path: string) => void} [onActionRowBlur]
  */
 
 /**
@@ -66,11 +63,8 @@ function TopicTreeNode({
   onCompareTopicRanges,
   highlightAllTopics = false,
   activeActionMenuPath = null,
-  focusedActionRowPath = null,
   onToggleActionMenu = () => {},
   onCloseActionMenu = () => {},
-  onActionRowFocus = () => {},
-  onActionRowBlur = () => {},
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
@@ -103,11 +97,8 @@ function TopicTreeNode({
     onCompareTopicRanges,
     highlightAllTopics,
     activeActionMenuPath,
-    focusedActionRowPath,
     onToggleActionMenu,
     onCloseActionMenu,
-    onActionRowFocus,
-    onActionRowBlur,
   };
 
   const titleClassName = [
@@ -122,8 +113,7 @@ function TopicTreeNode({
     ? { '--topic-highlight-color': getTopicHighlightColor(topic.name) }
     : undefined;
   const isActionMenuOpen = activeActionMenuPath === node.fullPath;
-  const isActionRowFocused = focusedActionRowPath === node.fullPath;
-  const areActionsVisible = isActionMenuOpen || isActionRowFocused;
+  const areActionsVisible = isActionMenuOpen;
   const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
   const handleAction = (callback) => {
@@ -135,12 +125,6 @@ function TopicTreeNode({
     <li className="topic-tree-node">
       <div
         className={`topic-tree-node__row${depth === 0 ? ' topic-tree-node__row--root' : ''}${isActionMenuOpen ? ' topic-tree-node__row--actions-open' : ''}`}
-        onFocusCapture={() => onActionRowFocus(node.fullPath)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) {
-            onActionRowBlur(node.fullPath);
-          }
-        }}
       >
         <div className="topic-tree-node__guide" />
 
