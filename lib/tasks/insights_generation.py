@@ -1,6 +1,7 @@
 """
 Insights generation task.
 """
+import inspect
 import logging
 import re
 from collections import defaultdict
@@ -36,6 +37,50 @@ def _coerce_sentence_text(value: Any) -> str:
 def _cache_namespace(llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
     return f"content_annotation:{model_id}"
+
+
+def _build_compatible_insight_llm(
+    llm_callable: Any,
+    *,
+    temperature: float,
+    chunker: Any,
+    retry_policy: RetryConfig,
+) -> Any:
+    """Build an insight LLM across txt_splitt API versions."""
+    build_signature = inspect.signature(build_insight_llm)
+    builder_arguments: Dict[str, Any] = {
+        "temperature": temperature,
+        "chunker": chunker,
+    }
+
+    if "retry_policy" in build_signature.parameters:
+        builder_arguments["retry_policy"] = retry_policy
+
+    if "client" in build_signature.parameters:
+        builder_arguments["client"] = llm_callable
+        return build_insight_llm(**builder_arguments)
+
+    if "llm_callable" in build_signature.parameters:
+        builder_arguments["llm_callable"] = llm_callable
+        return build_insight_llm(**builder_arguments)
+
+    insight_llm = build_insight_llm(**builder_arguments)
+
+    # Older txt_splitt releases return an unbound TopicRangeLLM. Bind the client
+    # and retry policy here so the caller can still use .query() directly.
+    if getattr(insight_llm, "_client", None) is None:
+        setattr(insight_llm, "_client", llm_callable)
+    if getattr(insight_llm, "_retry_policy", None) is None:
+        setattr(insight_llm, "_retry_policy", retry_policy)
+    return insight_llm
+
+
+def _build_compatible_insight_parser(*, input_mode: str) -> InsightParser:
+    """Build an insight parser across txt_splitt API versions."""
+    parser_signature = inspect.signature(InsightParser)
+    if "input_mode" in parser_signature.parameters:
+        return InsightParser(input_mode=input_mode)
+    return InsightParser()
 
 
 def _insight_ranges_to_sentence_indices(ranges: List[Any]) -> List[int]:
@@ -295,13 +340,13 @@ def _generate_insights(
         max_attempts=3,
         temperature_schedule=[0.1, 0.3, 0.5],
     )
-    insight_llm = build_insight_llm(
+    insight_llm = _build_compatible_insight_llm(
         llm_callable,
         temperature=0.0,
         chunker=OverlapChunker(max_chars=84000),
         retry_policy=retry_policy,
     )
-    parser = InsightParser(input_mode="text")
+    parser = _build_compatible_insight_parser(input_mode="text")
 
     try:
         raw_response = insight_llm.query(marked)

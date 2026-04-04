@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 from lib.tasks.insights_generation import (
+    _build_compatible_insight_llm,
+    _build_compatible_insight_parser,
     _align_source_sentences_to_results_sentences,
     _map_insight_ranges_to_topics_by_overlap,
     _map_insight_source_sentences_to_topics,
@@ -68,6 +70,48 @@ def test_maps_topics_from_overlapping_ranges_without_exact_index_match():
     result = _map_insight_ranges_to_topics_by_overlap(ranges, topics)
 
     assert result == ["Topic B"]
+
+
+def test_build_compatible_insight_llm_binds_legacy_builder_client_and_retry_policy():
+    legacy_insight_llm = MagicMock()
+    legacy_insight_llm._client = None
+    legacy_insight_llm._retry_policy = None
+    llm_callable = MagicMock()
+    retry_policy = MagicMock()
+    chunker = MagicMock()
+
+    def _legacy_build_insight_llm(*, temperature: float = 0.0, chunker: object | None = None) -> MagicMock:
+        assert temperature == 0.0
+        assert chunker is not None
+        return legacy_insight_llm
+
+    with patch("lib.tasks.insights_generation.build_insight_llm", side_effect=_legacy_build_insight_llm):
+        result = _build_compatible_insight_llm(
+            llm_callable,
+            temperature=0.0,
+            chunker=chunker,
+            retry_policy=retry_policy,
+        )
+
+    assert result is legacy_insight_llm
+    assert legacy_insight_llm._client is llm_callable
+    assert legacy_insight_llm._retry_policy is retry_policy
+
+
+def test_build_compatible_insight_parser_uses_legacy_zero_arg_constructor():
+    legacy_parser = MagicMock()
+
+    class _LegacyInsightParser:
+        def __init__(self) -> None:
+            pass
+
+    with patch("lib.tasks.insights_generation.InsightParser", _LegacyInsightParser):
+        with patch("lib.tasks.insights_generation.inspect.signature", return_value=MagicMock(parameters={})):
+            with patch("lib.tasks.insights_generation.InsightParser", return_value=legacy_parser) as mock_parser:
+                result = _build_compatible_insight_parser(input_mode="text")
+
+    assert result is legacy_parser
+    mock_parser.assert_called_once_with()
 
 
 def test_process_insights_generation_stores_insights(mock_db):

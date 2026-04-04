@@ -45,6 +45,19 @@ class _TopicRangeParserProtocol(Protocol):
         ...
 
 
+class _LLMFutureProtocol(Protocol):
+    def result(self, timeout: float = 300.0) -> str:
+        ...
+
+
+class _ResolvedLLMFuture:
+    def __init__(self, response: str) -> None:
+        self._response = response
+
+    def result(self, timeout: float = 300.0) -> str:  # noqa: ARG002
+        return self._response
+
+
 class _ValidatedCachingLLMCallable(CachingLLMCallable):
     """Cache wrapper that only stores and serves responses accepted by a validator."""
 
@@ -100,6 +113,122 @@ class _ValidatedCachingLLMCallable(CachingLLMCallable):
             bypass_reason="validation_failed",
         )
         return response
+
+    def submit(self, prompt: str, temperature: float) -> _LLMFutureProtocol:
+        if not hasattr(self._inner, "submit"):
+            return _ResolvedLLMFuture(self.call(prompt, temperature))
+
+        if not self._should_cache(temperature):
+            self._annotate_cache_event(
+                hit=False,
+                cache_key=None,
+                bypass_reason="nonzero_temperature",
+            )
+            return cast(Any, self._inner).submit(prompt, temperature)
+
+        cache_key = _build_cache_key(
+            namespace=self._namespace,
+            model_id=self._model_id,
+            prompt_version=self._prompt_version,
+            prompt=prompt,
+            temperature=temperature,
+        )
+        entry = self._store.get(cache_key)
+        if entry is not None and self._validator(prompt, entry.response):
+            self._annotate_cache_event(hit=True, cache_key=cache_key)
+            return _ResolvedLLMFuture(entry.response)
+
+        inner_future = cast(Any, self._inner).submit(prompt, temperature)
+        return _ValidatedCachingFuture(
+            inner_future=inner_future,
+            store=self._store,
+            validator=self._validator,
+            prompt=prompt,
+            cache_key=cache_key,
+            namespace=self._namespace,
+            model_id=self._model_id,
+            prompt_version=self._prompt_version,
+            temperature=temperature,
+            annotate_cache_event=self._annotate_cache_event,
+        )
+
+
+class _ValidatedCachingFuture:
+    def __init__(
+        self,
+        *,
+        inner_future: _LLMFutureProtocol,
+        store: Any,
+        validator: Callable[[str, str], bool],
+        prompt: str,
+        cache_key: str,
+        namespace: str,
+        model_id: Optional[str],
+        prompt_version: Optional[str],
+        temperature: float,
+        annotate_cache_event: Callable[..., None],
+    ) -> None:
+        self._inner_future = inner_future
+        self._store = store
+        self._validator = validator
+        self._prompt = prompt
+        self._cache_key = cache_key
+        self._namespace = namespace
+        self._model_id = model_id
+        self._prompt_version = prompt_version
+        self._temperature = temperature
+        self._annotate_cache_event = annotate_cache_event
+
+    def result(self, timeout: float = 300.0) -> str:
+        response = self._inner_future.result(timeout=timeout)
+        if self._validator(self._prompt, response):
+            self._store.set(
+                CacheEntry(
+                    key=self._cache_key,
+                    response=response,
+                    created_at=time.time(),
+                    namespace=self._namespace,
+                    model_id=self._model_id,
+                    prompt_version=self._prompt_version,
+                    temperature=self._temperature,
+                )
+            )
+            self._annotate_cache_event(hit=False, cache_key=self._cache_key)
+            return response
+
+        self._annotate_cache_event(
+            hit=False,
+            cache_key=self._cache_key,
+            bypass_reason="validation_failed",
+        )
+        return response
+
+
+class _TracingFuture:
+    def __init__(
+        self,
+        *,
+        inner_future: _LLMFutureProtocol,
+        tracer: Tracer,
+        prompt: str,
+        temperature: float,
+    ) -> None:
+        self._inner_future = inner_future
+        self._tracer = tracer
+        self._prompt = prompt
+        self._temperature = temperature
+
+    def result(self, timeout: float = 300.0) -> str:
+        with self._tracer.span(
+            "llm.call",
+            prompt_length=len(self._prompt),
+            temperature=self._temperature,
+        ) as span:
+            response = self._inner_future.result(timeout=timeout)
+            span.attributes.setdefault("response_length", len(response))
+            span.attributes.setdefault("prompt", self._prompt)
+            span.attributes.setdefault("response", response)
+            return response
 
 
 class _LLMCallableAdapter:
@@ -265,6 +394,28 @@ def _execute_request(
     return LLMResponse(content=response)
 
 
+def _submit_request(
+    llm_callable: Any,
+    request: LLMRequest,
+) -> Optional[_LLMFutureProtocol]:
+    if isinstance(llm_callable, TracingLLMCallable):
+        inner_submit = _submit_request(getattr(llm_callable, "_inner"), request)
+        if inner_submit is None:
+            return None
+        return _TracingFuture(
+            inner_future=inner_submit,
+            tracer=getattr(llm_callable, "_tracer"),
+            prompt=request.prompt,
+            temperature=request.temperature,
+        )
+
+    submit = getattr(llm_callable, "submit", None)
+    if callable(submit):
+        return cast(_LLMFutureProtocol, submit(request.prompt, request.temperature))
+
+    return None
+
+
 def _run_pipeline_session(
     pipeline: Any,
     article: str,
@@ -273,10 +424,17 @@ def _run_pipeline_session(
     session = pipeline.start(article)
     while not session.is_complete():
         requests = session.pending_requests()
-        responses = [
-            _execute_request(llm_callable, request)
-            for request in requests
-        ]
+        futures_or_none = [_submit_request(llm_callable, request) for request in requests]
+        if all(future is not None for future in futures_or_none):
+            responses = [
+                LLMResponse(content=cast(_LLMFutureProtocol, future).result())
+                for future in futures_or_none
+            ]
+        else:
+            responses = [
+                _execute_request(llm_callable, request)
+                for request in requests
+            ]
         session.submit_responses(responses)
     return session.result()
 

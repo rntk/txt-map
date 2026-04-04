@@ -1,5 +1,6 @@
 """Unit tests for llm_workers startup cleanup behavior."""
 
+import os
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -91,4 +92,56 @@ class TestLLMWorkersMain:
             COMPLETED_TASK_RETENTION_HOURS,
         )
         mock_worker_cls.return_value.run.assert_called_once_with()
+        mock_client.close.assert_called_once_with()
+
+    @patch.dict(os.environ, {"LLM_WORKER_CONCURRENCY": "3"}, clear=False)
+    @patch("llm_workers.threading.Thread")
+    @patch("llm_workers.signal.signal")
+    @patch("llm_workers.logger")
+    @patch("llm_workers.LLMWorker")
+    @patch("llm_workers.create_llm_client")
+    @patch("llm_workers.MongoLLMCacheStore")
+    @patch("llm_workers.LLMQueueStore")
+    @patch("llm_workers.AppSettingsStorage")
+    @patch("llm_workers.MongoClient")
+    def test_main_starts_multiple_worker_threads_when_configured(
+        self,
+        mock_mongo_client: MagicMock,
+        mock_app_settings_storage: MagicMock,
+        mock_queue_store_cls: MagicMock,
+        mock_cache_store_cls: MagicMock,
+        mock_create_llm_client: MagicMock,
+        mock_worker_cls: MagicMock,
+        mock_logger: MagicMock,
+        mock_signal: MagicMock,
+        mock_thread_cls: MagicMock,
+    ) -> None:
+        """Startup can fan out multiple in-process LLM workers."""
+        mock_client = MagicMock()
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        mock_mongo_client.return_value = mock_client
+
+        mock_queue_store = MagicMock()
+        mock_queue_store.cleanup_old.return_value = 0
+        mock_queue_store_cls.return_value = mock_queue_store
+
+        mock_llm = MagicMock()
+        mock_llm.provider_name = "openai"
+        mock_llm.model_name = "gpt-test"
+        mock_create_llm_client.return_value = mock_llm
+
+        thread_instances = [MagicMock(), MagicMock(), MagicMock()]
+        mock_thread_cls.side_effect = thread_instances
+
+        main()
+
+        assert mock_worker_cls.call_count == 3
+        for call_args in mock_worker_cls.call_args_list:
+            assert call_args.kwargs["register_signal_handlers"] is False
+        assert mock_thread_cls.call_count == 3
+        for thread in thread_instances:
+            thread.start.assert_called_once_with()
+            thread.join.assert_called_once_with()
+        assert mock_signal.call_count == 2
         mock_client.close.assert_called_once_with()

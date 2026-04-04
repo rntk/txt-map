@@ -16,6 +16,7 @@ approximately N-times the LLM throughput.
 import logging
 import os
 import signal
+import threading
 import time
 from pathlib import Path
 from types import FrameType
@@ -48,17 +49,27 @@ class LLMWorker:
         *,
         poll_interval: float = 0.5,
         heartbeat_file: str | None = None,
+        worker_id: str | None = None,
+        register_signal_handlers: bool = True,
     ) -> None:
         self._db: Database = db
         self._poll_interval = poll_interval
         self._queue_store = LLMQueueStore(db)
         self._cache_store = MongoLLMCacheStore(db)
-        self._worker_id = f"llm-worker-{os.getpid()}"
+        self._worker_id = worker_id or f"llm-worker-{os.getpid()}"
         self._running = True
         self._heartbeat_file = heartbeat_file
 
-        signal.signal(signal.SIGINT, self._handle_stop)
-        signal.signal(signal.SIGTERM, self._handle_stop)
+        if register_signal_handlers:
+            signal.signal(signal.SIGINT, self._handle_stop)
+            signal.signal(signal.SIGTERM, self._handle_stop)
+
+    @property
+    def worker_id(self) -> str:
+        return self._worker_id
+
+    def stop(self) -> None:
+        self._running = False
 
     def _record_heartbeat(self) -> None:
         """Update the heartbeat file timestamp."""
@@ -144,6 +155,7 @@ def main() -> None:
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
     poll_interval = float(os.getenv("LLM_WORKER_POLL_INTERVAL", "0.5"))
     heartbeat_file = os.getenv("LLM_WORKER_HEARTBEAT_FILE")
+    concurrency = max(1, int(os.getenv("LLM_WORKER_CONCURRENCY", "1")))
 
     logger.info("Connecting to MongoDB: %s", mongodb_url)
     client = MongoClient(mongodb_url)
@@ -170,11 +182,42 @@ def main() -> None:
     llm = create_llm_client(db=db)
     logger.info("Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name)
 
-    worker = LLMWorker(db, poll_interval=poll_interval, heartbeat_file=heartbeat_file)
+    workers = [
+        LLMWorker(
+            db,
+            poll_interval=poll_interval,
+            heartbeat_file=heartbeat_file,
+            worker_id=f"llm-worker-{os.getpid()}-{index + 1}",
+            register_signal_handlers=False,
+        )
+        for index in range(concurrency)
+    ]
+
+    def handle_stop(signum: int, frame: FrameType | None) -> None:  # noqa: ARG001
+        logger.info("Received signal %s, stopping %s LLM worker(s)", signum, len(workers))
+        for worker in workers:
+            worker.stop()
+
+    signal.signal(signal.SIGINT, handle_stop)
+    signal.signal(signal.SIGTERM, handle_stop)
+
     try:
-        worker.run()
+        if concurrency == 1:
+            workers[0].run()
+        else:
+            logger.info("Starting %s LLM worker threads", concurrency)
+            threads = [
+                threading.Thread(target=worker.run, name=worker.worker_id)
+                for worker in workers
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, shutting down")
+        for worker in workers:
+            worker.stop()
     finally:
         client.close()
 

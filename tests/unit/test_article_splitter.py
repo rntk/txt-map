@@ -445,6 +445,7 @@ class TestPipelineExecutionCompatibility:
 
         llm_callable = MagicMock()
         llm_callable.call.return_value = "LLM output"
+        llm_callable.submit = None
 
         result = _execute_pipeline(pipeline, "Article body", llm_callable)
 
@@ -454,6 +455,46 @@ class TestPipelineExecutionCompatibility:
         submitted_responses = session.submit_responses.call_args.args[0]
         assert len(submitted_responses) == 1
         assert submitted_responses[0].content == "LLM output"
+
+    def test_execute_pipeline_submits_deferred_batch_requests_in_parallel_when_supported(self):
+        """Deferred sessions use non-blocking submission when available."""
+        pipeline = MagicMock()
+        pipeline.run.side_effect = RuntimeError(
+            "run() cannot execute deferred batches; use start() and drive the session"
+        )
+
+        requests = (
+            LLMRequest(prompt="Prompt A", temperature=0.1),
+            LLMRequest(prompt="Prompt B", temperature=0.2),
+        )
+        session = MagicMock()
+        session.is_complete.side_effect = [False, True]
+        session.pending_requests.return_value = requests
+        expected_result = MagicMock()
+        session.result.return_value = expected_result
+        pipeline.start.return_value = session
+
+        class MockFuture:
+            def __init__(self, response: str) -> None:
+                self._response = response
+
+            def result(self, timeout: float = 300.0) -> str:  # noqa: ARG002
+                return self._response
+
+        llm_callable = MagicMock()
+        llm_callable.submit.side_effect = [
+            MockFuture("Result A"),
+            MockFuture("Result B"),
+        ]
+
+        result = _execute_pipeline(pipeline, "Article body", llm_callable)
+
+        assert result is expected_result
+        llm_callable.submit.assert_any_call("Prompt A", 0.1)
+        llm_callable.submit.assert_any_call("Prompt B", 0.2)
+        llm_callable.call.assert_not_called()
+        submitted_responses = session.submit_responses.call_args.args[0]
+        assert [response.content for response in submitted_responses] == ["Result A", "Result B"]
 
     def test_execute_pipeline_reraises_other_runtime_errors(self):
         """Unrelated runtime errors are not swallowed."""
