@@ -41,6 +41,30 @@ describe("sanitizeHTML", () => {
     expect(link.getAttribute("href")).toBeNull();
   });
 
+  it("keeps safe base64 raster image data urls", () => {
+    const input = `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA" alt="PDF image">`;
+    const output = sanitizeHTML(input);
+    const root = document.createElement("div");
+    root.innerHTML = output;
+    const image = root.querySelector("img");
+
+    expect(image).not.toBeNull();
+    expect(image.getAttribute("src")).toBe(
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA",
+    );
+  });
+
+  it("removes non-image data urls", () => {
+    const input = `<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">Link</a>`;
+    const output = sanitizeHTML(input);
+    const root = document.createElement("div");
+    root.innerHTML = output;
+    const link = root.querySelector("a");
+
+    expect(link).not.toBeNull();
+    expect(link.getAttribute("href")).toBeNull();
+  });
+
   // --- Style normalization tests ---
 
   describe("font-size clamping", () => {

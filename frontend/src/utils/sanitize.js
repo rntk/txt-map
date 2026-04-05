@@ -152,11 +152,17 @@ export function sanitizeHTML(html) {
     template.content.querySelectorAll(tag).forEach((el) => el.remove());
   });
 
+  const isSafeDataImageUrl = (val) =>
+    /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(
+      String(val).trim(),
+    );
+
   const isUnsafeUrl = (val) => {
     if (!val) return false;
     const v = String(val).trim().toLowerCase();
     const jsProto = `java${"script:"}`;
     const vbsProto = `vb${"script:"}`;
+    if (isSafeDataImageUrl(val)) return false;
     return (
       v.startsWith(jsProto) || v.startsWith("data:") || v.startsWith(vbsProto)
     );

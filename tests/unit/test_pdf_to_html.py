@@ -5,6 +5,7 @@ Tests PDFToSemanticHTML class, convert_pdf_to_html, and extract_text_from_pdf fu
 Tests PyMuPDF (fitz) integration and edge cases.
 """
 
+import base64
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 import pymupdf
@@ -905,6 +906,29 @@ class TestConvert:
 
         # Document should be closed (can't use it after close)
         # PyMuPDF documents have a 'close' method that sets internal state
+
+    @patch("pymupdf.open")
+    def test_converts_image_block_to_base64(self, mock_open, valid_pdf_bytes):
+        """Image blocks are converted to base64 inline images."""
+        mock_doc = MagicMock()
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = {
+            "blocks": [
+                {
+                    "type": 1,  # Image type
+                    "image": b"fake_image_data",
+                    "ext": "png",
+                }
+            ]
+        }
+        mock_doc.__iter__.side_effect = lambda: iter([mock_page])
+        mock_open.return_value = mock_doc
+
+        converter = PDFToSemanticHTML(b"fake bytes")
+        result = converter.convert()
+
+        expected_base64 = base64.b64encode(b"fake_image_data").decode("utf-8")
+        assert f'<img src="data:image/png;base64,{expected_base64}"' in result
 
 
 # =============================================================================

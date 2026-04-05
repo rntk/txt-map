@@ -6,9 +6,13 @@ with proper headings (<h1>, <h2>, <h3>), paragraphs (<p>),
 and inline formatting (<strong>, <em>).
 """
 
+import logging
 import pymupdf
+import base64
 from typing import List, Optional
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -111,7 +115,43 @@ class PDFToSemanticHTML:
             current_paragraph: List[str] = []
 
             for block in blocks:
-                if block.get("type") != 0:  # Skip non-text blocks (images, etc.)
+                if block.get("type") == 1:  # Image block
+                    # Flush any accumulated paragraph before image
+                    if current_paragraph:
+                        para_text = "".join(current_paragraph).strip()
+                        if para_text:
+                            page_html.append(f"<p>{para_text}</p>")
+                        current_paragraph = []
+
+                    img_bytes = block.get("image")
+                    img_ext = block.get("ext", "png")
+                    if not img_bytes:
+                        logger.warning(
+                            "Image block on page %d has no image data (xref: %s)",
+                            page_num + 1,
+                            block.get("xref", "unknown"),
+                        )
+                        continue
+
+                    base64_data = base64.b64encode(img_bytes).decode("utf-8")
+                    img_size_kb = len(base64_data) / 1024
+                    if img_size_kb > 500:
+                        logger.warning(
+                            "Large image on page %d: %.1f KB base64-encoded. "
+                            "Output HTML will be large due to inline embedding.",
+                            page_num + 1,
+                            img_size_kb,
+                        )
+
+                    # Get image position for alt text
+                    bbox = block.get("bbox", [0, 0, 0, 0])
+                    img_alt = f"PDF Image (page {page_num + 1}, position {int(bbox[0])},{int(bbox[1])})"
+                    page_html.append(
+                        f'<img src="data:image/{img_ext};base64,{base64_data}" style="max-width: 100%; height: auto; margin: 1em 0;" alt="{img_alt}" />'
+                    )
+                    continue
+
+                if block.get("type") != 0:  # Skip other non-text blocks
                     continue
                 if "lines" not in block:
                     continue

@@ -33,6 +33,10 @@ class ReadTopicsRequest(BaseModel):
 
 
 router = APIRouter()
+EMBEDDED_PDF_IMAGE_RE = re.compile(
+    r"""<img\b[^>]*\bsrc=["']data:image/(?:png|jpeg|jpg|gif|webp);base64,""",
+    re.IGNORECASE,
+)
 
 
 def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -> None:
@@ -70,6 +74,11 @@ def post_submit(
 ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf", ".fb2", ".epub"}
 
 
+def _html_contains_embedded_pdf_images(html_content: str) -> bool:
+    """Return True when converted PDF HTML contains at least one embedded raster image."""
+    return bool(EMBEDDED_PDF_IMAGE_RE.search(html_content))
+
+
 def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
     """
     Extract (html_content, text_content) from uploaded file bytes.
@@ -96,7 +105,9 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
             html_content = convert_pdf_to_html(data)
             # Extract plain text for text_content
             text_content = extract_text_from_pdf(data)
-            if not text_content.strip():
+            if not text_content.strip() and not _html_contains_embedded_pdf_images(
+                html_content
+            ):
                 raise HTTPException(
                     status_code=400,
                     detail="PDF appears to contain no extractable text (may be scanned/image-only).",

@@ -1,4 +1,5 @@
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 import uuid
@@ -85,6 +86,45 @@ def test_post_upload(client, mock_storage, mock_task_queue):
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
     assert mock_task_queue.create.call_count == 9
+
+
+def test_extract_content_from_upload_allows_image_only_pdf_html():
+    from handlers.submission_handler import _extract_content_from_upload
+
+    html_content = (
+        '<!DOCTYPE html><html><body><img src="data:image/png;base64,AAAA" '
+        'alt="PDF Image" /></body></html>'
+    )
+
+    with (
+        patch(
+            "lib.pdf_to_html.convert_pdf_to_html",
+            return_value=html_content,
+        ),
+        patch("lib.pdf_to_html.extract_text_from_pdf", return_value=""),
+    ):
+        extracted_html, extracted_text = _extract_content_from_upload(
+            "scan.pdf", b"%PDF-1.4"
+        )
+
+    assert extracted_html == html_content
+    assert extracted_text == ""
+
+
+def test_extract_content_from_upload_rejects_empty_pdf_without_text_or_images():
+    from handlers.submission_handler import _extract_content_from_upload
+
+    html_content = "<!DOCTYPE html><html><body></body></html>"
+
+    with (
+        patch(
+            "lib.pdf_to_html.convert_pdf_to_html",
+            return_value=html_content,
+        ),
+        patch("lib.pdf_to_html.extract_text_from_pdf", return_value=""),
+    ):
+        with pytest.raises(HTTPException, match="no extractable text"):
+            _extract_content_from_upload("empty.pdf", b"%PDF-1.4")
 
 
 def test_get_submission_status(client, mock_storage, sample_submission):
