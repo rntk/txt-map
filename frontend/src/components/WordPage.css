@@ -120,18 +120,37 @@
   overflow-y: auto;
 }
 
-.word-page-sentence-card {
-  padding: 0.85rem;
-  border: 1px solid var(--shell-border);
-  border-radius: 1rem;
-  background: rgba(248, 248, 245, 0.94);
+.word-page-similar-words {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--shell-border);
 }
 
-.word-page-sentence-header {
-  margin-bottom: 0.6rem;
+.word-page-similar-words h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
   color: var(--shell-muted-strong);
-  font-size: 0.8rem;
-  font-weight: 700;
+}
+
+.word-page-similar-words-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.similar-word-link {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  background: var(--shell-bg-alt);
+  color: var(--shell-accent);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.similar-word-link:hover {
+  background: var(--shell-accent);
+  color: white;
 }
 
 @media (max-width: 640px) {

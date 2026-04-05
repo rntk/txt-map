@@ -183,6 +183,20 @@ export function useSubmission(submissionId) {
     [readTopics],
   );
 
+  const getSimilarWords = useCallback(
+    async (word) => {
+      const response = await fetch(
+        `/api/submission/${submissionId}/similar-words?word=${encodeURIComponent(word)}`,
+      );
+      if (!response.ok) {
+        return [];
+      }
+      const data = await response.json();
+      return data.similar_words || [];
+    },
+    [submissionId],
+  );
+
   return {
     submission,
     loading,
@@ -193,5 +207,6 @@ export function useSubmission(submissionId) {
     toggleRead,
     setSelectionReadState,
     toggleReadAll,
+    getSimilarWords,
   };
 }

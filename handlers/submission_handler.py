@@ -380,52 +380,75 @@ def post_refresh(
     return {"message": "Tasks queued for recalculation", "tasks_queued": task_names}
 
 
-@router.get("/submission/{submission_id}/word-cloud")
-def get_word_cloud(
-    path: List[str] = Query(default=[]),
-    word: Optional[str] = Query(default=None),
-    top_n: int = Query(default=60, ge=1, le=200),
+@router.get("/submission/{submission_id}/similar-words")
+def get_similar_words(
+    word: str = Query(...),
     submission: dict = Depends(require_submission),
 ) -> Dict[str, Any]:
     """
-    Return a word-frequency cloud for the sentences. If *word* is provided,
-    it filters for sentences containing that word. Otherwise, it filters by *path*
-    (a hierarchical list of topic segments, e.g. ["Sport", "Tennis"]).
+    Return top 10 similar words from the article using a multi-stage approach.
+    1. Lemma matches, 2. Fuzzy matches, 3. Topic-based keywords, 4. Frequent words.
     """
     results = submission.get("results") or {}
-    topics = results.get("topics") or []
     sentences = results.get("sentences") or []
+    topics = results.get("topics") or []
+    
+    from lib.nlp import _lemmatizer_instance, _stop_words_set
+    lemmatizer = _lemmatizer_instance()
+    stop_words = _stop_words_set()
+    import difflib
+    from collections import Counter
 
-    if not sentences:
-        return {"words": [], "sentence_count": 0}
+    word_lower = word.lower()
+    word_lemma = lemmatizer.lemmatize(word_lower, pos='v')
 
-    # Collect sentence indices
-    sentence_indices: Set[int] = set()
+    # Collect unique candidate words
+    all_tokens = []
+    for sent in sentences:
+        all_tokens.extend(re.findall(r"\b[a-z]{3,}\b", sent.lower()))
+    
+    candidate_counts = Counter([t for t in all_tokens if t not in stop_words])
+    unique_candidates = sorted(candidate_counts.keys(), key=lambda x: candidate_counts[x], reverse=True)
 
-    if word:
-        # Regex to match exact word with boundaries, case-insensitive
-        pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
-        for idx, sentence in enumerate(sentences):
-            if pattern.search(sentence):
-                sentence_indices.add(idx + 1)
-    else:
-        for topic in topics:
-            name = topic.get("name", "")
-            parts = [p.strip() for p in name.split(">")]
+    similar_words = []
 
-            # Check if topic matches hierarchical path
-            if len(parts) >= len(path) and all(
-                parts[i] == path[i] for i in range(len(path))
-            ):
-                for idx in topic.get("sentences") or []:
-                    sentence_indices.add(int(idx))
+    # 1. Lemma / Exact matches
+    for candidate in unique_candidates:
+        if lemmatizer.lemmatize(candidate, pos='v') == word_lemma or candidate == word_lower:
+            if candidate != word_lower:
+                similar_words.append(candidate)
 
-    filtered_texts = [
-        sentences[idx - 1] for idx in sentence_indices if 1 <= idx <= len(sentences)
-    ]
+    # 2. Fuzzy / Substring matches (if not enough from stage 1)
+    if len(similar_words) < 10:
+        fuzzy_matches = difflib.get_close_matches(word_lower, unique_candidates, n=10, cutoff=0.7)
+        for fm in fuzzy_matches:
+            if fm not in similar_words and fm != word_lower:
+                similar_words.append(fm)
+        
+        # Substring search
+        for candidate in unique_candidates:
+            if word_lower in candidate or candidate in word_lower:
+                if candidate not in similar_words and candidate != word_lower:
+                    similar_words.append(candidate)
 
-    words = compute_word_frequencies(filtered_texts, top_n=top_n)
-    return {"words": words, "sentence_count": len(sentence_indices)}
+    # 3. Topic-based neighbors (words that appear in the same topic as the word, if any)
+    pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    related_topics = [t for t in topics if any(pattern.search(sentences[i-1]) for i in t.get("sentences", []))]
+    
+    if related_topics:
+        for t in related_topics:
+            for i in t.get("sentences", []):
+                for w in re.findall(r"\b[a-z]{3,}\b", sentences[i-1].lower()):
+                    if w not in stop_words and w != word_lower and w not in similar_words:
+                        similar_words.append(w)
+
+    # 4. Fallback (top frequent words)
+    if len(similar_words) < 10:
+        for w, _ in candidate_counts.most_common(20):
+            if w not in similar_words and w != word_lower:
+                similar_words.append(w)
+
+    return {"similar_words": list(dict.fromkeys(similar_words))[:10]}
 
 
 @router.get("/global-topics")

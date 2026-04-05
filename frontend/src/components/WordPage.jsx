@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSubmission } from "../hooks/useSubmission";
 import TextDisplay from "./TextDisplay";
 import CircularPackingChart from "./CircularPackingChart";
@@ -61,8 +61,15 @@ export default function WordPage() {
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
   const compareGroupRefs = useRef({});
 
-  const { submission, loading, error, readTopics, toggleRead } =
+  const { submission, loading, error, readTopics, toggleRead, getSimilarWords } =
     useSubmission(submissionId);
+  const [similarWords, setSimilarWords] = useState([]);
+
+  useEffect(() => {
+    if (word) {
+      getSimilarWords(word).then(setSimilarWords);
+    }
+  }, [word, getSimilarWords]);
 
   // Derive subsets
   const matchingData = useMemo(() => {
@@ -332,9 +339,29 @@ export default function WordPage() {
           {activeTab === "sentences" && (
             <div>
               {sentencesInfo.length === 0 ? (
-                <p className="word-page-no-occurrences">
-                  No occurrences of this word were found in the article.
-                </p>
+                <div className="word-page-no-occurrences">
+                  <p>No occurrences of "{word}" were found in the article.</p>
+                  {similarWords.length > 0 && (
+                    <div className="word-page-similar-words">
+                      <h3>You might be looking for:</h3>
+                      <div className="word-page-similar-words-list">
+                        {similarWords.map((w) => (
+                          <button
+                            key={w}
+                            className="similar-word-link"
+                            onClick={() =>
+                              navigate(
+                                `/page/word/${submissionId}/${encodeURIComponent(w)}`,
+                              )
+                            }
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="word-page-sentences-list">
                   {sentencesInfo.map(({ index, text }) => (
@@ -359,6 +386,26 @@ export default function WordPage() {
                       />
                     </div>
                   ))}
+                  {similarWords.length > 0 && (
+                    <div className="word-page-similar-words">
+                      <h3>Other related words:</h3>
+                      <div className="word-page-similar-words-list">
+                        {similarWords.map((w) => (
+                          <button
+                            key={w}
+                            className="similar-word-link"
+                            onClick={() =>
+                              navigate(
+                                `/page/word/${submissionId}/${encodeURIComponent(w)}`,
+                              )
+                            }
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
