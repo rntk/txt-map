@@ -82,13 +82,25 @@ class PDFToSemanticHTML:
             return "h3"
         return None
 
-    def _wrap_text_with_style(self, text: str, flags: int) -> str:
-        """Wrap text with <strong> and <em> tags based on font flags."""
+    def _get_link_for_rect(self, rect: pymupdf.Rect, links: List[dict]) -> Optional[str]:
+        """Find if a text rectangle overlaps with any link."""
+        for link in links:
+            if link.get("kind") == pymupdf.LINK_URI:
+                link_rect = pymupdf.Rect(link["from"])
+                if link_rect.intersects(rect):
+                    return link.get("uri")
+        return None
+
+
+    def _wrap_text_with_style(self, text: str, flags: int, link: Optional[str] = None) -> str:
+        """Wrap text with <strong>, <em>, and <a> tags based on font flags and link."""
         # Apply italic first, then bold (for proper nesting)
         if flags & pymupdf.TEXT_FONT_ITALIC:
             text = f"<em>{text}</em>"
         if flags & pymupdf.TEXT_FONT_BOLD:
             text = f"<strong>{text}</strong>"
+        if link:
+            text = f'<a href="{link}" target="_blank" rel="noopener noreferrer">{text}</a>'
         return text
 
     def _escape_html(self, text: str) -> str:
@@ -110,6 +122,7 @@ class PDFToSemanticHTML:
         html_parts: List[str] = []
 
         for page_num, page in enumerate(self.doc):
+            links = page.get_links()
             blocks = page.get_text("dict")["blocks"]
             page_html: List[str] = []
             current_paragraph: List[str] = []
@@ -186,10 +199,12 @@ class PDFToSemanticHTML:
                         # Build paragraph content with inline formatting
                         line_parts: List[str] = []
                         for span in spans:
+                            span_rect = pymupdf.Rect(span["bbox"])
+                            link = self._get_link_for_rect(span_rect, links)
                             escaped_text = self._escape_html(span.get("text", ""))
                             flags = span.get("flags", 0)
                             styled_text = self._wrap_text_with_style(
-                                escaped_text, flags
+                                escaped_text, flags, link=link
                             )
                             line_parts.append(styled_text)
 
