@@ -2,6 +2,17 @@
 
 These instructions are intended for AI agents working on this project.
 
+> **Important — Manage Command Output Size**:
+> Commands like test runners, linters, and build scripts can produce very large outputs.
+> To avoid blowing up the context window with unnecessary data, **always redirect command output to a temporary file** and then carefully inspect only the relevant parts.
+> Example pattern:
+> ```bash
+> ./test.sh > /tmp/test_output.txt 2>&1
+> grep -E "FAILED|ERROR|passed|failed" /tmp/test_output.txt
+> # Then open specific sections of the file as needed
+> ```
+> Use `grep`, `tail`, `head`, or `sed` to extract only the information you need from the output file instead of printing everything to the terminal.
+
 1.  **Type Definitions**:
     - Always add type definitions on both the backend and frontend codebase.
     - Backend (Python): Use type hints for all function parameters, return types, and variable annotations.
