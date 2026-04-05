@@ -59,6 +59,13 @@
   overflow-y: auto;
 }
 
+.word-page--compare-active .word-page-content {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
 .word-page-loading,
 .word-page-error,
 .word-page-no-submission {
@@ -73,10 +80,49 @@
 .word-page-sentences-list,
 .word-page-tree-container,
 .word-page-chart-container,
-.word-page-timeline-container {
+.word-page-timeline-container,
+.word-page-compare-container {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.word-page-compare-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: var(--shell-bg, #f8f8f5);
+  padding: 0.25rem;
+  padding-top: 2rem;
+  overflow: auto;
+}
+
+.word-page-compare-container .global-topics-compare {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-height: 0;
+  overflow-x: auto;
+}
+
+.word-page-compare-container .global-topics-compare__column {
+  height: 100%;
+  max-height: 100%;
+  flex-shrink: 0;
+}
+
+.word-page-compare-container .global-topics-compare__column-header {
+  display: none;
+}
+
+.word-page-compare-container
+  .global-topics-compare__column
+  > .global-topics-compare__context {
+  max-height: 50%;
+  overflow-y: auto;
 }
 
 .word-page-sentence-card {

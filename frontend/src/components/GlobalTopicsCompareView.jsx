@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { highlightText } from "../utils/diffUtils";
 import "../styles/GlobalTopics.css";
 
 /**
@@ -19,9 +20,9 @@ import "../styles/GlobalTopics.css";
  */
 
 /**
- * @param {{ groups: GlobalTopicsCompareGroup[], groupRefs: React.MutableRefObject<Record<string, HTMLElement | null>> }} props
+ * @param {{ groups: GlobalTopicsCompareGroup[], groupRefs: React.MutableRefObject<Record<string, HTMLElement | null>>, highlightWord?: string }} props
  */
-function GlobalTopicsCompareView({ groups, groupRefs }) {
+function GlobalTopicsCompareView({ groups, groupRefs, highlightWord }) {
   const safeGroups = Array.isArray(groups) ? groups : [];
 
   if (safeGroups.length === 0) {
@@ -129,6 +130,7 @@ function GlobalTopicsCompareView({ groups, groupRefs }) {
             topContext={topContext}
             middleContent={middleContent}
             bottomContext={bottomContext}
+            highlightWord={highlightWord}
             groupRef={(el) => {
               if (groupRefs?.current && !groupRefs.current[topic_name]) {
                 groupRefs.current[topic_name] = el;
@@ -175,6 +177,7 @@ function CompareColumn({
   topContext,
   middleContent,
   bottomContext,
+  highlightWord,
   groupRef,
 }) {
   const topRef = useRef(null);
@@ -211,7 +214,11 @@ function CompareColumn({
         {topContext.length > 0 ? (
           <div className="global-topics-compare__context-inner">
             {topContext.map((item) => (
-              <ContextSentence key={item.index} item={item} />
+              <ContextSentence
+                key={item.index}
+                item={item}
+                highlightWord={highlightWord}
+              />
             ))}
           </div>
         ) : (
@@ -227,7 +234,9 @@ function CompareColumn({
             key={item.index}
             className={`global-topics-compare__match-sentence${item.isMatch ? " global-topics-compare__match-sentence--highlighted" : ""}`}
           >
-            {item.text}
+            {highlightWord
+              ? highlightText(item.text, highlightWord)
+              : item.text}
           </div>
         ))}
       </div>
@@ -236,7 +245,11 @@ function CompareColumn({
         {bottomContext.length > 0 ? (
           <div className="global-topics-compare__context-inner">
             {bottomContext.map((item) => (
-              <ContextSentence key={item.index} item={item} />
+              <ContextSentence
+                key={item.index}
+                item={item}
+                highlightWord={highlightWord}
+              />
             ))}
           </div>
         ) : (
@@ -249,7 +262,7 @@ function CompareColumn({
   );
 }
 
-function ContextSentence({ item }) {
+function ContextSentence({ item, highlightWord }) {
   return (
     <div className="global-topics-source-card__context-item">
       {item.topics.length > 0 && (
@@ -264,7 +277,9 @@ function ContextSentence({ item }) {
           ))}
         </div>
       )}
-      <div>{item.text}</div>
+      <div>
+        {highlightWord ? highlightText(item.text, highlightWord) : item.text}
+      </div>
     </div>
   );
 }

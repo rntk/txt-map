@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useSubmission } from "../hooks/useSubmission";
 import TextDisplay from "./TextDisplay";
 import CircularPackingChart from "./CircularPackingChart";
@@ -7,6 +7,7 @@ import TopicsTagCloud from "./TopicsTagCloud";
 import SummaryTimeline from "./SummaryTimeline";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import WordTree, { buildWordTreeEntries } from "./WordTree";
+import GlobalTopicsCompareView from "./GlobalTopicsCompareView";
 import { buildSummaryTimelineItems } from "../utils/summaryTimeline";
 import "./WordPage.css";
 
@@ -25,6 +26,7 @@ import "./WordPage.css";
 /** @type {readonly WordPageTab[]} */
 const VIS_TABS = [
   { key: "sentences", label: "Sentences" },
+  { key: "compare", label: "Compare" },
   { key: "tree", label: "Tree" },
   { key: "circles", label: "Topics (Circles)" },
   { key: "treemap", label: "Topics (Treemap)" },
@@ -53,6 +55,7 @@ export default function WordPage() {
   const [hoveredTopic] = useState(null);
   const [summaryModalTopic, setSummaryModalTopic] = useState(null);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const compareGroupRefs = useRef({});
 
   const { submission, loading, error, readTopics, toggleRead } =
     useSubmission(submissionId);
@@ -183,6 +186,22 @@ export default function WordPage() {
     treeEntries,
   } = matchingData;
 
+  const compareGroups = useMemo(() => {
+    if (!submission?.results || sentencesInfo.length === 0) {
+      return [];
+    }
+
+    return sentencesInfo.map((sentenceInfo, idx) => ({
+      submission_id: submissionId,
+      source_url: submission?.url || null,
+      topic_name: `${word} (${idx + 1})`,
+      sentences: [sentenceInfo.text],
+      all_sentences: allSentences,
+      topics: allTopics,
+      indices: [sentenceInfo.index + 1],
+    }));
+  }, [submission, submissionId, word, sentencesInfo, allSentences, allTopics]);
+
   const readSentenceIndices = useMemo(() => {
     const indices = new Set();
     allTopics.forEach((topic) => {
@@ -243,7 +262,9 @@ export default function WordPage() {
     return <div className="word-page-no-submission">No submission found.</div>;
 
   return (
-    <div className="page-stack word-page">
+    <div
+      className={`page-stack word-page${activeTab === "compare" ? " word-page--compare-active" : ""}`}
+    >
       <div className="word-page-header">
         <div className="word-page-header-row">
           <button
@@ -317,6 +338,22 @@ export default function WordPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "compare" && (
+            <div className="word-page-compare-container">
+              {compareGroups.length > 0 ? (
+                <GlobalTopicsCompareView
+                  groups={compareGroups}
+                  groupRefs={compareGroupRefs}
+                  highlightWord={word}
+                />
+              ) : (
+                <p className="word-page-no-occurrences">
+                  No occurrences of this word were found in the article.
+                </p>
               )}
             </div>
           )}
