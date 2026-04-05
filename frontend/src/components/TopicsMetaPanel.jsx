@@ -53,9 +53,9 @@ function PanelClusters({ clusters }) {
 }
 
 /**
- * @param {{ topicMapping: TopicMapping|null, latentTopics: LatentTopic[] }} props
+ * @param {{ submissionId: string, topicMapping: TopicMapping|null, latentTopics: LatentTopic[] }} props
  */
-function PanelLatentTopics({ topicMapping, latentTopics }) {
+function PanelLatentTopics({ submissionId, topicMapping, latentTopics }) {
   if (!topicMapping || !latentTopics || latentTopics.length === 0) {
     return (
       <p className="topics-meta-panel__empty">
@@ -83,24 +83,32 @@ function PanelLatentTopics({ topicMapping, latentTopics }) {
 
   return (
     <div className="topics-meta-panel__cards">
-      {filtered.map((lt) => (
-        <div key={lt.id} className="topics-meta-panel__card">
-          <div className="topics-meta-panel__card-title">{lt.id + 1}</div>
-          <KeywordList keywords={lt.keywords} />
-          <div className="topics-meta-panel__card-meta">
-            Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight:{" "}
-            {((lt.weight || 0) * 100).toFixed(1)}%
-          </div>
-        </div>
-      ))}
+      {filtered.map((lt) => {
+        const topicName = lt.keywords[0] || `Latent Topic ${lt.id + 1}`;
+        return (
+          <a
+            key={lt.id}
+            href={`/page/word/${submissionId}/${encodeURIComponent(topicName)}`}
+            className="topics-meta-panel__card"
+            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+          >
+            <div className="topics-meta-panel__card-title">{lt.id + 1}</div>
+            <KeywordList keywords={lt.keywords} />
+            <div className="topics-meta-panel__card-meta">
+              Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight:{" "}
+              {((lt.weight || 0) * 100).toFixed(1)}%
+            </div>
+          </a>
+        );
+      })}
     </div>
   );
 }
 
 /**
- * @param {{ sentences: string[], sentenceIndices: number[] }} props
+ * @param {{ submissionId: string, sentences: string[], sentenceIndices: number[] }} props
  */
-function PanelTagCloud({ sentences, sentenceIndices }) {
+function PanelTagCloud({ submissionId, sentences, sentenceIndices }) {
   /** @type {WordFreq[]} */
   const words = useMemo(() => {
     if (!sentences || !sentenceIndices || sentenceIndices.length === 0)
@@ -133,10 +141,15 @@ function PanelTagCloud({ sentences, sentenceIndices }) {
   return (
     <div className="topics-meta-panel__tag-cloud">
       {words.map(({ word, frequency }) => (
-        <span key={word} className="topics-meta-panel__tag-cloud-item">
+        <a
+          key={word}
+          href={`/page/word/${submissionId}/${encodeURIComponent(word)}`}
+          className="topics-meta-panel__tag-cloud-item"
+          style={{ cursor: 'pointer' }}
+        >
           {word}
           <span className="topics-meta-panel__tag-cloud-freq">{frequency}</span>
-        </span>
+        </a>
       ))}
     </div>
   );
@@ -315,6 +328,7 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
         <section className="topics-meta-panel__section">
           <div className="topics-meta-panel__section-title">Latent Topics</div>
           <PanelLatentTopics
+            submissionId={submissionId}
             topicMapping={topicMapping}
             latentTopics={latentTopics}
           />
@@ -329,6 +343,7 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
           <section className="topics-meta-panel__section">
             <div className="topics-meta-panel__section-title">Tag Cloud</div>
             <PanelTagCloud
+              submissionId={submissionId}
               sentences={data.sentences}
               sentenceIndices={selectedTopic.sentences || []}
             />
