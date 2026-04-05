@@ -40,7 +40,7 @@ function PanelClusters({ clusters }) {
       {clusters.map((c) => (
         <div key={c.cluster_id} className="topics-meta-panel__card">
           <div className="topics-meta-panel__card-title">
-            Cluster {c.cluster_id + 1}
+            {c.cluster_id + 1}
           </div>
           <KeywordList keywords={c.keywords} />
           <div className="topics-meta-panel__card-meta">
@@ -86,7 +86,7 @@ function PanelLatentTopics({ topicMapping, latentTopics }) {
       {filtered.map((lt) => (
         <div key={lt.id} className="topics-meta-panel__card">
           <div className="topics-meta-panel__card-title">
-            Latent topic {lt.id + 1}
+            {lt.id + 1}
           </div>
           <KeywordList keywords={lt.keywords} />
           <div className="topics-meta-panel__card-meta">
