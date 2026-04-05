@@ -8,7 +8,8 @@ import {
   resolveTopicMarkup,
 } from "../markup/topicMarkupUtils";
 import { getTopicHighlightColor } from "../../utils/topicColorUtils";
-import { isTopicRead } from "../../utils/topicReadUtils";
+import { isTopicSelectionRead } from "../../utils/topicReadUtils";
+import { buildTopicModalSelection } from "../../utils/topicModalSelection";
 import { HighlightContext } from "./HighlightContext";
 import HighlightedText from "./HighlightedText";
 
@@ -31,6 +32,7 @@ const EXTEND_COUNT = 3;
  * @property {React.ReactNode} [headerExtra]
  * @property {(topic: TopicSentencesModalTopic) => void} [onShowInArticle]
  * @property {Record<string, unknown>} [markup]
+ * @property {Array<unknown>} [allTopics]
  * @property {Set<string> | Iterable<string>} [readTopics]
  * @property {(topic: TopicSentencesModalTopic) => void} [onToggleRead]
  */
@@ -65,39 +67,8 @@ function formatSentenceSpan(firstIndex, lastIndex) {
  * @param {TopicSentencesModalTopic | null | undefined} topic
  * @returns {TopicSentencesModalTopic | null}
  */
-function normalizeTopic(topic) {
-  if (!topic) {
-    return null;
-  }
-
-  const trimmedName = typeof topic.name === "string" ? topic.name.trim() : "";
-  const trimmedFullPath =
-    typeof topic.fullPath === "string" ? topic.fullPath.trim() : "";
-  const trimmedDisplayName =
-    typeof topic.displayName === "string" ? topic.displayName.trim() : "";
-  const canonicalName = trimmedName || trimmedFullPath || trimmedDisplayName;
-  const sentenceIndexSource = topic.sentenceIndices ?? topic.sentences;
-  const normalizedSentenceIndices = Array.isArray(sentenceIndexSource)
-    ? sentenceIndexSource
-    : sentenceIndexSource instanceof Set
-      ? Array.from(sentenceIndexSource)
-      : [];
-
-  if (!canonicalName) {
-    return {
-      ...topic,
-      displayName: trimmedDisplayName,
-      sentenceIndices: normalizedSentenceIndices,
-    };
-  }
-
-  return {
-    ...topic,
-    name: canonicalName,
-    fullPath: trimmedFullPath || canonicalName,
-    displayName: trimmedDisplayName || canonicalName,
-    sentenceIndices: normalizedSentenceIndices,
-  };
+function normalizeTopic(topic, allTopics) {
+  return buildTopicModalSelection(topic, allTopics);
 }
 
 /**
@@ -111,6 +82,7 @@ function TopicSentencesModal({
   headerExtra,
   onShowInArticle,
   markup,
+  allTopics = [],
   readTopics = new Set(),
   onToggleRead,
 }) {
@@ -119,7 +91,14 @@ function TopicSentencesModal({
   const [pendingScrollIndex, setPendingScrollIndex] = useState(null);
   const sentenceRowRefs = useRef({});
   const minimapPaneRef = useRef(null);
-  const normalizedTopic = normalizeTopic(topic);
+  const normalizedTopic = normalizeTopic(topic, allTopics);
+  const modalSentences = useMemo(() => {
+    if (Array.isArray(normalizedTopic?._sentences)) {
+      return normalizedTopic._sentences;
+    }
+
+    return Array.isArray(sentences) ? sentences : [];
+  }, [normalizedTopic?._sentences, sentences]);
 
   const highlightWords = useMemo(() => {
     if (!normalizedTopic?.displayName) return [];
@@ -131,7 +110,7 @@ function TopicSentencesModal({
   }, [normalizedTopic?.displayName]);
 
   const isRead = normalizedTopic
-    ? isTopicRead(normalizedTopic.name, readTopics)
+    ? isTopicSelectionRead(normalizedTopic, readTopics)
     : false;
   const indicesList = normalizedTopic?.sentenceIndices || [];
   const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
@@ -149,7 +128,15 @@ function TopicSentencesModal({
     : [];
   const markupUnits = Array.isArray(topicMarkup?.positions)
     ? topicMarkup.positions.map((position) => position.text || "")
-    : sentences;
+    : modalSentences;
+  const canToggleRead =
+    Boolean(onToggleRead) &&
+    Array.isArray(normalizedTopic?.canonicalTopicNames) &&
+    normalizedTopic.canonicalTopicNames.length > 0;
+  const canShowInArticle =
+    Boolean(onShowInArticle) &&
+    typeof normalizedTopic?.primaryTopicName === "string" &&
+    normalizedTopic.primaryTopicName.trim().length > 0;
 
   useEffect(() => {
     setExtendedIndices(new Set());
@@ -171,13 +158,13 @@ function TopicSentencesModal({
     (a, b) => a - b,
   );
   const rangeGroups = groupConsecutive(allIndices);
-  const totalSentences = sentences ? sentences.length : 0;
+  const totalSentences = modalSentences.length;
   const topicSentenceIndexSet = useMemo(
     () => new Set(sortedBase.filter((value) => Number.isInteger(value))),
     [sortedBase],
   );
   const articleMinimapSentenceStates = useMemo(() => {
-    if (!Array.isArray(sentences) || sentences.length === 0) {
+    if (!Array.isArray(modalSentences) || modalSentences.length === 0) {
       return [];
     }
 
@@ -185,7 +172,7 @@ function TopicSentencesModal({
       ? getTopicHighlightColor(normalizedTopic.name)
       : "rgba(31, 32, 29, 0.85)";
 
-    return sentences.map((_, index) => {
+    return modalSentences.map((_, index) => {
       const sentenceIndex = index + 1;
       if (topicSentenceIndexSet.has(sentenceIndex)) {
         return { isActive: true, color: topicColor };
@@ -197,8 +184,8 @@ function TopicSentencesModal({
     });
   }, [
     extendedIndices,
+    modalSentences,
     normalizedTopic?.name,
-    sentences,
     topicSentenceIndexSet,
   ]);
 
@@ -317,7 +304,7 @@ function TopicSentencesModal({
         <div className="topic-sentences-modal__header">
           <h3>{normalizedTopic.displayName}</h3>
           <div className="topic-sentences-modal__header-actions">
-            {onToggleRead && (
+            {canToggleRead && (
               <button
                 type="button"
                 className={`topic-sentences-modal__read-btn${isRead ? " topic-sentences-modal__read-btn--active" : ""}`}
@@ -336,7 +323,7 @@ function TopicSentencesModal({
                 {isRead ? "Mark unread" : "Mark as read"}
               </button>
             )}
-            {onShowInArticle && (
+            {canShowInArticle && (
               <button
                 type="button"
                 className="topic-sentences-modal__show-in-article"
@@ -477,8 +464,8 @@ function TopicSentencesModal({
                             <span className="topic-sentences-modal__sentence-text">
                               <HighlightedText
                                 text={
-                                  sentences && sentences[idx - 1]
-                                    ? sentences[idx - 1]
+                                  modalSentences[idx - 1]
+                                    ? modalSentences[idx - 1]
                                     : ""
                                 }
                               />
@@ -518,7 +505,7 @@ function TopicSentencesModal({
               </div>
             </div>
             <ArticleMinimap
-              sentences={Array.isArray(sentences) ? sentences : []}
+              sentences={modalSentences}
               sentenceStates={articleMinimapSentenceStates}
               onSentenceClick={handleMinimapSentenceClick}
             />

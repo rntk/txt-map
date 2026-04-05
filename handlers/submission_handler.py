@@ -495,11 +495,27 @@ def get_global_topics_sentences(
     return {"groups": groups}
 
 
+def _is_topic_read(topic_name: str, read_topics: Set[str]) -> bool:
+    """Return True when the exact topic or one of its parent paths is marked read."""
+    if not topic_name:
+        return False
+
+    parts = [part.strip() for part in topic_name.split(">") if part.strip()]
+    current_path = ""
+
+    for index, part in enumerate(parts):
+        current_path = part if index == 0 else f"{current_path}>{part}"
+        if current_path in read_topics:
+            return True
+
+    return False
+
+
 def _calculate_read_indices(topics: List[Dict], read_topics: Set[str]) -> Set[int]:
     """Helper to get unique sentence indices for read topics."""
     indices = set()
     for topic in topics:
-        if topic.get("name") in read_topics:
+        if _is_topic_read(topic.get("name") or "", read_topics):
             indices.update(topic.get("sentences") or [])
     return indices
 

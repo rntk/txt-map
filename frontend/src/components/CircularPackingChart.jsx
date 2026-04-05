@@ -11,6 +11,7 @@ import {
   getLevelLabel,
   hasDeeperChildren,
 } from "../utils/topicHierarchy";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
 
 const PALETTE = [
   "#7ba3cc",
@@ -331,7 +332,7 @@ export default function CircularPackingChart({
       const topicFullPath = node.data.fullPath;
       if (!topicFullPath) return;
 
-      const isRead = safeReadTopics.has(topicFullPath);
+      const isRead = isTopicSelectionRead(node.data.topic, safeReadTopics);
       if (!isRead) return;
       if (node.r < 8) return;
 
@@ -473,6 +474,7 @@ export default function CircularPackingChart({
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

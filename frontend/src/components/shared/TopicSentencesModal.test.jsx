@@ -149,6 +149,62 @@ describe("TopicSentencesModal markup resolution", () => {
     );
   });
 
+  it("hides read and show-in-article actions for non-canonical keyword selections", () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          kind: "keyword",
+          name: "physics",
+          displayName: "physics",
+          sentenceIndices: [1],
+          canonicalTopicNames: [],
+          primaryTopicName: null,
+        }}
+        sentences={["Quantum mechanics changed physics."]}
+        onClose={vi.fn()}
+        onToggleRead={vi.fn()}
+        onShowInArticle={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Mark as read" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Show in article" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps grouped selections unread until all canonical topics are read", () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          kind: "topic_group",
+          name: "Science Group (2 topics)",
+          displayName: "Science Group (2 topics)",
+          sentenceIndices: [1, 2],
+          canonicalTopicNames: ["Science>Physics", "Science>Chemistry"],
+          primaryTopicName: "Science>Physics",
+        }}
+        sentences={[
+          "Quantum mechanics changed physics.",
+          "Chemical bonds explain reactions.",
+        ]}
+        onClose={vi.fn()}
+        readTopics={new Set(["Science>Physics"])}
+        onToggleRead={vi.fn()}
+        onShowInArticle={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Mark as read" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show in article" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders separate enriched range panels for non-adjacent source sentence groups", () => {
     render(
       <TopicSentencesModal

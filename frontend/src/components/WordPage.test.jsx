@@ -220,6 +220,46 @@ describe("WordPage header layout", () => {
     );
   });
 
+  it("navigates back to TextPage when a chart requests Show in article", () => {
+    const originalLocation = window.location;
+    const mockLocation = {
+      _href: "http://localhost/page/word/sub-123/beta",
+      pathname: "/page/word/sub-123/beta",
+      search: "",
+      get href() {
+        return this._href;
+      },
+      set href(value) {
+        this._href = value;
+        const nextUrl = new URL(value, "http://localhost");
+        this.pathname = nextUrl.pathname;
+        this.search = nextUrl.search;
+      },
+    };
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: mockLocation,
+    });
+
+    try {
+      render(<WordPage />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Topics (Circles)" }));
+
+      const chartProps = mockCircularPackingChart.mock.calls.at(-1)[0];
+      chartProps.onShowInArticle({ fullPath: "Topic 1" });
+
+      expect(window.location.pathname).toBe("/page/text/sub-123");
+      expect(window.location.search).toBe("?topic=Topic%201");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
+
   it("marks tree entries as read when their sentence belongs to a read topic", () => {
     mockUseSubmission.mockReturnValue({
       submission: {

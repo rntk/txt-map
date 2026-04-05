@@ -4,7 +4,6 @@ import {
   getSubtreeStats as getSubtreeStatsUtil,
 } from "../utils/topicTree";
 import TopicTreeNode from "./TopicTreeNode";
-import { getTopicSelectionKey } from "../utils/chartConstants";
 import {
   getTopicCSSClass,
   getTopicHighlightColor,

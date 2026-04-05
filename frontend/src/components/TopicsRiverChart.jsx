@@ -11,6 +11,7 @@ import TopicSentencesModal from "./shared/TopicSentencesModal";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
 import { buildScopedChartData } from "../utils/topicHierarchy";
 import { useTopicLevel } from "../hooks/useTopicLevel";
+import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 import "./TopicsBarChart.css";
 
 /**
@@ -219,12 +220,7 @@ const TopicsRiverChart = ({
       .on("click", function (event, d) {
         const topicObj = scopedData.find((t) => t.name === d.key);
         if (topicObj) {
-          setSelectedTopicForModal({
-            name: topicObj.fullPath || topicObj.name,
-            displayName: topicObj.displayName || topicObj.name,
-            fullPath: topicObj.fullPath || topicObj.name,
-            sentenceIndices: topicObj.sentences,
-          });
+          setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
         }
       });
 
@@ -372,6 +368,7 @@ const TopicsRiverChart = ({
           sentences={sentences}
           onClose={() => setSelectedTopicForModal(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

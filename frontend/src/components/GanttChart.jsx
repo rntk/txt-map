@@ -5,6 +5,7 @@ import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
 import { buildScopedChartData } from "../utils/topicHierarchy";
 import { useTopicLevel } from "../hooks/useTopicLevel";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
+import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 import "./TopicsBarChart.css";
 
 /**
@@ -213,12 +214,18 @@ const GanttChart = ({
         tooltip.style("opacity", 0);
       })
       .on("click", function (event, d) {
-        setSelectedTopicForModal({
-          name: d.fullPath || d.name,
-          displayName: d.displayName || d.name,
-          fullPath: d.fullPath || d.name,
-          sentenceIndices: d.sentences,
-        });
+        setSelectedTopicForModal(
+          buildModalSelectionFromTopic({
+            name: d.fullPath || d.name,
+            displayName: d.displayName || d.name,
+            fullPath: d.fullPath || d.name,
+            sentenceIndices: d.sentences,
+            ranges: Array.isArray(d.ranges) ? d.ranges : [],
+            canonicalTopicNames: d.canonicalTopicNames || [],
+            primaryTopicName:
+              d.canonicalTopicNames?.[0] || d.fullPath || d.name,
+          }),
+        );
       });
 
     g.selectAll(".gantt-bar")
@@ -265,12 +272,7 @@ const GanttChart = ({
       })
       .on("click", function (event, d) {
         if (d.topicObj) {
-          setSelectedTopicForModal({
-            name: d.topicObj.fullPath || d.topicObj.name,
-            displayName: d.topicObj.displayName || d.topicObj.name,
-            fullPath: d.topicObj.fullPath || d.topicObj.name,
-            sentenceIndices: d.topicObj.sentences,
-          });
+          setSelectedTopicForModal(buildModalSelectionFromTopic(d.topicObj));
         }
       });
 
@@ -325,12 +327,7 @@ const GanttChart = ({
       .on("click", function (event, d) {
         const topicObj = scopedData.find((t) => t.name === d);
         if (topicObj) {
-          setSelectedTopicForModal({
-            name: topicObj.fullPath || topicObj.name,
-            displayName: topicObj.displayName || topicObj.name,
-            fullPath: topicObj.fullPath || topicObj.name,
-            sentenceIndices: topicObj.sentences,
-          });
+          setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
         }
       });
 
@@ -361,6 +358,7 @@ const GanttChart = ({
           sentences={sentences}
           onClose={() => setSelectedTopicForModal(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

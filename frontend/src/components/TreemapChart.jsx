@@ -11,6 +11,7 @@ import {
   getLevelLabel,
   hasDeeperChildren,
 } from "../utils/topicHierarchy";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
 
 const PALETTE = [
   "#f2b35d",
@@ -390,7 +391,10 @@ export default function TreemapChart({
 
         // Add overlay pattern for read topics
         const topicFullPath = node.data.fullPath;
-        if (topicFullPath && safeReadTopics.has(topicFullPath)) {
+        if (
+          topicFullPath &&
+          isTopicSelectionRead(node.data.topic, safeReadTopics)
+        ) {
           group
             .append("rect")
             .attr("x", node.x0 + 1)
@@ -514,6 +518,7 @@ export default function TreemapChart({
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

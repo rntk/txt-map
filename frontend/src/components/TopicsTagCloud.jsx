@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
+import { buildModalSelectionFromKeyword } from "../utils/topicModalSelection";
 import "./TopicNavigation.css";
 
 /**
@@ -453,13 +454,14 @@ function TopicsTagCloud({
 
       {selectedKeyword && (
         <TopicSentencesModal
-          topic={{
-            name: selectedKeyword,
-            displayName: selectedKeyword,
-            sentenceIndices: keywordSentences.map(({ index }) => index),
-          }}
+          topic={buildModalSelectionFromKeyword(
+            selectedKeyword,
+            keywordSentences.map(({ index }) => index),
+            sentences,
+          )}
           sentences={sentences}
           onClose={() => setSelectedKeyword(null)}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

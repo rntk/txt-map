@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import TopicList from "./TopicList";
 import TextDisplay from "./TextDisplay";
-import ReadProgress from "./ReadProgress";
 import GroupedByTopicsView from "./GroupedByTopicsView";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import TextPageActionsPortal from "./TextPageActionsPortal";
@@ -26,10 +25,15 @@ import TopicsMetaPanel from "./TopicsMetaPanel";
 import { useSubmission } from "../hooks/useSubmission";
 import { useTopicNavigation } from "../hooks/useTopicNavigation";
 import { useTextSelection } from "../hooks/useTextSelection";
-import { getTopicSelectionKey } from "../utils/chartConstants";
 import { useTextPageData } from "../hooks/useTextPageData";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
+import {
+  buildModalSelectionFromSummarySource,
+  buildModalSelectionFromTopic,
+  buildModalSelectionFromTopicGroup,
+  buildTopicModalSelection,
+} from "../utils/topicModalSelection";
 import "../styles/text-reading.css";
 
 const FULLSCREEN_TABS = [
@@ -69,8 +73,6 @@ function TextPage() {
     }
   }, [selectedTopics, highlightedGroupedTopic]);
   const [summaryModalTopic, setSummaryModalTopic] = useState(null);
-  const [showPanel, setShowPanel] = useState(false);
-  const [panelTopic, setPanelTopic] = useState(null);
   const [fullscreenGraph, setFullscreenGraph] = useState(null);
   const [compareTopicData, setCompareTopicData] = useState(null);
   const [highlightAllTopics, setHighlightAllTopics] = useState(false);
@@ -215,36 +217,23 @@ function TextPage() {
         : [];
 
       if (Array.isArray(topicOrTopics)) {
-        const topicNames = topicOrTopics.map((t) => t.name);
-        const displayName = `${topicOrTopics[0].name.split(/[\s_>]/)[0]} Group (${topicOrTopics.length} topics)`;
         const relatedTopics = (submission?.results?.topics || []).filter((t) =>
-          topicNames.includes(t.name),
+          topicOrTopics.some((groupTopic) => groupTopic?.name === t.name),
         );
-        const allIndices = new Set();
-        const allRanges = [];
-        relatedTopics.forEach((t) => {
-          (t.sentences || []).forEach((idx) => allIndices.add(idx));
-          if (t.ranges) {
-            allRanges.push(...t.ranges);
-          }
-        });
-        setSummaryModalTopic({
-          name: displayName,
-          displayName: displayName,
-          fullPath: displayName,
-          sentenceIndices: Array.from(allIndices).sort((a, b) => a - b),
-          ranges: allRanges,
-          _sentences: localSafeSentences,
-        });
+        setSummaryModalTopic(
+          buildModalSelectionFromTopicGroup(relatedTopics, localSafeSentences),
+        );
       } else {
         const fullTopic =
           (submission?.results?.topics || []).find(
             (t) => t.name === topicOrTopics.name,
           ) || topicOrTopics;
-        setSummaryModalTopic({
-          ...fullTopic,
-          _sentences: localSafeSentences,
-        });
+        setSummaryModalTopic(
+          buildModalSelectionFromTopic({
+            ...fullTopic,
+            _sentences: localSafeSentences,
+          }),
+        );
       }
     },
     [submission?.results],
@@ -252,14 +241,14 @@ function TextPage() {
 
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
-      setSummaryModalTopic({
-        name: topicName || "Source Sentences",
-        displayName: topicName || "Source Sentences",
-        fullPath: topicName || null,
-        sentenceIndices: mapping.source_sentences,
-        _summarySentence: mapping.summary_sentence,
-        _sentences: article.sentences,
-      });
+      setSummaryModalTopic(
+        buildModalSelectionFromSummarySource({
+          topicName,
+          sentenceIndices: mapping.source_sentences,
+          summarySentence: mapping.summary_sentence,
+          sentences: article.sentences,
+        }),
+      );
     }
   }, []);
 
@@ -268,20 +257,21 @@ function TextPage() {
   }, []);
 
   const handleShowTopicSentences = useCallback((topic) => {
-    setSummaryModalTopic({
-      name: topic.name,
-      displayName: topic.name,
-      fullPath: topic.name,
-      sentenceIndices: topic.sentences || [],
-      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
-    });
+    setSummaryModalTopic(buildModalSelectionFromTopic(topic));
   }, []);
 
   const pendingShowTopicRef = useRef(null);
 
   const handleShowInArticle = useCallback(
     (modalTopic) => {
-      const topicName = modalTopic.fullPath || modalTopic.displayName;
+      const normalizedSelection = buildTopicModalSelection(
+        modalTopic,
+        _safeTopics,
+      );
+      const topicName =
+        normalizedSelection?.primaryTopicName ||
+        normalizedSelection?.fullPath ||
+        normalizedSelection?.displayName;
       const matchedTopic = _safeTopics.find((t) => t.name === topicName);
       if (!matchedTopic) return;
       pendingShowTopicRef.current = matchedTopic;
@@ -294,6 +284,38 @@ function TextPage() {
     },
     [_safeTopics, closeFullscreenGraph],
   );
+
+  useEffect(() => {
+    if (!_safeTopics.length) {
+      return;
+    }
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const topicParam = searchParams.get("topic");
+    if (!topicParam) {
+      return;
+    }
+
+    const matchedTopic = _safeTopics.find((topic) => topic.name === topicParam);
+    if (!matchedTopic) {
+      return;
+    }
+
+    setActiveTab("article");
+    setFullscreenGraph(null);
+    setGroupedByTopics(false);
+    setSelectedTopics((prev) =>
+      prev.some((topic) => topic.name === matchedTopic.name)
+        ? prev
+        : [...prev, matchedTopic],
+    );
+    pendingShowTopicRef.current = matchedTopic;
+
+    searchParams.delete("topic");
+    const nextSearch = searchParams.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [_safeTopics]);
 
   useEffect(() => {
     if (!fullscreenGraph && pendingShowTopicRef.current) {
@@ -1150,6 +1172,7 @@ function TextPage() {
               closeSummaryModal={closeSummaryModal}
               handleSummaryClick={handleSummaryClick}
               articles={articles}
+              topics={safeTopics}
               onClose={closeFullscreenGraph}
               onShowInArticle={handleShowInArticle}
               readTopics={readTopics}
@@ -1169,6 +1192,7 @@ function TextPage() {
               closeSummaryModal={closeSummaryModal}
               handleSummaryClick={handleSummaryClick}
               articles={articles}
+              topics={safeTopics}
               onClose={closeFullscreenGraph}
               onShowInArticle={handleShowInArticle}
               readTopics={readTopics}
@@ -1204,7 +1228,9 @@ function TextPage() {
           topic={summaryModalTopic}
           sentences={summaryModalTopic._sentences || safeSentences}
           onClose={closeSummaryModal}
+          onShowInArticle={handleShowInArticle}
           markup={submission?.results?.markup}
+          allTopics={safeTopics}
           readTopics={readTopics}
           onToggleRead={toggleRead}
         />

@@ -1,4 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  setTopicNamesReadState,
+  toReadTopicsSet,
+} from "../utils/topicReadUtils";
+import { getTopicSelectionCanonicalTopicNames } from "../utils/topicModalSelection";
+
+function getSelectionTopicNames(selection) {
+  const canonicalTopicNames = getTopicSelectionCanonicalTopicNames(selection);
+  if (canonicalTopicNames.length > 0) {
+    return canonicalTopicNames;
+  }
+  return [];
+}
 
 export function useSubmission(submissionId) {
   const [submission, setSubmission] = useState(null);
@@ -8,6 +21,27 @@ export function useSubmission(submissionId) {
   const hasLoadedRef = useRef(false);
   const lastSyncedRef = useRef("");
   const pendingSaveRef = useRef(null);
+
+  const persistReadTopics = useCallback(
+    async (topicsArr, serialized) => {
+      const response = await fetch(
+        `/api/submission/${submissionId}/read-topics`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ read_topics: topicsArr }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to sync read topics");
+      }
+
+      lastSyncedRef.current = serialized;
+      pendingSaveRef.current = null;
+    },
+    [submissionId],
+  );
 
   const fetchSubmission = useCallback(async () => {
     try {
@@ -96,45 +130,50 @@ export function useSubmission(submissionId) {
 
   useEffect(() => {
     if (!hasLoadedRef.current) return;
-    const topicsArr = [...readTopics];
+    const topicsArr = [...toReadTopicsSet(readTopics)];
     const serialized = JSON.stringify([...topicsArr].sort());
     if (serialized === lastSyncedRef.current) return;
 
     pendingSaveRef.current = { id: submissionId, topics: topicsArr };
 
     const timer = setTimeout(() => {
-      fetch(`/api/submission/${submissionId}/read-topics`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ read_topics: topicsArr }),
-      })
-        .then(() => {
-          lastSyncedRef.current = serialized;
-          pendingSaveRef.current = null;
-        })
-        .catch(() => {});
+      persistReadTopics(topicsArr, serialized).catch(() => {});
     }, 500);
     return () => clearTimeout(timer);
-  }, [readTopics, submissionId]);
+  }, [persistReadTopics, readTopics, submissionId]);
 
-  const toggleRead = (topic) => {
+  const setSelectionReadState = useCallback((selection, shouldRead) => {
+    const topicNames = getSelectionTopicNames(selection);
+    if (topicNames.length === 0) {
+      return;
+    }
+
     setReadTopics((prev) => {
-      const newSet = new Set(prev);
-      const topicName = topic.name;
-      if (newSet.has(topicName)) {
-        newSet.delete(topicName);
-      } else {
-        newSet.add(topicName);
-      }
-      return newSet;
+      return setTopicNamesReadState(prev, topicNames, shouldRead);
     });
-  };
+  }, []);
+
+  const toggleRead = useCallback((selection) => {
+    const topicNames = getSelectionTopicNames(selection);
+    if (topicNames.length === 0) {
+      return;
+    }
+
+    setReadTopics((prev) => {
+      const readTopicsSet = toReadTopicsSet(prev);
+      const shouldRead = topicNames.some(
+        (topicName) => !readTopicsSet.has(topicName),
+      );
+      return setTopicNamesReadState(readTopicsSet, topicNames, shouldRead);
+    });
+  }, []);
 
   const toggleReadAll = useCallback(
     (allTopicNames) => {
+      const safeReadTopics = toReadTopicsSet(readTopics);
       const allRead =
         allTopicNames.length > 0 &&
-        allTopicNames.every((n) => readTopics.has(n));
+        allTopicNames.every((n) => safeReadTopics.has(n));
       if (allRead) {
         setReadTopics(new Set());
       } else {
@@ -152,6 +191,7 @@ export function useSubmission(submissionId) {
     readTopics,
     setReadTopics,
     toggleRead,
+    setSelectionReadState,
     toggleReadAll,
   };
 }

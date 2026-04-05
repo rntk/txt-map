@@ -117,6 +117,7 @@ const MarimekkoChartTab = ({
           sentences={safeSentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

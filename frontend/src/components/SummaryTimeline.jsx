@@ -13,6 +13,7 @@ function SummaryTimeline({
   closeSummaryModal,
   handleSummaryClick,
   articles,
+  topics,
   onClose,
   onShowInArticle,
   readTopics,
@@ -205,6 +206,7 @@ function SummaryTimeline({
             sentences={summaryModalTopic._sentences}
             onClose={closeSummaryModal}
             onShowInArticle={onShowInArticle}
+            allTopics={topics}
             readTopics={readTopics}
             onToggleRead={onToggleRead}
             markup={markup}

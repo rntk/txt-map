@@ -15,6 +15,8 @@ import Breadcrumbs from "./shared/Breadcrumbs";
 import { useTopicLevel } from "../hooks/useTopicLevel";
 import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import { useContainerSize } from "../hooks/useContainerSize";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
+import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 
 export { buildScopedChartData, getScopedMaxLevel };
 
@@ -274,7 +276,10 @@ function ArticleStructureChart({
 
             {/* Overlay pattern for read topics */}
             {layout.blocks.map((block) => {
-              if (!block.fullPath || !safeReadTopics.has(block.fullPath))
+              if (
+                !block.fullPath ||
+                !isTopicSelectionRead(block, safeReadTopics)
+              )
                 return null;
               return (
                 <rect
@@ -338,15 +343,21 @@ function ArticleStructureChart({
                       transform={`translate(${btnX}, ${btnY})`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setModalTopic({
-                          name: block.fullPath,
-                          displayName: block.displayName,
-                          fullPath: block.fullPath,
-                          sentenceIndices: block.sentenceIndices || [],
-                          ranges: Array.isArray(block.ranges)
-                            ? block.ranges
-                            : [],
-                        });
+                        setModalTopic(
+                          buildModalSelectionFromTopic({
+                            name: block.fullPath,
+                            displayName: block.displayName,
+                            fullPath: block.fullPath,
+                            sentenceIndices: block.sentenceIndices || [],
+                            ranges: Array.isArray(block.ranges)
+                              ? block.ranges
+                              : [],
+                            canonicalTopicNames:
+                              block.canonicalTopicNames || [],
+                            primaryTopicName:
+                              block.canonicalTopicNames?.[0] || block.fullPath,
+                          }),
+                        );
                       }}
                       aria-label={`View sentences for ${block.displayName}`}
                     >
@@ -553,6 +564,7 @@ function ArticleStructureChart({
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

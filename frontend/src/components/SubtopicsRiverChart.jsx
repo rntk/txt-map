@@ -404,6 +404,7 @@ const SubtopicsRiverChart = ({
           sentences={sentences}
           onClose={() => setSelectedSubtopicForModal(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

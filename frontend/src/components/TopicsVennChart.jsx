@@ -11,6 +11,7 @@ import {
   getScopeLabel,
   hasDeeperChildren,
 } from "../utils/topicHierarchy";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
 import "./TopicsVennChart.css";
 
 const PALETTE = [
@@ -440,7 +441,10 @@ export default function TopicsVennChart({
     });
 
     const sets = Array.from(levelSets.values()).map((s) => {
-      s.isRead = s.topics.every((t) => safeReadTopics.has(t.name));
+      s.isRead = isTopicSelectionRead(
+        { canonicalTopicNames: s.topics.map((topic) => topic.name) },
+        safeReadTopics,
+      );
       return s;
     });
 
@@ -576,6 +580,7 @@ export default function TopicsVennChart({
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

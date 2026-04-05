@@ -13,6 +13,8 @@ import {
   hasDeeperChildren,
   sanitizePathForTestId,
 } from "../utils/topicHierarchy";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
+import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 
 const BASE_COLORS = [
   "#a8c4d8",
@@ -125,13 +127,17 @@ function TopicsBarChart({
   };
 
   const handleOpenModal = (item) => {
-    setModalTopic({
-      name: item.fullPath,
-      displayName: item.displayName,
-      fullPath: item.fullPath,
-      sentenceIndices: item.sentenceIndices || [],
-      ranges: Array.isArray(item.ranges) ? item.ranges : [],
-    });
+    setModalTopic(
+      buildModalSelectionFromTopic({
+        name: item.fullPath,
+        displayName: item.displayName,
+        fullPath: item.fullPath,
+        sentenceIndices: item.sentenceIndices || [],
+        ranges: Array.isArray(item.ranges) ? item.ranges : [],
+        canonicalTopicNames: item.canonicalTopicNames || [],
+        primaryTopicName: item.canonicalTopicNames?.[0] || item.fullPath,
+      }),
+    );
   };
 
   if (!topics || topics.length === 0) {
@@ -188,7 +194,7 @@ function TopicsBarChart({
               const color = colorScale[item.fullPath] || "#999";
               const isHovered = hoveredBar === index;
               const isLast = index === chartData.length - 1;
-              const isRead = safeReadTopics.has(item.fullPath);
+              const isRead = isTopicSelectionRead(item, safeReadTopics);
 
               return (
                 <div
@@ -270,6 +276,7 @@ function TopicsBarChart({
           sentences={sentences}
           onClose={() => setModalTopic(null)}
           onShowInArticle={onShowInArticle}
+          allTopics={topics}
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}

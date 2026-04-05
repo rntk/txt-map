@@ -193,6 +193,7 @@ export function buildScopedChartData(
         displayName: groupParts[groupParts.length - 1] || key,
         sentenceIndices: new Set(),
         ranges: [],
+        canonicalTopicNames: new Set(),
         fallbackChars: 0,
       });
     }
@@ -211,6 +212,10 @@ export function buildScopedChartData(
 
     if (Array.isArray(topic.ranges) && topic.ranges.length > 0) {
       entry.ranges.push(...topic.ranges);
+    }
+
+    if (typeof topic.name === "string" && topic.name.trim()) {
+      entry.canonicalTopicNames.add(topic.name.trim());
     }
   });
 
@@ -237,6 +242,7 @@ export function buildScopedChartData(
         totalChars,
         sentenceCount: entry.sentenceIndices.size,
         sentenceIndices: indices,
+        canonicalTopicNames: Array.from(entry.canonicalTopicNames).sort(),
         ranges: entry.ranges
           .filter(
             (range) =>

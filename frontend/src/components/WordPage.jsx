@@ -9,6 +9,10 @@ import TopicSentencesModal from "./shared/TopicSentencesModal";
 import WordTree, { buildWordTreeEntries } from "./WordTree";
 import GlobalTopicsCompareView from "./GlobalTopicsCompareView";
 import { buildSummaryTimelineItems } from "../utils/summaryTimeline";
+import {
+  buildModalSelectionFromSummarySource,
+  buildTopicModalSelection,
+} from "../utils/topicModalSelection";
 import "./WordPage.css";
 
 /**
@@ -233,16 +237,34 @@ export default function WordPage() {
    */
   const handleSummaryClick = useCallback((mapping, article, topicName) => {
     if (mapping && mapping.source_sentences) {
-      setSummaryModalTopic({
-        name: topicName || "Source Sentences",
-        displayName: topicName || "Source Sentences",
-        fullPath: topicName || null,
-        sentenceIndices: mapping.source_sentences,
-        _summarySentence: mapping.summary_sentence,
-        _sentences: article.sentences,
-      });
+      setSummaryModalTopic(
+        buildModalSelectionFromSummarySource({
+          topicName,
+          sentenceIndices: mapping.source_sentences,
+          summarySentence: mapping.summary_sentence,
+          sentences: article.sentences,
+        }),
+      );
     }
   }, []);
+
+  const handleShowInArticle = useCallback(
+    (modalTopic) => {
+      const normalizedSelection = buildTopicModalSelection(
+        modalTopic,
+        allTopics,
+      );
+      const primaryTopicName = normalizedSelection?.primaryTopicName;
+      if (!primaryTopicName) {
+        return;
+      }
+
+      navigate(
+        `/page/text/${submissionId}?topic=${encodeURIComponent(primaryTopicName)}`,
+      );
+    },
+    [allTopics, submissionId],
+  );
 
   const articles = useMemo(
     () => [
@@ -369,7 +391,9 @@ export default function WordPage() {
               <CircularPackingChart
                 topics={topics}
                 sentences={allSentences}
-                onShowInArticle={() => {}}
+                onShowInArticle={handleShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
                 markup={submission?.results?.markup}
               />
             </div>
@@ -380,7 +404,9 @@ export default function WordPage() {
               <TreemapChart
                 topics={topics}
                 sentences={allSentences}
-                onShowInArticle={() => {}}
+                onShowInArticle={handleShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
                 markup={submission?.results?.markup}
               />
             </div>
@@ -397,10 +423,9 @@ export default function WordPage() {
                 closeSummaryModal={() => setSummaryModalTopic(null)}
                 handleSummaryClick={handleSummaryClick}
                 articles={articles}
+                topics={allTopics}
                 onClose={() => setActiveTab("sentences")}
-                onShowInArticle={() => {
-                  setActiveTab("sentences");
-                }}
+                onShowInArticle={handleShowInArticle}
                 readTopics={readTopics}
                 onToggleRead={toggleRead}
                 markup={submission?.results?.markup}
@@ -419,6 +444,7 @@ export default function WordPage() {
                 readTopics={readTopics}
                 onToggleRead={toggleRead}
                 markup={submission?.results?.markup}
+                onShowInArticle={handleShowInArticle}
               />
             </div>
           )}
@@ -430,6 +456,8 @@ export default function WordPage() {
           topic={summaryModalTopic}
           sentences={summaryModalTopic._sentences || allSentences}
           onClose={() => setSummaryModalTopic(null)}
+          onShowInArticle={handleShowInArticle}
+          allTopics={allTopics}
           readTopics={readTopics}
           onToggleRead={toggleRead}
           markup={submission?.results?.markup}

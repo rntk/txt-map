@@ -194,6 +194,20 @@ describe("TextPage raw text navigation", () => {
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
+  it("focuses a topic from the URL query parameter and clears the query string", async () => {
+    window.history.pushState(
+      {},
+      "",
+      "/page/text/test-submission-id?topic=Topic1",
+    );
+
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    expect(window.location.search).toBe("");
+  });
+
   it("applies faded styling in raw text for read topics that are not selected", async () => {
     render(<TextPage />);
 
@@ -461,6 +475,26 @@ describe("TextPage raw text navigation", () => {
     await waitFor(() => {
       expect(screen.getByText("100%")).toBeInTheDocument();
     });
+  });
+
+  it("syncs exact canonical read topics to the backend", async () => {
+    render(<TextPage />);
+    await screen.findByText("Source:");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark Read" }));
+
+    await waitFor(
+      () => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          "/api/submission/test-submission-id/read-topics",
+          expect.objectContaining({
+            method: "PUT",
+            body: JSON.stringify({ read_topics: ["Topic1"] }),
+          }),
+        );
+      },
+      { timeout: 1500 },
+    );
   });
 
   it("renders the fullscreen insights view with titles and source sentences", async () => {
