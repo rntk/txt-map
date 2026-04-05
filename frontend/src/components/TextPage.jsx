@@ -941,24 +941,24 @@ function TextPage() {
     status.overall === "processing" || status.overall === "pending";
   return (
     <div className="app reading-page">
-      <div className="reading-page__toolbar-stack">
-        <TextPageActionsPortal>
-          <TextPageToolbar
-            submissionId={submissionId}
-            status={status}
-            onRefresh={fetchSubmission}
-            visualizationTabs={articles.length > 0 ? FULLSCREEN_TABS : []}
-            onTabClick={handleTabClick}
-          />
-        </TextPageActionsPortal>
+      <TextPageActionsPortal>
+        <TextPageToolbar
+          submissionId={submissionId}
+          status={status}
+          onRefresh={fetchSubmission}
+          visualizationTabs={articles.length > 0 ? FULLSCREEN_TABS : []}
+          onTabClick={handleTabClick}
+        />
+      </TextPageActionsPortal>
 
-        {isProcessing && (
+      {isProcessing && (
+        <div className="reading-page__toolbar-stack">
           <div className="reading-page__status-banner reading-page__status-banner--processing">
             <strong>Processing in progress...</strong> Results will appear as
             tasks complete.
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {articles.length > 0 ? (
         <>
