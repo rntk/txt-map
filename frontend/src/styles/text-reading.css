@@ -417,7 +417,6 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding-bottom: 4px;
-  border-bottom: 1px solid #eee;
 }
 
 .topics-meta-panel__cards {
@@ -427,7 +426,7 @@
 }
 
 .topics-meta-panel__card {
-  border: 1px solid #ddd;
+  background: #f8faff;
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 0.82rem;
@@ -450,8 +449,6 @@
 }
 
 .topics-meta-panel__keyword-tag {
-  background: #e8f0fe;
-  color: #1a56db;
   border-radius: 3px;
   padding: 1px 5px;
   font-size: 0.75rem;
@@ -472,8 +469,6 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: #f0f4ff;
-  color: #1a56db;
   border-radius: 4px;
   padding: 2px 7px;
   font-size: 0.78rem;
@@ -481,8 +476,6 @@
 }
 
 .topics-meta-panel__tag-cloud-freq {
-  background: #d0deff;
-  color: #1a3a8f;
   border-radius: 3px;
   padding: 0 4px;
   font-size: 0.7rem;
@@ -498,8 +491,7 @@
 
 .topics-meta-panel__summary {
   background: #f8faff;
-  border-left: 3px solid #1a56db;
-  border-radius: 0 6px 6px 0;
+  border-radius: 6px;
   padding: 8px 10px;
 }
 
