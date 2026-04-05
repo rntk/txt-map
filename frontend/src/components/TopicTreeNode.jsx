@@ -253,28 +253,32 @@ function TopicTreeNode({
                 >
                   Show
                 </button>
-                <button
-                  type="button"
-                  className="topic-nav-button"
-                  tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() =>
-                    handleAction(() => onNavigateTopic?.(topic, "prev"))
-                  }
-                  title="Scroll to previous sentence for this topic"
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  className="topic-nav-button"
-                  tabIndex={areActionsVisible ? 0 : -1}
-                  onClick={() =>
-                    handleAction(() => onNavigateTopic?.(topic, "next"))
-                  }
-                  title="Scroll to next sentence for this topic"
-                >
-                  Next
-                </button>
+                {Array.isArray(topic.ranges) && topic.ranges.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="topic-nav-button"
+                      tabIndex={areActionsVisible ? 0 : -1}
+                      onClick={() =>
+                        handleAction(() => onNavigateTopic?.(topic, "prev"))
+                      }
+                      title="Scroll to previous sentence for this topic"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      type="button"
+                      className="topic-nav-button"
+                      tabIndex={areActionsVisible ? 0 : -1}
+                      onClick={() =>
+                        handleAction(() => onNavigateTopic?.(topic, "next"))
+                      }
+                      title="Scroll to next sentence for this topic"
+                    >
+                      Next
+                    </button>
+                  </>
+                )}
                 {onOpenVisualization && (
                   <button
                     type="button"

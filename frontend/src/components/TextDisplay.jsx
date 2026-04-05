@@ -674,7 +674,7 @@ function TextDisplay({
                     >
                       {isRead ? "Mark Unread" : "Mark Read"}
                     </button>
-                    {onNavigateTopic && (
+                    {onNavigateTopic && rangeCount > 1 && (
                       <>
                         <button
                           className="text-topic-tooltip-btn"

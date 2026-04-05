@@ -338,20 +338,24 @@ function MarkupTopicBlock({
                   >
                     {isRead ? "Mark Unread" : "Mark Read"}
                   </button>
-                  <button
-                    className="text-topic-tooltip-btn"
-                    onClick={() => onNavigateTopic(topic, "prev")}
-                    title="Scroll to previous occurrence"
-                  >
-                    ‹ Prev
-                  </button>
-                  <button
-                    className="text-topic-tooltip-btn"
-                    onClick={() => onNavigateTopic(topic, "next")}
-                    title="Scroll to next occurrence"
-                  >
-                    Next ›
-                  </button>
+                  {rangeCount > 1 && (
+                    <>
+                      <button
+                        className="text-topic-tooltip-btn"
+                        onClick={() => onNavigateTopic(topic, "prev")}
+                        title="Scroll to previous occurrence"
+                      >
+                        ‹ Prev
+                      </button>
+                      <button
+                        className="text-topic-tooltip-btn"
+                        onClick={() => onNavigateTopic(topic, "next")}
+                        title="Scroll to next occurrence"
+                      >
+                        Next ›
+                      </button>
+                    </>
+                  )}
                   <button
                     className="text-topic-tooltip-btn"
                     onClick={() => {
