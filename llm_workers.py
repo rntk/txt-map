@@ -183,6 +183,12 @@ def main() -> None:
             deleted_count,
             COMPLETED_TASK_RETENTION_HOURS,
         )
+    reclaimed_count = queue_store.reclaim_stale_processing()
+    if reclaimed_count:
+        logger.info(
+            "Reclaimed %s stale 'processing' LLM queue requests back to 'pending'",
+            reclaimed_count,
+        )
     cache_store = MongoLLMCacheStore(db)
     cache_store.prepare()
 

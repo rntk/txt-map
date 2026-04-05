@@ -123,6 +123,29 @@ class LLMQueueStore:
         result = self._col.delete_one({"request_id": request_id})
         return result.deleted_count > 0
 
+    def reclaim_stale_processing(self, stale_after_minutes: int = 10) -> int:
+        """
+        Reset requests stuck in "processing" back to "pending".
+
+        If an LLM worker crashes mid-execution the request stays in
+        "processing" forever and the polling task worker would wait
+        indefinitely.  Any request that has been in "processing" for
+        longer than *stale_after_minutes* is considered orphaned and is
+        reset so another worker can pick it up.
+        """
+        cutoff = datetime.now(UTC) - timedelta(minutes=stale_after_minutes)
+        result = self._col.update_many(
+            {"status": "processing", "started_at": {"$lt": cutoff}},
+            {
+                "$set": {
+                    "status": "pending",
+                    "started_at": None,
+                    "worker_id": None,
+                }
+            },
+        )
+        return result.modified_count
+
     def cleanup_old(
         self,
         max_age_hours: int = 24,

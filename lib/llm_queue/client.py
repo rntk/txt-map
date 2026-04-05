@@ -42,7 +42,7 @@ class LLMFuture:
         doc = self._store.get_result(self._request_id)
         return doc is not None and doc["status"] in ("completed", "failed")
 
-    def result(self, timeout: float = 300.0) -> str:
+    def result(self, timeout: Optional[float] = None) -> str:
         """
         Block until the result is available.
 
@@ -52,7 +52,7 @@ class LLMFuture:
         if self._cached_response is not None:
             return self._cached_response
 
-        deadline = time.monotonic() + timeout
+        deadline = time.monotonic() + timeout if timeout is not None else None
         while True:
             doc = self._store.get_result(self._request_id)
             if doc is None:
@@ -66,14 +66,14 @@ class LLMFuture:
                 raise LLMRequestError(
                     f"LLM request {self._request_id} failed: {doc.get('error', 'unknown error')}"
                 )
-            if time.monotonic() >= deadline:
+            if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"LLM request {self._request_id} timed out after {timeout}s"
                 )
             time.sleep(self._poll_interval)
 
     @staticmethod
-    def gather(*futures: "LLMFuture", timeout: float = 300.0) -> list[str]:
+    def gather(*futures: "LLMFuture", timeout: Optional[float] = None) -> list[str]:
         """Wait for multiple futures and return results in order."""
         return [f.result(timeout=timeout) for f in futures]
 

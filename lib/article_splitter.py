@@ -46,14 +46,14 @@ class _TopicRangeParserProtocol(Protocol):
 
 
 class _LLMFutureProtocol(Protocol):
-    def result(self, timeout: float = 300.0) -> str: ...
+    def result(self, timeout: Optional[float] = None) -> str: ...
 
 
 class _ResolvedLLMFuture:
     def __init__(self, response: str) -> None:
         self._response = response
 
-    def result(self, timeout: float = 300.0) -> str:  # noqa: ARG002
+    def result(self, timeout: Optional[float] = None) -> str:  # noqa: ARG002
         return self._response
 
 
@@ -178,7 +178,7 @@ class _ValidatedCachingFuture:
         self._temperature = temperature
         self._annotate_cache_event = annotate_cache_event
 
-    def result(self, timeout: float = 300.0) -> str:
+    def result(self, timeout: Optional[float] = None) -> str:
         response = self._inner_future.result(timeout=timeout)
         if self._validator(self._prompt, response):
             self._store.set(
@@ -217,7 +217,7 @@ class _TracingFuture:
         self._prompt = prompt
         self._temperature = temperature
 
-    def result(self, timeout: float = 300.0) -> str:
+    def result(self, timeout: Optional[float] = None) -> str:
         with self._tracer.span(
             "llm.call",
             prompt_length=len(self._prompt),

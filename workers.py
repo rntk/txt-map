@@ -7,7 +7,7 @@ import signal
 import logging
 import os
 from pathlib import Path
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from pymongo import MongoClient
 
 from lib.diff.semantic_diff import (
@@ -136,16 +136,25 @@ class Worker:
         Atomically claim a pending task from the queue.
         Returns the task document if claimed, None otherwise.
         """
+        now = datetime.now(UTC)
         # Try to claim tasks in priority order
         for task_type in sorted(
             TASK_HANDLERS.keys(), key=lambda t: TASK_PRIORITIES.get(t, 99)
         ):
+            # Skip tasks that are in a dependency-cooldown window.
             task = self.db.task_queue.find_one_and_update(
-                {"status": "pending", "task_type": task_type},
+                {
+                    "status": "pending",
+                    "task_type": task_type,
+                    "$or": [
+                        {"blocked_until": {"$exists": False}},
+                        {"blocked_until": {"$lte": now}},
+                    ],
+                },
                 {
                     "$set": {
                         "status": "processing",
-                        "started_at": datetime.now(UTC),
+                        "started_at": now,
                         "worker_id": self.worker_id,
                     }
                 },
@@ -160,7 +169,9 @@ class Worker:
                     )
                     return task
                 else:
-                    # Dependencies not met, put back as pending
+                    # Dependencies not met — put back with a short cooldown so
+                    # this task isn't re-claimed on the very next poll cycle,
+                    # and tasks of the same type with met deps aren't starved.
                     self.db.task_queue.update_one(
                         {"_id": task["_id"]},
                         {
@@ -168,6 +179,7 @@ class Worker:
                                 "status": "pending",
                                 "started_at": None,
                                 "worker_id": None,
+                                "blocked_until": now + timedelta(seconds=10),
                             }
                         },
                     )
@@ -206,6 +218,7 @@ class Worker:
                     store=self.queue_store,
                     model_id=llm_meta.model_id,
                     max_context_tokens=llm_meta.max_context_tokens,
+                    cache_store=self.cache_store,
                 )
             else:
                 # Synchronous fallback: no llm_worker infrastructure present.
