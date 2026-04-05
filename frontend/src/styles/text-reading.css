@@ -292,14 +292,14 @@
 
 .reading-page__minimap-panel {
   position: sticky;
-  top: 54px;
+  top: 40px;
   align-self: stretch;
   min-width: 0;
   height: calc(100vh - 96px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 6px;
   border: 1px solid #dfe3e8;
   border-radius: 10px;
   background: #fff;
@@ -328,8 +328,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 4px 8px;
   border-bottom: 1px solid #dfe3e8;
   background: #fff;
 }

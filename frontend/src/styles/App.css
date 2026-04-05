@@ -8,7 +8,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
   gap: 15px;
 }
@@ -19,8 +19,8 @@
   background: white;
   z-index: var(--z-sticky);
   border-bottom: 1px solid #dfe3e8;
-  padding: 4px 10px;
-  margin-bottom: 10px;
+  padding: 4px 6px;
+  margin-bottom: 3px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -29,7 +29,7 @@
 }
 
 .article-body {
-  padding: 0 6px;
+  padding: 0 3px;
 }
 
 .tabs {
@@ -3990,7 +3990,7 @@
   top: 0;
   gap: 0.55rem;
   padding: 0.7rem 0.85rem;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.15rem;
   border: 1px solid var(--shell-border);
   background: rgba(248, 248, 245, 0.9);
   backdrop-filter: blur(14px);
