@@ -4253,6 +4253,21 @@
   position: relative;
 }
 
+/* Allow scroll when compare tab is active - use !important to override base styles */
+.global-page-content:has(.word-page--compare-active) {
+  overflow: auto !important;
+}
+
+.page-surface:has(.word-page--compare-active) {
+  overflow: visible !important;
+}
+
+.word-page.word-page--compare-active {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 97vh !important;
+}
+
 .word-tree-graph-container {
   width: 100%;
   overflow: auto;

@@ -59,7 +59,7 @@
   overflow-y: auto;
 }
 
-.word-page--compare-active .word-page-content {
+.word-page.word-page--compare-active .word-page-content {
   padding: 0;
   border: none;
   background: transparent;
@@ -88,15 +88,10 @@
 }
 
 .word-page-compare-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  background: var(--shell-bg, #f8f8f5);
-  padding: 0.25rem;
-  padding-top: 2rem;
+  height: 100%;
+  min-height: 100%;
+  margin: -0.85rem;
+  padding: 0.85rem 0.85rem 0 0.85rem;
   overflow: auto;
 }
 
