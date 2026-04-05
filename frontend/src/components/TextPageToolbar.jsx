@@ -23,10 +23,18 @@ import "./shared/sharedControls.css";
  */
 
 /**
+ * @typedef {Object} TextPageTab
+ * @property {string} key
+ * @property {string} label
+ */
+
+/**
  * @typedef {Object} TextPageToolbarProps
  * @property {string} submissionId
  * @property {TextPageToolbarStatus} status
  * @property {() => void} onRefresh
+ * @property {TextPageTab[]} [visualizationTabs]
+ * @property {((tabKey: string) => void) | null} [onTabClick]
  */
 
 const RECALCULATE_ACTIONS = [
@@ -82,7 +90,13 @@ const RECALCULATE_ACTIONS = [
 /**
  * @param {TextPageToolbarProps} props
  */
-function TextPageToolbar({ submissionId, status, onRefresh }) {
+function TextPageToolbar({
+  submissionId,
+  status,
+  onRefresh,
+  visualizationTabs,
+  onTabClick,
+}) {
   const [actionMessage, setActionMessage] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -145,6 +159,30 @@ function TextPageToolbar({ submissionId, status, onRefresh }) {
 
   return (
     <>
+      {visualizationTabs && visualizationTabs.length > 0 && onTabClick && (
+        <DropdownMenu
+          buttonContent={
+            <>
+              <span className="shared-control-trigger__icon">👁</span> View
+            </>
+          }
+        >
+          <h3 className="shared-control-popover__title">Visualizations</h3>
+          <div className="shared-control-stack">
+            {visualizationTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className="shared-control-button shared-control-button--toolbar"
+                onClick={() => onTabClick(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </DropdownMenu>
+      )}
+
       <DropdownMenu buttonContent={<span>Status</span>}>
         <h3 className="shared-control-popover__title">Task Status</h3>
         <StatusIndicator tasks={status.tasks} />

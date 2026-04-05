@@ -307,7 +307,9 @@ const GanttChart = ({
           .tickSize(0)
           .tickFormat((d) => {
             const topicObj = scopedData.find((t) => t.name === d);
-            return topicObj ? (topicObj.displayName || topicObj.name) : String(d || "");
+            return topicObj
+              ? topicObj.displayName || topicObj.name
+              : String(d || "");
           }),
       )
       .selectAll("text")

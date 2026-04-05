@@ -133,6 +133,11 @@ describe("TextPage raw text navigation", () => {
       navigator.sendBeacon = vi.fn();
     }
 
+    // Create portal target for TextPageToolbar
+    const portalTarget = document.createElement("div");
+    portalTarget.id = "global-menu-portal-target";
+    document.body.appendChild(portalTarget);
+
     global.fetch = vi.fn(async (url) => {
       if (String(url).includes("/api/submission/test-submission-id/status")) {
         return {
@@ -153,6 +158,12 @@ describe("TextPage raw text navigation", () => {
   afterEach(() => {
     global.fetch = originalFetch;
     HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+
+    // Clean up portal target
+    const portalTarget = document.getElementById("global-menu-portal-target");
+    if (portalTarget) {
+      portalTarget.remove();
+    }
   });
 
   it("renders highlighted raw text and focuses a raw-text anchor from the topic list", async () => {
@@ -457,6 +468,8 @@ describe("TextPage raw text navigation", () => {
 
     await screen.findByText("Source:");
 
+    // Open the View dropdown and click on Insights
+    fireEvent.click(screen.getByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Insights/ }));
 
     expect(screen.getByText("Important connection")).toBeInTheDocument();

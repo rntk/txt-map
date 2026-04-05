@@ -85,9 +85,7 @@ function PanelLatentTopics({ topicMapping, latentTopics }) {
     <div className="topics-meta-panel__cards">
       {filtered.map((lt) => (
         <div key={lt.id} className="topics-meta-panel__card">
-          <div className="topics-meta-panel__card-title">
-            {lt.id + 1}
-          </div>
+          <div className="topics-meta-panel__card-title">{lt.id + 1}</div>
           <KeywordList keywords={lt.keywords} />
           <div className="topics-meta-panel__card-meta">
             Score: {((idToScore[lt.id] || 0) * 100).toFixed(1)}% · Weight:{" "}

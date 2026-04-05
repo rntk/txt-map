@@ -947,30 +947,10 @@ function TextPage() {
             submissionId={submissionId}
             status={status}
             onRefresh={fetchSubmission}
+            visualizationTabs={articles.length > 0 ? FULLSCREEN_TABS : []}
+            onTabClick={handleTabClick}
           />
         </TextPageActionsPortal>
-
-        {articles.length > 0 && (
-          <div className="tab-bar">
-            <div className="tab-group reading-tabs__group">
-              <span className="tab-group-label reading-tabs__label">
-                Visualizations
-              </span>
-              <div className="tabs reading-tabs__list">
-                {FULLSCREEN_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    className={`reading-tab${activeTab === tab.key ? " reading-tab--active active" : ""}`}
-                    onClick={() => handleTabClick(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {isProcessing && (
           <div className="reading-page__status-banner reading-page__status-banner--processing">
