@@ -428,13 +428,13 @@
   background: #f8faff;
   border-radius: 6px;
   padding: 8px 10px;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
 }
 
 .topics-meta-panel__card-title {
   font-weight: 700;
   color: #555;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
@@ -450,12 +450,12 @@
 .topics-meta-panel__keyword-tag {
   border-radius: 3px;
   padding: 1px 5px;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .topics-meta-panel__card-meta {
   color: #666;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 .topics-meta-panel__tag-cloud {
@@ -470,21 +470,20 @@
   gap: 3px;
   border-radius: 4px;
   padding: 2px 7px;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   cursor: default;
 }
 
 .topics-meta-panel__tag-cloud-freq {
   border-radius: 3px;
   padding: 0 4px;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
-
 .topics-meta-panel__empty {
   color: #888;
   font-style: italic;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   margin: 0;
 }
 
@@ -495,7 +494,7 @@
 }
 
 .topics-meta-panel__summary-text {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   color: #333;
   line-height: 1.5;
   margin: 0;
