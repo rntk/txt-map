@@ -29,6 +29,7 @@ import { useTextSelection } from "../hooks/useTextSelection";
 import { getTopicSelectionKey } from "../utils/chartConstants";
 import { useTextPageData } from "../hooks/useTextPageData";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
+import { isTopicRead } from "../utils/topicReadUtils";
 import "../styles/text-reading.css";
 
 const FULLSCREEN_TABS = [
@@ -153,7 +154,7 @@ function TextPage() {
     articles.forEach((article, aIdx) => {
       total_count += (article.sentences || []).length;
       (article.topics || []).forEach((topic) => {
-        if (readTopics.has(topic.name)) {
+        if (isTopicRead(topic.name, readTopics)) {
           (topic.sentences || []).forEach((idx) =>
             read_indices.add(`${aIdx}-${idx}`),
           );

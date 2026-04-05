@@ -12,6 +12,7 @@ import {
   getTopicHighlightColor,
   getTopicCSSClass,
 } from "../utils/topicColorUtils";
+import { isTopicRead } from "../utils/topicReadUtils";
 import { useTooltip } from "../hooks/useTooltip";
 import { HighlightContext } from "./shared/HighlightContext";
 import HighlightedText from "./shared/HighlightedText";
@@ -159,7 +160,7 @@ function TextDisplay({
       const isHighlighted =
         safeSelectedTopics.some((t) => t.name === topic.name) ||
         (hoveredTopic && hoveredTopic.name === topic.name);
-      const isFaded = readTopicsSet.has(topic.name);
+      const isFaded = isTopicRead(topic.name, readTopicsSet);
 
       ranges.forEach((range) => {
         const rangeStart = Number(range.start);
@@ -238,10 +239,9 @@ function TextDisplay({
   // Sentence-index-based sets for non-rawHtml fallback paths
   const fadedIndices = useMemo(() => {
     const set = new Set();
-    readTopicsSet.forEach((topicName) => {
-      const relatedTopic = safeArticleTopics.find((t) => t.name === topicName);
-      if (relatedTopic) {
-        relatedTopic.sentences.forEach((num) => set.add(num - 1));
+    safeArticleTopics.forEach((topic) => {
+      if (isTopicRead(topic.name, readTopicsSet)) {
+        (topic.sentences || []).forEach((num) => set.add(num - 1));
       }
     });
     return set;
@@ -640,7 +640,7 @@ function TextDisplay({
           )}
           {tooltip.topics.length > 0 &&
             tooltip.topics.map(({ topic, rangeCount }, i) => {
-              const isRead = readTopicsSet.has(topic.name);
+              const isRead = isTopicRead(topic.name, readTopicsSet);
               const isSelected = safeSelectedTopics.some(
                 (t) => t.name === topic.name,
               );

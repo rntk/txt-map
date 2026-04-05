@@ -8,6 +8,7 @@ import {
 } from "./markup/topicMarkupUtils";
 import { useTooltip } from "../hooks/useTooltip";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
+import { isTopicRead } from "../utils/topicReadUtils";
 import "../styles/text-reading.css";
 
 const TOOLTIP_WIDTH = 260;
@@ -307,7 +308,7 @@ function MarkupTopicBlock({
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           {tooltip.topics.map(({ topic, rangeCount }) => {
-            const isRead = readTopicsSet.has(topic.name);
+            const isRead = isTopicRead(topic.name, readTopicsSet);
             const isSelected = safeSelectedTopics.some(
               (selectedTopic) => selectedTopic.name === topic.name,
             );

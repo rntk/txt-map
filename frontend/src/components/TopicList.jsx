@@ -9,6 +9,7 @@ import {
   getTopicCSSClass,
   getTopicHighlightColor,
 } from "../utils/topicColorUtils";
+import { isTopicRead } from "../utils/topicReadUtils";
 import "./TopicNavigation.css";
 
 /**
@@ -126,7 +127,7 @@ function TopicList({
       if (node.node.isLeaf && node.node.topic) {
         const name = node.node.topic.name;
         const hasSelected = selectedNamesSet.has(name);
-        const allRead = safeReadTopics.has(name);
+        const allRead = isTopicRead(name, safeReadTopics);
         const entry = { hasSelected, allRead, hasLeaves: true };
         map.set(node.node.fullPath, entry);
         return entry;
@@ -375,7 +376,8 @@ function TopicList({
     };
     topicTree.forEach((root) => collect(root));
     return (
-      leaves.length > 0 && leaves.every((name) => safeReadTopics.has(name))
+      leaves.length > 0 &&
+      leaves.every((name) => isTopicRead(name, safeReadTopics))
     );
   }, [topicTree, safeReadTopics]);
 

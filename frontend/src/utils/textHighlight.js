@@ -1,3 +1,5 @@
+import { isTopicRead } from "./topicReadUtils";
+
 export function normalizeCharRange(range, textLength) {
   const start = Number(range?.start);
   const end = Number(range?.end);
@@ -43,7 +45,7 @@ export function buildTopicStateRanges(
 
     const isHighlighted =
       selectedNames.has(topicName) || hoveredName === topicName;
-    const isFaded = readNames.has(topicName);
+    const isFaded = isTopicRead(topicName, readNames);
 
     ranges.forEach((range) => {
       const normalizedRange = normalizeCharRange(range, textLength);

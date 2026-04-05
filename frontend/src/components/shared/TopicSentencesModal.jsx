@@ -8,6 +8,7 @@ import {
   resolveTopicMarkup,
 } from "../markup/topicMarkupUtils";
 import { getTopicHighlightColor } from "../../utils/topicColorUtils";
+import { isTopicRead } from "../../utils/topicReadUtils";
 import { HighlightContext } from "./HighlightContext";
 import HighlightedText from "./HighlightedText";
 
@@ -129,10 +130,9 @@ function TopicSentencesModal({
       .filter((word) => word.length > 0);
   }, [normalizedTopic?.displayName]);
 
-  const isRead =
-    normalizedTopic && readTopics instanceof Set
-      ? readTopics.has(normalizedTopic.name)
-      : false;
+  const isRead = normalizedTopic
+    ? isTopicRead(normalizedTopic.name, readTopics)
+    : false;
   const indicesList = normalizedTopic?.sentenceIndices || [];
   const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
   const hasEnrichedMarkup = Boolean(
