@@ -2,8 +2,8 @@
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: var(--shell-space-sm, 0.6rem);
-  margin-bottom: var(--shell-space-md, 0.85rem);
+  gap: var(--shell-space-sm, 0.3rem);
+  margin-bottom: var(--shell-space-xs, 0.4rem);
 }
 
 .topic-nav-toolbar {
