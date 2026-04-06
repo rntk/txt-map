@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import * as d3 from "d3";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
 import Breadcrumbs from "./shared/Breadcrumbs";
-import { buildScopedChartData, hasDeeperChildren } from "../utils/topicHierarchy";
+import {
+  buildScopedGanttRows,
+  hasDeeperChildren,
+} from "../utils/topicHierarchy";
 import { useTopicLevel } from "../hooks/useTopicLevel";
 import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
@@ -33,15 +36,27 @@ const GanttChart = ({
   const containerRef = useRef(null);
   const [activeTopic, setActiveTopic] = useState(null);
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
-  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(
+    topics,
+    scopePath,
+  );
   const [selectedTopicForModal, setSelectedTopicForModal] = useState(null);
 
-  const scopedData = useMemo(() => {
-    const data = buildScopedChartData(topics, sentences, scopePath, selectedLevel);
-    return data.map((d) => ({
-      ...d,
-      sentences: d.sentenceIndices,
-    }));
+  const { scopedData, parentBands } = useMemo(() => {
+    const { rows, parentBands: groupedParentBands } = buildScopedGanttRows(
+      topics,
+      sentences,
+      scopePath,
+      selectedLevel,
+    );
+
+    return {
+      parentBands: groupedParentBands,
+      scopedData: rows.map((d) => ({
+        ...d,
+        sentences: d.sentenceIndices,
+      })),
+    };
   }, [topics, sentences, scopePath, selectedLevel]);
 
   const effectiveLength = useMemo(() => {
@@ -95,14 +110,17 @@ const GanttChart = ({
     return data;
   }, [scopedData]);
 
-  const handleTopicClick = (topicObj) => {
-    if (hasDeeperChildren(topics, topicObj.fullPath)) {
-      drillInto(topicObj.fullPath);
-      setSelectedLevel(0);
-    } else {
-      setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
-    }
-  };
+  const handleTopicClick = useCallback(
+    (topicObj) => {
+      if (hasDeeperChildren(topics, topicObj.fullPath)) {
+        drillInto(topicObj.fullPath);
+        setSelectedLevel(0);
+      } else {
+        setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
+      }
+    },
+    [drillInto, setSelectedLevel, topics],
+  );
 
   useEffect(() => {
     if (
@@ -122,11 +140,13 @@ const GanttChart = ({
 
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    context.font = "16px sans-serif";
+    if (context) {
+      context.font = "16px sans-serif";
+    }
 
     const maxLabelPixelWidth = scopedData.reduce((max, d) => {
       const text = d.displayName || d.name || "";
-      const width = context.measureText(text).width;
+      const width = context ? context.measureText(text).width : text.length * 9;
       return Math.max(max, width);
     }, 0);
 
@@ -190,12 +210,41 @@ const GanttChart = ({
       .attr("height", y.bandwidth())
       .attr("fill", "transparent");
 
+    g.selectAll(".gantt-parent-band")
+      .data(parentBands)
+      .enter()
+      .append("rect")
+      .attr("class", "gantt-parent-band")
+      .attr("data-parent-path", (d) => d.fullPath)
+      .attr("x", (d) => x(d.start))
+      .attr("y", (d) => y(scopedData[d.rowStartIndex]?.name) || 0)
+      .attr("width", (d) => Math.max(2, x(d.end) - x(d.start)))
+      .attr("height", (d) =>
+        Math.max(
+          y.bandwidth(),
+          (y(scopedData[d.rowEndIndex]?.name) || 0) -
+            (y(scopedData[d.rowStartIndex]?.name) || 0) +
+            y.bandwidth(),
+        ),
+      )
+      .style("fill", (d) => getTopicHighlightColor(d.fullPath) || "#b0b0b0");
+
+    g.selectAll(".gantt-parent-band-label")
+      .data(parentBands)
+      .enter()
+      .append("text")
+      .attr("class", "gantt-parent-band-label")
+      .attr("x", (d) => x(d.start) + 8)
+      .attr("y", (d) => (y(scopedData[d.rowStartIndex]?.name) || 0) + 14)
+      .text((d) => d.displayName);
+
     // Invisible full-width row overlay for hover detection
     g.selectAll(".gantt-row-overlay")
       .data(scopedData)
       .enter()
       .append("rect")
       .attr("class", "gantt-row-overlay")
+      .attr("data-topic-path", (d) => d.fullPath)
       .attr("x", -margin.left)
       .attr("y", (d) => y(d.name))
       .attr("width", width)
@@ -234,6 +283,7 @@ const GanttChart = ({
       .enter()
       .append("rect")
       .attr("class", "gantt-bar")
+      .attr("data-topic-path", (d) => d.topicObj?.fullPath || d.topic)
       .attr("x", (d) => x(d.start))
       .attr("y", (d) => y(d.topic))
       .attr("width", (d) => Math.max(2, x(d.end) - x(d.start)))
@@ -242,7 +292,9 @@ const GanttChart = ({
       .style("opacity", (d) =>
         activeTopic && activeTopic !== d.topic ? 0.3 : 0.8,
       )
-      .style("cursor", (d) => (hasDeeperChildren(topics, d.topicObj.fullPath) ? "zoom-in" : "pointer"))
+      .style("cursor", (d) =>
+        hasDeeperChildren(topics, d.topicObj.fullPath) ? "zoom-in" : "pointer",
+      )
       .on("mouseover", function (event, d) {
         setActiveTopic(d.topic);
         tooltip
@@ -335,7 +387,14 @@ const GanttChart = ({
     return () => {
       d3.select("body").selectAll(".gantt-tooltip").remove();
     };
-  }, [effectiveLength, scopedData, chartData, activeTopic]);
+  }, [
+    activeTopic,
+    chartData,
+    effectiveLength,
+    handleTopicClick,
+    parentBands,
+    scopedData,
+  ]);
 
   return (
     <div

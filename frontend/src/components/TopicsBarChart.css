@@ -390,3 +390,20 @@
   overflow-y: auto;
   height: 100%;
 }
+
+.gantt-parent-band {
+  fill-opacity: 0.15;
+  stroke: rgba(70, 62, 49, 0.28);
+  stroke-width: 1;
+  rx: 6px;
+  ry: 6px;
+}
+
+.gantt-parent-band-label {
+  fill: rgba(44, 44, 44, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  text-transform: uppercase;
+}

@@ -21,6 +21,15 @@ export function getTopicParts(topicOrName) {
     .filter(Boolean);
 }
 
+export function getParentTopicPath(topicOrName) {
+  const parts = getTopicParts(topicOrName);
+  if (parts.length <= 1) {
+    return "";
+  }
+
+  return parts.slice(0, -1).join(">");
+}
+
 export function isWithinScope(parts, scopePath) {
   if (scopePath.length === 0) return true;
   if (parts.length < scopePath.length) return false;
@@ -264,4 +273,130 @@ export function buildScopedChartData(
     })
     .filter((item) => item.sentenceCount > 0 || item.totalChars > 0)
     .sort((a, b) => a.firstSentence - b.firstSentence);
+}
+
+/**
+ * @typedef {ReturnType<typeof buildScopedChartData>[number] & {
+ *   parentFullPath: string | null,
+ *   parentDisplayName: string | null,
+ *   parentFirstSentence: number
+ * }} GanttScopedRow
+ */
+
+/**
+ * @typedef {Object} GanttParentBand
+ * @property {string} fullPath
+ * @property {string} displayName
+ * @property {number} start
+ * @property {number} end
+ * @property {number} rowStartIndex
+ * @property {number} rowEndIndex
+ */
+
+/**
+ * Builds row and parent-band data for the scoped Gantt chart.
+ *
+ * @param {TopicHierarchyInput[]} topics
+ * @param {string[]} [sentences=[]]
+ * @param {string[]} [scopePath=[]]
+ * @param {number} [selectedLevel=0]
+ * @returns {{ rows: GanttScopedRow[], parentBands: GanttParentBand[] }}
+ */
+export function buildScopedGanttRows(
+  topics,
+  sentences = [],
+  scopePath = [],
+  selectedLevel = 0,
+) {
+  const rows = buildScopedChartData(
+    topics,
+    sentences,
+    scopePath,
+    selectedLevel,
+  );
+  const visibleDepth = scopePath.length + selectedLevel + 1;
+
+  if (rows.length === 0) {
+    return { rows: [], parentBands: [] };
+  }
+
+  if (visibleDepth <= 1) {
+    return {
+      rows: [...rows].sort(
+        (left, right) =>
+          left.firstSentence - right.firstSentence ||
+          left.fullPath.localeCompare(right.fullPath),
+      ),
+      parentBands: [],
+    };
+  }
+
+  const parentLevel = visibleDepth - 2;
+  const parentRows = buildScopedChartData(topics, sentences, [], parentLevel);
+  const parentMap = new Map(parentRows.map((row) => [row.fullPath, row]));
+
+  /** @type {GanttScopedRow[]} */
+  const enrichedRows = rows
+    .map((row) => {
+      const parentFullPath = getParentTopicPath(row.fullPath);
+      const parentRow = parentMap.get(parentFullPath);
+
+      return {
+        ...row,
+        parentFullPath: parentFullPath || null,
+        parentDisplayName: parentRow?.displayName || null,
+        parentFirstSentence: parentRow?.firstSentence ?? row.firstSentence,
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.parentFirstSentence - right.parentFirstSentence ||
+        String(
+          left.parentDisplayName || left.parentFullPath || "",
+        ).localeCompare(
+          String(right.parentDisplayName || right.parentFullPath || ""),
+        ) ||
+        left.firstSentence - right.firstSentence ||
+        left.fullPath.localeCompare(right.fullPath),
+    );
+
+  /** @type {GanttParentBand[]} */
+  const parentBands = [];
+  let currentBand = null;
+
+  enrichedRows.forEach((row, index) => {
+    if (!row.parentFullPath) {
+      currentBand = null;
+      return;
+    }
+
+    const parentRow = parentMap.get(row.parentFullPath);
+    if (!parentRow || parentRow.sentenceIndices.length === 0) {
+      currentBand = null;
+      return;
+    }
+
+    const bandStart = Math.min(...parentRow.sentenceIndices);
+    const bandEnd = Math.max(...parentRow.sentenceIndices) + 1;
+
+    if (currentBand && currentBand.fullPath === row.parentFullPath) {
+      currentBand.rowEndIndex = index;
+      return;
+    }
+
+    currentBand = {
+      fullPath: row.parentFullPath,
+      displayName:
+        row.parentDisplayName ||
+        getTopicParts(row.parentFullPath).slice(-1)[0] ||
+        row.parentFullPath,
+      start: bandStart,
+      end: bandEnd,
+      rowStartIndex: index,
+      rowEndIndex: index,
+    };
+    parentBands.push(currentBand);
+  });
+
+  return { rows: enrichedRows, parentBands };
 }
