@@ -118,11 +118,11 @@ const GanttChart = ({
 
     d3.select(svgRef.current).selectAll("*").remove();
 
-    const rowHeight = 25;
+    const rowHeight = 35;
 
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    context.font = "11px sans-serif";
+    context.font = "16px sans-serif";
 
     const maxLabelPixelWidth = scopedData.reduce((max, d) => {
       const text = d.displayName || d.name || "";
@@ -316,7 +316,7 @@ const GanttChart = ({
           }),
       )
       .selectAll("text")
-      .style("font-size", "11px")
+      .style("font-size", "16px")
       .style("fill", "#333")
       .style("cursor", "pointer")
       .on("mouseover", function (event, d) {
