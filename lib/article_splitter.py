@@ -561,6 +561,7 @@ def split_article(
         html_cleaner=html_cleaner,
         offset_restorer=offset_restorer,
         tracer=tracer,
+        merge_similar_topics=True,
     )
 
     article_preview = article[:500] + "..." if len(article) > 500 else article
