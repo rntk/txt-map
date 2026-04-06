@@ -6,6 +6,7 @@ from lib.storage.submissions import SubmissionsStorage
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.task_queue import TaskQueueStorage
 from lib.storage.llm_cache import MongoLLMCacheStore
+from lib.storage.tokens import TokenStorage
 from lib.llm_queue.store import LLMQueueStore
 
 
@@ -31,6 +32,10 @@ def get_cache_store(request: Request) -> MongoLLMCacheStore:
 
 def get_llm_queue_store(request: Request) -> LLMQueueStore:
     return request.app.state.llm_queue_store
+
+
+def get_token_storage(request: Request) -> TokenStorage:
+    return request.app.state.token_storage
 
 
 def require_submission(

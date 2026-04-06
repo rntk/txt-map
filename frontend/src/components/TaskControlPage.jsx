@@ -173,6 +173,7 @@ function TaskControlPage() {
       const response = await fetch("/api/task-queue/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload),
       });
       if (!response.ok) {

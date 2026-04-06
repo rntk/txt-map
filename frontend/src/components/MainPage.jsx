@@ -3,6 +3,13 @@ import GlobalReadProgress from "./GlobalReadProgress";
 import "../styles/MainPage.css";
 
 /**
+ * @typedef {Object} MainPageProps
+ * @property {boolean} [isSuperuser]
+ * @property {boolean} [isAuthenticated]
+ * @property {() => void} [onLogout]
+ */
+
+/**
  * @typedef {Object} MenuItem
  * @property {string} title
  * @property {string} description
@@ -296,7 +303,11 @@ function UploadCard() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Server error ${res.status}`);
@@ -388,6 +399,7 @@ function UrlCard() {
       const res = await fetch("/api/fetch-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ url: trimmed }),
       });
       if (!res.ok) {
@@ -448,7 +460,88 @@ function UrlCard() {
   );
 }
 
-function MainPage() {
+/**
+ * @param {{ onLogout: () => void }} props
+ * @returns {React.JSX.Element}
+ */
+function LogoutCard({ onLogout }) {
+  const [confirming, setConfirming] = useState(false);
+
+  const handleClick = () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    onLogout();
+  };
+
+  const handleCancel = () => {
+    setConfirming(false);
+  };
+
+  if (confirming) {
+    return (
+      <div className="main-page-card main-page-card--logout main-page-card--confirming">
+        <span className="main-page-card__eyebrow">Confirm</span>
+        <span className="main-page-card__title">Sign Out?</span>
+        <span className="main-page-card__description">
+          Are you sure you want to sign out?
+        </span>
+        <div className="main-page-card__actions">
+          <button
+            type="button"
+            className="main-page-card__btn main-page-card__btn--secondary"
+            onClick={handleCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="main-page-card__btn main-page-card__btn--danger"
+            onClick={handleClick}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="main-page-card main-page-card--logout"
+      onClick={handleClick}
+    >
+      <span className="main-page-card__eyebrow">Session</span>
+      <span className="main-page-card__title">Sign Out</span>
+      <span className="main-page-card__description">
+        End your current session and return to the login page.
+      </span>
+    </button>
+  );
+}
+
+/**
+ * @returns {React.JSX.Element}
+ */
+function TokenManagementCard() {
+  return (
+    <a href="/page/tokens" className="main-page-card main-page-card--tokens">
+      <span className="main-page-card__eyebrow">Admin</span>
+      <span className="main-page-card__title">Token Management</span>
+      <span className="main-page-card__description">
+        Create and manage access tokens for other users. Superuser only.
+      </span>
+    </a>
+  );
+}
+
+/**
+ * @param {MainPageProps} props
+ * @returns {React.JSX.Element}
+ */
+function MainPage({ isSuperuser = false, isAuthenticated = false, onLogout }) {
   return (
     <div className="main-page">
       <div className="main-page-intro main-page-intro--split">
@@ -492,6 +585,19 @@ function MainPage() {
           ))}
         </div>
       </section>
+
+      {(isAuthenticated || isSuperuser) && (
+        <section className="main-page-section">
+          <div className="main-page-section__header">
+            <span className="main-page-section__eyebrow">Authentication</span>
+            <h3 className="main-page-section__title">Session</h3>
+          </div>
+          <div className="main-page-grid">
+            {isSuperuser && <TokenManagementCard />}
+            {isAuthenticated && onLogout && <LogoutCard onLogout={onLogout} />}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

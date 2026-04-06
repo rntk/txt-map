@@ -27,33 +27,54 @@ vi.mock("./components/GlobalTopicsPage", () => ({
 
 describe("App LLM selector", () => {
   const originalFetch = global.fetch;
+  const originalLocation = window.location;
 
   beforeEach(() => {
     window.history.pushState({}, "", "/page/tasks");
+    // Mock window.location.href setter
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...originalLocation, href: originalLocation.href },
+    });
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    window.location = originalLocation;
     vi.restoreAllMocks();
   });
 
   it("renders provider and model selectors from settings payload", async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        llm_provider: "OpenAI",
-        llm_model: "gpt-4o",
-        llm_applies_on_next_task: true,
-        llm_available_providers: [
-          {
-            key: "openai",
-            name: "OpenAI",
-            models: ["gpt-4o", "gpt-5-mini"],
-            default_model: "gpt-4o",
-          },
-        ],
-      }),
-    }));
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          llm_provider: "OpenAI",
+          llm_model: "gpt-4o",
+          llm_applies_on_next_task: true,
+          llm_available_providers: [
+            {
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
+            },
+          ],
+        }),
+      };
+    });
 
     render(<App />);
 
@@ -63,22 +84,36 @@ describe("App LLM selector", () => {
   });
 
   it("renders topbar controls without the legacy app shell header", async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        llm_provider: "OpenAI",
-        llm_model: "gpt-4o",
-        llm_applies_on_next_task: true,
-        llm_available_providers: [
-          {
-            key: "openai",
-            name: "OpenAI",
-            models: ["gpt-4o", "gpt-5-mini"],
-            default_model: "gpt-4o",
-          },
-        ],
-      }),
-    }));
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          llm_provider: "OpenAI",
+          llm_model: "gpt-4o",
+          llm_applies_on_next_task: true,
+          llm_available_providers: [
+            {
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
+            },
+          ],
+        }),
+      };
+    });
 
     const { container } = render(<App />);
 
@@ -96,28 +131,42 @@ describe("App LLM selector", () => {
   });
 
   it("switches model to provider default when provider changes", async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        llm_provider: "OpenAI",
-        llm_model: "gpt-5-mini",
-        llm_applies_on_next_task: true,
-        llm_available_providers: [
-          {
-            key: "openai",
-            name: "OpenAI",
-            models: ["gpt-4o", "gpt-5-mini"],
-            default_model: "gpt-4o",
-          },
-          {
-            key: "anthropic",
-            name: "Anthropic",
-            models: ["claude-sonnet-4-20250514"],
-            default_model: "claude-sonnet-4-20250514",
-          },
-        ],
-      }),
-    }));
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          llm_provider: "OpenAI",
+          llm_model: "gpt-5-mini",
+          llm_applies_on_next_task: true,
+          llm_available_providers: [
+            {
+              key: "openai",
+              name: "OpenAI",
+              models: ["gpt-4o", "gpt-5-mini"],
+              default_model: "gpt-4o",
+            },
+            {
+              key: "anthropic",
+              name: "Anthropic",
+              models: ["claude-sonnet-4-20250514"],
+              default_model: "claude-sonnet-4-20250514",
+            },
+          ],
+        }),
+      };
+    });
 
     render(<App />);
 
@@ -131,40 +180,57 @@ describe("App LLM selector", () => {
   });
 
   it("saves the selected provider and model", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          llm_provider: "OpenAI",
-          llm_model: "gpt-4o",
-          llm_applies_on_next_task: true,
-          llm_available_providers: [
-            {
-              key: "openai",
-              name: "OpenAI",
-              models: ["gpt-4o", "gpt-5-mini"],
-              default_model: "gpt-4o",
-            },
-          ],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          llm_provider: "OpenAI",
-          llm_model: "gpt-5-mini",
-          llm_applies_on_next_task: true,
-          llm_available_providers: [
-            {
-              key: "openai",
-              name: "OpenAI",
-              models: ["gpt-4o", "gpt-5-mini"],
-              default_model: "gpt-4o",
-            },
-          ],
-        }),
-      });
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      if (url === "/api/settings") {
+        return {
+          ok: true,
+          json: async () => ({
+            llm_provider: "OpenAI",
+            llm_model: "gpt-4o",
+            llm_applies_on_next_task: true,
+            llm_available_providers: [
+              {
+                key: "openai",
+                name: "OpenAI",
+                models: ["gpt-4o", "gpt-5-mini"],
+                default_model: "gpt-4o",
+              },
+            ],
+          }),
+        };
+      }
+      if (url === "/api/settings/llm") {
+        return {
+          ok: true,
+          json: async () => ({
+            llm_provider: "OpenAI",
+            llm_model: "gpt-5-mini",
+            llm_applies_on_next_task: true,
+            llm_available_providers: [
+              {
+                key: "openai",
+                name: "OpenAI",
+                models: ["gpt-4o", "gpt-5-mini"],
+                default_model: "gpt-4o",
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    });
 
     render(<App />);
 
@@ -174,8 +240,7 @@ describe("App LLM selector", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenNthCalledWith(
-        2,
+      expect(global.fetch).toHaveBeenCalledWith(
         "/api/settings/llm",
         expect.objectContaining({
           method: "PUT",
@@ -185,28 +250,45 @@ describe("App LLM selector", () => {
   });
 
   it("shows an inline error hint when saving fails", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          llm_provider: "OpenAI",
-          llm_model: "gpt-4o",
-          llm_applies_on_next_task: true,
-          llm_available_providers: [
-            {
-              key: "openai",
-              name: "OpenAI",
-              models: ["gpt-4o", "gpt-5-mini"],
-              default_model: "gpt-4o",
-            },
-          ],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({}),
-      });
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      if (url === "/api/settings") {
+        return {
+          ok: true,
+          json: async () => ({
+            llm_provider: "OpenAI",
+            llm_model: "gpt-4o",
+            llm_applies_on_next_task: true,
+            llm_available_providers: [
+              {
+                key: "openai",
+                name: "OpenAI",
+                models: ["gpt-4o", "gpt-5-mini"],
+                default_model: "gpt-4o",
+              },
+            ],
+          }),
+        };
+      }
+      if (url === "/api/settings/llm") {
+        return {
+          ok: false,
+          json: async () => ({}),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    });
 
     render(<App />);
 

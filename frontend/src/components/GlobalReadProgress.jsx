@@ -10,7 +10,9 @@ export default function GlobalReadProgress({ size = 150 }) {
 
     async function loadProgress() {
       try {
-        const response = await fetch("/api/submissions/read-progress");
+        const response = await fetch("/api/submissions/read-progress", {
+          credentials: "include",
+        });
         const data = await response.json();
 
         if (isActive) {

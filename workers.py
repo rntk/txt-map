@@ -186,6 +186,7 @@ class Worker:
 
         return None
 
+
     def claim_diff_job(self):
         """
         Atomically claim a pending semantic diff job.

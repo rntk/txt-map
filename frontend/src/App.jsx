@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import CachePage from "./components/CachePage";
 import DiffPage from "./components/DiffPage";
 import GlobalTopicsPage from "./components/GlobalTopicsPage";
+import LoginPage from "./components/LoginPage";
 import MainPage from "./components/MainPage";
 import TaskControlPage from "./components/TaskControlPage";
 import LlmTaskControlPage from "./components/LlmTaskControlPage";
 import TextListPage from "./components/TextListPage";
 import TextPage from "./components/TextPage";
+import TokensPage from "./components/TokensPage";
 import WordPage from "./components/WordPage";
 import TopicAnalysisPage from "./components/TopicAnalysisPage";
 
@@ -57,6 +59,18 @@ import TopicAnalysisPage from "./components/TopicAnalysisPage";
  * @property {string} currentPath
  * @property {React.ReactNode} content
  * @property {React.ReactNode} [actions]
+ * @property {boolean} isAuthenticated
+ * @property {boolean} isSuperuser
+ * @property {() => void} onLogout
+ */
+
+/**
+ * @typedef {Object} AuthState
+ * @property {boolean} isAuthenticated
+ * @property {boolean} isSuperuser
+ * @property {string | null} alias
+ * @property {boolean} isLoading
+ * @property {boolean} authEnabled
  */
 
 /** @type {readonly NavigationItem[]} */
@@ -108,11 +122,13 @@ const navigationItems = [
 const PAGE_COMPONENTS = {
   cache: CachePage,
   diff: DiffPage,
+  login: LoginPage,
   menu: MainPage,
   tasks: TaskControlPage,
   "llm-tasks": LlmTaskControlPage,
   text: TextPage,
   texts: TextListPage,
+  tokens: TokensPage,
   topics: GlobalTopicsPage,
   word: WordPage,
   "topic-analysis": TopicAnalysisPage,
@@ -223,13 +239,34 @@ function LlmSelector({
  * @param {AppShellProps} props
  * @returns {React.JSX.Element}
  */
-function AppShell({ pageKey, currentPath, content, actions }) {
+function AppShell({
+  pageKey,
+  currentPath,
+  content,
+  actions,
+  isAuthenticated,
+  isSuperuser,
+  onLogout,
+}) {
+  // Build navigation items based on auth state
+  const navItems = [...navigationItems];
+
+  // Add Tokens page for superuser
+  if (isSuperuser) {
+    navItems.push({
+      title: "Tokens",
+      link: "/page/tokens",
+      badge: "TK",
+      description: "Token management",
+    });
+  }
+
   return (
     <div className={`app-shell${pageKey === "menu" ? " app-shell--home" : ""}`}>
       <div className="app-shell__main">
         <div className="app-shell__topbar">
           <nav className="app-shell__topnav" aria-label="Global navigation">
-            {navigationItems.map((item) => (
+            {navItems.map((item) => (
               <ShellNavLink
                 key={item.link}
                 item={item}
@@ -243,6 +280,16 @@ function AppShell({ pageKey, currentPath, content, actions }) {
               className="app-shell__portal-target"
             />
             {actions}
+            {isAuthenticated && (
+              <button
+                type="button"
+                className="app-shell__logout-btn"
+                onClick={onLogout}
+                title="Sign out"
+              >
+                Logout
+              </button>
+            )}
           </div>
         </div>
         <main className="global-page-content">
@@ -264,8 +311,78 @@ function App() {
   const [draftModel, setDraftModel] = useState("");
   const [saveState, setSaveState] = useState("idle");
 
+  // Auth state
+  const [auth, setAuth] = useState({
+    isAuthenticated: false,
+    isSuperuser: false,
+    alias: null,
+    isLoading: true,
+    authEnabled: false,
+  });
+
+  // Check authentication status
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await fetch("/api/auth/verify", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        // Check if auth is enabled
+        const configResponse = await fetch("/api/auth/config", {
+          credentials: "include",
+        });
+        const config = await configResponse.json();
+
+        setAuth({
+          isAuthenticated: false,
+          isSuperuser: false,
+          alias: null,
+          isLoading: false,
+          authEnabled: config.enabled,
+        });
+        return;
+      }
+
+      const data = await response.json();
+      setAuth({
+        isAuthenticated: data.authenticated,
+        isSuperuser: data.is_superuser,
+        alias: data.alias,
+        isLoading: false,
+        authEnabled: true,
+      });
+    } catch {
+      // On network error, assume auth is enabled to be safe.
+      // This prevents bypassing auth due to transient errors.
+      // Keep isLoading true to prevent flashing unauthenticated UI.
+      setAuth({
+        isAuthenticated: false,
+        isSuperuser: false,
+        alias: null,
+        isLoading: true,
+        authEnabled: true,
+      });
+    }
+  }, []);
+
   useEffect(() => {
-    fetch("/api/settings")
+    checkAuth();
+  }, [checkAuth]);
+
+  // Handle redirect to login in useEffect, not during render
+  useEffect(() => {
+    if (auth.authEnabled && !auth.isAuthenticated && !auth.isLoading) {
+      const requestedPageKey = window.location.pathname.split("/")[2] || "menu";
+      if (requestedPageKey !== "login") {
+        window.location.href = "/page/login";
+      }
+    }
+  }, [auth.authEnabled, auth.isAuthenticated, auth.isLoading]);
+
+  // Load LLM settings
+  useEffect(() => {
+    fetch("/api/settings", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         setSettings(data);
@@ -317,6 +434,7 @@ function App() {
       const response = await fetch("/api/settings/llm", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ provider: draftProvider, model: draftModel }),
       });
       if (!response.ok) {
@@ -332,10 +450,68 @@ function App() {
     }
   };
 
+  /**
+   * Handle logout
+   * @returns {Promise<void>}
+   */
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Ignore errors
+    }
+    // Clear auth state and redirect to login
+    setAuth({
+      isAuthenticated: false,
+      isSuperuser: false,
+      alias: null,
+      isLoading: false,
+      authEnabled: auth.authEnabled,
+    });
+    window.location.href = "/page/login";
+  };
+
+  /**
+   * Handle successful login
+   */
+  const handleLoginSuccess = () => {
+    checkAuth();
+  };
+
   const requestedPageKey = currentPath.split("/")[2] || "menu";
   const pageKey = PAGE_COMPONENTS[requestedPageKey]
     ? requestedPageKey
     : "notFound";
+
+  // Show loading state
+  if (auth.isLoading) {
+    return (
+      <div className="app-shell">
+        <div className="app-shell__main">
+          <div className="page-surface page-surface--centered">
+            <div className="loading-message">Loading...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show redirecting state if auth is required but user is not authenticated.
+  // The actual redirect is handled by useEffect.
+  if (auth.authEnabled && !auth.isAuthenticated && pageKey !== "login") {
+    return (
+      <div className="app-shell">
+        <div className="app-shell__main">
+          <div className="page-surface page-surface--centered">
+            <div className="loading-message">Redirecting to login...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (pageKey === "notFound") {
     return (
@@ -343,11 +519,27 @@ function App() {
         currentPath={currentPath}
         pageKey={pageKey}
         content={<div>Page not found</div>}
+        isAuthenticated={auth.isAuthenticated}
+        isSuperuser={auth.isSuperuser}
+        onLogout={handleLogout}
       />
     );
   }
 
   const PageComponent = PAGE_COMPONENTS[pageKey];
+
+  // Pass auth props to MainPage
+  const pageProps =
+    pageKey === "menu"
+      ? {
+          isSuperuser: auth.isSuperuser,
+          isAuthenticated: auth.isAuthenticated,
+          onLogout: handleLogout,
+        }
+      : pageKey === "login"
+        ? { onLoginSuccess: handleLoginSuccess }
+        : {};
+
   const llmSelector = (
     <LlmSelector
       settings={settings}
@@ -366,7 +558,10 @@ function App() {
       currentPath={currentPath}
       pageKey={pageKey}
       actions={llmSelector}
-      content={<PageComponent />}
+      content={<PageComponent {...pageProps} />}
+      isAuthenticated={auth.isAuthenticated}
+      isSuperuser={auth.isSuperuser}
+      onLogout={handleLogout}
     />
   );
 }

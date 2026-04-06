@@ -3478,6 +3478,25 @@
   flex-wrap: wrap;
 }
 
+.app-shell__logout-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--shell-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.app-shell__logout-btn:hover {
+  background: rgba(34, 35, 34, 0.05);
+  color: var(--shell-ink);
+}
+
 .app-shell__nav-link {
   display: flex;
   align-items: center;
@@ -3590,6 +3609,19 @@
       rgba(245, 245, 241, 0.88)
     ),
     var(--shell-surface);
+}
+
+.page-surface--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-message {
+  padding: 2rem;
+  text-align: center;
+  color: var(--shell-muted);
+  font-size: 1rem;
 }
 
 .llm-provider-badge {

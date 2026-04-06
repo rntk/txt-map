@@ -74,7 +74,9 @@ function CachePage() {
    */
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch("/api/llm-cache/stats");
+      const response = await fetch("/api/llm-cache/stats", {
+        credentials: "include",
+      });
       if (!response.ok) {
         return;
       }
@@ -196,7 +198,10 @@ function CachePage() {
 
     setActionMessage("");
     try {
-      const response = await fetch("/api/llm-cache", { method: "DELETE" });
+      const response = await fetch("/api/llm-cache", {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, "Clear all failed"));
       }

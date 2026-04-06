@@ -22,7 +22,8 @@ function SummaryTimeline({
   markup: markupProp,
 }) {
   const article = useArticle();
-  const summaryTimelineItems = summaryTimelineItemsProp ?? article?.summaryTimelineItems ?? [];
+  const summaryTimelineItems =
+    summaryTimelineItemsProp ?? article?.summaryTimelineItems ?? [];
   const sentences = sentencesProp ?? article?.sentences ?? [];
   const articles = articlesProp ?? article?.articles ?? [];
   const topics = topicsProp ?? article?.topics ?? [];

@@ -66,7 +66,9 @@ function DiffPage() {
     setLoadingSubmissions(true);
     setSubmissionsError("");
     try {
-      const response = await fetch("/api/submissions?limit=500");
+      const response = await fetch("/api/submissions?limit=500", {
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error(
           await readErrorMessage(response, "Failed to load documents"),
@@ -159,6 +161,7 @@ function DiffPage() {
         const response = await fetch("/api/diff/calculate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             left_submission_id: leftId,
             right_submission_id: rightId,

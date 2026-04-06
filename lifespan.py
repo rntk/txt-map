@@ -10,6 +10,7 @@ from lib.storage.app_settings import AppSettingsStorage
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.task_queue import TaskQueueStorage
+from lib.storage.tokens import TokenStorage
 from lib.llm_queue.store import LLMQueueStore
 from lib.nlp import ensure_nltk_data
 
@@ -46,6 +47,9 @@ async def lifespan(app: FastAPI):
     app_settings_storage = AppSettingsStorage(db)
     app_settings_storage.prepare()
 
+    token_storage = TokenStorage(db)
+    token_storage.prepare()
+
     task_queue_storage = TaskQueueStorage(db)
     llm_queue_store = LLMQueueStore(db)
 
@@ -54,6 +58,7 @@ async def lifespan(app: FastAPI):
     app.state.semantic_diffs_storage = semantic_diffs_storage
     app.state.llm_cache_store = llm_cache_store
     app.state.app_settings_storage = app_settings_storage
+    app.state.token_storage = token_storage
     app.state.task_queue_storage = task_queue_storage
     app.state.llm_queue_store = llm_queue_store
 

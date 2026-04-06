@@ -66,7 +66,7 @@ function GlobalTopicsPage() {
   }, [fullscreenGraph, chartSentencesFetched, topics]);
 
   useEffect(() => {
-    fetch("/api/global-topics")
+    fetch("/api/global-topics", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         const transformed = (data.topics || []).map((t) => ({

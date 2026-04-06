@@ -133,11 +133,15 @@ function TopicSentencesModal({
     : false;
   const indicesList = normalizedTopic?.sentenceIndices || [];
   const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
-  const hasEnrichedMarkup = Boolean(
-    topicMarkup &&
-    Array.isArray(topicMarkup.segments) &&
-    topicMarkup.segments.some((segment) => segment?.type !== "plain"),
-  );
+  const hasHtmlMarkup =
+    typeof topicMarkup?.html === "string" && topicMarkup.html.length > 0;
+  const hasEnrichedMarkup =
+    hasHtmlMarkup ||
+    Boolean(
+      topicMarkup &&
+      Array.isArray(topicMarkup.segments) &&
+      topicMarkup.segments.some((segment) => segment?.type !== "plain"),
+    );
   const enrichedRangeGroups = hasEnrichedMarkup
     ? buildEnrichedRangeGroupsWithFallbacks(
         Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],

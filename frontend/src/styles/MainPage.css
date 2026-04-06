@@ -422,6 +422,68 @@
   font-size: 0.82rem;
 }
 
+/* Logout and Token Management Cards */
+.main-page-card--logout,
+.main-page-card--tokens {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92),
+      rgba(248, 248, 246, 0.96)
+    ),
+    var(--shell-surface-strong);
+}
+
+.main-page-card--tokens:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 22px 44px rgba(59, 130, 246, 0.08);
+}
+
+.main-page-card--logout:hover {
+  border-color: rgba(220, 38, 38, 0.3);
+  box-shadow: 0 22px 44px rgba(220, 38, 38, 0.08);
+}
+
+.main-page-card--confirming {
+  align-items: stretch;
+}
+
+.main-page-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.main-page-card__btn {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.main-page-card__btn--secondary {
+  background: white;
+  color: var(--shell-ink);
+}
+
+.main-page-card__btn--secondary:hover {
+  background: rgba(31, 32, 29, 0.05);
+}
+
+.main-page-card__btn--danger {
+  background: #dc2626;
+  color: white;
+  border-color: #dc2626;
+}
+
+.main-page-card__btn--danger:hover {
+  background: #b91c1c;
+}
+
 @media (max-width: 720px) {
   .main-page {
     gap: 1rem;
