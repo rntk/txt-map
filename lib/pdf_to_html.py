@@ -82,17 +82,24 @@ class PDFToSemanticHTML:
             return "h3"
         return None
 
-    def _get_link_for_rect(self, rect: pymupdf.Rect, links: List[dict]) -> Optional[str]:
-        """Find if a text rectangle overlaps with any link."""
+    def _get_link_for_rect(self, rect: pymupdf.Rect, links: List[dict]) -> Optional[tuple]:
+        """Find if a text rectangle overlaps with any link. Returns (kind, target)."""
         for link in links:
-            if link.get("kind") == pymupdf.LINK_URI:
-                link_rect = pymupdf.Rect(link["from"])
-                if link_rect.intersects(rect):
-                    return link.get("uri")
+            link_rect = pymupdf.Rect(link["from"])
+            if link_rect.intersects(rect):
+                if link.get("kind") == pymupdf.LINK_URI:
+                    return ("uri", link.get("uri"))
+                elif link.get("kind") in (pymupdf.LINK_GOTO, pymupdf.LINK_NAMED):
+                    # 'page' in the link dict is 0-indexed page number
+                    # LINK_NAMED may not have a 'page' index directly sometimes
+                    # but PyMuPDF usually populates 'page' if it resolves successfully.
+                    page_target = link.get("page")
+                    if page_target is not None:
+                        return ("goto", page_target)
         return None
 
 
-    def _wrap_text_with_style(self, text: str, flags: int, link: Optional[str] = None) -> str:
+    def _wrap_text_with_style(self, text: str, flags: int, link: Optional[tuple] = None) -> str:
         """Wrap text with <strong>, <em>, and <a> tags based on font flags and link."""
         # Apply italic first, then bold (for proper nesting)
         if flags & pymupdf.TEXT_FONT_ITALIC:
@@ -100,7 +107,12 @@ class PDFToSemanticHTML:
         if flags & pymupdf.TEXT_FONT_BOLD:
             text = f"<strong>{text}</strong>"
         if link:
-            text = f'<a href="{link}" target="_blank" rel="noopener noreferrer">{text}</a>'
+            kind, target = link
+            if kind == "uri":
+                text = f'<a href="{target}" target="_blank" rel="noopener noreferrer">{text}</a>'
+            elif kind == "goto":
+                # Assuming internal links navigate to page anchor
+                text = f'<a href="#pdf-page-{target + 1}">{text}</a>'
         return text
 
     def _escape_html(self, text: str) -> str:
@@ -187,10 +199,14 @@ class PDFToSemanticHTML:
                         current_paragraph = []
 
                     if heading_tag:
-                        # Combine all spans for heading
-                        heading_text = "".join(
-                            self._escape_html(span["text"]) for span in spans
-                        )
+                        # Combine all spans for heading, preserving links
+                        heading_parts = []
+                        for span in spans:
+                            span_rect = pymupdf.Rect(span["bbox"])
+                            link = self._get_link_for_rect(span_rect, links)
+                            escaped = self._escape_html(span["text"])
+                            heading_parts.append(self._wrap_text_with_style(escaped, span.get("flags", 0), link=link))
+                        heading_text = "".join(heading_parts)
                         if heading_text.strip():
                             page_html.append(
                                 f"<{heading_tag}>{heading_text}</{heading_tag}>"
@@ -219,7 +235,9 @@ class PDFToSemanticHTML:
 
             if page_html:
                 html_parts.append(
-                    f"<!-- Page {page_num + 1} -->\n" + "\n".join(page_html)
+                    f'<div id="pdf-page-{page_num + 1}">'
+                    + f"<!-- Page {page_num + 1} -->\n" + "\n".join(page_html)
+                    + "</div>"
                 )
 
         # Wrap in basic HTML document structure
