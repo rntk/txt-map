@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useMemo, useState } from "react";
 import * as d3 from "d3";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
-import { buildScopedChartData } from "../utils/topicHierarchy";
+import Breadcrumbs from "./shared/Breadcrumbs";
+import { buildScopedChartData, hasDeeperChildren } from "../utils/topicHierarchy";
 import { useTopicLevel } from "../hooks/useTopicLevel";
+import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 import "./TopicsBarChart.css";
@@ -30,16 +32,17 @@ const GanttChart = ({
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const [activeTopic, setActiveTopic] = useState(null);
-  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
+  const { scopePath, navigateTo, drillInto } = useScopeNavigation();
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics, scopePath);
   const [selectedTopicForModal, setSelectedTopicForModal] = useState(null);
 
   const scopedData = useMemo(() => {
-    const data = buildScopedChartData(topics, sentences, [], selectedLevel);
+    const data = buildScopedChartData(topics, sentences, scopePath, selectedLevel);
     return data.map((d) => ({
       ...d,
       sentences: d.sentenceIndices,
     }));
-  }, [topics, sentences, selectedLevel]);
+  }, [topics, sentences, scopePath, selectedLevel]);
 
   const effectiveLength = useMemo(() => {
     if (!topics || topics.length === 0) return 0;
@@ -91,6 +94,15 @@ const GanttChart = ({
     });
     return data;
   }, [scopedData]);
+
+  const handleTopicClick = (topicObj) => {
+    if (hasDeeperChildren(topics, topicObj.fullPath)) {
+      drillInto(topicObj.fullPath);
+      setSelectedLevel(0);
+    } else {
+      setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
+    }
+  };
 
   useEffect(() => {
     if (
@@ -214,18 +226,7 @@ const GanttChart = ({
         tooltip.style("opacity", 0);
       })
       .on("click", function (event, d) {
-        setSelectedTopicForModal(
-          buildModalSelectionFromTopic({
-            name: d.fullPath || d.name,
-            displayName: d.displayName || d.name,
-            fullPath: d.fullPath || d.name,
-            sentenceIndices: d.sentences,
-            ranges: Array.isArray(d.ranges) ? d.ranges : [],
-            canonicalTopicNames: d.canonicalTopicNames || [],
-            primaryTopicName:
-              d.canonicalTopicNames?.[0] || d.fullPath || d.name,
-          }),
-        );
+        handleTopicClick(d);
       });
 
     g.selectAll(".gantt-bar")
@@ -241,7 +242,7 @@ const GanttChart = ({
       .style("opacity", (d) =>
         activeTopic && activeTopic !== d.topic ? 0.3 : 0.8,
       )
-      .style("cursor", "pointer")
+      .style("cursor", (d) => (hasDeeperChildren(topics, d.topicObj.fullPath) ? "zoom-in" : "pointer"))
       .on("mouseover", function (event, d) {
         setActiveTopic(d.topic);
         tooltip
@@ -272,7 +273,7 @@ const GanttChart = ({
       })
       .on("click", function (event, d) {
         if (d.topicObj) {
-          setSelectedTopicForModal(buildModalSelectionFromTopic(d.topicObj));
+          handleTopicClick(d.topicObj);
         }
       });
 
@@ -327,7 +328,7 @@ const GanttChart = ({
       .on("click", function (event, d) {
         const topicObj = scopedData.find((t) => t.name === d);
         if (topicObj) {
-          setSelectedTopicForModal(buildModalSelectionFromTopic(topicObj));
+          handleTopicClick(topicObj);
         }
       });
 
@@ -341,12 +342,15 @@ const GanttChart = ({
       ref={containerRef}
       className="gantt-chart chart-surface chart-surface--river"
     >
-      <TopicLevelSwitcher
-        className="gantt-chart__level-switcher"
-        selectedLevel={selectedLevel}
-        maxLevel={maxLevel}
-        onChange={setSelectedLevel}
-      />
+      <div className="gantt-chart__controls">
+        <Breadcrumbs scopePath={scopePath} onNavigate={navigateTo} />
+        <TopicLevelSwitcher
+          className="gantt-chart__level-switcher"
+          selectedLevel={selectedLevel}
+          maxLevel={maxLevel}
+          onChange={setSelectedLevel}
+        />
+      </div>
 
       <div className="gantt-chart__canvas chart-scroll-area">
         <svg ref={svgRef} className="gantt-chart__svg chart-svg"></svg>
