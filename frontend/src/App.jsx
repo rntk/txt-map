@@ -387,7 +387,8 @@ function App() {
     if (auth.authEnabled && !auth.isAuthenticated && !auth.isLoading) {
       const requestedPageKey = window.location.pathname.split("/")[2] || "menu";
       if (requestedPageKey !== "login") {
-        window.location.href = "/page/login";
+        const redirectUrl = window.location.pathname + window.location.search;
+        window.location.href = `/page/login?redirect=${encodeURIComponent(redirectUrl)}`;
       }
     }
   }, [auth.authEnabled, auth.isAuthenticated, auth.isLoading]);
@@ -498,7 +499,9 @@ function App() {
    * Handle successful login
    */
   const handleLoginSuccess = () => {
-    checkAuth();
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    window.location.href = redirect || "/page/menu";
   };
 
   const requestedPageKey = currentPath.split("/")[2] || "menu";

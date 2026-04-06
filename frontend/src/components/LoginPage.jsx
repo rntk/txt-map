@@ -48,7 +48,7 @@ function LoginPage({ onLoginSuccess }) {
         if (onLoginSuccess) {
           onLoginSuccess();
         } else {
-          // Redirect to home page
+          // Default fallback
           window.location.href = "/page/menu";
         }
       } else {
