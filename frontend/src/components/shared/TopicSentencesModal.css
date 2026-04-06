@@ -283,6 +283,20 @@
   cursor: not-allowed;
 }
 
+.topic-sentences-modal__summary-pane {
+  background: rgba(31, 32, 29, 0.03);
+  border: 1px solid var(--shell-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--shell-ink);
+}
+
+.topic-sentences-modal__summary-pane p {
+  margin: 0;
+}
+
 .topic-sentences-modal__raw-json {
   font-family: var(--font-mono);
   font-size: var(--text-xs);

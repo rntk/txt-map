@@ -17,6 +17,7 @@ import { useScopeNavigation } from "../hooks/useScopeNavigation";
 import { useContainerSize } from "../hooks/useContainerSize";
 import { isTopicSelectionRead } from "../utils/topicReadUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
+import { useArticle } from "../contexts/ArticleContext";
 
 export { buildScopedChartData, getScopedMaxLevel };
 
@@ -48,13 +49,19 @@ function rollingAverage(data, windowSize) {
  * @param {ArticleStructureChartProps} props
  */
 function ArticleStructureChart({
-  topics,
-  sentences = [],
+  topics: topicsProp,
+  sentences: sentencesProp,
   onShowInArticle,
-  readTopics,
-  onToggleRead,
-  markup,
+  readTopics: readTopicsProp,
+  onToggleRead: onToggleReadProp,
+  markup: markupProp,
 }) {
+  const article = useArticle();
+  const topics = topicsProp ?? article?.enrichedTopics ?? [];
+  const sentences = sentencesProp ?? article?.sentences ?? [];
+  const readTopics = readTopicsProp ?? article?.readTopics ?? new Set();
+  const onToggleRead = onToggleReadProp ?? article?.toggleRead;
+  const markup = markupProp ?? article?.markup;
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(
     topics,

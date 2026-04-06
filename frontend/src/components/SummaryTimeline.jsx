@@ -1,25 +1,34 @@
 import React from "react";
 import FullScreenGraph from "./FullScreenGraph";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
+import { useArticle } from "../contexts/ArticleContext";
 
 function SummaryTimeline({
   mode = "summary",
   title,
-  summaryTimelineItems,
+  summaryTimelineItems: summaryTimelineItemsProp,
   insights,
-  sentences,
+  sentences: sentencesProp,
   highlightedSummaryParas,
   summaryModalTopic,
   closeSummaryModal,
   handleSummaryClick,
-  articles,
-  topics,
+  articles: articlesProp,
+  topics: topicsProp,
   onClose,
   onShowInArticle,
-  readTopics,
-  onToggleRead,
-  markup,
+  readTopics: readTopicsProp,
+  onToggleRead: onToggleReadProp,
+  markup: markupProp,
 }) {
+  const article = useArticle();
+  const summaryTimelineItems = summaryTimelineItemsProp ?? article?.summaryTimelineItems ?? [];
+  const sentences = sentencesProp ?? article?.sentences ?? [];
+  const articles = articlesProp ?? article?.articles ?? [];
+  const topics = topicsProp ?? article?.topics ?? [];
+  const readTopics = readTopicsProp ?? article?.readTopics ?? new Set();
+  const onToggleRead = onToggleReadProp ?? article?.toggleRead;
+  const markup = markupProp ?? article?.markup;
   const resolvedTitle =
     title || (mode === "insights" ? "Insights" : "Topic Summaries");
   const insightItems = Array.isArray(insights) ? insights : [];
@@ -210,11 +219,6 @@ function SummaryTimeline({
             readTopics={readTopics}
             onToggleRead={onToggleRead}
             markup={markup}
-            headerExtra={
-              <div>
-                <strong>Summary:</strong> {summaryModalTopic._summarySentence}
-              </div>
-            }
           />
         )}
       </div>

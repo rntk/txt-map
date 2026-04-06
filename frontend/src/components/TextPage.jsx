@@ -22,10 +22,9 @@ import RawTextView from "./RawTextView";
 import WordSelectionPopup from "./WordSelectionPopup";
 import ArticleMinimap from "./grid/ArticleMinimap";
 import TopicsMetaPanel from "./TopicsMetaPanel";
-import { useSubmission } from "../hooks/useSubmission";
+import { ArticleProvider, useArticle } from "../contexts/ArticleContext";
 import { useTopicNavigation } from "../hooks/useTopicNavigation";
 import { useTextSelection } from "../hooks/useTextSelection";
-import { useTextPageData } from "../hooks/useTextPageData";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
 import {
@@ -54,9 +53,38 @@ const FULLSCREEN_TABS = [
   { key: "treemap", label: "Treemap" },
 ];
 
-function TextPage() {
-  const [selectedTopics, setSelectedTopics] = useState([]);
-  const [hoveredTopic, setHoveredTopic] = useState(null);
+function TextPageContent() {
+  const {
+    submissionId,
+    submission,
+    loading,
+    error,
+    fetchSubmission,
+    readTopics,
+    toggleRead,
+    toggleReadAll: toggleReadAllBase,
+    safeTopics,
+    rawText,
+    articleSummaryText,
+    articleSummaryBullets,
+    topicSummaryParaMap,
+    allTopics,
+    rawTextHighlightRanges,
+    rawTextFadeRanges,
+    highlightedSummaryParas,
+    articles,
+    insights,
+    insightNavItems,
+    insightTopicNameSet,
+    summaryTimelineItems,
+    articleBulletMatches,
+    articleTextMatches,
+    selectedTopics,
+    hoveredTopic,
+    setSelectedTopics,
+    setHoveredTopic,
+  } = useArticle();
+
   const [activeTab, setActiveTab] = useState("article");
   const [sidebarTab, setSidebarTab] = useState("topics");
   const [groupedByTopics, setGroupedByTopics] = useState(false);
@@ -117,38 +145,7 @@ function TextPage() {
     }
   }, []);
 
-  const submissionId = window.location.pathname.split("/")[3];
-
-  const {
-    submission,
-    loading,
-    error,
-    fetchSubmission,
-    readTopics,
-    toggleRead,
-    toggleReadAll: toggleReadAllBase,
-  } = useSubmission(submissionId);
-
   const { selectionData } = useTextSelection();
-
-  const {
-    safeTopics: _safeTopics,
-    rawText: _rawText,
-    articleSummaryText,
-    articleSummaryBullets,
-    topicSummaryParaMap: _topicSummaryParaMap,
-    allTopics,
-    insightNavItems,
-    insightTopicNameSet,
-    rawTextHighlightRanges,
-    rawTextFadeRanges,
-    highlightedSummaryParas,
-    articles,
-    insights,
-    summaryTimelineItems,
-    articleBulletMatches,
-    articleTextMatches,
-  } = useTextPageData(submission, selectedTopics, hoveredTopic, readTopics);
 
   const readProgressInfo = useMemo(() => {
     let total_count = 0;
@@ -173,11 +170,11 @@ function TextPage() {
 
   const { navigateTopicSentence } = useTopicNavigation({
     activeTab,
-    rawText: _rawText,
-    safeTopics: _safeTopics,
+    rawText,
+    safeTopics,
     groupedByTopics,
     selectedTopics,
-    topicSummaryParaMap: _topicSummaryParaMap,
+    topicSummaryParaMap,
     setHighlightedGroupedTopic,
   });
 
@@ -194,7 +191,7 @@ function TextPage() {
           : [...prev, topic];
       });
     },
-    [clearActiveInsight],
+    [clearActiveInsight, setSelectedTopics, setHoveredTopic],
   );
 
   const handleHoverTopic = useCallback((topic) => {
@@ -266,13 +263,13 @@ function TextPage() {
     (modalTopic) => {
       const normalizedSelection = buildTopicModalSelection(
         modalTopic,
-        _safeTopics,
+        safeTopics,
       );
       const topicName =
         normalizedSelection?.primaryTopicName ||
         normalizedSelection?.fullPath ||
         normalizedSelection?.displayName;
-      const matchedTopic = _safeTopics.find((t) => t.name === topicName);
+      const matchedTopic = safeTopics.find((t) => t.name === topicName);
       if (!matchedTopic) return;
       pendingShowTopicRef.current = matchedTopic;
       closeFullscreenGraph();
@@ -282,11 +279,11 @@ function TextPage() {
           : [...prev, matchedTopic],
       );
     },
-    [_safeTopics, closeFullscreenGraph],
+    [safeTopics, closeFullscreenGraph],
   );
 
   useEffect(() => {
-    if (!_safeTopics.length) {
+    if (!safeTopics.length) {
       return;
     }
 
@@ -296,7 +293,7 @@ function TextPage() {
       return;
     }
 
-    const matchedTopic = _safeTopics.find((topic) => topic.name === topicParam);
+    const matchedTopic = safeTopics.find((topic) => topic.name === topicParam);
     if (!matchedTopic) {
       return;
     }
@@ -315,7 +312,7 @@ function TextPage() {
     const nextSearch = searchParams.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
     window.history.replaceState({}, "", nextUrl);
-  }, [_safeTopics]);
+  }, [safeTopics]);
 
   useEffect(() => {
     if (!fullscreenGraph && pendingShowTopicRef.current) {
@@ -337,10 +334,10 @@ function TextPage() {
       return [];
     }
 
-    return Array.isArray(_topicSummaryParaMap[focusedSummaryTopicName])
-      ? _topicSummaryParaMap[focusedSummaryTopicName]
+    return Array.isArray(topicSummaryParaMap[focusedSummaryTopicName])
+      ? topicSummaryParaMap[focusedSummaryTopicName]
       : [];
-  }, [_topicSummaryParaMap, focusedSummaryTopicName]);
+  }, [topicSummaryParaMap, focusedSummaryTopicName]);
 
   const effectiveHighlightedSummaryParas = useMemo(() => {
     if (focusedSummaryParas.length === 0) {
@@ -453,8 +450,6 @@ function TextPage() {
     [allTopics, safeSentences],
   );
 
-  const safeTopics = _safeTopics;
-  const rawText = _rawText;
   const coloredTopicNames = useMemo(() => {
     if (sidebarTab === "insights" && highlightInsightTopics) {
       return insightTopicNameSet;
@@ -1253,6 +1248,15 @@ function TextPage() {
         submissionId={submissionId}
       />
     </div>
+  );
+}
+
+function TextPage() {
+  const submissionId = window.location.pathname.split("/")[3];
+  return (
+    <ArticleProvider submissionId={submissionId}>
+      <TextPageContent />
+    </ArticleProvider>
   );
 }
 

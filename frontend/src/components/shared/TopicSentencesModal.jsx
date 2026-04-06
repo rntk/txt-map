@@ -12,6 +12,7 @@ import { isTopicSelectionRead } from "../../utils/topicReadUtils";
 import { buildTopicModalSelection } from "../../utils/topicModalSelection";
 import { HighlightContext } from "./HighlightContext";
 import HighlightedText from "./HighlightedText";
+import { useArticle } from "../../contexts/ArticleContext";
 
 const EXTEND_COUNT = 3;
 
@@ -77,21 +78,39 @@ function normalizeTopic(topic, allTopics) {
  */
 function TopicSentencesModal({
   topic,
-  sentences,
+  sentences: sentencesProp,
   onClose,
   headerExtra,
   onShowInArticle,
-  markup,
-  allTopics = [],
-  readTopics = new Set(),
-  onToggleRead,
+  markup: markupProp,
+  allTopics: allTopicsProp,
+  readTopics: readTopicsProp,
+  onToggleRead: onToggleReadProp,
 }) {
+  const article = useArticle();
+  const sentences = sentencesProp ?? article?.sentences ?? [];
+  const markup = markupProp ?? article?.markup;
+  const allTopics = allTopicsProp ?? article?.topics ?? [];
+  const readTopics = readTopicsProp ?? article?.readTopics ?? new Set();
+  const onToggleRead = onToggleReadProp ?? article?.toggleRead;
+  const globalTopicSummaries = article?.topicSummaries ?? {};
   const [extendedIndices, setExtendedIndices] = useState(new Set());
   const [activeTab, setActiveTab] = useState("sentences");
   const [pendingScrollIndex, setPendingScrollIndex] = useState(null);
   const sentenceRowRefs = useRef({});
   const minimapPaneRef = useRef(null);
   const normalizedTopic = normalizeTopic(topic, allTopics);
+
+  const summarySentence = useMemo(() => {
+    if (normalizedTopic?._summarySentence) {
+      return normalizedTopic._summarySentence;
+    }
+    if (normalizedTopic?.name && globalTopicSummaries[normalizedTopic.name]) {
+      return globalTopicSummaries[normalizedTopic.name];
+    }
+    return null;
+  }, [normalizedTopic, globalTopicSummaries]);
+
   const modalSentences = useMemo(() => {
     if (Array.isArray(normalizedTopic?._sentences)) {
       return normalizedTopic._sentences;
@@ -289,8 +308,11 @@ function TopicSentencesModal({
 
   if (!normalizedTopic) return null;
 
+  const hasSummary = Boolean(summarySentence);
+
   const tabs = [
     { key: "sentences", label: "Sentences" },
+    { key: "summary", label: "Summary", disabled: !hasSummary },
     { key: "enriched", label: "Enriched", disabled: !hasEnrichedMarkup },
     { key: "raw", label: "Raw JSON", disabled: !hasEnrichedMarkup },
   ];
@@ -367,7 +389,11 @@ function TopicSentencesModal({
         <div className="topic-sentences-modal__body">
           <div className="topic-sentences-modal__content-pane">
             <HighlightContext.Provider value={highlightWords}>
-              {activeTab === "enriched" && hasEnrichedMarkup ? (
+              {activeTab === "summary" && hasSummary ? (
+                <div className="topic-sentences-modal__summary-pane">
+                  <p>{summarySentence}</p>
+                </div>
+              ) : activeTab === "enriched" && hasEnrichedMarkup ? (
                 <div className="topic-sentences-modal__enriched-groups">
                   {(enrichedRangeGroups.length > 0
                     ? enrichedRangeGroups
