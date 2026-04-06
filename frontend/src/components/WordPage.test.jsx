@@ -8,6 +8,7 @@ const mockTextDisplay = vi.fn();
 const mockCircularPackingChart = vi.fn();
 const mockTreemapChart = vi.fn();
 const mockWordTree = vi.fn();
+const mockGetSimilarWords = vi.fn();
 
 vi.mock("../hooks/useSubmission", () => ({
   useSubmission: (...args) => mockUseSubmission(...args),
@@ -84,6 +85,8 @@ describe("WordPage header layout", () => {
     mockCircularPackingChart.mockClear();
     mockTreemapChart.mockClear();
     mockWordTree.mockClear();
+    mockGetSimilarWords.mockReset();
+    mockGetSimilarWords.mockResolvedValue([]);
     mockUseSubmission.mockReturnValue({
       submission: {
         status: {
@@ -129,6 +132,7 @@ describe("WordPage header layout", () => {
       error: null,
       readTopics: new Set(),
       toggleRead: vi.fn(),
+      getSimilarWords: mockGetSimilarWords,
     });
 
     window.history.pushState({}, "", "/page/word/sub-123/beta");
@@ -280,6 +284,7 @@ describe("WordPage header layout", () => {
       error: null,
       readTopics: new Set(["Topic 1"]),
       toggleRead: vi.fn(),
+      getSimilarWords: mockGetSimilarWords,
     });
 
     render(<WordPage />);

@@ -299,4 +299,35 @@ describe("App LLM selector", () => {
 
     expect(await screen.findByText("Save failed")).toBeInTheDocument();
   });
+
+  it("shows an inline hint when loading settings fails", async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/auth/verify") {
+        return {
+          ok: true,
+          json: async () => ({ authenticated: true, is_superuser: false }),
+        };
+      }
+      if (url === "/api/auth/config") {
+        return {
+          ok: true,
+          json: async () => ({ enabled: false }),
+        };
+      }
+      if (url === "/api/settings") {
+        return {
+          ok: false,
+          json: async () => ({}),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("LLM settings unavailable"),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("LLM provider")).toBeNull();
+  });
 });

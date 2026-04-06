@@ -7,7 +7,6 @@ import requests as http_requests
 from lib.constants import TASK_PRIORITIES
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
-from lib.nlp import compute_word_frequencies
 from handlers.dependencies import (
     get_submissions_storage,
     get_task_queue_storage,
@@ -392,39 +391,47 @@ def get_similar_words(
     results = submission.get("results") or {}
     sentences = results.get("sentences") or []
     topics = results.get("topics") or []
-    
+
     from lib.nlp import _lemmatizer_instance, _stop_words_set
+
     lemmatizer = _lemmatizer_instance()
     stop_words = _stop_words_set()
     import difflib
     from collections import Counter
 
     word_lower = word.lower()
-    word_lemma = lemmatizer.lemmatize(word_lower, pos='v')
+    word_lemma = lemmatizer.lemmatize(word_lower, pos="v")
 
     # Collect unique candidate words
     all_tokens = []
     for sent in sentences:
         all_tokens.extend(re.findall(r"\b[a-z]{3,}\b", sent.lower()))
-    
+
     candidate_counts = Counter([t for t in all_tokens if t not in stop_words])
-    unique_candidates = sorted(candidate_counts.keys(), key=lambda x: candidate_counts[x], reverse=True)
+    unique_candidates = sorted(
+        candidate_counts.keys(), key=lambda x: candidate_counts[x], reverse=True
+    )
 
     similar_words = []
 
     # 1. Lemma / Exact matches
     for candidate in unique_candidates:
-        if lemmatizer.lemmatize(candidate, pos='v') == word_lemma or candidate == word_lower:
+        if (
+            lemmatizer.lemmatize(candidate, pos="v") == word_lemma
+            or candidate == word_lower
+        ):
             if candidate != word_lower:
                 similar_words.append(candidate)
 
     # 2. Fuzzy / Substring matches (if not enough from stage 1)
     if len(similar_words) < 10:
-        fuzzy_matches = difflib.get_close_matches(word_lower, unique_candidates, n=10, cutoff=0.7)
+        fuzzy_matches = difflib.get_close_matches(
+            word_lower, unique_candidates, n=10, cutoff=0.7
+        )
         for fm in fuzzy_matches:
             if fm not in similar_words and fm != word_lower:
                 similar_words.append(fm)
-        
+
         # Substring search
         for candidate in unique_candidates:
             if word_lower in candidate or candidate in word_lower:
@@ -433,13 +440,21 @@ def get_similar_words(
 
     # 3. Topic-based neighbors (words that appear in the same topic as the word, if any)
     pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
-    related_topics = [t for t in topics if any(pattern.search(sentences[i-1]) for i in t.get("sentences", []))]
-    
+    related_topics = [
+        t
+        for t in topics
+        if any(pattern.search(sentences[i - 1]) for i in t.get("sentences", []))
+    ]
+
     if related_topics:
         for t in related_topics:
             for i in t.get("sentences", []):
-                for w in re.findall(r"\b[a-z]{3,}\b", sentences[i-1].lower()):
-                    if w not in stop_words and w != word_lower and w not in similar_words:
+                for w in re.findall(r"\b[a-z]{3,}\b", sentences[i - 1].lower()):
+                    if (
+                        w not in stop_words
+                        and w != word_lower
+                        and w not in similar_words
+                    ):
                         similar_words.append(w)
 
     # 4. Fallback (top frequent words)

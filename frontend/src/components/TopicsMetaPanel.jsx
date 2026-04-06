@@ -89,8 +89,7 @@ function PanelLatentTopics({ submissionId, topicMapping, latentTopics }) {
           <a
             key={lt.id}
             href={`/page/word/${submissionId}/${encodeURIComponent(topicName)}`}
-            className="topics-meta-panel__card"
-            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+            className="topics-meta-panel__card topics-meta-panel__card-link"
           >
             <div className="topics-meta-panel__card-title">{lt.id + 1}</div>
             <KeywordList keywords={lt.keywords} />
@@ -144,8 +143,7 @@ function PanelTagCloud({ submissionId, sentences, sentenceIndices }) {
         <a
           key={word}
           href={`/page/word/${submissionId}/${encodeURIComponent(word)}`}
-          className="topics-meta-panel__tag-cloud-item"
-          style={{ cursor: 'pointer' }}
+          className="topics-meta-panel__tag-cloud-item topics-meta-panel__tag-cloud-item--interactive"
         >
           {word}
           <span className="topics-meta-panel__tag-cloud-freq">{frequency}</span>

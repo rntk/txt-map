@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import { ArticleProvider, useArticle } from "../contexts/ArticleContext";
 import TextDisplay from "./TextDisplay";
 import CircularPackingChart from "./CircularPackingChart";
@@ -304,225 +310,225 @@ function WordPageContent({ word }) {
     return <div className="word-page-no-submission">No submission found.</div>;
 
   return (
-      <div
-        className={`page-stack word-page${activeTab === "compare" ? " word-page--compare-active" : ""}`}
-      >
-        <div className="word-page-header">
-          <div className="word-page-header-row">
-            <button
-              type="button"
-              onClick={() => navigate(`/page/text/${submissionId}`)}
-              className="action-btn"
-            >
-              ← Back to Article
-            </button>
-            <h2 className="word-page-title">
-              Sentences matching:{" "}
-              <span className="word-page-word-highlight">"{word}"</span>
-            </h2>
-            {activeTab === "sentences" && (
-              <label className="grouped-topics-toggle word-page-tooltip-toggle">
-                <input
-                  type="checkbox"
-                  checked={tooltipEnabled}
-                  onChange={() => setTooltipEnabled((prev) => !prev)}
-                />
-                Show tooltips
-              </label>
-            )}
-            <div className="tab-bar word-page-tab-bar">
-              <div className="tabs">
-                {VIS_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    className={activeTab === tab.key ? "active" : ""}
-                    onClick={() => handleTabClick(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+    <div
+      className={`page-stack word-page${activeTab === "compare" ? " word-page--compare-active" : ""}`}
+    >
+      <div className="word-page-header">
+        <div className="word-page-header-row">
+          <button
+            type="button"
+            onClick={() => navigate(`/page/text/${submissionId}`)}
+            className="action-btn"
+          >
+            ← Back to Article
+          </button>
+          <h2 className="word-page-title">
+            Sentences matching:{" "}
+            <span className="word-page-word-highlight">"{word}"</span>
+          </h2>
+          {activeTab === "sentences" && (
+            <label className="grouped-topics-toggle word-page-tooltip-toggle">
+              <input
+                type="checkbox"
+                checked={tooltipEnabled}
+                onChange={() => setTooltipEnabled((prev) => !prev)}
+              />
+              Show tooltips
+            </label>
+          )}
+          <div className="tab-bar word-page-tab-bar">
+            <div className="tabs">
+              {VIS_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={activeTab === tab.key ? "active" : ""}
+                  onClick={() => handleTabClick(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
-
-        <div className="container word-page-container">
-          <div className="word-page-content">
-            {activeTab === "sentences" && (
-              <div>
-                {sentencesInfo.length === 0 ? (
-                  <div className="word-page-no-occurrences">
-                    <p>No occurrences of "{word}" were found in the article.</p>
-                    {similarWords.length > 0 && (
-                      <div className="word-page-similar-words">
-                        <h3>You might be looking for:</h3>
-                        <div className="word-page-similar-words-list">
-                          {similarWords.map((w) => (
-                            <button
-                              key={w}
-                              className="similar-word-link"
-                              onClick={() =>
-                                navigate(
-                                  `/page/word/${submissionId}/${encodeURIComponent(w)}`,
-                                )
-                              }
-                            >
-                              {w}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="word-page-sentences-list">
-                    {sentencesInfo.map(({ index, text }) => (
-                      <div key={index} className="word-page-sentence-card">
-                        <div className="word-page-sentence-header">
-                          <span>Sentence #{index + 1}</span>
-                        </div>
-                        <TextDisplay
-                          sentences={[text]}
-                          selectedTopics={selectedTopics}
-                          hoveredTopic={hoveredTopic}
-                          readTopics={readTopics}
-                          articleTopics={topics
-                            .filter((t) => t.sentences.includes(index + 1))
-                            .map((t) => ({ ...t, sentences: [1] }))}
-                          articleIndex={0}
-                          onToggleRead={toggleRead}
-                          onToggleTopic={toggleTopic}
-                          tooltipEnabled={tooltipEnabled}
-                          submissionId={submissionId}
-                          highlightWords={[word]}
-                        />
-                      </div>
-                    ))}
-                    {similarWords.length > 0 && (
-                      <div className="word-page-similar-words">
-                        <h3>Other related words:</h3>
-                        <div className="word-page-similar-words-list">
-                          {similarWords.map((w) => (
-                            <button
-                              key={w}
-                              className="similar-word-link"
-                              onClick={() =>
-                                navigate(
-                                  `/page/word/${submissionId}/${encodeURIComponent(w)}`,
-                                )
-                              }
-                            >
-                              {w}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === "compare" && (
-              <div className="word-page-compare-container">
-                {compareGroups.length > 0 ? (
-                  <GlobalTopicsCompareView
-                    groups={compareGroups}
-                    groupRefs={compareGroupRefs}
-                    highlightWord={word}
-                  />
-                ) : (
-                  <p className="word-page-no-occurrences">
-                    No occurrences of this word were found in the article.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {activeTab === "tree" && (
-              <div className="word-page-tree-container">
-                <WordTree entries={treeEntriesWithReadState} pivotLabel={word} />
-              </div>
-            )}
-
-            {activeTab === "circles" && (
-              <div className="word-page-chart-container">
-                <CircularPackingChart
-                  topics={topics}
-                  sentences={allSentences}
-                  onShowInArticle={handleShowInArticle}
-                  readTopics={readTopics}
-                  onToggleRead={toggleRead}
-                  markup={submission?.results?.markup}
-                />
-              </div>
-            )}
-
-            {activeTab === "treemap" && (
-              <div className="word-page-chart-container">
-                <TreemapChart
-                  topics={topics}
-                  sentences={allSentences}
-                  onShowInArticle={handleShowInArticle}
-                  readTopics={readTopics}
-                  onToggleRead={toggleRead}
-                  markup={submission?.results?.markup}
-                />
-              </div>
-            )}
-
-            {activeTab === "summaries" && (
-              <div className="word-page-timeline-container">
-                <SummaryTimeline
-                  mode="summary"
-                  title="Topic Summaries"
-                  summaryTimelineItems={timelineItems}
-                  highlightedSummaryParas={new Set()}
-                  summaryModalTopic={null}
-                  closeSummaryModal={() => setSummaryModalTopic(null)}
-                  handleSummaryClick={handleSummaryClick}
-                  articles={articles}
-                  topics={allTopics}
-                  onClose={() => setActiveTab("sentences")}
-                  onShowInArticle={handleShowInArticle}
-                  readTopics={readTopics}
-                  onToggleRead={toggleRead}
-                  markup={submission?.results?.markup}
-                />
-              </div>
-            )}
-
-            {activeTab === "tags" && (
-              <div>
-                <h3>Tags Cloud for sentences containing "{word}"</h3>
-                <TopicsTagCloud
-                  submissionId={submissionId}
-                  topics={[]}
-                  sentences={allSentences}
-                  forcedPathQuery={`word=${encodeURIComponent(word)}`}
-                  readTopics={readTopics}
-                  onToggleRead={toggleRead}
-                  markup={submission?.results?.markup}
-                  onShowInArticle={handleShowInArticle}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {summaryModalTopic && (
-          <TopicSentencesModal
-            topic={summaryModalTopic}
-            sentences={summaryModalTopic._sentences || allSentences}
-            onClose={() => setSummaryModalTopic(null)}
-            onShowInArticle={handleShowInArticle}
-            allTopics={allTopics}
-            readTopics={readTopics}
-            onToggleRead={toggleRead}
-            markup={submission?.results?.markup}
-          />
-        )}
       </div>
+
+      <div className="container word-page-container">
+        <div className="word-page-content">
+          {activeTab === "sentences" && (
+            <div>
+              {sentencesInfo.length === 0 ? (
+                <div className="word-page-no-occurrences">
+                  <p>No occurrences of "{word}" were found in the article.</p>
+                  {similarWords.length > 0 && (
+                    <div className="word-page-similar-words">
+                      <h3>You might be looking for:</h3>
+                      <div className="word-page-similar-words-list">
+                        {similarWords.map((w) => (
+                          <button
+                            key={w}
+                            className="similar-word-link"
+                            onClick={() =>
+                              navigate(
+                                `/page/word/${submissionId}/${encodeURIComponent(w)}`,
+                              )
+                            }
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="word-page-sentences-list">
+                  {sentencesInfo.map(({ index, text }) => (
+                    <div key={index} className="word-page-sentence-card">
+                      <div className="word-page-sentence-header">
+                        <span>Sentence #{index + 1}</span>
+                      </div>
+                      <TextDisplay
+                        sentences={[text]}
+                        selectedTopics={selectedTopics}
+                        hoveredTopic={hoveredTopic}
+                        readTopics={readTopics}
+                        articleTopics={topics
+                          .filter((t) => t.sentences.includes(index + 1))
+                          .map((t) => ({ ...t, sentences: [1] }))}
+                        articleIndex={0}
+                        onToggleRead={toggleRead}
+                        onToggleTopic={toggleTopic}
+                        tooltipEnabled={tooltipEnabled}
+                        submissionId={submissionId}
+                        highlightWords={[word]}
+                      />
+                    </div>
+                  ))}
+                  {similarWords.length > 0 && (
+                    <div className="word-page-similar-words">
+                      <h3>Other related words:</h3>
+                      <div className="word-page-similar-words-list">
+                        {similarWords.map((w) => (
+                          <button
+                            key={w}
+                            className="similar-word-link"
+                            onClick={() =>
+                              navigate(
+                                `/page/word/${submissionId}/${encodeURIComponent(w)}`,
+                              )
+                            }
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "compare" && (
+            <div className="word-page-compare-container">
+              {compareGroups.length > 0 ? (
+                <GlobalTopicsCompareView
+                  groups={compareGroups}
+                  groupRefs={compareGroupRefs}
+                  highlightWord={word}
+                />
+              ) : (
+                <p className="word-page-no-occurrences">
+                  No occurrences of this word were found in the article.
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "tree" && (
+            <div className="word-page-tree-container">
+              <WordTree entries={treeEntriesWithReadState} pivotLabel={word} />
+            </div>
+          )}
+
+          {activeTab === "circles" && (
+            <div className="word-page-chart-container">
+              <CircularPackingChart
+                topics={topics}
+                sentences={allSentences}
+                onShowInArticle={handleShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
+              />
+            </div>
+          )}
+
+          {activeTab === "treemap" && (
+            <div className="word-page-chart-container">
+              <TreemapChart
+                topics={topics}
+                sentences={allSentences}
+                onShowInArticle={handleShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
+              />
+            </div>
+          )}
+
+          {activeTab === "summaries" && (
+            <div className="word-page-timeline-container">
+              <SummaryTimeline
+                mode="summary"
+                title="Topic Summaries"
+                summaryTimelineItems={timelineItems}
+                highlightedSummaryParas={new Set()}
+                summaryModalTopic={null}
+                closeSummaryModal={() => setSummaryModalTopic(null)}
+                handleSummaryClick={handleSummaryClick}
+                articles={articles}
+                topics={allTopics}
+                onClose={() => setActiveTab("sentences")}
+                onShowInArticle={handleShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
+              />
+            </div>
+          )}
+
+          {activeTab === "tags" && (
+            <div>
+              <h3>Tags Cloud for sentences containing "{word}"</h3>
+              <TopicsTagCloud
+                submissionId={submissionId}
+                topics={[]}
+                sentences={allSentences}
+                forcedPathQuery={`word=${encodeURIComponent(word)}`}
+                readTopics={readTopics}
+                onToggleRead={toggleRead}
+                markup={submission?.results?.markup}
+                onShowInArticle={handleShowInArticle}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {summaryModalTopic && (
+        <TopicSentencesModal
+          topic={summaryModalTopic}
+          sentences={summaryModalTopic._sentences || allSentences}
+          onClose={() => setSummaryModalTopic(null)}
+          onShowInArticle={handleShowInArticle}
+          allTopics={allTopics}
+          readTopics={readTopics}
+          onToggleRead={toggleRead}
+          markup={submission?.results?.markup}
+        />
+      )}
+    </div>
   );
 }

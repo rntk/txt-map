@@ -4,10 +4,10 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import TopicList from "./TopicList";
 
 // A minimal flat topic
-const makeTopic = (name, totalSentences = 1) => ({
+const makeTopic = (name, totalSentences = 1, ranges = []) => ({
   name,
   totalSentences,
-  ranges: [],
+  ranges,
 });
 const makeInsight = (
   id,
@@ -225,7 +225,16 @@ describe("TopicList general rendering", () => {
   });
 
   it("keeps leaf actions non-tabbable until the overflow trigger is opened", () => {
-    render(<TopicList topics={[makeTopic("Science")]} />);
+    render(
+      <TopicList
+        topics={[
+          makeTopic("Science", 1, [
+            [0, 1],
+            [2, 3],
+          ]),
+        ]}
+      />,
+    );
 
     const row = getRowForText("Science");
     const nextButton = within(row).getByRole("button", { name: "Next" });
@@ -243,7 +252,20 @@ describe("TopicList general rendering", () => {
   });
 
   it("opens only one manual action menu at a time", () => {
-    render(<TopicList topics={[makeTopic("Science"), makeTopic("History")]} />);
+    render(
+      <TopicList
+        topics={[
+          makeTopic("Science", 1, [
+            [0, 1],
+            [2, 3],
+          ]),
+          makeTopic("History", 1, [
+            [0, 1],
+            [2, 3],
+          ]),
+        ]}
+      />,
+    );
 
     const scienceRow = getRowForText("Science");
     const historyRow = getRowForText("History");
@@ -272,30 +294,28 @@ describe("TopicList general rendering", () => {
   });
 
   it("closes a manually opened menu after using an action", () => {
-    const onNavigateTopic = vi.fn();
+    const onToggleRead = vi.fn();
 
     render(
-      <TopicList
-        topics={[makeTopic("Science")]}
-        onNavigateTopic={onNavigateTopic}
-      />,
+      <TopicList topics={[makeTopic("Science")]} onToggleRead={onToggleRead} />,
     );
 
     const row = getRowForText("Science");
     const trigger = within(row).getByRole("button", {
       name: "Show actions for Science",
     });
-    const nextButton = within(row).getByRole("button", { name: "Next" });
+    const markReadButton = within(row).getByRole("button", {
+      name: "Mark Read",
+    });
 
     fireEvent.click(trigger);
-    fireEvent.click(nextButton);
+    fireEvent.click(markReadButton);
 
-    expect(onNavigateTopic).toHaveBeenCalledWith(
+    expect(onToggleRead).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Science" }),
-      "next",
     );
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(nextButton).toHaveAttribute("tabindex", "-1");
+    expect(markReadButton).toHaveAttribute("tabindex", "-1");
   });
 
   it("marks read controls as active when a leaf topic is read", () => {

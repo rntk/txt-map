@@ -1,6 +1,6 @@
-import pytest
 from lib.pdf_to_html import convert_pdf_to_html
 import pymupdf
+
 
 def test_convert_pdf_with_links():
     # Create a simple PDF with a link
@@ -9,14 +9,16 @@ def test_convert_pdf_with_links():
     page.insert_text((50, 50), "Click here", fontsize=12)
     # Define a link rect around "Click here"
     link_rect = pymupdf.Rect(50, 40, 150, 60)
-    page.insert_link({"kind": pymupdf.LINK_URI, "uri": "https://example.com", "from": link_rect})
+    page.insert_link(
+        {"kind": pymupdf.LINK_URI, "uri": "https://example.com", "from": link_rect}
+    )
 
     pdf_bytes = doc.write()
     doc.close()
 
     html = convert_pdf_to_html(pdf_bytes)
     assert 'href="https://example.com"' in html
-    assert 'Click here' in html
+    assert "Click here" in html
     assert 'target="_blank" rel="noopener noreferrer"' in html
 
 
@@ -37,5 +39,5 @@ def test_convert_pdf_with_internal_links():
     html = convert_pdf_to_html(pdf_bytes)
     assert 'href="#page-2"' in html
     assert 'id="page-2"' in html
-    assert 'Go to page 2' in html
-    assert 'You are on page 2' in html
+    assert "Go to page 2" in html
+    assert "You are on page 2" in html

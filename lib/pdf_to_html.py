@@ -82,7 +82,9 @@ class PDFToSemanticHTML:
             return "h3"
         return None
 
-    def _get_link_for_rect(self, rect: pymupdf.Rect, links: List[dict]) -> Optional[tuple]:
+    def _get_link_for_rect(
+        self, rect: pymupdf.Rect, links: List[dict]
+    ) -> Optional[tuple]:
         """Find if a text rectangle overlaps with any link. Returns (kind, target)."""
         for link in links:
             link_rect = pymupdf.Rect(link["from"])
@@ -98,8 +100,9 @@ class PDFToSemanticHTML:
                         return ("goto", page_target)
         return None
 
-
-    def _wrap_text_with_style(self, text: str, flags: int, link: Optional[tuple] = None) -> str:
+    def _wrap_text_with_style(
+        self, text: str, flags: int, link: Optional[tuple] = None
+    ) -> str:
         """Wrap text with <strong>, <em>, and <a> tags based on font flags and link."""
         # Apply italic first, then bold (for proper nesting)
         if flags & pymupdf.TEXT_FONT_ITALIC:
@@ -205,7 +208,11 @@ class PDFToSemanticHTML:
                             span_rect = pymupdf.Rect(span["bbox"])
                             link = self._get_link_for_rect(span_rect, links)
                             escaped = self._escape_html(span["text"])
-                            heading_parts.append(self._wrap_text_with_style(escaped, span.get("flags", 0), link=link))
+                            heading_parts.append(
+                                self._wrap_text_with_style(
+                                    escaped, span.get("flags", 0), link=link
+                                )
+                            )
                         heading_text = "".join(heading_parts)
                         if heading_text.strip():
                             page_html.append(
@@ -236,7 +243,8 @@ class PDFToSemanticHTML:
             if page_html:
                 html_parts.append(
                     f'<div id="pdf-page-{page_num + 1}">'
-                    + f"<!-- Page {page_num + 1} -->\n" + "\n".join(page_html)
+                    + f"<!-- Page {page_num + 1} -->\n"
+                    + "\n".join(page_html)
                     + "</div>"
                 )
 

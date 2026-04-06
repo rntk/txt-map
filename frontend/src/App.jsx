@@ -47,6 +47,7 @@ import TopicAnalysisPage from "./components/TopicAnalysisPage";
  * @property {string} draftProvider
  * @property {string} draftModel
  * @property {string} saveState
+ * @property {boolean} loadError
  * @property {boolean} hasPendingChanges
  * @property {(event: React.ChangeEvent<HTMLSelectElement>) => void} onProviderChange
  * @property {(event: React.ChangeEvent<HTMLSelectElement>) => void} onModelChange
@@ -136,9 +137,14 @@ const PAGE_COMPONENTS = {
 
 /**
  * @param {string} saveState
+ * @param {boolean} loadError
  * @returns {string}
  */
-function getSaveHintText(saveState) {
+function getSaveHintText(saveState, loadError) {
+  if (loadError) {
+    return "LLM settings unavailable";
+  }
+
   if (saveState === "error") {
     return "Save failed";
   }
@@ -174,6 +180,7 @@ function LlmSelector({
   draftProvider,
   draftModel,
   saveState,
+  loadError,
   hasPendingChanges,
   onProviderChange,
   onModelChange,
@@ -183,10 +190,14 @@ function LlmSelector({
   const selectedProvider =
     providerOptions.find((provider) => provider.name === draftProvider) || null;
   const modelOptions = selectedProvider?.models || [];
-  const saveHintText = settings ? getSaveHintText(saveState) : "";
+  const saveHintText = getSaveHintText(saveState, loadError);
 
   if (!settings || providerOptions.length === 0) {
-    return null;
+    return loadError ? (
+      <div className="llm-provider-badge" aria-label="LLM settings">
+        <span className="llm-provider-badge__hint">{saveHintText}</span>
+      </div>
+    ) : null;
   }
 
   return (
@@ -310,6 +321,7 @@ function App() {
   const [draftProvider, setDraftProvider] = useState("");
   const [draftModel, setDraftModel] = useState("");
   const [saveState, setSaveState] = useState("idle");
+  const [settingsLoadError, setSettingsLoadError] = useState(false);
 
   // Auth state
   const [auth, setAuth] = useState({
@@ -383,13 +395,21 @@ function App() {
   // Load LLM settings
   useEffect(() => {
     fetch("/api/settings", { credentials: "include" })
-      .then((r) => r.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load LLM settings");
+        }
+        return response.json();
+      })
       .then((data) => {
         setSettings(data);
         setDraftProvider(data.llm_provider || "");
         setDraftModel(data.llm_model || "");
+        setSettingsLoadError(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        setSettingsLoadError(true);
+      });
   }, []);
 
   const hasPendingChanges = Boolean(
@@ -546,6 +566,7 @@ function App() {
       draftProvider={draftProvider}
       draftModel={draftModel}
       saveState={saveState}
+      loadError={settingsLoadError}
       hasPendingChanges={hasPendingChanges}
       onProviderChange={handleProviderChange}
       onModelChange={handleModelChange}
