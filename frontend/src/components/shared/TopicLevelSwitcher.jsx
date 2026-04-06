@@ -6,9 +6,9 @@ function TopicLevelSwitcher({
   selectedLevel,
   maxLevel,
   onChange,
-  label = "Topic Level:",
+  label = "Level:",
   className = "",
-  getOptionLabel = (level) => `Level ${level} (${getLevelLabel(level)})`,
+  getOptionLabel = (level) => `L${level}`,
 }) {
   const rootClassName = ["topic-level-switcher", className]
     .filter(Boolean)

@@ -4,6 +4,8 @@ import {
   getSubtreeStats as getSubtreeStatsUtil,
 } from "../utils/topicTree";
 import TopicTreeNode from "./TopicTreeNode";
+import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
+import { useTopicLevel } from "../hooks/useTopicLevel";
 import {
   getTopicCSSClass,
   getTopicHighlightColor,
@@ -88,6 +90,7 @@ function TopicList({
   onCompareTopicRanges,
   onAnalyzeTopic,
 }) {
+  const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [insightSearchQuery, setInsightSearchQuery] = useState("");
@@ -108,7 +111,7 @@ function TopicList({
   const hasInsights = safeInsights.length > 0;
   const currentSidebarTab = hasInsights ? sidebarTab : "topics";
 
-  const topicTree = useMemo(() => buildTopicTree(topics), [topics]);
+  const topicTree = useMemo(() => buildTopicTree(topics, selectedLevel), [topics, selectedLevel]);
   const getSubtreeStats = useCallback(
     (treeNode) => getSubtreeStatsUtil(treeNode),
     [],
@@ -445,6 +448,13 @@ function TopicList({
 
       {currentSidebarTab === "topics" && topicTree.length > 0 && (
         <div className="topic-nav-panel">
+          <div className="topic-nav-toolbar">
+            <TopicLevelSwitcher
+              selectedLevel={selectedLevel}
+              maxLevel={maxLevel}
+              onChange={setSelectedLevel}
+            />
+          </div>
           <div className="topic-nav-toolbar">
             <div className="topic-nav-toolbar__group">
               <button

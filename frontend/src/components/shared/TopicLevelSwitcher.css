@@ -1,48 +1,49 @@
 .topic-level-switcher {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.6rem;
   flex-wrap: wrap;
 }
 
 .topic-level-switcher__label {
-  font-size: 13px;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: #555;
+  color: var(--shell-muted-strong, #3d3e3a);
   white-space: nowrap;
 }
 
 .topic-level-switcher__buttons {
   display: flex;
-  gap: 6px;
+  gap: 0.35rem;
   flex-wrap: wrap;
 }
 
 .topic-level-switcher__button {
-  padding: 6px 14px;
+  appearance: none;
+  padding: 0.35rem 0.6rem;
   font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: #555;
-  background-color: #e9ecef;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  box-sizing: border-box;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--shell-muted-strong, #3d3e3a);
+  background: var(--shell-surface-strong, #ffffff);
+  border: 1px solid var(--shell-border, rgba(29, 30, 27, 0.08));
+  border-radius: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
 }
 
 .topic-level-switcher__button:hover {
-  background-color: #dee2e6;
+  background: rgba(31, 32, 29, 0.04);
+  border-color: rgba(29, 30, 27, 0.14);
 }
 
 .topic-level-switcher__button.active {
-  color: #fff;
-  background-color: #7ba3cc;
-  border-color: #5a8ab8;
-  box-shadow: inset 0 0 0 1px #5a8ab8;
-}
-
-.topic-level-switcher__button.active:hover {
-  background-color: #6a95c0;
+  background: #e8f4e8;
+  border-color: #a8d8a8;
+  color: #2d6a2d;
 }

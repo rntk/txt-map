@@ -1,4 +1,4 @@
-export function buildTopicTree(topics) {
+export function buildTopicTree(topics, startLevel = 0) {
   const safe = Array.isArray(topics) ? topics : [];
   const tree = new Map();
 
@@ -34,7 +34,7 @@ export function buildTopicTree(topics) {
 
   const roots = [];
   tree.forEach((value) => {
-    if (value.node.depth === 0) {
+    if (value.node.depth === startLevel) {
       roots.push(value);
     }
   });
