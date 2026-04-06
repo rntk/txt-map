@@ -189,6 +189,7 @@ function TopicTreeNode({
                     onClick={() => {
                       onNavigateTopic?.(topic, "focus");
                     }}
+                    title={topic.summary || undefined}
                   >
                     {node.name}
                   </span>
@@ -356,10 +357,6 @@ function TopicTreeNode({
               </>
             )}
           </div>
-
-          {node.isLeaf && topic && topic.summary && (
-            <div className="topic-tree-node__summary">{topic.summary}</div>
-          )}
         </div>
       </div>
 
