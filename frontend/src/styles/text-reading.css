@@ -587,6 +587,24 @@
   will-change: top, height;
 }
 
+.topic-article-view__range-accent-top,
+.topic-article-view__range-accent-bottom {
+  position: absolute;
+  right: 0;
+  width: 12px;
+  height: 4px;
+  background: var(--topic-accent-color);
+  border-radius: 999px;
+}
+
+.topic-article-view__range-accent-top {
+  top: 0;
+}
+
+.topic-article-view__range-accent-bottom {
+  bottom: 0;
+}
+
 .topic-article-view__notes-column {
   position: absolute;
   top: 0;

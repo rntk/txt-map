@@ -286,11 +286,60 @@ function buildTopicNoteLayouts(articleRoot, items) {
 
   const articleRect = articleRoot.getBoundingClientRect();
 
+  // Cache sentences
+  const sentenceElements = articleRoot.querySelectorAll(
+    '[data-article-index="0"][data-sentence-index], [id^="sentence-0-"]'
+  );
+  const sentenceMap = new Map();
+  for (let i = 0; i < sentenceElements.length; i++) {
+    const el = sentenceElements[i];
+    const indexStr = el.getAttribute("data-sentence-index") || el.id.replace("sentence-0-", "");
+    const index = parseInt(indexStr, 10);
+    if (!isNaN(index)) {
+      sentenceMap.set(index, el);
+    }
+  }
+
+  // Cache characters
+  const charElements = articleRoot.querySelectorAll('[data-article-index="0"][data-char-start]');
+  const charCandidates = [];
+  for (let i = 0; i < charElements.length; i++) {
+    const el = charElements[i];
+    const start = parseInt(el.getAttribute("data-char-start"), 10);
+    if (!isNaN(start)) {
+      charCandidates.push({ node: el, start });
+    }
+  }
+  charCandidates.sort((a, b) => a.start - b.start);
+
+  const getSentenceNodeCached = (index) => sentenceMap.get(index) || null;
+  const getCharNodeCached = (charIndex) => {
+    if (!Number.isFinite(charIndex) || charCandidates.length === 0) return null;
+    let left = 0, right = charCandidates.length - 1;
+    let best = charCandidates[right];
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      if (charCandidates[mid].start >= charIndex) {
+        best = charCandidates[mid];
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
+    }
+    return best.node;
+  };
+
   /** @type {TopicMeasuredLayout[]} */
   const results = [];
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
-    const { startNode, endNode } = getTopicBoundaryNodes(articleRoot, item);
+    let startNode = getSentenceNodeCached(item.startSentenceIndex);
+    let endNode = getSentenceNodeCached(item.endSentenceIndex);
+
+    if (!startNode || !endNode) {
+      startNode = startNode || getCharNodeCached(item.startCharIndex);
+      endNode = endNode || getCharNodeCached(item.endCharIndex);
+    }
 
     if (
       !(startNode instanceof HTMLElement) ||
@@ -715,16 +764,22 @@ function TopicArticleFullscreenView({
           : window.setTimeout(run, 0);
     };
 
+    let resizeTimeout;
     const handleResize = () => {
-      measureLayouts();
-      scheduleSync();
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        measureLayouts();
+        scheduleSync();
+      }, 150);
     };
 
     container.addEventListener("scroll", scheduleSync, { passive: true });
     window.addEventListener("resize", handleResize);
-    handleResize();
+    measureLayouts();
+    scheduleSync();
 
     return () => {
+      clearTimeout(resizeTimeout);
       container.removeEventListener("scroll", scheduleSync);
       window.removeEventListener("resize", handleResize);
       if (animationFrameRef.current) {
@@ -1065,7 +1120,10 @@ const RangeAccentDot = React.memo(function RangeAccentDot({
       ref={setRef}
       className={`topic-article-view__range-accent ${getTopicCSSClass(topicName)}`}
       aria-hidden="true"
-    />
+    >
+      <div className="topic-article-view__range-accent-top" />
+      <div className="topic-article-view__range-accent-bottom" />
+    </div>
   );
 });
 
