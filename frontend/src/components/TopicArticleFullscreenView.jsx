@@ -468,6 +468,7 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
  * @param {number} scrollTop
  * @param {number} viewportHeight
  * @param {string|null} activeSegmentKey
+ * @param {number} [mountBuffer] - Extra pixels beyond the viewport to keep cards mounted (hysteresis)
  * @returns {TopicVisibleNoteLayout[]}
  */
 function buildVisibleTopicNoteLayouts(
@@ -475,13 +476,14 @@ function buildVisibleTopicNoteLayouts(
   scrollTop,
   viewportHeight,
   activeSegmentKey,
+  mountBuffer = 0,
 ) {
   if (layouts.length === 0 || viewportHeight <= 0) {
     return [];
   }
 
-  const viewportTop = scrollTop;
-  const viewportBottom = scrollTop + viewportHeight;
+  const viewportTop = scrollTop - mountBuffer;
+  const viewportBottom = scrollTop + viewportHeight + mountBuffer;
   const maxVisibleNotes = Math.max(
     1,
     Math.floor(
@@ -531,12 +533,16 @@ function buildVisibleTopicNoteLayouts(
           );
         })();
 
-  const topEdge = viewportTop + NOTE_VIEWPORT_PADDING;
+  // Position clamping always uses the real viewport boundaries (without buffer)
+  // so that cards don't get pushed to off-screen positions.
+  const realViewportTop = scrollTop;
+  const realViewportBottom = scrollTop + viewportHeight;
+  const topEdge = realViewportTop + NOTE_VIEWPORT_PADDING;
   const noteHeights = limitedCandidates.map((layout) =>
     estimateTopicNoteHeight(layout.noteTitleLines),
   );
   const maxNoteHeight = Math.max(...noteHeights);
-  const bottomEdge = viewportBottom - NOTE_VIEWPORT_PADDING - maxNoteHeight;
+  const bottomEdge = realViewportBottom - NOTE_VIEWPORT_PADDING - maxNoteHeight;
   const forwardTops = [];
   limitedCandidates.forEach((layout, index) => {
     const naturalTop = layout.bracketTop;
@@ -696,8 +702,12 @@ function TopicArticleFullscreenView({
   const activeSegmentKeyRef = useRef(activeSegmentKey);
   const prevVisibleSetRef = useRef("");
   const visibleTopLevelLabelsRef = useRef(visibleTopLevelLabels);
+  // Cached joined key for visibleTopLevelLabels to avoid re-joining on every rAF frame.
+  const visibleTopLevelLabelsKeyRef = useRef("");
   const summaryCardRef = useRef(null);
   const summaryCardLayoutRef = useRef(summaryCardLayout);
+  // Tracks the debounce timer used to remove the --scrolling CSS class.
+  const scrollingClassTimerRef = useRef(0);
   noteLayoutsRef.current = noteLayouts;
   activeSegmentKeyRef.current = activeSegmentKey;
   visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
@@ -858,6 +868,9 @@ function TopicArticleFullscreenView({
       return undefined;
     }
 
+    const SCROLL_CLASS = "topic-article-view__scroll--scrolling";
+    const MOUNT_BUFFER = 40;
+
     const scheduleSync = () => {
       if (animationFrameRef.current) {
         if (typeof window.cancelAnimationFrame === "function") {
@@ -867,17 +880,28 @@ function TopicArticleFullscreenView({
         }
       }
 
+      // Mark the container as actively scrolling so CSS transitions are
+      // suppressed — cards track the viewport live without visual lag.
+      container.classList.add(SCROLL_CLASS);
+      clearTimeout(scrollingClassTimerRef.current);
+      scrollingClassTimerRef.current = setTimeout(() => {
+        container.classList.remove(SCROLL_CLASS);
+      }, 150);
+
       const run = () => {
         animationFrameRef.current = 0;
         const scrollTop = container.scrollTop;
         const viewportHeight = container.clientHeight;
 
         // Compute visible layouts once per frame (pure math — no DOM reads).
+        // mountBuffer keeps cards mounted a bit beyond the viewport edges to
+        // reduce mount/unmount churn at boundaries.
         const visible = buildVisibleTopicNoteLayouts(
           noteLayoutsRef.current,
           scrollTop,
           viewportHeight,
           activeSegmentKeyRef.current,
+          MOUNT_BUFFER,
         );
         const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
           noteLayoutsRef.current,
@@ -931,10 +955,10 @@ function TopicArticleFullscreenView({
           prevVisibleSetRef.current = newSet;
           setMountedLayouts(visible);
         }
-        if (
-          nextVisibleTopLevelLabels.join("\0") !==
-          visibleTopLevelLabelsRef.current.join("\0")
-        ) {
+        // Use cached key ref to avoid re-joining on every frame.
+        const nextLabelsKey = nextVisibleTopLevelLabels.join("\0");
+        if (nextLabelsKey !== visibleTopLevelLabelsKeyRef.current) {
+          visibleTopLevelLabelsKeyRef.current = nextLabelsKey;
           setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
         }
         const currentSummaryCardLayout = summaryCardLayoutRef.current;
@@ -971,6 +995,8 @@ function TopicArticleFullscreenView({
 
     return () => {
       clearTimeout(resizeTimeout);
+      clearTimeout(scrollingClassTimerRef.current);
+      container.classList.remove(SCROLL_CLASS);
       container.removeEventListener("scroll", scheduleSync);
       window.removeEventListener("resize", handleResize);
       if (animationFrameRef.current) {
@@ -989,21 +1015,13 @@ function TopicArticleFullscreenView({
     syncActiveTopicToViewport,
   ]);
 
-  // After mountedLayouts changes (new cards mounted), write their initial
-  // positions.  The rAF loop will keep positions current from that point on.
+  // After mountedLayouts changes (new cards mounted), write their initial CSS
+  // custom-property positions to the freshly attached DOM nodes.  The rAF loop
+  // keeps positions current from that point on, so we only need to seed the
+  // values here — no need to recompute layouts from scratch.
   useEffect(() => {
-    const container = articleScrollRef.current;
-    if (!(container instanceof HTMLElement)) {
-      return;
-    }
-    const visible = buildVisibleTopicNoteLayouts(
-      noteLayoutsRef.current,
-      container.scrollTop,
-      container.clientHeight,
-      activeSegmentKeyRef.current,
-    );
-    for (let i = 0; i < visible.length; i += 1) {
-      const layout = visible[i];
+    for (let i = 0; i < mountedLayouts.length; i += 1) {
+      const layout = mountedLayouts[i];
       const anchor = noteAnchorRefs.current[layout.segmentKey];
       if (anchor instanceof HTMLElement) {
         anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
@@ -1021,37 +1039,7 @@ function TopicArticleFullscreenView({
         );
       }
     }
-    const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
-      noteLayoutsRef.current,
-      container.scrollTop,
-      container.clientHeight,
-    );
-    if (
-      nextVisibleTopLevelLabels.join("\0") !==
-      visibleTopLevelLabelsRef.current.join("\0")
-    ) {
-      setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
-    }
-    const nextSummaryCardLayout = buildTopicSummaryCardLayout(
-      activeSummaryLayout,
-      activeSummary,
-      container.scrollTop,
-      container.clientHeight,
-    );
-    const summaryCardNode = summaryCardRef.current;
-    if (summaryCardNode instanceof HTMLElement && nextSummaryCardLayout) {
-      summaryCardNode.style.setProperty(
-        "--topic-summary-top",
-        `${nextSummaryCardLayout.summaryTop}px`,
-      );
-    }
-    setSummaryCardLayout((currentValue) =>
-      currentValue?.segmentKey === nextSummaryCardLayout?.segmentKey &&
-      currentValue?.summary === nextSummaryCardLayout?.summary
-        ? currentValue
-        : nextSummaryCardLayout,
-    );
-  }, [activeSummary, activeSummaryLayout, mountedLayouts]);
+  }, [mountedLayouts]);
 
   useEffect(() => {
     return () => {

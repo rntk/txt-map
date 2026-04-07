@@ -585,6 +585,9 @@
   opacity: 0.95;
   pointer-events: none;
   will-change: top, height;
+  transition:
+    top 0.18s ease,
+    height 0.18s ease;
 }
 
 .topic-article-view__range-accent-top,
@@ -605,6 +608,17 @@
   bottom: 0;
 }
 
+@keyframes topicNoteEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .topic-article-view__notes-column {
   position: absolute;
   top: 0;
@@ -620,6 +634,8 @@
   width: 100%;
   min-height: var(--topic-note-height, 84px);
   will-change: top;
+  transition: top 0.18s ease;
+  animation: topicNoteEnter 0.2s ease both;
 }
 
 .topic-article-view__note-anchor::before {
@@ -632,6 +648,15 @@
   border-radius: 999px;
   background: var(--topic-accent-color, #98a2b3);
   opacity: 0.95;
+}
+
+/* Disable position transitions while the user is actively scrolling so cards
+   track the scroll position immediately and feel live rather than lagging. */
+.topic-article-view__scroll--scrolling .topic-article-view__note-anchor,
+.topic-article-view__scroll--scrolling .topic-article-view__range-accent,
+.topic-article-view__scroll--scrolling .topic-article-view__summary-card {
+  transition: none;
+  animation: none;
 }
 
 .topic-article-view__topic-note {
@@ -719,6 +744,7 @@
   line-height: 1.2;
   text-transform: uppercase;
   word-break: break-word;
+  animation: topicNoteEnter 0.2s ease both;
 }
 
 .topic-article-view__summary-card {
@@ -733,6 +759,8 @@
   background: rgba(255, 253, 249, 0.98);
   box-shadow: 0 14px 28px rgba(16, 24, 40, 0.08);
   will-change: top;
+  transition: top 0.15s ease;
+  animation: topicNoteEnter 0.22s ease both;
 }
 
 .topic-article-view__summary-card-title {
