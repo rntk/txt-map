@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  useState,
+} from "react";
 import * as d3 from "d3";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";

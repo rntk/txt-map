@@ -111,7 +111,10 @@ function TopicList({
   const hasInsights = safeInsights.length > 0;
   const currentSidebarTab = hasInsights ? sidebarTab : "topics";
 
-  const topicTree = useMemo(() => buildTopicTree(topics, selectedLevel), [topics, selectedLevel]);
+  const topicTree = useMemo(
+    () => buildTopicTree(topics, selectedLevel),
+    [topics, selectedLevel],
+  );
   const getSubtreeStats = useCallback(
     (treeNode) => getSubtreeStatsUtil(treeNode),
     [],

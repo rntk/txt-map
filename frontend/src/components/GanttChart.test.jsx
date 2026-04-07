@@ -102,9 +102,7 @@ describe("GanttChart", () => {
       <GanttChart topics={topics} sentences={sentences} />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "L1" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "L1" }));
 
     const parentBands = Array.from(
       container.querySelectorAll(".gantt-parent-band"),
@@ -119,9 +117,7 @@ describe("GanttChart", () => {
     fireEvent.click(physicsBar);
 
     expect(screen.getByRole("button", { name: "Physics" })).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "L0" }),
-    ).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "L0" })).toHaveClass("active");
     expect(
       container.querySelectorAll(
         '.gantt-parent-band[data-parent-path="Science>Physics"]',
