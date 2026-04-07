@@ -12,6 +12,7 @@ import {
   getTopicAccentColor,
   getTopicCSSClass,
 } from "../utils/topicColorUtils";
+import { splitTopicPath } from "../utils/summaryTimeline";
 
 /**
  * @typedef {Object} TopicTimelineItem
@@ -20,6 +21,9 @@ import {
  * @property {number} endSentenceIndex
  * @property {number|null} startCharIndex
  * @property {number|null} endCharIndex
+ * @property {string[]} pathSegments
+ * @property {string} topLevelLabel
+ * @property {string[]} noteTitleLines
  * @property {Object} topic
  */
 
@@ -30,6 +34,9 @@ import {
  * @property {number} endSentenceIndex
  * @property {number} bracketTop
  * @property {number} bracketHeight
+ * @property {string[]} pathSegments
+ * @property {string} topLevelLabel
+ * @property {string[]} noteTitleLines
  * @property {Object} topic
  */
 
@@ -65,6 +72,27 @@ import {
 const NOTE_CARD_ESTIMATED_HEIGHT = 84;
 const NOTE_MIN_GAP = 12;
 const NOTE_VIEWPORT_PADDING = 8;
+const NOTE_CARD_BASE_HEIGHT = 58;
+const NOTE_CARD_LINE_HEIGHT = 18;
+const NOTE_CARD_MAX_TITLE_LINES = 3;
+
+/**
+ * @param {string[]} noteTitleLines
+ * @returns {number}
+ */
+export function estimateTopicNoteHeight(noteTitleLines) {
+  const lineCount = Math.max(
+    1,
+    Math.min(
+      NOTE_CARD_MAX_TITLE_LINES,
+      Array.isArray(noteTitleLines) ? noteTitleLines.length : 0,
+    ),
+  );
+  return Math.max(
+    NOTE_CARD_ESTIMATED_HEIGHT,
+    NOTE_CARD_BASE_HEIGHT + lineCount * NOTE_CARD_LINE_HEIGHT,
+  );
+}
 
 /**
  * @param {Object} topic
@@ -119,10 +147,20 @@ function buildTopicTimelineItems(topics) {
         return null;
       }
 
+      const pathSegments = splitTopicPath(topic.name);
+      const normalizedPathSegments =
+        pathSegments.length > 0 ? pathSegments : [topic.name];
+
       return {
         name: topic.name,
         startSentenceIndex: bounds.startSentenceIndex,
         endSentenceIndex: bounds.endSentenceIndex,
+        pathSegments: normalizedPathSegments,
+        topLevelLabel: normalizedPathSegments[0] || topic.name,
+        noteTitleLines:
+          normalizedPathSegments.length > 1
+            ? normalizedPathSegments.slice(1)
+            : [topic.name],
         startCharIndex: (() => {
           const values = (Array.isArray(topic?.ranges) ? topic.ranges : [])
             .map((range) => Number(range?.start))
@@ -248,35 +286,39 @@ function buildTopicNoteLayouts(articleRoot, items) {
 
   const articleRect = articleRoot.getBoundingClientRect();
 
-  return items
-    .map((item) => {
-      const { startNode, endNode } = getTopicBoundaryNodes(articleRoot, item);
+  /** @type {TopicMeasuredLayout[]} */
+  const results = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const { startNode, endNode } = getTopicBoundaryNodes(articleRoot, item);
 
-      if (
-        !(startNode instanceof HTMLElement) ||
-        !(endNode instanceof HTMLElement)
-      ) {
-        return null;
-      }
+    if (
+      !(startNode instanceof HTMLElement) ||
+      !(endNode instanceof HTMLElement)
+    ) {
+      continue;
+    }
 
-      const startRect = startNode.getBoundingClientRect();
-      const endRect = endNode.getBoundingClientRect();
-      const bracketTop =
-        startRect.top - articleRect.top + articleRoot.scrollTop;
-      const bracketBottom =
-        endRect.bottom - articleRect.top + articleRoot.scrollTop;
-      const bracketHeight = Math.max(24, bracketBottom - bracketTop);
+    const startRect = startNode.getBoundingClientRect();
+    const endRect = endNode.getBoundingClientRect();
+    const bracketTop = startRect.top - articleRect.top + articleRoot.scrollTop;
+    const bracketBottom =
+      endRect.bottom - articleRect.top + articleRoot.scrollTop;
+    const bracketHeight = Math.max(24, bracketBottom - bracketTop);
 
-      return {
-        name: item.name,
-        startSentenceIndex: item.startSentenceIndex,
-        endSentenceIndex: item.endSentenceIndex,
-        bracketTop,
-        bracketHeight,
-        topic: item.topic,
-      };
-    })
-    .filter(Boolean);
+    results.push({
+      name: item.name,
+      startSentenceIndex: item.startSentenceIndex,
+      endSentenceIndex: item.endSentenceIndex,
+      bracketTop,
+      bracketHeight,
+      pathSegments: item.pathSegments,
+      topLevelLabel: item.topLevelLabel,
+      noteTitleLines: item.noteTitleLines,
+      topic: item.topic,
+    });
+  }
+  return results;
 }
 
 /**
@@ -357,12 +399,16 @@ function buildVisibleTopicNoteLayouts(
         })();
 
   const topEdge = viewportTop + NOTE_VIEWPORT_PADDING;
-  const bottomEdge =
-    viewportBottom - NOTE_VIEWPORT_PADDING - NOTE_CARD_ESTIMATED_HEIGHT;
+  const noteHeights = limitedCandidates.map((layout) =>
+    estimateTopicNoteHeight(layout.noteTitleLines),
+  );
+  const maxNoteHeight = Math.max(...noteHeights);
+  const bottomEdge = viewportBottom - NOTE_VIEWPORT_PADDING - maxNoteHeight;
   const forwardTops = [];
   limitedCandidates.forEach((layout, index) => {
+    const noteHeight = noteHeights[index];
     const bracketCenter = layout.bracketTop + layout.bracketHeight / 2;
-    const naturalTop = bracketCenter - NOTE_CARD_ESTIMATED_HEIGHT / 2;
+    const naturalTop = bracketCenter - noteHeight / 2;
     const clampedTop = Math.min(
       Math.max(naturalTop, topEdge),
       Math.max(topEdge, bottomEdge),
@@ -374,7 +420,7 @@ function buildVisibleTopicNoteLayouts(
     forwardTops.push(
       Math.max(
         clampedTop,
-        forwardTops[index - 1] + NOTE_CARD_ESTIMATED_HEIGHT + NOTE_MIN_GAP,
+        forwardTops[index - 1] + noteHeights[index - 1] + NOTE_MIN_GAP,
       ),
     );
   });
@@ -386,14 +432,47 @@ function buildVisibleTopicNoteLayouts(
       topEdge,
       Math.min(forwardTops[index], nextTop),
     );
-    nextTop = positionedTops[index] - NOTE_CARD_ESTIMATED_HEIGHT - NOTE_MIN_GAP;
+    nextTop = positionedTops[index] - noteHeights[index] - NOTE_MIN_GAP;
   }
 
   return limitedCandidates.map((layout, index) => ({
     ...layout,
     noteTop: positionedTops[index],
-    noteHeight: NOTE_CARD_ESTIMATED_HEIGHT,
+    noteHeight: noteHeights[index],
   }));
+}
+
+/**
+ * @param {TopicMeasuredLayout[]} layouts
+ * @param {number} scrollTop
+ * @param {number} viewportHeight
+ * @returns {string[]}
+ */
+function buildVisibleTopLevelLabels(layouts, scrollTop, viewportHeight) {
+  if (layouts.length === 0 || viewportHeight <= 0) {
+    return [];
+  }
+
+  const viewportTop = scrollTop;
+  const viewportBottom = scrollTop + viewportHeight;
+  const seen = new Set();
+  const labels = [];
+
+  layouts.forEach((layout) => {
+    const bracketBottom = layout.bracketTop + layout.bracketHeight;
+    if (bracketBottom <= viewportTop || layout.bracketTop >= viewportBottom) {
+      return;
+    }
+
+    if (!layout.topLevelLabel || seen.has(layout.topLevelLabel)) {
+      return;
+    }
+
+    seen.add(layout.topLevelLabel);
+    labels.push(layout.topLevelLabel);
+  });
+
+  return labels;
 }
 
 /**
@@ -435,12 +514,24 @@ function TopicArticleFullscreenView({
     topicTimelineItems[0]?.name || null,
   );
   const [noteLayouts, setNoteLayouts] = useState([]);
-  const [scrollMetrics, setScrollMetrics] = useState({
-    scrollTop: 0,
-    viewportHeight: 0,
-  });
+  // Controls which TopicNoteCard components are mounted; updated only when the
+  // visible card set changes (not on every scroll pixel).
+  const [mountedLayouts, setMountedLayouts] = useState([]);
   const [previewTopicName, setPreviewTopicName] = useState(null);
   const [pinnedTopicName, setPinnedTopicName] = useState(null);
+  const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
+
+  // Refs that mirror state for use inside rAF callbacks without stale closures.
+  // Updated synchronously during render so they are always current by the time
+  // any pending animation frame fires.
+  const noteLayoutsRef = useRef(noteLayouts);
+  const activeTopicNameRef = useRef(activeTopicName);
+  const prevVisibleSetRef = useRef("");
+  const visibleTopLevelLabelsRef = useRef(visibleTopLevelLabels);
+  noteLayoutsRef.current = noteLayouts;
+  activeTopicNameRef.current = activeTopicName;
+  visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
+
   const effectiveHoveredTopic = useMemo(() => {
     const hoveredTopicName =
       previewTopicName || pinnedTopicName || hoveredTopic?.name || null;
@@ -454,16 +545,7 @@ function TopicArticleFullscreenView({
       hoveredTopic || { name: hoveredTopicName }
     );
   }, [hoveredTopic, pinnedTopicName, previewTopicName, topicTimelineItems]);
-  const visibleNoteLayouts = useMemo(
-    () =>
-      buildVisibleTopicNoteLayouts(
-        noteLayouts,
-        scrollMetrics.scrollTop,
-        scrollMetrics.viewportHeight,
-        activeTopicName,
-      ),
-    [activeTopicName, noteLayouts, scrollMetrics],
-  );
+
   const noteAccentStyleSheet = useMemo(() => {
     const seen = new Set();
     const lines = [];
@@ -479,23 +561,21 @@ function TopicArticleFullscreenView({
     });
     return lines.join("\n");
   }, [topicTimelineItems]);
+  // Memoise raw-HTML body extraction so it does not run on every re-render.
+  const rawHtmlBody = useMemo(() => {
+    const rawHtml = article?.raw_html || "";
+    const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return bodyMatch ? bodyMatch[1] : rawHtml;
+  }, [article?.raw_html]);
 
-  const syncScrollMetrics = useCallback(() => {
-    const container = articleScrollRef.current;
-    if (!(container instanceof HTMLElement)) {
-      return;
-    }
+  // Stable callbacks for ref assignment — avoids creating new closures each
+  // render which would otherwise cause React to teardown/re-attach DOM refs.
+  const handleNoteAnchorRef = useCallback((name, node) => {
+    noteAnchorRefs.current[name] = node;
+  }, []);
 
-    setScrollMetrics((previousMetrics) => {
-      const nextMetrics = {
-        scrollTop: container.scrollTop,
-        viewportHeight: container.clientHeight,
-      };
-      return previousMetrics.scrollTop === nextMetrics.scrollTop &&
-        previousMetrics.viewportHeight === nextMetrics.viewportHeight
-        ? previousMetrics
-        : nextMetrics;
-    });
+  const handleRangeAccentRef = useCallback((name, node) => {
+    articleRangeAccentRefs.current[name] = node;
   }, []);
 
   const syncActiveTopicToViewport = useCallback(() => {
@@ -504,7 +584,8 @@ function TopicArticleFullscreenView({
       return;
     }
 
-    if (noteLayouts.length === 0) {
+    const layouts = noteLayoutsRef.current;
+    if (layouts.length === 0) {
       return;
     }
 
@@ -512,17 +593,19 @@ function TopicArticleFullscreenView({
       container.scrollTop +
       Math.min(84, Math.max(40, container.clientHeight / 4));
     const activeItem =
-      noteLayouts.find(
+      layouts.find(
         (layout) =>
           probeOffset >= layout.bracketTop &&
           probeOffset <= layout.bracketTop + layout.bracketHeight,
       ) ||
-      noteLayouts.find((layout) => layout.bracketTop >= probeOffset) ||
-      noteLayouts[noteLayouts.length - 1];
+      layouts.find((layout) => layout.bracketTop >= probeOffset) ||
+      layouts[layouts.length - 1];
     if (activeItem?.name) {
-      setActiveTopicName(activeItem.name);
+      setActiveTopicName((prev) =>
+        prev === activeItem.name ? prev : activeItem.name,
+      );
     }
-  }, [noteLayouts]);
+  }, []); // stable — reads from noteLayoutsRef
 
   const measureLayouts = useCallback(() => {
     const articleRoot = articleRootRef.current;
@@ -537,27 +620,6 @@ function TopicArticleFullscreenView({
   useLayoutEffect(() => {
     measureLayouts();
   }, [measureLayouts]);
-
-  useEffect(() => {
-    visibleNoteLayouts.forEach((layout) => {
-      const noteAnchor = noteAnchorRefs.current[layout.name];
-      if (noteAnchor instanceof HTMLElement) {
-        noteAnchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
-      }
-
-      const articleRangeAccent = articleRangeAccentRefs.current[layout.name];
-      if (articleRangeAccent instanceof HTMLElement) {
-        articleRangeAccent.style.setProperty(
-          "--topic-range-top",
-          `${layout.bracketTop}px`,
-        );
-        articleRangeAccent.style.setProperty(
-          "--topic-range-height",
-          `${layout.bracketHeight}px`,
-        );
-      }
-    });
-  }, [visibleNoteLayouts]);
 
   useEffect(() => {
     setActiveTopicName((currentValue) => {
@@ -586,21 +648,75 @@ function TopicArticleFullscreenView({
         }
       }
 
+      const run = () => {
+        animationFrameRef.current = 0;
+        const scrollTop = container.scrollTop;
+        const viewportHeight = container.clientHeight;
+
+        // Compute visible layouts once per frame (pure math — no DOM reads).
+        const visible = buildVisibleTopicNoteLayouts(
+          noteLayoutsRef.current,
+          scrollTop,
+          viewportHeight,
+          activeTopicNameRef.current,
+        );
+        const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
+          noteLayoutsRef.current,
+          scrollTop,
+          viewportHeight,
+        );
+
+        // Write positions directly to DOM refs, bypassing the React render
+        // cycle entirely.  This keeps scroll at 60 fps without re-renders.
+        for (let i = 0; i < visible.length; i += 1) {
+          const layout = visible[i];
+          const anchor = noteAnchorRefs.current[layout.name];
+          if (anchor instanceof HTMLElement) {
+            anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
+            anchor.style.setProperty(
+              "--topic-note-height",
+              `${layout.noteHeight}px`,
+            );
+          }
+          const accent = articleRangeAccentRefs.current[layout.name];
+          if (accent instanceof HTMLElement) {
+            accent.style.setProperty(
+              "--topic-range-top",
+              `${layout.bracketTop}px`,
+            );
+            accent.style.setProperty(
+              "--topic-range-height",
+              `${layout.bracketHeight}px`,
+            );
+          }
+        }
+
+        // Trigger a React re-render only when the mounted card *set* changes
+        // (topics entering / leaving the viewport window).  For pure position
+        // changes the direct DOM writes above are sufficient.
+        const newSet = visible.map((l) => l.name).join("\0");
+        if (newSet !== prevVisibleSetRef.current) {
+          prevVisibleSetRef.current = newSet;
+          setMountedLayouts(visible);
+        }
+        if (
+          nextVisibleTopLevelLabels.join("\0") !==
+          visibleTopLevelLabelsRef.current.join("\0")
+        ) {
+          setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
+        }
+
+        syncActiveTopicToViewport();
+      };
+
       animationFrameRef.current =
         typeof window.requestAnimationFrame === "function"
-          ? window.requestAnimationFrame(() => {
-              syncScrollMetrics();
-              syncActiveTopicToViewport();
-            })
-          : window.setTimeout(() => {
-              syncScrollMetrics();
-              syncActiveTopicToViewport();
-            }, 0);
+          ? window.requestAnimationFrame(run)
+          : window.setTimeout(run, 0);
     };
 
     const handleResize = () => {
       measureLayouts();
-      syncScrollMetrics();
       scheduleSync();
     };
 
@@ -620,7 +736,60 @@ function TopicArticleFullscreenView({
         animationFrameRef.current = 0;
       }
     };
-  }, [measureLayouts, syncActiveTopicToViewport, syncScrollMetrics]);
+  }, [measureLayouts, syncActiveTopicToViewport]);
+
+  // After mountedLayouts changes (new cards mounted), write their initial
+  // positions.  The rAF loop will keep positions current from that point on.
+  useEffect(() => {
+    const container = articleScrollRef.current;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const visible = buildVisibleTopicNoteLayouts(
+      noteLayoutsRef.current,
+      container.scrollTop,
+      container.clientHeight,
+      activeTopicNameRef.current,
+    );
+    for (let i = 0; i < visible.length; i += 1) {
+      const layout = visible[i];
+      const anchor = noteAnchorRefs.current[layout.name];
+      if (anchor instanceof HTMLElement) {
+        anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
+        anchor.style.setProperty(
+          "--topic-note-height",
+          `${layout.noteHeight}px`,
+        );
+      }
+      const accent = articleRangeAccentRefs.current[layout.name];
+      if (accent instanceof HTMLElement) {
+        accent.style.setProperty("--topic-range-top", `${layout.bracketTop}px`);
+        accent.style.setProperty(
+          "--topic-range-height",
+          `${layout.bracketHeight}px`,
+        );
+      }
+    }
+    const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
+      noteLayoutsRef.current,
+      container.scrollTop,
+      container.clientHeight,
+    );
+    if (
+      nextVisibleTopLevelLabels.join("\0") !==
+      visibleTopLevelLabelsRef.current.join("\0")
+    ) {
+      setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
+    }
+  }, [mountedLayouts]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof setHoveredTopic === "function") {
+        setHoveredTopic(null);
+      }
+    };
+  }, [setHoveredTopic]);
 
   const scrollToTopic = useCallback(
     (item) => {
@@ -689,14 +858,6 @@ function TopicArticleFullscreenView({
     }
   }, [pinnedTopicName, setHoveredTopic, topicTimelineItems]);
 
-  useEffect(() => {
-    return () => {
-      if (typeof setHoveredTopic === "function") {
-        setHoveredTopic(null);
-      }
-    };
-  }, [setHoveredTopic]);
-
   const articleContent = article?.sentences?.length ? (
     <TextDisplay
       sentences={article.sentences}
@@ -723,13 +884,7 @@ function TopicArticleFullscreenView({
   ) : (
     <div
       className="topic-article-view__raw-html"
-      dangerouslySetInnerHTML={{
-        __html: (() => {
-          const rawHtml = article?.raw_html || "";
-          const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-          return bodyMatch ? bodyMatch[1] : rawHtml;
-        })(),
-      }}
+      dangerouslySetInnerHTML={{ __html: rawHtmlBody }}
     />
   );
 
@@ -745,20 +900,20 @@ function TopicArticleFullscreenView({
             aria-label="Synced article scroll area"
           >
             <div className="topic-article-view__canvas">
+              {visibleTopLevelLabels.length > 0 ? (
+                <CurrentAreaLabel topLevelLabels={visibleTopLevelLabels} />
+              ) : null}
               <div className="topic-article-view__article-column">
                 <div
                   ref={articleRootRef}
                   className="topic-article-view__article"
                 >
                   {articleContent}
-                  {visibleNoteLayouts.map((layout) => (
-                    <div
-                      key={`${layout.name}-range-accent`}
-                      ref={(node) => {
-                        articleRangeAccentRefs.current[layout.name] = node;
-                      }}
-                      className={`topic-article-view__range-accent ${getTopicCSSClass(layout.name)}`}
-                      aria-hidden="true"
+                  {mountedLayouts.map((layout) => (
+                    <RangeAccentDot
+                      key={layout.name}
+                      topicName={layout.name}
+                      onRef={handleRangeAccentRef}
                     />
                   ))}
                 </div>
@@ -769,46 +924,22 @@ function TopicArticleFullscreenView({
                 role="region"
                 aria-label="Synced topics list"
               >
-                {visibleNoteLayouts.length > 0 ? (
-                  visibleNoteLayouts.map((layout) => {
-                    const isActive = layout.name === activeTopicName;
-                    const isHighlighted =
-                      layout.name === previewTopicName ||
-                      layout.name === pinnedTopicName;
-                    return (
-                      <div
-                        key={layout.name}
-                        ref={(node) => {
-                          noteAnchorRefs.current[layout.name] = node;
-                        }}
-                        className={`topic-article-view__note-anchor ${getTopicCSSClass(layout.name)}`}
-                      >
-                        <button
-                          type="button"
-                          className={`topic-article-view__topic-note ${getTopicCSSClass(layout.name)}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
-                          data-topic-name={layout.name}
-                          aria-current={isActive ? "true" : undefined}
-                          aria-pressed={isHighlighted ? "true" : "false"}
-                          onMouseEnter={() => handleNoteEnter(layout.topic)}
-                          onMouseLeave={handleNoteLeave}
-                          onFocus={() => handleNoteEnter(layout.topic)}
-                          onBlur={handleNoteLeave}
-                          onPointerDown={() => handleNoteEnter(layout.topic)}
-                          onClick={() => scrollToTopic(layout)}
-                        >
-                          <span className="topic-article-view__topic-name">
-                            {layout.name}
-                          </span>
-                          <span className="topic-article-view__topic-range">
-                            {formatSentenceRangeLabel(
-                              layout.startSentenceIndex,
-                              layout.endSentenceIndex,
-                            )}
-                          </span>
-                        </button>
-                      </div>
-                    );
-                  })
+                {mountedLayouts.length > 0 ? (
+                  mountedLayouts.map((layout) => (
+                    <TopicNoteCard
+                      key={layout.name}
+                      layout={layout}
+                      isActive={layout.name === activeTopicName}
+                      isHighlighted={
+                        layout.name === previewTopicName ||
+                        layout.name === pinnedTopicName
+                      }
+                      onEnter={handleNoteEnter}
+                      onLeave={handleNoteLeave}
+                      onScrollTo={scrollToTopic}
+                      onAnchorRef={handleNoteAnchorRef}
+                    />
+                  ))
                 ) : noteLayouts.length === 0 ? (
                   <p className="topic-article-view__empty">
                     No aligned topics available.
@@ -822,5 +953,120 @@ function TopicArticleFullscreenView({
     </FullScreenGraph>
   );
 }
+
+/**
+ * @typedef {Object} TopicNoteCardProps
+ * @property {TopicVisibleNoteLayout} layout
+ * @property {boolean} isActive
+ * @property {boolean} isHighlighted
+ * @property {(topic: Object) => void} onEnter
+ * @property {() => void} onLeave
+ * @property {(layout: TopicVisibleNoteLayout) => void} onScrollTo
+ * @property {(name: string, node: HTMLElement | null) => void} onAnchorRef
+ */
+
+/** @param {TopicNoteCardProps} props */
+const TopicNoteCard = React.memo(function TopicNoteCard({
+  layout,
+  isActive,
+  isHighlighted,
+  onEnter,
+  onLeave,
+  onScrollTo,
+  onAnchorRef,
+}) {
+  const setRef = useCallback(
+    (node) => onAnchorRef(layout.name, node),
+    [onAnchorRef, layout.name],
+  );
+  const handleEnter = useCallback(
+    () => onEnter(layout.topic),
+    [layout.topic, onEnter],
+  );
+  const handleClick = useCallback(
+    () => onScrollTo(layout),
+    [layout, onScrollTo],
+  );
+  const cssClass = getTopicCSSClass(layout.name);
+
+  return (
+    <div ref={setRef} className={`topic-article-view__note-anchor ${cssClass}`}>
+      <button
+        type="button"
+        className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
+        data-topic-name={layout.name}
+        aria-current={isActive ? "true" : undefined}
+        aria-pressed={isHighlighted ? "true" : "false"}
+        onMouseEnter={handleEnter}
+        onMouseLeave={onLeave}
+        onFocus={handleEnter}
+        onBlur={onLeave}
+        onPointerDown={handleEnter}
+        onClick={handleClick}
+      >
+        <span className="topic-article-view__topic-name">
+          {layout.noteTitleLines.map((line, index) => (
+            <span
+              key={`${layout.name}-${index}-${line}`}
+              className="topic-article-view__topic-name-line"
+            >
+              {line}
+            </span>
+          ))}
+        </span>
+        <span className="topic-article-view__topic-range">
+          {formatSentenceRangeLabel(
+            layout.startSentenceIndex,
+            layout.endSentenceIndex,
+          )}
+        </span>
+      </button>
+    </div>
+  );
+});
+
+/**
+ * @typedef {Object} CurrentAreaLabelProps
+ * @property {string[]} topLevelLabels
+ */
+
+/** @param {CurrentAreaLabelProps} props */
+const CurrentAreaLabel = React.memo(function CurrentAreaLabel({
+  topLevelLabels,
+}) {
+  return (
+    <div
+      className="topic-article-view__current-area"
+      aria-label="Current topic areas"
+    >
+      {topLevelLabels.map((topLevelLabel) => (
+        <span
+          key={topLevelLabel}
+          className="topic-article-view__current-area-label"
+        >
+          {topLevelLabel}
+        </span>
+      ))}
+    </div>
+  );
+});
+
+/** @param {{ topicName: string, onRef: (name: string, node: HTMLElement | null) => void }} props */
+const RangeAccentDot = React.memo(function RangeAccentDot({
+  topicName,
+  onRef,
+}) {
+  const setRef = useCallback(
+    (node) => onRef(topicName, node),
+    [onRef, topicName],
+  );
+  return (
+    <div
+      ref={setRef}
+      className={`topic-article-view__range-accent ${getTopicCSSClass(topicName)}`}
+      aria-hidden="true"
+    />
+  );
+});
 
 export default React.memo(TopicArticleFullscreenView);
