@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import TextDisplay from "./TextDisplay";
+import { getTopicAccentColor } from "../utils/topicColorUtils";
 
 describe("TextDisplay", () => {
   beforeEach(() => {
@@ -104,6 +105,54 @@ describe("TextDisplay", () => {
 
       expect(sentence0).not.toHaveClass("highlighted");
       expect(sentence1).toHaveClass("highlighted");
+    });
+
+    it("renders sentence margin accents when topic range accents are enabled", () => {
+      const props = {
+        ...defaultProps,
+        showTopicRangeAccents: true,
+        articleTopics: [{ name: "Topic1", sentences: [2], ranges: [] }],
+      };
+
+      render(<TextDisplay {...props} />);
+
+      const sentence0 = document.getElementById("sentence-0-0");
+      const sentence1 = document.getElementById("sentence-0-1");
+
+      expect(sentence0).not.toHaveClass(
+        "reading-article__sentence--with-topic-accent",
+      );
+      expect(sentence1).toHaveClass(
+        "reading-article__sentence--with-topic-accent",
+      );
+      expect(sentence1.style.getPropertyValue("--topic-range-accent")).toBe(
+        getTopicAccentColor("Topic1"),
+      );
+    });
+
+    it("stacks sentence margin accents when multiple topics share a sentence", () => {
+      const props = {
+        ...defaultProps,
+        showTopicRangeAccents: true,
+        articleTopics: [
+          { name: "Topic1", sentences: [2], ranges: [] },
+          { name: "Topic2", sentences: [2], ranges: [] },
+        ],
+      };
+
+      render(<TextDisplay {...props} />);
+
+      const sentence1 = document.getElementById("sentence-0-1");
+      const accentValue = sentence1.style.getPropertyValue(
+        "--topic-range-accent",
+      );
+
+      expect(sentence1).toHaveClass(
+        "reading-article__sentence--with-topic-accent",
+      );
+      expect(accentValue).toContain("linear-gradient");
+      expect(accentValue).toContain(getTopicAccentColor("Topic1"));
+      expect(accentValue).toContain(getTopicAccentColor("Topic2"));
     });
   });
 

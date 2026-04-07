@@ -503,11 +503,177 @@ describe("TextPage raw text navigation", () => {
     await screen.findByText("Source:");
 
     // Open the View dropdown and click on Insights
-    fireEvent.click(screen.getByRole("button", { name: /View/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Insights/ }));
 
     expect(screen.getByText("Important connection")).toBeInTheDocument();
     expect(screen.getAllByText("Alpha Beta Gamma").length).toBeGreaterThan(0);
+  });
+
+  it("opens the fullscreen topics plus article view from the View menu", async () => {
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
+
+    expect(
+      screen.getByRole("heading", { name: "Margin Notes" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Synced article scroll area" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Beta Gamma").length).toBeGreaterThan(0);
+  });
+
+  it("scrolls from a fullscreen topic row without toggling the main selected topic state", async () => {
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    const topicCheckbox = screen
+      .getAllByRole("checkbox")
+      .find((element) => element.closest("li") !== null);
+    expect(topicCheckbox).not.toBeChecked();
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
+    fireEvent.click(
+      within(screen.getByLabelText("Synced topics list")).getByRole("button", {
+        name: /Topic1/,
+      }),
+    );
+
+    expect(topicCheckbox).not.toBeChecked();
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("highlights the article range when a fullscreen topic note is hovered or clicked", async () => {
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
+
+    const topicNote = within(
+      screen.getByLabelText("Synced topics list"),
+    ).getByRole("button", { name: /Topic1/ });
+    const articleSentence = screen
+      .getAllByText("Alpha Beta Gamma")
+      .find((element) => element.closest(".reading-article__sentence"))
+      .closest(".reading-article__sentence");
+
+    expect(articleSentence).not.toHaveClass("highlighted");
+
+    fireEvent.mouseEnter(topicNote);
+    expect(articleSentence).toHaveClass("highlighted");
+
+    fireEvent.mouseLeave(topicNote);
+    fireEvent.click(topicNote);
+    expect(articleSentence).toHaveClass("highlighted");
+  });
+
+  it("orders the fullscreen topic list by article position and syncs the active row on article scroll", async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes("/api/submission/test-submission-id/status")) {
+        return {
+          ok: true,
+          json: async () => ({ overall_status: "completed", tasks: {} }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockSubmission,
+          results: {
+            ...mockSubmission.results,
+            sentences: ["First sentence.", "Second sentence."],
+            topics: [
+              {
+                name: "Later Topic",
+                sentences: [2],
+                ranges: [
+                  { start: 20, end: 30, sentence_start: 2, sentence_end: 2 },
+                ],
+              },
+              {
+                name: "Earlier Topic",
+                sentences: [1],
+                ranges: [
+                  { start: 0, end: 10, sentence_start: 1, sentence_end: 1 },
+                ],
+              },
+            ],
+          },
+        }),
+      };
+    });
+
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
+
+    const topicList = screen.getByLabelText("Synced topics list");
+    const topicRows = within(topicList).getAllByRole("button");
+    expect(topicRows.map((element) => element.textContent)).toEqual([
+      expect.stringContaining("Earlier Topic"),
+      expect.stringContaining("Later Topic"),
+    ]);
+
+    const articleScrollArea = screen.getByLabelText(
+      "Synced article scroll area",
+    );
+    const articleContainerRect = {
+      top: 0,
+      bottom: 300,
+      left: 0,
+      right: 800,
+      width: 800,
+      height: 300,
+    };
+
+    Object.defineProperty(articleScrollArea, "clientHeight", {
+      configurable: true,
+      value: 300,
+    });
+    articleScrollArea.getBoundingClientRect = () => articleContainerRect;
+
+    const sentenceZero = document.getElementById("sentence-0-0");
+    const sentenceOne = document.getElementById("sentence-0-1");
+
+    sentenceZero.getBoundingClientRect = () => ({
+      top: -120,
+      bottom: -80,
+      left: 0,
+      right: 600,
+      width: 600,
+      height: 40,
+    });
+    sentenceOne.getBoundingClientRect = () => ({
+      top: 90,
+      bottom: 130,
+      left: 0,
+      right: 600,
+      width: 600,
+      height: 40,
+    });
+
+    fireEvent.scroll(articleScrollArea);
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByLabelText("Synced topics list")).getByRole(
+          "button",
+          { name: /Later Topic/ },
+        ),
+      ).toHaveAttribute("aria-current", "true");
+    });
   });
 
   it("renders the sidebar insights tab and highlights insight sentences when clicked", async () => {

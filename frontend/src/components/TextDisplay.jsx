@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { sanitizeHTML } from "../utils/sanitize";
 import { buildHighlightedRawHtml } from "../utils/htmlHighlight";
 import {
+  getTopicAccentColor,
   getTopicHighlightColor,
   getTopicCSSClass,
 } from "../utils/topicColorUtils";
@@ -47,6 +48,7 @@ const TOOLTIP_VIEWPORT_MARGIN = 10;
  * @property {Array<number>} [activeInsightSentenceIndices]
  * @property {Array<{start: number, end: number}>} [activeInsightRanges]
  * @property {Set<string> | string[]} [coloredTopicNames]
+ * @property {boolean} [showTopicRangeAccents]
  */
 
 /**
@@ -75,6 +77,7 @@ function TextDisplay({
   activeInsightSentenceIndices = [],
   activeInsightRanges = [],
   coloredTopicNames = null,
+  showTopicRangeAccents = false,
 }) {
   const safeSentences = useMemo(
     () => (Array.isArray(sentences) ? sentences : []),
@@ -236,6 +239,52 @@ function TextDisplay({
     return map;
   }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
 
+  const sentenceAccentMap = useMemo(() => {
+    if (!showTopicRangeAccents) {
+      return null;
+    }
+
+    /** @type {Map<number, string[]>} */
+    const colorEntriesBySentence = new Map();
+    safeArticleTopics.forEach((topic) => {
+      const color = getTopicAccentColor(topic.name);
+      (Array.isArray(topic.sentences) ? topic.sentences : []).forEach((num) => {
+        const index = Number(num) - 1;
+        if (!Number.isInteger(index) || index < 0) {
+          return;
+        }
+        if (!colorEntriesBySentence.has(index)) {
+          colorEntriesBySentence.set(index, []);
+        }
+        const colors = colorEntriesBySentence.get(index);
+        if (!colors.includes(color)) {
+          colors.push(color);
+        }
+      });
+    });
+
+    /** @type {Map<number, string>} */
+    const accentMap = new Map();
+    colorEntriesBySentence.forEach((colors, index) => {
+      if (colors.length === 1) {
+        accentMap.set(index, colors[0]);
+        return;
+      }
+
+      const step = 100 / colors.length;
+      const gradientStops = colors
+        .map((color, colorIndex) => {
+          const start = (colorIndex * step).toFixed(2);
+          const end = ((colorIndex + 1) * step).toFixed(2);
+          return `${color} ${start}% ${end}%`;
+        })
+        .join(", ");
+      accentMap.set(index, `linear-gradient(180deg, ${gradientStops})`);
+    });
+
+    return accentMap;
+  }, [showTopicRangeAccents, safeArticleTopics]);
+
   // Sentence-index-based sets for non-rawHtml fallback paths
   const fadedIndices = useMemo(() => {
     const set = new Set();
@@ -311,15 +360,30 @@ function TextDisplay({
     return map;
   }, [safeArticleTopics]);
 
-  const getColoredSentenceStyle = useCallback(
+  const getSentenceRuntimeStyle = useCallback(
     (index) => {
-      if (!coloredHighlightMode || !sentenceColorMap?.has(index)) {
+      const style = {};
+
+      if (coloredHighlightMode && sentenceColorMap?.has(index)) {
+        style["--topic-highlight-color"] = sentenceColorMap.get(index);
+      }
+
+      if (showTopicRangeAccents && sentenceAccentMap?.has(index)) {
+        style["--topic-range-accent"] = sentenceAccentMap.get(index);
+      }
+
+      if (Object.keys(style).length === 0) {
         return undefined;
       }
 
-      return { "--topic-highlight-color": sentenceColorMap.get(index) };
+      return style;
     },
-    [coloredHighlightMode, sentenceColorMap],
+    [
+      coloredHighlightMode,
+      sentenceAccentMap,
+      sentenceColorMap,
+      showTopicRangeAccents,
+    ],
   );
 
   // --- Reverse mapping: char position -> topic(s) ---
@@ -801,8 +865,8 @@ function TextDisplay({
                     id={`sentence-${articleIndex}-${index}`}
                     data-article-index={articleIndex}
                     data-sentence-index={index}
-                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
-                    style={getColoredSentenceStyle(index)}
+                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
+                    style={getSentenceRuntimeStyle(index)}
                     dangerouslySetInnerHTML={{
                       __html: sanitizeHTML(text) + " ",
                     }}
@@ -846,8 +910,8 @@ function TextDisplay({
                 id={`sentence-${articleIndex}-${index}`}
                 data-article-index={articleIndex}
                 data-sentence-index={index}
-                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
-                style={getColoredSentenceStyle(index)}
+                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
+                style={getSentenceRuntimeStyle(index)}
               >
                 {effectiveHighlightWords ? (
                   <HighlightedText

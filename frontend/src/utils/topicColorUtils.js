@@ -30,6 +30,17 @@ export function getTopicHighlightColor(topicName) {
 }
 
 /**
+ * Returns a stable muted accent color for topic markers and borders.
+ *
+ * @param {string} topicName
+ * @returns {string} CSS hsl color string
+ */
+export function getTopicAccentColor(topicName) {
+  const hue = hashString(topicName) % 360;
+  return `hsl(${hue}, 42%, 46%)`;
+}
+
+/**
  * Returns a stable CSS class name for a topic's highlight color.
  * Safe to use as a CSS selector.
  *
