@@ -455,9 +455,7 @@ function buildVisibleTopicNoteLayouts(
   const bottomEdge = viewportBottom - NOTE_VIEWPORT_PADDING - maxNoteHeight;
   const forwardTops = [];
   limitedCandidates.forEach((layout, index) => {
-    const noteHeight = noteHeights[index];
-    const bracketCenter = layout.bracketTop + layout.bracketHeight / 2;
-    const naturalTop = bracketCenter - noteHeight / 2;
+    const naturalTop = layout.bracketTop;
     const clampedTop = Math.min(
       Math.max(naturalTop, topEdge),
       Math.max(topEdge, bottomEdge),
@@ -1121,8 +1119,28 @@ const RangeAccentDot = React.memo(function RangeAccentDot({
       className={`topic-article-view__range-accent ${getTopicCSSClass(topicName)}`}
       aria-hidden="true"
     >
-      <div className="topic-article-view__range-accent-top" />
-      <div className="topic-article-view__range-accent-bottom" />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: "12px",
+          height: "4px",
+          background: "var(--topic-accent-color)",
+          borderRadius: "999px",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: 0,
+          width: "12px",
+          height: "4px",
+          background: "var(--topic-accent-color)",
+          borderRadius: "999px",
+        }}
+      />
     </div>
   );
 });
