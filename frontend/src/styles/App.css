@@ -1,3 +1,33 @@
+/* ==========================================================================
+   Color Palette - Extracted from reference swatches
+   ========================================================================== */
+:root {
+  /* Blues / Slate */
+  --color-slate-700: #1f334b;
+  --color-slate-600: #405b76;
+  --color-slate-500: #3a5662;
+  --color-slate-400: #8797a7;
+  --color-slate-300: #6c8b90;
+  --color-slate-200: #c2d0db;
+  --color-slate-100: #e6f0f1;
+
+  /* Greens / Sage */
+  --color-sage-700: #31504b;
+  --color-sage-500: #678a76;
+  --color-sage-400: #6b8c81;
+  --color-sage-300: #393f3b;
+
+  /* Warm accents */
+  --color-earth-700: #3e2423;
+  --color-earth-600: #694f42;
+  --color-earth-500: #9b4d40;
+  --color-gold-500: #bd9a5a;
+
+  /* Neutrals */
+  --color-neutral-900: #0e171e;
+  --color-neutral-800: #171f22;
+}
+
 .article-section {
   margin-bottom: 20px;
   border-bottom: 2px solid #ccc;
