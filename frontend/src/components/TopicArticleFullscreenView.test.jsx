@@ -66,15 +66,17 @@ function buildSentences(count) {
 }
 
 function queryTopicButtons(topicName) {
-  return Array.from(document.querySelectorAll("button[data-topic-name]")).filter(
-    (element) => element.getAttribute("data-topic-name") === topicName,
-  );
+  return Array.from(
+    document.querySelectorAll("button[data-topic-name]"),
+  ).filter((element) => element.getAttribute("data-topic-name") === topicName);
 }
 
 function queryTopicButtonBySegment(topicName, segmentKey) {
   return (
     Array.from(
-      document.querySelectorAll("button[data-topic-name][data-topic-segment-key]"),
+      document.querySelectorAll(
+        "button[data-topic-name][data-topic-segment-key]",
+      ),
     ).find(
       (element) =>
         element.getAttribute("data-topic-name") === topicName &&
@@ -401,7 +403,9 @@ describe("TopicArticleFullscreenView", () => {
     );
 
     await waitFor(() => {
-      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(1);
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
+        1,
+      );
     });
     expect(screen.getByText("Sentences 2-3")).toBeInTheDocument();
 
@@ -413,15 +417,162 @@ describe("TopicArticleFullscreenView", () => {
     fireEvent.scroll(scrollRegion);
 
     await waitFor(() => {
-      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(0);
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
+        0,
+      );
     });
 
     scrollRegion.scrollTop = 1280;
     fireEvent.scroll(scrollRegion);
 
     await waitFor(() => {
-      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(1);
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
+        1,
+      );
     });
     expect(screen.getByText("Sentences 9-10")).toBeInTheDocument();
+  });
+
+  it("shows a left-side summary card for the hovered topic note", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics":
+                "A short explanation of the genetics topic.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    fireEvent.mouseEnter(queryTopicButtons("Science > Biology > Genetics")[0]);
+
+    await waitFor(() => {
+      const summaryCard = screen.getByLabelText(
+        "Summary for Science > Biology > Genetics",
+      );
+      expect(within(summaryCard).getByText("Summary")).toBeInTheDocument();
+      expect(summaryCard).toHaveTextContent(
+        "A short explanation of the genetics topic.",
+      );
+    });
+  });
+
+  it("keeps the summary card visible after click when the pointer leaves", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics":
+                "Pinned summary text remains visible.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    const noteButton = queryTopicButtons("Science > Biology > Genetics")[0];
+    fireEvent.click(noteButton);
+    fireEvent.mouseLeave(noteButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Summary for Science > Biology > Genetics"),
+      ).toHaveTextContent("Pinned summary text remains visible.");
+    });
+  });
+
+  it("does not render a summary card when the topic has no summary", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {},
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    fireEvent.mouseEnter(queryTopicButtons("Science > Biology > Genetics")[0]);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByLabelText("Summary for Science > Biology > Genetics"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not render a summary card from external hoveredTopic without note interaction", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        hoveredTopic={{ name: "Science > Biology > Genetics" }}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics": "Should only show on note interaction.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    expect(
+      screen.queryByLabelText("Summary for Science > Biology > Genetics"),
+    ).not.toBeInTheDocument();
   });
 });

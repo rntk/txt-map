@@ -50,6 +50,15 @@ import { splitTopicPath } from "../utils/summaryTimeline";
  */
 
 /**
+ * @typedef {{
+ *   segmentKey: string,
+ *   name: string,
+ *   summary: string,
+ *   summaryTop: number,
+ * }} TopicSummaryCardLayout
+ */
+
+/**
  * @typedef {Object} TopicArticleFullscreenViewProps
  * @property {Array<Object>} articles
  * @property {Array<Object>} safeTopics
@@ -77,6 +86,8 @@ const NOTE_VIEWPORT_PADDING = 8;
 const NOTE_CARD_BASE_HEIGHT = 58;
 const NOTE_CARD_LINE_HEIGHT = 18;
 const NOTE_CARD_MAX_TITLE_LINES = 3;
+const SUMMARY_CARD_VIEWPORT_PADDING = 18;
+const SUMMARY_CARD_TOP_CLEARANCE = 72;
 
 /**
  * @param {string[]} noteTitleLines
@@ -488,18 +499,17 @@ function buildVisibleTopicNoteLayouts(
   }
 
   const sortedVisibleCandidates = [...visibleCandidates].sort((left, right) => {
-      if (left.bracketTop !== right.bracketTop) {
-        return left.bracketTop - right.bracketTop;
-      }
-      if (left.startSentenceIndex !== right.startSentenceIndex) {
-        return left.startSentenceIndex - right.startSentenceIndex;
-      }
-      if (left.endSentenceIndex !== right.endSentenceIndex) {
-        return left.endSentenceIndex - right.endSentenceIndex;
-      }
-      return left.segmentKey.localeCompare(right.segmentKey);
-    },
-  );
+    if (left.bracketTop !== right.bracketTop) {
+      return left.bracketTop - right.bracketTop;
+    }
+    if (left.startSentenceIndex !== right.startSentenceIndex) {
+      return left.startSentenceIndex - right.startSentenceIndex;
+    }
+    if (left.endSentenceIndex !== right.endSentenceIndex) {
+      return left.endSentenceIndex - right.endSentenceIndex;
+    }
+    return left.segmentKey.localeCompare(right.segmentKey);
+  });
 
   const limitedCandidates =
     sortedVisibleCandidates.length <= maxVisibleNotes
@@ -597,6 +607,40 @@ function buildVisibleTopLevelLabels(layouts, scrollTop, viewportHeight) {
 }
 
 /**
+ * @param {TopicMeasuredLayout | null} layout
+ * @param {string} summary
+ * @param {number} scrollTop
+ * @param {number} viewportHeight
+ * @returns {TopicSummaryCardLayout | null}
+ */
+function buildTopicSummaryCardLayout(
+  layout,
+  summary,
+  scrollTop,
+  viewportHeight,
+) {
+  const trimmedSummary = typeof summary === "string" ? summary.trim() : "";
+  if (!layout || !trimmedSummary || viewportHeight <= 0) {
+    return null;
+  }
+
+  const topEdge = scrollTop + SUMMARY_CARD_VIEWPORT_PADDING;
+  const topWithClearance = scrollTop + SUMMARY_CARD_TOP_CLEARANCE;
+  const bottomEdge = scrollTop + viewportHeight - SUMMARY_CARD_VIEWPORT_PADDING;
+  const summaryTop = Math.min(
+    Math.max(layout.bracketTop, Math.max(topEdge, topWithClearance)),
+    Math.max(topEdge, bottomEdge),
+  );
+
+  return {
+    segmentKey: layout.segmentKey,
+    name: layout.name,
+    summary: trimmedSummary,
+    summaryTop,
+  };
+}
+
+/**
  * @param {TopicArticleFullscreenViewProps} props
  * @returns {React.JSX.Element}
  */
@@ -639,8 +683,11 @@ function TopicArticleFullscreenView({
   // visible card set changes (not on every scroll pixel).
   const [mountedLayouts, setMountedLayouts] = useState([]);
   const [previewTopicName, setPreviewTopicName] = useState(null);
+  const [previewSegmentKey, setPreviewSegmentKey] = useState(null);
   const [pinnedTopicName, setPinnedTopicName] = useState(null);
+  const [pinnedSegmentKey, setPinnedSegmentKey] = useState(null);
   const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
+  const [summaryCardLayout, setSummaryCardLayout] = useState(null);
 
   // Refs that mirror state for use inside rAF callbacks without stale closures.
   // Updated synchronously during render so they are always current by the time
@@ -649,9 +696,12 @@ function TopicArticleFullscreenView({
   const activeSegmentKeyRef = useRef(activeSegmentKey);
   const prevVisibleSetRef = useRef("");
   const visibleTopLevelLabelsRef = useRef(visibleTopLevelLabels);
+  const summaryCardRef = useRef(null);
+  const summaryCardLayoutRef = useRef(summaryCardLayout);
   noteLayoutsRef.current = noteLayouts;
   activeSegmentKeyRef.current = activeSegmentKey;
   visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
+  summaryCardLayoutRef.current = summaryCardLayout;
 
   const effectiveHoveredTopic = useMemo(() => {
     const hoveredTopicName =
@@ -688,6 +738,54 @@ function TopicArticleFullscreenView({
     const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     return bodyMatch ? bodyMatch[1] : rawHtml;
   }, [article?.raw_html]);
+  const topicSummaryMap = useMemo(
+    () =>
+      article?.topic_summaries && typeof article.topic_summaries === "object"
+        ? article.topic_summaries
+        : {},
+    [article?.topic_summaries],
+  );
+  const activeSummaryLayout = useMemo(() => {
+    const preferredSegmentKey = previewSegmentKey || pinnedSegmentKey;
+    const preferredTopicName = previewTopicName || pinnedTopicName || null;
+
+    if (!preferredSegmentKey && !preferredTopicName) {
+      return null;
+    }
+
+    if (preferredSegmentKey) {
+      const matchingSegment = noteLayouts.find(
+        (layout) => layout.segmentKey === preferredSegmentKey,
+      );
+      if (matchingSegment) {
+        return matchingSegment;
+      }
+    }
+
+    return (
+      noteLayouts.find(
+        (layout) =>
+          layout.name === preferredTopicName &&
+          layout.segmentKey === activeSegmentKey,
+      ) ||
+      noteLayouts.find((layout) => layout.name === preferredTopicName) ||
+      null
+    );
+  }, [
+    activeSegmentKey,
+    noteLayouts,
+    pinnedSegmentKey,
+    pinnedTopicName,
+    previewSegmentKey,
+    previewTopicName,
+  ]);
+  const activeSummary = useMemo(() => {
+    if (!activeSummaryLayout) {
+      return "";
+    }
+    const summary = topicSummaryMap[activeSummaryLayout.name];
+    return typeof summary === "string" ? summary.trim() : "";
+  }, [activeSummaryLayout, topicSummaryMap]);
 
   // Stable callbacks for ref assignment — avoids creating new closures each
   // render which would otherwise cause React to teardown/re-attach DOM refs.
@@ -786,6 +884,12 @@ function TopicArticleFullscreenView({
           scrollTop,
           viewportHeight,
         );
+        const nextSummaryCardLayout = buildTopicSummaryCardLayout(
+          activeSummaryLayout,
+          activeSummary,
+          scrollTop,
+          viewportHeight,
+        );
 
         // Write positions directly to DOM refs, bypassing the React render
         // cycle entirely.  This keeps scroll at 60 fps without re-renders.
@@ -811,6 +915,13 @@ function TopicArticleFullscreenView({
             );
           }
         }
+        const summaryCardNode = summaryCardRef.current;
+        if (summaryCardNode instanceof HTMLElement && nextSummaryCardLayout) {
+          summaryCardNode.style.setProperty(
+            "--topic-summary-top",
+            `${nextSummaryCardLayout.summaryTop}px`,
+          );
+        }
 
         // Trigger a React re-render only when the mounted card *set* changes
         // (topics entering / leaving the viewport window).  For pure position
@@ -825,6 +936,14 @@ function TopicArticleFullscreenView({
           visibleTopLevelLabelsRef.current.join("\0")
         ) {
           setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
+        }
+        const currentSummaryCardLayout = summaryCardLayoutRef.current;
+        const isSameSummaryCardLayout =
+          currentSummaryCardLayout?.segmentKey ===
+            nextSummaryCardLayout?.segmentKey &&
+          currentSummaryCardLayout?.summary === nextSummaryCardLayout?.summary;
+        if (!isSameSummaryCardLayout) {
+          setSummaryCardLayout(nextSummaryCardLayout);
         }
 
         syncActiveTopicToViewport();
@@ -863,7 +982,12 @@ function TopicArticleFullscreenView({
         animationFrameRef.current = 0;
       }
     };
-  }, [measureLayouts, syncActiveTopicToViewport]);
+  }, [
+    activeSummary,
+    activeSummaryLayout,
+    measureLayouts,
+    syncActiveTopicToViewport,
+  ]);
 
   // After mountedLayouts changes (new cards mounted), write their initial
   // positions.  The rAF loop will keep positions current from that point on.
@@ -908,7 +1032,26 @@ function TopicArticleFullscreenView({
     ) {
       setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
     }
-  }, [mountedLayouts]);
+    const nextSummaryCardLayout = buildTopicSummaryCardLayout(
+      activeSummaryLayout,
+      activeSummary,
+      container.scrollTop,
+      container.clientHeight,
+    );
+    const summaryCardNode = summaryCardRef.current;
+    if (summaryCardNode instanceof HTMLElement && nextSummaryCardLayout) {
+      summaryCardNode.style.setProperty(
+        "--topic-summary-top",
+        `${nextSummaryCardLayout.summaryTop}px`,
+      );
+    }
+    setSummaryCardLayout((currentValue) =>
+      currentValue?.segmentKey === nextSummaryCardLayout?.segmentKey &&
+      currentValue?.summary === nextSummaryCardLayout?.summary
+        ? currentValue
+        : nextSummaryCardLayout,
+    );
+  }, [activeSummary, activeSummaryLayout, mountedLayouts]);
 
   useEffect(() => {
     return () => {
@@ -928,6 +1071,7 @@ function TopicArticleFullscreenView({
 
       setActiveSegmentKey(item.segmentKey);
       setPinnedTopicName(item.name);
+      setPinnedSegmentKey(item.segmentKey);
       if (typeof setHoveredTopic === "function") {
         setHoveredTopic(item.topic);
       }
@@ -963,27 +1107,36 @@ function TopicArticleFullscreenView({
   );
 
   const handleNoteEnter = useCallback(
-    (topic) => {
-      if (!topic?.name) {
+    (layout) => {
+      if (!layout?.topic?.name) {
         return;
       }
-      setPreviewTopicName(topic.name);
+      setPreviewSegmentKey(layout.segmentKey);
+      setPreviewTopicName(layout.topic.name);
       if (typeof setHoveredTopic === "function") {
-        setHoveredTopic(topic);
+        setHoveredTopic(layout.topic);
       }
     },
     [setHoveredTopic],
   );
 
   const handleNoteLeave = useCallback(() => {
+    setPreviewSegmentKey(null);
     setPreviewTopicName(null);
     if (typeof setHoveredTopic === "function") {
       const nextTopic =
+        topicTimelineItems.find((item) => item.segmentKey === pinnedSegmentKey)
+          ?.topic ||
         topicTimelineItems.find((item) => item.name === pinnedTopicName)
-          ?.topic || null;
+          ?.topic ||
+        null;
       setHoveredTopic(nextTopic);
     }
-  }, [pinnedTopicName, setHoveredTopic, topicTimelineItems]);
+  }, [pinnedSegmentKey, pinnedTopicName, setHoveredTopic, topicTimelineItems]);
+
+  const handleSummaryCardRef = useCallback((node) => {
+    summaryCardRef.current = node;
+  }, []);
 
   const articleContent = article?.sentences?.length ? (
     <TextDisplay
@@ -1030,6 +1183,12 @@ function TopicArticleFullscreenView({
               {visibleTopLevelLabels.length > 0 ? (
                 <CurrentAreaLabel topLevelLabels={visibleTopLevelLabels} />
               ) : null}
+              {summaryCardLayout ? (
+                <TopicSummaryCard
+                  layout={summaryCardLayout}
+                  onCardRef={handleSummaryCardRef}
+                />
+              ) : null}
               <div className="topic-article-view__article-column">
                 <div
                   ref={articleRootRef}
@@ -1059,8 +1218,12 @@ function TopicArticleFullscreenView({
                       layout={layout}
                       isActive={layout.segmentKey === activeSegmentKey}
                       isHighlighted={
-                        layout.name === previewTopicName ||
-                        layout.name === pinnedTopicName
+                        layout.segmentKey === previewSegmentKey ||
+                        layout.segmentKey === pinnedSegmentKey ||
+                        (layout.name === previewTopicName &&
+                          previewSegmentKey === null) ||
+                        (layout.name === pinnedTopicName &&
+                          pinnedSegmentKey === null)
                       }
                       onEnter={handleNoteEnter}
                       onLeave={handleNoteLeave}
@@ -1087,7 +1250,7 @@ function TopicArticleFullscreenView({
  * @property {TopicVisibleNoteLayout} layout
  * @property {boolean} isActive
  * @property {boolean} isHighlighted
- * @property {(topic: Object) => void} onEnter
+ * @property {(layout: TopicVisibleNoteLayout) => void} onEnter
  * @property {() => void} onLeave
  * @property {(layout: TopicVisibleNoteLayout) => void} onScrollTo
  * @property {(segmentKey: string, node: HTMLElement | null) => void} onAnchorRef
@@ -1107,10 +1270,7 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
     (node) => onAnchorRef(layout.segmentKey, node),
     [layout.segmentKey, onAnchorRef],
   );
-  const handleEnter = useCallback(
-    () => onEnter(layout.topic),
-    [layout.topic, onEnter],
-  );
+  const handleEnter = useCallback(() => onEnter(layout), [layout, onEnter]);
   const handleClick = useCallback(
     () => onScrollTo(layout),
     [layout, onScrollTo],
@@ -1151,6 +1311,29 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
         </span>
       </button>
     </div>
+  );
+});
+
+/**
+ * @typedef {Object} TopicSummaryCardProps
+ * @property {TopicSummaryCardLayout} layout
+ * @property {(node: HTMLElement | null) => void} onCardRef
+ */
+
+/** @param {TopicSummaryCardProps} props */
+const TopicSummaryCard = React.memo(function TopicSummaryCard({
+  layout,
+  onCardRef,
+}) {
+  return (
+    <aside
+      ref={onCardRef}
+      className="topic-article-view__summary-card"
+      aria-label={`Summary for ${layout.name}`}
+    >
+      <div className="topic-article-view__summary-card-title">Summary</div>
+      <p className="topic-article-view__summary-card-body">{layout.summary}</p>
+    </aside>
   );
 });
 
