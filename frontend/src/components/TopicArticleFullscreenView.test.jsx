@@ -61,6 +61,28 @@ const defaultProps = {
   setHoveredTopic: vi.fn(),
 };
 
+function buildSentences(count) {
+  return Array.from({ length: count }, (_, index) => `Sentence ${index + 1}.`);
+}
+
+function queryTopicButtons(topicName) {
+  return Array.from(document.querySelectorAll("button[data-topic-name]")).filter(
+    (element) => element.getAttribute("data-topic-name") === topicName,
+  );
+}
+
+function queryTopicButtonBySegment(topicName, segmentKey) {
+  return (
+    Array.from(
+      document.querySelectorAll("button[data-topic-name][data-topic-segment-key]"),
+    ).find(
+      (element) =>
+        element.getAttribute("data-topic-name") === topicName &&
+        element.getAttribute("data-topic-segment-key") === segmentKey,
+    ) || null
+  );
+}
+
 function applyMockLayoutMetrics() {
   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
     configurable: true,
@@ -176,11 +198,10 @@ describe("TopicArticleFullscreenView", () => {
       />,
     );
 
-    const noteButton = await waitFor(() =>
-      document.querySelector(
-        'button[data-topic-name="Science > Biology > Genetics"]',
-      ),
-    );
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+    const noteButton = queryTopicButtons("Science > Biology > Genetics")[0];
 
     expect(noteButton).toBeInTheDocument();
     expect(noteButton.textContent).not.toContain(">");
@@ -241,9 +262,10 @@ describe("TopicArticleFullscreenView", () => {
       />,
     );
 
-    const noteButton = await waitFor(() =>
-      document.querySelector('button[data-topic-name="Science"]'),
-    );
+    await waitFor(() => {
+      expect(queryTopicButtons("Science")).toHaveLength(1);
+    });
+    const noteButton = queryTopicButtons("Science")[0];
 
     expect(within(noteButton).getByText("Science")).toBeInTheDocument();
     await waitFor(() => {
@@ -256,5 +278,150 @@ describe("TopicArticleFullscreenView", () => {
   it("estimates taller note cards for deeper topic paths", () => {
     expect(estimateTopicNoteHeight(["Biology"])).toBe(84);
     expect(estimateTopicNoteHeight(["Biology", "Genetics", "DNA"])).toBe(112);
+  });
+
+  it("renders one explicit-range note per visible range for the same topic", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(10),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 2, 4, 5],
+                ranges: [
+                  { sentence_start: 1, sentence_end: 2, start: 0, end: 10 },
+                  { sentence_start: 4, sentence_end: 5, start: 20, end: 30 },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(2);
+    });
+    expect(screen.getByText("Sentences 1-2")).toBeInTheDocument();
+    expect(screen.getByText("Sentences 4-5")).toBeInTheDocument();
+    expect(
+      document.querySelectorAll(".topic-article-view__range-accent"),
+    ).toHaveLength(2);
+  });
+
+  it("hides a topic note between separated explicit ranges and remounts it on the visible segment", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(10),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 10],
+                ranges: [
+                  { sentence_start: 1, sentence_end: 1, start: 0, end: 10 },
+                  { sentence_start: 10, sentence_end: 10, start: 20, end: 30 },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryTopicButtonBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::0",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Sentence 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current topic areas")).toHaveTextContent(
+      "Science",
+    );
+
+    const scrollRegion = screen.getByRole("region", {
+      name: "Synced article scroll area",
+    });
+
+    scrollRegion.scrollTop = 200;
+    fireEvent.scroll(scrollRegion);
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(0);
+    });
+    expect(
+      screen.queryByLabelText("Current topic areas"),
+    ).not.toBeInTheDocument();
+
+    scrollRegion.scrollTop = 1280;
+    fireEvent.scroll(scrollRegion);
+
+    await waitFor(() => {
+      expect(
+        queryTopicButtonBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::1",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Sentence 10")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current topic areas")).toHaveTextContent(
+      "Science",
+    );
+  });
+
+  it("splits non-consecutive sentence lists into separate visible note segments when ranges are absent", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(10),
+            topics: [
+              {
+                name: "Business > Markets > Equities",
+                sentences: [2, 3, 9, 10],
+                ranges: [],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(1);
+    });
+    expect(screen.getByText("Sentences 2-3")).toBeInTheDocument();
+
+    const scrollRegion = screen.getByRole("region", {
+      name: "Synced article scroll area",
+    });
+
+    scrollRegion.scrollTop = 450;
+    fireEvent.scroll(scrollRegion);
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(0);
+    });
+
+    scrollRegion.scrollTop = 1280;
+    fireEvent.scroll(scrollRegion);
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(1);
+    });
+    expect(screen.getByText("Sentences 9-10")).toBeInTheDocument();
   });
 });

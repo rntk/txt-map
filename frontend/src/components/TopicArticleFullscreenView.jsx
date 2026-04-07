@@ -16,6 +16,7 @@ import { splitTopicPath } from "../utils/summaryTimeline";
 
 /**
  * @typedef {Object} TopicTimelineItem
+ * @property {string} segmentKey
  * @property {string} name
  * @property {number} startSentenceIndex
  * @property {number} endSentenceIndex
@@ -29,6 +30,7 @@ import { splitTopicPath } from "../utils/summaryTimeline";
 
 /**
  * @typedef {Object} TopicMeasuredLayout
+ * @property {string} segmentKey
  * @property {string} name
  * @property {number} startSentenceIndex
  * @property {number} endSentenceIndex
@@ -95,44 +97,107 @@ export function estimateTopicNoteHeight(noteTitleLines) {
 }
 
 /**
- * @param {Object} topic
- * @returns {{startSentenceIndex: number, endSentenceIndex: number} | null}
+ * @param {number[]} indices
+ * @returns {Array<{ startSentenceIndex: number, endSentenceIndex: number }>}
  */
-function getTopicSentenceBounds(topic) {
-  const rangeBounds = (Array.isArray(topic?.ranges) ? topic.ranges : [])
+function buildConsecutiveSentenceSegments(indices) {
+  const sortedIndices = (Array.isArray(indices) ? indices : [])
+    .map((value) => Number(value) - 1)
+    .filter((value) => Number.isInteger(value) && value >= 0)
+    .sort((left, right) => left - right);
+
+  if (sortedIndices.length === 0) {
+    return [];
+  }
+
+  /** @type {Array<{ startSentenceIndex: number, endSentenceIndex: number }>} */
+  const segments = [];
+  let startSentenceIndex = sortedIndices[0];
+  let endSentenceIndex = sortedIndices[0];
+
+  for (let index = 1; index < sortedIndices.length; index += 1) {
+    const nextIndex = sortedIndices[index];
+    if (nextIndex <= endSentenceIndex + 1) {
+      endSentenceIndex = Math.max(endSentenceIndex, nextIndex);
+      continue;
+    }
+
+    segments.push({ startSentenceIndex, endSentenceIndex });
+    startSentenceIndex = nextIndex;
+    endSentenceIndex = nextIndex;
+  }
+
+  segments.push({ startSentenceIndex, endSentenceIndex });
+  return segments;
+}
+
+/**
+ * @param {Array<Object>} ranges
+ * @returns {Array<{
+ *   startSentenceIndex: number,
+ *   endSentenceIndex: number,
+ *   startCharIndex: number | null,
+ *   endCharIndex: number | null,
+ * }>}
+ */
+function buildSentenceRangeSegments(ranges) {
+  return (Array.isArray(ranges) ? ranges : [])
     .map((range) => ({
-      start: Number(range?.sentence_start) - 1,
-      end: Number(range?.sentence_end) - 1,
+      startSentenceIndex: Number(range?.sentence_start) - 1,
+      endSentenceIndex: Number(range?.sentence_end) - 1,
+      startCharIndex: Number(range?.start),
+      endCharIndex: Number(range?.end),
     }))
     .filter(
       (range) =>
-        Number.isInteger(range.start) &&
-        Number.isInteger(range.end) &&
-        range.start >= 0 &&
-        range.end >= range.start,
-    );
+        Number.isInteger(range.startSentenceIndex) &&
+        Number.isInteger(range.endSentenceIndex) &&
+        range.startSentenceIndex >= 0 &&
+        range.endSentenceIndex >= range.startSentenceIndex,
+    )
+    .map((range) => ({
+      startSentenceIndex: range.startSentenceIndex,
+      endSentenceIndex: range.endSentenceIndex,
+      startCharIndex: Number.isFinite(range.startCharIndex)
+        ? range.startCharIndex
+        : null,
+      endCharIndex: Number.isFinite(range.endCharIndex)
+        ? range.endCharIndex
+        : null,
+    }))
+    .sort((left, right) => {
+      if (left.startSentenceIndex !== right.startSentenceIndex) {
+        return left.startSentenceIndex - right.startSentenceIndex;
+      }
+      if (left.endSentenceIndex !== right.endSentenceIndex) {
+        return left.endSentenceIndex - right.endSentenceIndex;
+      }
+      const leftStart = left.startCharIndex ?? Number.NEGATIVE_INFINITY;
+      const rightStart = right.startCharIndex ?? Number.NEGATIVE_INFINITY;
+      return leftStart - rightStart;
+    });
+}
 
-  if (rangeBounds.length > 0) {
-    return {
-      startSentenceIndex: Math.min(...rangeBounds.map((range) => range.start)),
-      endSentenceIndex: Math.max(...rangeBounds.map((range) => range.end)),
-    };
+/**
+ * @param {Object} topic
+ * @returns {Array<{
+ *   startSentenceIndex: number,
+ *   endSentenceIndex: number,
+ *   startCharIndex: number | null,
+ *   endCharIndex: number | null,
+ * }>}
+ */
+function getTopicSegments(topic) {
+  const rangeSegments = buildSentenceRangeSegments(topic?.ranges);
+  if (rangeSegments.length > 0) {
+    return rangeSegments;
   }
 
-  const sentenceIndices = (
-    Array.isArray(topic?.sentences) ? topic.sentences : []
-  )
-    .map((value) => Number(value) - 1)
-    .filter((value) => Number.isInteger(value) && value >= 0);
-
-  if (sentenceIndices.length === 0) {
-    return null;
-  }
-
-  return {
-    startSentenceIndex: Math.min(...sentenceIndices),
-    endSentenceIndex: Math.max(...sentenceIndices),
-  };
+  return buildConsecutiveSentenceSegments(topic?.sentences).map((segment) => ({
+    ...segment,
+    startCharIndex: null,
+    endCharIndex: null,
+  }));
 }
 
 /**
@@ -141,42 +206,30 @@ function getTopicSentenceBounds(topic) {
  */
 function buildTopicTimelineItems(topics) {
   return (Array.isArray(topics) ? topics : [])
-    .map((topic) => {
-      const bounds = getTopicSentenceBounds(topic);
-      if (!topic?.name || !bounds) {
-        return null;
+    .flatMap((topic) => {
+      if (!topic?.name) {
+        return [];
       }
-
       const pathSegments = splitTopicPath(topic.name);
       const normalizedPathSegments =
         pathSegments.length > 0 ? pathSegments : [topic.name];
 
-      return {
+      return getTopicSegments(topic).map((segment, segmentIndex) => ({
+        segmentKey: `${topic.name}::${segmentIndex}`,
         name: topic.name,
-        startSentenceIndex: bounds.startSentenceIndex,
-        endSentenceIndex: bounds.endSentenceIndex,
+        startSentenceIndex: segment.startSentenceIndex,
+        endSentenceIndex: segment.endSentenceIndex,
         pathSegments: normalizedPathSegments,
         topLevelLabel: normalizedPathSegments[0] || topic.name,
         noteTitleLines:
           normalizedPathSegments.length > 1
             ? normalizedPathSegments.slice(1)
             : [topic.name],
-        startCharIndex: (() => {
-          const values = (Array.isArray(topic?.ranges) ? topic.ranges : [])
-            .map((range) => Number(range?.start))
-            .filter(Number.isFinite);
-          return values.length > 0 ? Math.min(...values) : null;
-        })(),
-        endCharIndex: (() => {
-          const values = (Array.isArray(topic?.ranges) ? topic.ranges : [])
-            .map((range) => Number(range?.end))
-            .filter(Number.isFinite);
-          return values.length > 0 ? Math.max(...values) : null;
-        })(),
+        startCharIndex: segment.startCharIndex,
+        endCharIndex: segment.endCharIndex,
         topic,
-      };
+      }));
     })
-    .filter(Boolean)
     .sort((left, right) => {
       if (left.startSentenceIndex !== right.startSentenceIndex) {
         return left.startSentenceIndex - right.startSentenceIndex;
@@ -288,12 +341,14 @@ function buildTopicNoteLayouts(articleRoot, items) {
 
   // Cache sentences
   const sentenceElements = articleRoot.querySelectorAll(
-    '[data-article-index="0"][data-sentence-index], [id^="sentence-0-"]'
+    '[data-article-index="0"][data-sentence-index], [id^="sentence-0-"]',
   );
   const sentenceMap = new Map();
   for (let i = 0; i < sentenceElements.length; i++) {
     const el = sentenceElements[i];
-    const indexStr = el.getAttribute("data-sentence-index") || el.id.replace("sentence-0-", "");
+    const indexStr =
+      el.getAttribute("data-sentence-index") ||
+      el.id.replace("sentence-0-", "");
     const index = parseInt(indexStr, 10);
     if (!isNaN(index)) {
       sentenceMap.set(index, el);
@@ -301,7 +356,9 @@ function buildTopicNoteLayouts(articleRoot, items) {
   }
 
   // Cache characters
-  const charElements = articleRoot.querySelectorAll('[data-article-index="0"][data-char-start]');
+  const charElements = articleRoot.querySelectorAll(
+    '[data-article-index="0"][data-char-start]',
+  );
   const charCandidates = [];
   for (let i = 0; i < charElements.length; i++) {
     const el = charElements[i];
@@ -315,7 +372,8 @@ function buildTopicNoteLayouts(articleRoot, items) {
   const getSentenceNodeCached = (index) => sentenceMap.get(index) || null;
   const getCharNodeCached = (charIndex) => {
     if (!Number.isFinite(charIndex) || charCandidates.length === 0) return null;
-    let left = 0, right = charCandidates.length - 1;
+    let left = 0,
+      right = charCandidates.length - 1;
     let best = charCandidates[right];
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
@@ -356,6 +414,7 @@ function buildTopicNoteLayouts(articleRoot, items) {
     const bracketHeight = Math.max(24, bracketBottom - bracketTop);
 
     results.push({
+      segmentKey: item.segmentKey,
       name: item.name,
       startSentenceIndex: item.startSentenceIndex,
       endSentenceIndex: item.endSentenceIndex,
@@ -383,6 +442,7 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
   return previousLayouts.every((layout, index) => {
     const nextLayout = nextLayouts[index];
     return (
+      layout.segmentKey === nextLayout.segmentKey &&
       layout.name === nextLayout.name &&
       layout.startSentenceIndex === nextLayout.startSentenceIndex &&
       layout.endSentenceIndex === nextLayout.endSentenceIndex &&
@@ -396,14 +456,14 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
  * @param {TopicMeasuredLayout[]} layouts
  * @param {number} scrollTop
  * @param {number} viewportHeight
- * @param {string|null} activeTopicName
+ * @param {string|null} activeSegmentKey
  * @returns {TopicVisibleNoteLayout[]}
  */
 function buildVisibleTopicNoteLayouts(
   layouts,
   scrollTop,
   viewportHeight,
-  activeTopicName,
+  activeSegmentKey,
 ) {
   if (layouts.length === 0 || viewportHeight <= 0) {
     return [];
@@ -427,21 +487,35 @@ function buildVisibleTopicNoteLayouts(
     return [];
   }
 
+  const sortedVisibleCandidates = [...visibleCandidates].sort((left, right) => {
+      if (left.bracketTop !== right.bracketTop) {
+        return left.bracketTop - right.bracketTop;
+      }
+      if (left.startSentenceIndex !== right.startSentenceIndex) {
+        return left.startSentenceIndex - right.startSentenceIndex;
+      }
+      if (left.endSentenceIndex !== right.endSentenceIndex) {
+        return left.endSentenceIndex - right.endSentenceIndex;
+      }
+      return left.segmentKey.localeCompare(right.segmentKey);
+    },
+  );
+
   const limitedCandidates =
-    visibleCandidates.length <= maxVisibleNotes
-      ? visibleCandidates
+    sortedVisibleCandidates.length <= maxVisibleNotes
+      ? sortedVisibleCandidates
       : (() => {
           const focusIndex = Math.max(
             0,
-            visibleCandidates.findIndex(
-              (layout) => layout.name === activeTopicName,
+            sortedVisibleCandidates.findIndex(
+              (layout) => layout.segmentKey === activeSegmentKey,
             ),
           );
           const startIndex = Math.min(
             Math.max(0, focusIndex - Math.floor(maxVisibleNotes / 2)),
-            visibleCandidates.length - maxVisibleNotes,
+            sortedVisibleCandidates.length - maxVisibleNotes,
           );
-          return visibleCandidates.slice(
+          return sortedVisibleCandidates.slice(
             startIndex,
             startIndex + maxVisibleNotes,
           );
@@ -557,8 +631,8 @@ function TopicArticleFullscreenView({
   const articleRangeAccentRefs = useRef({});
   const noteAnchorRefs = useRef({});
   const animationFrameRef = useRef(0);
-  const [activeTopicName, setActiveTopicName] = useState(
-    topicTimelineItems[0]?.name || null,
+  const [activeSegmentKey, setActiveSegmentKey] = useState(
+    topicTimelineItems[0]?.segmentKey || null,
   );
   const [noteLayouts, setNoteLayouts] = useState([]);
   // Controls which TopicNoteCard components are mounted; updated only when the
@@ -572,11 +646,11 @@ function TopicArticleFullscreenView({
   // Updated synchronously during render so they are always current by the time
   // any pending animation frame fires.
   const noteLayoutsRef = useRef(noteLayouts);
-  const activeTopicNameRef = useRef(activeTopicName);
+  const activeSegmentKeyRef = useRef(activeSegmentKey);
   const prevVisibleSetRef = useRef("");
   const visibleTopLevelLabelsRef = useRef(visibleTopLevelLabels);
   noteLayoutsRef.current = noteLayouts;
-  activeTopicNameRef.current = activeTopicName;
+  activeSegmentKeyRef.current = activeSegmentKey;
   visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
 
   const effectiveHoveredTopic = useMemo(() => {
@@ -617,12 +691,12 @@ function TopicArticleFullscreenView({
 
   // Stable callbacks for ref assignment — avoids creating new closures each
   // render which would otherwise cause React to teardown/re-attach DOM refs.
-  const handleNoteAnchorRef = useCallback((name, node) => {
-    noteAnchorRefs.current[name] = node;
+  const handleNoteAnchorRef = useCallback((segmentKey, node) => {
+    noteAnchorRefs.current[segmentKey] = node;
   }, []);
 
-  const handleRangeAccentRef = useCallback((name, node) => {
-    articleRangeAccentRefs.current[name] = node;
+  const handleRangeAccentRef = useCallback((segmentKey, node) => {
+    articleRangeAccentRefs.current[segmentKey] = node;
   }, []);
 
   const syncActiveTopicToViewport = useCallback(() => {
@@ -647,9 +721,9 @@ function TopicArticleFullscreenView({
       ) ||
       layouts.find((layout) => layout.bracketTop >= probeOffset) ||
       layouts[layouts.length - 1];
-    if (activeItem?.name) {
-      setActiveTopicName((prev) =>
-        prev === activeItem.name ? prev : activeItem.name,
+    if (activeItem?.segmentKey) {
+      setActiveSegmentKey((prev) =>
+        prev === activeItem.segmentKey ? prev : activeItem.segmentKey,
       );
     }
   }, []); // stable — reads from noteLayoutsRef
@@ -669,14 +743,14 @@ function TopicArticleFullscreenView({
   }, [measureLayouts]);
 
   useEffect(() => {
-    setActiveTopicName((currentValue) => {
+    setActiveSegmentKey((currentValue) => {
       if (
         currentValue &&
-        topicTimelineItems.some((item) => item.name === currentValue)
+        topicTimelineItems.some((item) => item.segmentKey === currentValue)
       ) {
         return currentValue;
       }
-      return topicTimelineItems[0]?.name || null;
+      return topicTimelineItems[0]?.segmentKey || null;
     });
   }, [topicTimelineItems]);
 
@@ -705,7 +779,7 @@ function TopicArticleFullscreenView({
           noteLayoutsRef.current,
           scrollTop,
           viewportHeight,
-          activeTopicNameRef.current,
+          activeSegmentKeyRef.current,
         );
         const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
           noteLayoutsRef.current,
@@ -717,7 +791,7 @@ function TopicArticleFullscreenView({
         // cycle entirely.  This keeps scroll at 60 fps without re-renders.
         for (let i = 0; i < visible.length; i += 1) {
           const layout = visible[i];
-          const anchor = noteAnchorRefs.current[layout.name];
+          const anchor = noteAnchorRefs.current[layout.segmentKey];
           if (anchor instanceof HTMLElement) {
             anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
             anchor.style.setProperty(
@@ -725,7 +799,7 @@ function TopicArticleFullscreenView({
               `${layout.noteHeight}px`,
             );
           }
-          const accent = articleRangeAccentRefs.current[layout.name];
+          const accent = articleRangeAccentRefs.current[layout.segmentKey];
           if (accent instanceof HTMLElement) {
             accent.style.setProperty(
               "--topic-range-top",
@@ -741,7 +815,7 @@ function TopicArticleFullscreenView({
         // Trigger a React re-render only when the mounted card *set* changes
         // (topics entering / leaving the viewport window).  For pure position
         // changes the direct DOM writes above are sufficient.
-        const newSet = visible.map((l) => l.name).join("\0");
+        const newSet = visible.map((layout) => layout.segmentKey).join("\0");
         if (newSet !== prevVisibleSetRef.current) {
           prevVisibleSetRef.current = newSet;
           setMountedLayouts(visible);
@@ -802,11 +876,11 @@ function TopicArticleFullscreenView({
       noteLayoutsRef.current,
       container.scrollTop,
       container.clientHeight,
-      activeTopicNameRef.current,
+      activeSegmentKeyRef.current,
     );
     for (let i = 0; i < visible.length; i += 1) {
       const layout = visible[i];
-      const anchor = noteAnchorRefs.current[layout.name];
+      const anchor = noteAnchorRefs.current[layout.segmentKey];
       if (anchor instanceof HTMLElement) {
         anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
         anchor.style.setProperty(
@@ -814,7 +888,7 @@ function TopicArticleFullscreenView({
           `${layout.noteHeight}px`,
         );
       }
-      const accent = articleRangeAccentRefs.current[layout.name];
+      const accent = articleRangeAccentRefs.current[layout.segmentKey];
       if (accent instanceof HTMLElement) {
         accent.style.setProperty("--topic-range-top", `${layout.bracketTop}px`);
         accent.style.setProperty(
@@ -852,7 +926,7 @@ function TopicArticleFullscreenView({
         return;
       }
 
-      setActiveTopicName(item.name);
+      setActiveSegmentKey(item.segmentKey);
       setPinnedTopicName(item.name);
       if (typeof setHoveredTopic === "function") {
         setHoveredTopic(item.topic);
@@ -964,7 +1038,8 @@ function TopicArticleFullscreenView({
                   {articleContent}
                   {mountedLayouts.map((layout) => (
                     <RangeAccentDot
-                      key={layout.name}
+                      key={layout.segmentKey}
+                      segmentKey={layout.segmentKey}
                       topicName={layout.name}
                       onRef={handleRangeAccentRef}
                     />
@@ -980,9 +1055,9 @@ function TopicArticleFullscreenView({
                 {mountedLayouts.length > 0 ? (
                   mountedLayouts.map((layout) => (
                     <TopicNoteCard
-                      key={layout.name}
+                      key={layout.segmentKey}
                       layout={layout}
-                      isActive={layout.name === activeTopicName}
+                      isActive={layout.segmentKey === activeSegmentKey}
                       isHighlighted={
                         layout.name === previewTopicName ||
                         layout.name === pinnedTopicName
@@ -1015,7 +1090,7 @@ function TopicArticleFullscreenView({
  * @property {(topic: Object) => void} onEnter
  * @property {() => void} onLeave
  * @property {(layout: TopicVisibleNoteLayout) => void} onScrollTo
- * @property {(name: string, node: HTMLElement | null) => void} onAnchorRef
+ * @property {(segmentKey: string, node: HTMLElement | null) => void} onAnchorRef
  */
 
 /** @param {TopicNoteCardProps} props */
@@ -1029,8 +1104,8 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
   onAnchorRef,
 }) {
   const setRef = useCallback(
-    (node) => onAnchorRef(layout.name, node),
-    [onAnchorRef, layout.name],
+    (node) => onAnchorRef(layout.segmentKey, node),
+    [layout.segmentKey, onAnchorRef],
   );
   const handleEnter = useCallback(
     () => onEnter(layout.topic),
@@ -1048,6 +1123,7 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
         type="button"
         className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
         data-topic-name={layout.name}
+        data-topic-segment-key={layout.segmentKey}
         aria-current={isActive ? "true" : undefined}
         aria-pressed={isHighlighted ? "true" : "false"}
         onMouseEnter={handleEnter}
@@ -1104,43 +1180,26 @@ const CurrentAreaLabel = React.memo(function CurrentAreaLabel({
   );
 });
 
-/** @param {{ topicName: string, onRef: (name: string, node: HTMLElement | null) => void }} props */
+/** @param {{ segmentKey: string, topicName: string, onRef: (segmentKey: string, node: HTMLElement | null) => void }} props */
 const RangeAccentDot = React.memo(function RangeAccentDot({
+  segmentKey,
   topicName,
   onRef,
 }) {
   const setRef = useCallback(
-    (node) => onRef(topicName, node),
-    [onRef, topicName],
+    (node) => onRef(segmentKey, node),
+    [onRef, segmentKey],
   );
   return (
     <div
       ref={setRef}
       className={`topic-article-view__range-accent ${getTopicCSSClass(topicName)}`}
+      data-topic-segment-key={segmentKey}
+      data-topic-name={topicName}
       aria-hidden="true"
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: "12px",
-          height: "4px",
-          background: "var(--topic-accent-color)",
-          borderRadius: "999px",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          right: 0,
-          width: "12px",
-          height: "4px",
-          background: "var(--topic-accent-color)",
-          borderRadius: "999px",
-        }}
-      />
+      <div className="topic-article-view__range-accent-top" />
+      <div className="topic-article-view__range-accent-bottom" />
     </div>
   );
 });
