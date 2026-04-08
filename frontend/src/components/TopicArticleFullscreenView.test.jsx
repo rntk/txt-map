@@ -26,9 +26,12 @@ vi.mock("./TextDisplay", () => ({
     activeInsightSentenceIndices = [],
     interactiveSentenceIndices = [],
     interactiveHighlightClassName = "",
+    dimmedSentenceIndices = [],
+    dimmedHighlightClassName = "",
   }) => {
     const highlightedSet = new Set(activeInsightSentenceIndices);
     const interactiveSet = new Set(interactiveSentenceIndices);
+    const dimmedSet = new Set(dimmedSentenceIndices);
     return (
       <div className="text-content reading-article__content">
         {sentences.map((sentence, index) => (
@@ -41,7 +44,7 @@ vi.mock("./TextDisplay", () => ({
           >
             {interactiveSet.has(index + 1) ? (
               <span
-                className={`word-token ${interactiveHighlightClassName}`}
+                className={`word-token ${interactiveHighlightClassName}${dimmedSet.has(index + 1) ? ` ${dimmedHighlightClassName}` : ""}`}
                 data-sentence-index={index}
               >
                 {sentence}
@@ -395,6 +398,48 @@ describe("TopicArticleFullscreenView", () => {
     );
 
     expect(new Set(laneValues).size).toBeGreaterThan(1);
+  });
+
+  it("renders read topics with the read-state overlay treatment and dims revealed read source text", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        readTopics={new Set(["Science"])}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(3),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics": "Read topic summary.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    const overlayAnchor = document.querySelector(
+      ".topic-article-view__overlay-anchor",
+    );
+    expect(overlayAnchor).toHaveClass("topic-article-view__overlay-anchor--read");
+
+    fireEvent.click(queryTopicButtons("Science > Biology > Genetics")[0]);
+
+    await waitFor(() => {
+      expect(
+        document.querySelector(".topic-article-view__revealed-token--read"),
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows the summary card for the hovered overlay and keeps read controls there", async () => {

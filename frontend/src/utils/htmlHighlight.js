@@ -14,6 +14,8 @@ export function isInAnyRange(start, end, ranges) {
  * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
  * @param {Array<{start: number, end: number}>} [interactiveRanges]
  * @param {string} [interactiveClassName]
+ * @param {Array<{start: number, end: number}>} [dimmedRanges]
+ * @param {string} [dimmedClassName]
  */
 export function wrapWord(
   htmlWord,
@@ -25,6 +27,8 @@ export function wrapWord(
   coloredRanges = [],
   interactiveRanges = [],
   interactiveClassName = "",
+  dimmedRanges = [],
+  dimmedClassName = "",
 ) {
   const wordEnd = wordStart + htmlWord.length;
 
@@ -54,6 +58,9 @@ export function wrapWord(
   ) {
     classes.push(interactiveClassName);
   }
+  if (dimmedClassName && isInAnyRange(wordStart, wordEnd, dimmedRanges)) {
+    classes.push(dimmedClassName);
+  }
 
   return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
 }
@@ -67,6 +74,8 @@ export function wrapWord(
  * @param {Array<{start: number, end: number, color: string}>} [coloredRanges]
  * @param {Array<{start: number, end: number}>} [interactiveRanges]
  * @param {string} [interactiveClassName]
+ * @param {Array<{start: number, end: number}>} [dimmedRanges]
+ * @param {string} [dimmedClassName]
  */
 export function buildHighlightedRawHtml(
   rawHtml,
@@ -77,6 +86,8 @@ export function buildHighlightedRawHtml(
   coloredRanges = [],
   interactiveRanges = [],
   interactiveClassName = "",
+  dimmedRanges = [],
+  dimmedClassName = "",
 ) {
   if (!rawHtml) return "";
 
@@ -128,6 +139,8 @@ export function buildHighlightedRawHtml(
           coloredRanges,
           interactiveRanges,
           interactiveClassName,
+          dimmedRanges,
+          dimmedClassName,
         );
         wordBuffer = "";
         wordStart = -1;
@@ -147,6 +160,8 @@ export function buildHighlightedRawHtml(
             coloredRanges,
             interactiveRanges,
             interactiveClassName,
+            dimmedRanges,
+            dimmedClassName,
           );
           wordBuffer = "";
           wordStart = -1;
@@ -170,6 +185,8 @@ export function buildHighlightedRawHtml(
       coloredRanges,
       interactiveRanges,
       interactiveClassName,
+      dimmedRanges,
+      dimmedClassName,
     );
   }
 

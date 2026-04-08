@@ -692,6 +692,27 @@
   z-index: 6;
 }
 
+.topic-article-view__overlay-anchor--read .topic-article-view__topic-note {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.08) 0 6px,
+      rgba(255, 255, 255, 0) 6px 12px
+    ),
+    color-mix(in srgb, var(--topic-accent-color, #98a2b3) 32%, white);
+}
+
+.topic-article-view__overlay-anchor--read .topic-article-view__topic-note--active,
+.topic-article-view__overlay-anchor--read .topic-article-view__topic-note--highlighted {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.08) 0 6px,
+      rgba(255, 255, 255, 0) 6px 12px
+    ),
+    color-mix(in srgb, var(--topic-accent-color, #98a2b3) 38%, white);
+}
+
 .topic-article-view__topic-note-eyebrow {
   color: rgba(52, 64, 84, 0.8);
   font-size: 10px;
@@ -721,6 +742,10 @@
 
 .topic-article-view__revealed-token {
   cursor: pointer;
+}
+
+.topic-article-view__revealed-token--read {
+  opacity: 0.5;
 }
 
 .topic-article-view__read-btn {

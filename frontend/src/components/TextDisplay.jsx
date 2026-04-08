@@ -53,6 +53,9 @@ const EMPTY_ARRAY = [];
  * @property {Array<number>} [interactiveSentenceIndices]
  * @property {Array<{start: number, end: number}>} [interactiveHighlightRanges]
  * @property {string} [interactiveHighlightClassName]
+ * @property {Array<number>} [dimmedSentenceIndices]
+ * @property {Array<{start: number, end: number}>} [dimmedHighlightRanges]
+ * @property {string} [dimmedHighlightClassName]
  */
 
 /**
@@ -85,6 +88,9 @@ function TextDisplay({
   interactiveSentenceIndices = EMPTY_ARRAY,
   interactiveHighlightRanges = EMPTY_ARRAY,
   interactiveHighlightClassName = "",
+  dimmedSentenceIndices = EMPTY_ARRAY,
+  dimmedHighlightRanges = EMPTY_ARRAY,
+  dimmedHighlightClassName = "",
 }) {
   const safeSentences = useMemo(
     () => (Array.isArray(sentences) ? sentences : []),
@@ -170,6 +176,32 @@ function TextDisplay({
             )
         : [],
     [interactiveHighlightRanges],
+  );
+  const dimmedSentenceIndexSet = useMemo(
+    () =>
+      new Set(
+        (Array.isArray(dimmedSentenceIndices) ? dimmedSentenceIndices : [])
+          .filter((value) => Number.isInteger(value))
+          .map((value) => value - 1),
+      ),
+    [dimmedSentenceIndices],
+  );
+  const safeDimmedHighlightRanges = useMemo(
+    () =>
+      Array.isArray(dimmedHighlightRanges)
+        ? dimmedHighlightRanges
+            .map((range) => ({
+              start: Number(range?.start),
+              end: Number(range?.end),
+            }))
+            .filter(
+              (range) =>
+                Number.isFinite(range.start) &&
+                Number.isFinite(range.end) &&
+                range.end > range.start,
+            )
+        : [],
+    [dimmedHighlightRanges],
   );
 
   // Get highlight words from prop or context
@@ -373,6 +405,8 @@ function TextDisplay({
         coloredRanges,
         safeInteractiveHighlightRanges,
         interactiveHighlightClassName,
+        safeDimmedHighlightRanges,
+        dimmedHighlightClassName,
       ),
     [
       rawHtml,
@@ -383,6 +417,8 @@ function TextDisplay({
       coloredRanges,
       safeInteractiveHighlightRanges,
       interactiveHighlightClassName,
+      safeDimmedHighlightRanges,
+      dimmedHighlightClassName,
     ],
   );
 
@@ -885,6 +921,8 @@ function TextDisplay({
         handleTextClick={handleTextClick}
         highlightedIndices={highlightedIndices}
         highlightedRawHtml={highlightedRawHtml}
+        dimmedHighlightClassName={dimmedHighlightClassName}
+        dimmedSentenceIndexSet={dimmedSentenceIndexSet}
         interactiveHighlightClassName={interactiveHighlightClassName}
         interactiveSentenceIndexSet={interactiveSentenceIndexSet}
         onShowTopicSummary={onShowTopicSummary}
@@ -914,6 +952,8 @@ function TextDisplay({
  * @property {(event: React.MouseEvent<HTMLElement>) => void} handleTextClick
  * @property {Set<number>} highlightedIndices
  * @property {string} highlightedRawHtml
+ * @property {string} dimmedHighlightClassName
+ * @property {Set<number>} dimmedSentenceIndexSet
  * @property {string} interactiveHighlightClassName
  * @property {Set<number>} interactiveSentenceIndexSet
  * @property {((topic: Object, summary: string) => void) | null | undefined} onShowTopicSummary
@@ -939,6 +979,8 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
   handleTextClick,
   highlightedIndices,
   highlightedRawHtml,
+  dimmedHighlightClassName,
+  dimmedSentenceIndexSet,
   interactiveHighlightClassName,
   interactiveSentenceIndexSet,
   onShowTopicSummary,
@@ -954,9 +996,19 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
 }) {
   const renderInteractiveSentenceContent = useCallback(
     (text, sentenceIndex) => {
+      const classNames = [];
       if (
-        !interactiveHighlightClassName ||
-        !interactiveSentenceIndexSet.has(sentenceIndex)
+        interactiveHighlightClassName &&
+        interactiveSentenceIndexSet.has(sentenceIndex)
+      ) {
+        classNames.push(interactiveHighlightClassName);
+      }
+      if (dimmedHighlightClassName && dimmedSentenceIndexSet.has(sentenceIndex)) {
+        classNames.push(dimmedHighlightClassName);
+      }
+
+      if (
+        classNames.length === 0
       ) {
         return (
           <span
@@ -979,7 +1031,7 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
             return (
               <span
                 key={`${sentenceIndex}-${segmentIndex}-${segment}`}
-                className={`word-token ${interactiveHighlightClassName}`}
+                className={`word-token ${classNames.join(" ")}`}
                 data-sentence-index={sentenceIndex}
               >
                 {segment}
@@ -989,7 +1041,12 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
         </>
       );
     },
-    [interactiveHighlightClassName, interactiveSentenceIndexSet],
+    [
+      dimmedHighlightClassName,
+      dimmedSentenceIndexSet,
+      interactiveHighlightClassName,
+      interactiveSentenceIndexSet,
+    ],
   );
 
   if (highlightedRawHtml) {

@@ -740,6 +740,41 @@ function TopicArticleFullscreenView({
     });
     return ranges;
   }, [revealedLayouts]);
+  const readRevealedSentenceIndices = useMemo(() => {
+    const merged = new Set();
+    revealedLayouts.forEach((layout) => {
+      const normalizedTopic = buildNormalizedTopicSelection(layout);
+      if (!isTopicSelectionRead(normalizedTopic, readTopics)) {
+        return;
+      }
+      for (
+        let sentenceIndex = layout.startSentenceIndex;
+        sentenceIndex <= layout.endSentenceIndex;
+        sentenceIndex += 1
+      ) {
+        merged.add(sentenceIndex + 1);
+      }
+    });
+    return Array.from(merged).sort((left, right) => left - right);
+  }, [readTopics, revealedLayouts]);
+  const readRevealedCharRanges = useMemo(() => {
+    const ranges = [];
+    revealedLayouts.forEach((layout) => {
+      const normalizedTopic = buildNormalizedTopicSelection(layout);
+      if (
+        !isTopicSelectionRead(normalizedTopic, readTopics) ||
+        !Number.isFinite(layout.startCharIndex) ||
+        !Number.isFinite(layout.endCharIndex)
+      ) {
+        return;
+      }
+      ranges.push({
+        start: layout.startCharIndex,
+        end: layout.endCharIndex,
+      });
+    });
+    return ranges;
+  }, [readTopics, revealedLayouts]);
   const mergedInsightSentenceIndices = useMemo(() => {
     const merged = new Set(
       Array.isArray(activeInsightSentenceIndices)
@@ -1126,6 +1161,9 @@ function TopicArticleFullscreenView({
       interactiveSentenceIndices={revealedSentenceIndices}
       interactiveHighlightRanges={revealedCharRanges}
       interactiveHighlightClassName={REVEALED_TOKEN_CLASSNAME}
+      dimmedSentenceIndices={readRevealedSentenceIndices}
+      dimmedHighlightRanges={readRevealedCharRanges}
+      dimmedHighlightClassName={REVEALED_READ_TOKEN_CLASSNAME}
     />
   ) : (
     <div
@@ -1188,6 +1226,10 @@ function TopicArticleFullscreenView({
                         layout={layout}
                         isActive={layout.segmentKey === activeSegmentKey}
                         isHighlighted={layout.segmentKey === previewSegmentKey}
+                        isRead={isTopicSelectionRead(
+                          buildNormalizedTopicSelection(layout),
+                          readTopics,
+                        )}
                         onEnter={handleOverlayEnter}
                         onLeave={handleOverlayLeave}
                         onReveal={hideOverlayForSegment}
@@ -1223,6 +1265,7 @@ function TopicArticleFullscreenView({
  * @property {TopicOverlayLayout} layout
  * @property {boolean} isActive
  * @property {boolean} isHighlighted
+ * @property {boolean} isRead
  * @property {(layout: TopicMeasuredLayout) => void} onEnter
  * @property {() => void} onLeave
  * @property {(layout: TopicMeasuredLayout) => void} onReveal
@@ -1233,6 +1276,7 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
   layout,
   isActive,
   isHighlighted,
+  isRead,
   onEnter,
   onLeave,
   onReveal,
@@ -1256,7 +1300,7 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
 
   return (
     <div
-      className={`topic-article-view__overlay-anchor ${cssClass}${isActive ? " topic-article-view__overlay-anchor--active" : ""}${isHighlighted ? " topic-article-view__overlay-anchor--highlighted" : ""}`}
+      className={`topic-article-view__overlay-anchor ${cssClass}${isActive ? " topic-article-view__overlay-anchor--active" : ""}${isHighlighted ? " topic-article-view__overlay-anchor--highlighted" : ""}${isRead ? " topic-article-view__overlay-anchor--read" : ""}`}
       style={{
         "--topic-overlay-top": `${layout.bracketTop}px`,
         "--topic-overlay-height": `${layout.bracketHeight}px`,
@@ -1321,22 +1365,10 @@ const TopicSummaryCard = React.memo(function TopicSummaryCard({
     if (!topic) {
       return null;
     }
-    const baseTopic = buildModalSelectionFromTopic({
-      ...topic,
-      displayName: topic.displayName || layout.name,
-      fullPath: topic.fullPath || layout.name,
-      sentences: topic.sentences,
-      sentenceIndices: topic.sentenceIndices || topic.sentences,
+    return buildNormalizedTopicSelection({
+      name: layout.name,
+      topic,
     });
-
-    return {
-      ...baseTopic,
-      canonicalTopicNames:
-        Array.isArray(baseTopic.canonicalTopicNames) &&
-        baseTopic.canonicalTopicNames.length > 0
-          ? baseTopic.canonicalTopicNames
-          : [layout.name],
-    };
   }, [layout.name, topic]);
   const isRead = normalizedTopic
     ? isTopicSelectionRead(normalizedTopic, readTopics)
