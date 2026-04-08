@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple, Set
 import re
@@ -21,6 +21,7 @@ class SubmitRequest(BaseModel):
 
 class FetchUrlRequest(BaseModel):
     url: str
+    embed_images: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -78,7 +79,9 @@ def _html_contains_embedded_pdf_images(html_content: str) -> bool:
     return bool(EMBEDDED_PDF_IMAGE_RE.search(html_content))
 
 
-def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
+def _extract_content_from_upload(
+    filename: str, data: bytes, embed_images: bool = False
+) -> Tuple[str, str]:
     """
     Extract (html_content, text_content) from uploaded file bytes.
     Returns (html_content, text_content) — for plain text types both are the same.
@@ -101,7 +104,7 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 
         try:
             # Generate semantic HTML with headings, paragraphs, bold, italic
-            html_content = convert_pdf_to_html(data)
+            html_content = convert_pdf_to_html(data, embed_images=embed_images)
             # Extract plain text for text_content
             text_content = extract_text_from_pdf(data)
             if not text_content.strip() and not _html_contains_embedded_pdf_images(
@@ -160,6 +163,7 @@ def _extract_content_from_upload(filename: str, data: bytes) -> Tuple[str, str]:
 @router.post("/upload")
 async def post_upload(
     file: UploadFile = File(...),
+    embed_images: bool = Form(False),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
 ) -> Dict[str, str]:
@@ -176,7 +180,9 @@ async def post_upload(
         )
 
     data = await file.read()
-    html_content, text_content = _extract_content_from_upload(filename, data)
+    html_content, text_content = _extract_content_from_upload(
+        filename, data, embed_images=embed_images
+    )
 
     submission = submissions_storage.create(
         html_content=html_content,
@@ -235,7 +241,9 @@ def post_fetch_url(
     data = response.content
 
     if content_type == "application/pdf":
-        html_content, text_content = _extract_content_from_upload("document.pdf", data)
+        html_content, text_content = _extract_content_from_upload(
+            "document.pdf", data, embed_images=request.embed_images
+        )
     elif (
         content_type.startswith("text/")
         or content_type in ("application/xhtml+xml",)

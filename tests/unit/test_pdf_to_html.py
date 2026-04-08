@@ -924,7 +924,7 @@ class TestConvert:
         mock_doc.__iter__.side_effect = lambda: iter([mock_page])
         mock_open.return_value = mock_doc
 
-        converter = PDFToSemanticHTML(b"fake bytes")
+        converter = PDFToSemanticHTML(b"fake bytes", embed_images=True)
         result = converter.convert()
 
         expected_base64 = base64.b64encode(b"fake_image_data").decode("utf-8")

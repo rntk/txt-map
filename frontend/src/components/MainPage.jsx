@@ -270,6 +270,7 @@ function UploadCard() {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [embedImages, setEmbedImages] = useState(false);
   const uploadDescription = getUploadDescription(status, errorMsg);
   const uploadCardClassName = [
     "main-page-card",
@@ -303,6 +304,7 @@ function UploadCard() {
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("embed_images", embedImages ? "true" : "false");
       const res = await fetch("/api/upload", {
         method: "POST",
         credentials: "include",
@@ -369,6 +371,18 @@ function UploadCard() {
       <span className="main-page-card__eyebrow">Upload</span>
       <span className="main-page-card__title">Upload File</span>
       <span className="main-page-card__description">{uploadDescription}</span>
+      <label 
+        className="main-page-card__checkbox" 
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--color-text-muted)" }}
+      >
+        <input 
+          type="checkbox" 
+          checked={embedImages} 
+          onChange={(e) => setEmbedImages(e.target.checked)} 
+        />
+        Embed PDF images
+      </label>
     </button>
   );
 }
@@ -380,6 +394,7 @@ function UrlCard() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [embedImages, setEmbedImages] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -400,7 +415,7 @@ function UrlCard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: trimmed }),
+        body: JSON.stringify({ url: trimmed, embed_images: embedImages }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -453,6 +468,16 @@ function UrlCard() {
           {status === "loading" ? "Loading…" : "Load"}
         </button>
       </form>
+      <label 
+        style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--color-text-muted)" }}
+      >
+        <input 
+          type="checkbox" 
+          checked={embedImages} 
+          onChange={(e) => setEmbedImages(e.target.checked)} 
+        />
+        Embed PDF images
+      </label>
       {status === "error" && (
         <span className="main-page-url-error">{errorMsg}</span>
       )}

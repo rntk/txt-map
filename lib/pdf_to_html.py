@@ -27,8 +27,9 @@ class FontThresholds:
 class PDFToSemanticHTML:
     """Convert PDF to semantic HTML with proper heading and text tags."""
 
-    def __init__(self, pdf_bytes: bytes) -> None:
+    def __init__(self, pdf_bytes: bytes, embed_images: bool = False) -> None:
         self.doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+        self.embed_images = embed_images
         self.font_thresholds = self._analyze_font_sizes()
 
     def _analyze_font_sizes(self) -> FontThresholds:
@@ -151,6 +152,15 @@ class PDFToSemanticHTML:
                             page_html.append(f"<p>{para_text}</p>")
                         current_paragraph = []
 
+                    bbox = block.get("bbox", [0, 0, 0, 0])
+                    img_alt = f"PDF Image (page {page_num + 1}, position {int(bbox[0])},{int(bbox[1])})"
+
+                    if not self.embed_images:
+                        page_html.append(
+                            f'<div style="color: gray; margin: 1em 0;">[{img_alt} omitted]</div>'
+                        )
+                        continue
+
                     img_bytes = block.get("image")
                     img_ext = block.get("ext", "png")
                     if not img_bytes:
@@ -171,9 +181,6 @@ class PDFToSemanticHTML:
                             img_size_kb,
                         )
 
-                    # Get image position for alt text
-                    bbox = block.get("bbox", [0, 0, 0, 0])
-                    img_alt = f"PDF Image (page {page_num + 1}, position {int(bbox[0])},{int(bbox[1])})"
                     page_html.append(
                         f'<img src="data:image/{img_ext};base64,{base64_data}" style="max-width: 100%; height: auto; margin: 1em 0;" alt="{img_alt}" />'
                     )
@@ -278,17 +285,18 @@ class PDFToSemanticHTML:
         self.doc.close()
 
 
-def convert_pdf_to_html(pdf_bytes: bytes) -> str:
+def convert_pdf_to_html(pdf_bytes: bytes, embed_images: bool = False) -> str:
     """
     Convenience function to convert PDF bytes to semantic HTML.
 
     Args:
         pdf_bytes: Raw PDF file bytes
+        embed_images: Whether to embed images as base64 in the HTML. Defaults to False.
 
     Returns:
         Semantic HTML string
     """
-    converter = PDFToSemanticHTML(pdf_bytes)
+    converter = PDFToSemanticHTML(pdf_bytes, embed_images=embed_images)
     try:
         return converter.convert()
     finally:
