@@ -371,15 +371,23 @@ function UploadCard() {
       <span className="main-page-card__eyebrow">Upload</span>
       <span className="main-page-card__title">Upload File</span>
       <span className="main-page-card__description">{uploadDescription}</span>
-      <label 
-        className="main-page-card__checkbox" 
+      <label
+        className="main-page-card__checkbox"
         onClick={(e) => e.stopPropagation()}
-        style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--color-text-muted)" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginTop: "0.5rem",
+          fontSize: "0.85rem",
+          cursor: "pointer",
+          color: "var(--color-text-muted)",
+        }}
       >
-        <input 
-          type="checkbox" 
-          checked={embedImages} 
-          onChange={(e) => setEmbedImages(e.target.checked)} 
+        <input
+          type="checkbox"
+          checked={embedImages}
+          onChange={(e) => setEmbedImages(e.target.checked)}
         />
         Embed PDF images
       </label>
@@ -468,13 +476,21 @@ function UrlCard() {
           {status === "loading" ? "Loading…" : "Load"}
         </button>
       </form>
-      <label 
-        style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--color-text-muted)" }}
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginTop: "0.5rem",
+          fontSize: "0.85rem",
+          cursor: "pointer",
+          color: "var(--color-text-muted)",
+        }}
       >
-        <input 
-          type="checkbox" 
-          checked={embedImages} 
-          onChange={(e) => setEmbedImages(e.target.checked)} 
+        <input
+          type="checkbox"
+          checked={embedImages}
+          onChange={(e) => setEmbedImages(e.target.checked)}
         />
         Embed PDF images
       </label>

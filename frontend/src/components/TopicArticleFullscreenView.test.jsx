@@ -85,6 +85,17 @@ function queryTopicButtonBySegment(topicName, segmentKey) {
   );
 }
 
+function queryTopicReadButton(topicName) {
+  return (
+    Array.from(document.querySelectorAll(".topic-article-view__read-btn")).find(
+      (element) =>
+        element
+          .closest(".topic-article-view__note-anchor")
+          ?.querySelector(`button[data-topic-name="${topicName}"]`),
+    ) || null
+  );
+}
+
 function applyMockLayoutMetrics() {
   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
     configurable: true,
@@ -560,7 +571,8 @@ describe("TopicArticleFullscreenView", () => {
               },
             ],
             topic_summaries: {
-              "Science > Biology > Genetics": "Should only show on note interaction.",
+              "Science > Biology > Genetics":
+                "Should only show on note interaction.",
             },
           },
         ]}
@@ -574,5 +586,198 @@ describe("TopicArticleFullscreenView", () => {
     expect(
       screen.queryByLabelText("Summary for Science > Biology > Genetics"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the read button state and normalizes the topic before toggling read", async () => {
+    const onToggleRead = vi.fn();
+
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        onToggleRead={onToggleRead}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    const readButton = queryTopicReadButton("Science > Biology > Genetics");
+    expect(readButton).toHaveTextContent("Mark as read");
+
+    fireEvent.click(readButton);
+
+    expect(onToggleRead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "topic",
+        name: "Science > Biology > Genetics",
+        displayName: "Science > Biology > Genetics",
+        canonicalTopicNames: ["Science > Biology > Genetics"],
+        sentenceIndices: [1],
+      }),
+    );
+  });
+
+  it("renders mark unread for read topics", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        readTopics={new Set(["Science"])}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryTopicReadButton("Science > Biology > Genetics"),
+      ).toHaveTextContent("Mark unread");
+    });
+  });
+
+  it("does not trigger the note scroll action when the read button is clicked", async () => {
+    const onToggleRead = vi.fn();
+
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        onToggleRead={onToggleRead}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryTopicReadButton("Science > Biology > Genetics"),
+      ).toBeInTheDocument();
+    });
+
+    HTMLElement.prototype.scrollTo.mockClear();
+    HTMLElement.prototype.scrollIntoView.mockClear();
+
+    fireEvent.click(queryTopicReadButton("Science > Biology > Genetics"));
+
+    expect(onToggleRead).toHaveBeenCalledTimes(1);
+    expect(HTMLElement.prototype.scrollTo).not.toHaveBeenCalled();
+    expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("confirms before marking unread multi-range topics as read", async () => {
+    const onToggleRead = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        onToggleRead={onToggleRead}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(6),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 5],
+                ranges: [
+                  { sentence_start: 1, sentence_end: 1, start: 0, end: 10 },
+                  { sentence_start: 5, sentence_end: 5, start: 20, end: 30 },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryTopicReadButton("Science > Biology > Genetics"),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(queryTopicReadButton("Science > Biology > Genetics"));
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      '"Science > Biology > Genetics" has 2 separate ranges. Some may not be visible on screen. Mark as read?',
+    );
+    expect(onToggleRead).not.toHaveBeenCalled();
+  });
+
+  it("keeps the summary card visible while focusing the read button", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics":
+                "A short explanation of the genetics topic.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    const noteButton = queryTopicButtons("Science > Biology > Genetics")[0];
+    const readButton = queryTopicReadButton("Science > Biology > Genetics");
+
+    fireEvent.mouseEnter(noteButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Summary for Science > Biology > Genetics"),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.focus(readButton);
+
+    expect(
+      screen.getByLabelText("Summary for Science > Biology > Genetics"),
+    ).toBeInTheDocument();
   });
 });

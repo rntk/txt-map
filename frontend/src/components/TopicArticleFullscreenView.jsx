@@ -13,6 +13,8 @@ import {
   getTopicCSSClass,
 } from "../utils/topicColorUtils";
 import { splitTopicPath } from "../utils/summaryTimeline";
+import { isTopicSelectionRead } from "../utils/topicReadUtils";
+import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 
 /**
  * @typedef {Object} TopicTimelineItem
@@ -1213,6 +1215,8 @@ function TopicArticleFullscreenView({
                         (layout.name === pinnedTopicName &&
                           pinnedSegmentKey === null)
                       }
+                      readTopics={readTopics}
+                      onToggleRead={onToggleRead}
                       onEnter={handleNoteEnter}
                       onLeave={handleNoteLeave}
                       onScrollTo={scrollToTopic}
@@ -1238,6 +1242,8 @@ function TopicArticleFullscreenView({
  * @property {TopicVisibleNoteLayout} layout
  * @property {boolean} isActive
  * @property {boolean} isHighlighted
+ * @property {Set<string> | string[]} readTopics
+ * @property {(topic: Object) => void} onToggleRead
  * @property {(layout: TopicVisibleNoteLayout) => void} onEnter
  * @property {() => void} onLeave
  * @property {(layout: TopicVisibleNoteLayout) => void} onScrollTo
@@ -1249,6 +1255,8 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
   layout,
   isActive,
   isHighlighted,
+  readTopics,
+  onToggleRead,
   onEnter,
   onLeave,
   onScrollTo,
@@ -1263,41 +1271,109 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
     () => onScrollTo(layout),
     [layout, onScrollTo],
   );
+  const handleBlur = useCallback(
+    (event) => {
+      const nextFocusedElement = event.relatedTarget;
+      if (
+        nextFocusedElement instanceof Node &&
+        event.currentTarget.contains(nextFocusedElement)
+      ) {
+        return;
+      }
+      onLeave();
+    },
+    [onLeave],
+  );
+  const normalizedTopic = useMemo(() => {
+    const baseTopic = buildModalSelectionFromTopic({
+      ...layout.topic,
+      displayName: layout.topic?.displayName || layout.name,
+      fullPath: layout.topic?.fullPath || layout.name,
+      sentences: layout.topic?.sentences,
+      sentenceIndices: layout.topic?.sentenceIndices || layout.topic?.sentences,
+    });
+
+    return {
+      ...baseTopic,
+      canonicalTopicNames:
+        Array.isArray(baseTopic.canonicalTopicNames) &&
+        baseTopic.canonicalTopicNames.length > 0
+          ? baseTopic.canonicalTopicNames
+          : [layout.name],
+    };
+  }, [layout.name, layout.topic]);
+  const isRead = isTopicSelectionRead(normalizedTopic, readTopics);
+  const handleToggleRead = useCallback(
+    (event) => {
+      event.stopPropagation();
+
+      const ranges = normalizedTopic?.ranges;
+      if (Array.isArray(ranges) && ranges.length > 1 && !isRead) {
+        const ok = window.confirm(
+          `"${normalizedTopic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`,
+        );
+        if (!ok) {
+          return;
+        }
+      }
+
+      onToggleRead(normalizedTopic);
+    },
+    [isRead, normalizedTopic, onToggleRead],
+  );
   const cssClass = getTopicCSSClass(layout.name);
 
   return (
-    <div ref={setRef} className={`topic-article-view__note-anchor ${cssClass}`}>
-      <button
-        type="button"
+    <div
+      ref={setRef}
+      className={`topic-article-view__note-anchor ${cssClass}`}
+      onMouseEnter={handleEnter}
+      onMouseLeave={onLeave}
+      onFocus={handleEnter}
+      onBlur={handleBlur}
+    >
+      <div
         className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
-        data-topic-name={layout.name}
-        data-topic-segment-key={layout.segmentKey}
-        aria-current={isActive ? "true" : undefined}
-        aria-pressed={isHighlighted ? "true" : "false"}
-        onMouseEnter={handleEnter}
-        onMouseLeave={onLeave}
-        onFocus={handleEnter}
-        onBlur={onLeave}
-        onPointerDown={handleEnter}
-        onClick={handleClick}
       >
-        <span className="topic-article-view__topic-name">
-          {layout.noteTitleLines.map((line, index) => (
-            <span
-              key={`${layout.name}-${index}-${line}`}
-              className="topic-article-view__topic-name-line"
-            >
-              {line}
-            </span>
-          ))}
-        </span>
-        <span className="topic-article-view__topic-range">
-          {formatSentenceRangeLabel(
-            layout.startSentenceIndex,
-            layout.endSentenceIndex,
-          )}
-        </span>
-      </button>
+        <button
+          type="button"
+          className="topic-article-view__topic-main-action"
+          data-topic-name={layout.name}
+          data-topic-segment-key={layout.segmentKey}
+          aria-current={isActive ? "true" : undefined}
+          aria-pressed={isHighlighted ? "true" : "false"}
+          onPointerDown={handleEnter}
+          onClick={handleClick}
+        >
+          <span className="topic-article-view__topic-name">
+            {layout.noteTitleLines.map((line, index) => (
+              <span
+                key={`${layout.name}-${index}-${line}`}
+                className="topic-article-view__topic-name-line"
+              >
+                {line}
+              </span>
+            ))}
+          </span>
+        </button>
+        <div className="topic-article-view__topic-note-footer">
+          <span className="topic-article-view__topic-range">
+            {formatSentenceRangeLabel(
+              layout.startSentenceIndex,
+              layout.endSentenceIndex,
+            )}
+          </span>
+          <button
+            type="button"
+            className={`topic-article-view__read-btn${isRead ? " topic-article-view__read-btn--active" : ""}`}
+            onPointerDown={handleEnter}
+            onClick={handleToggleRead}
+            title={isRead ? "Mark topic as unread" : "Mark topic as read"}
+          >
+            {isRead ? "Mark unread" : "Mark as read"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 });
