@@ -1,47 +1,48 @@
-// Background script - triggers selection and opens redirect tabs
-browser.browserAction.onClicked.addListener((tab) => {
-  if (!tab || !tab.id) {
-    return;
-  }
+/**
+ * Background service worker for RSS Submission Analyzer Extension.
+ * Acts as a cross-origin fetch proxy for content scripts (required in Manifest V3).
+ */
 
-  browser.tabs.sendMessage(tab.id, { action: "startSelection" })
-    .catch(error => {
-      console.error("Failed to start selection:", error);
-    });
-});
+importScripts('config.js');
 
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "submitSelection") {
-    (async () => {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(message.payload || {})
-        });
-
-        const data = await response.json();
-        sendResponse({ ok: true, data });
-      } catch (error) {
-        console.error("Error submitting content:", error);
-        sendResponse({ ok: false, error: error.message });
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'submitContent') {
+    chrome.storage.local.get(['sessionToken']).then(({ sessionToken }) => {
+      if (!sessionToken) {
+        sendResponse({ success: false, error: 'Not authenticated. Please login via extension popup.' });
+        return;
       }
-    })();
-    return true;
+
+      fetch(`${API_URL}/api/submit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          html: request.html,
+          source_url: request.sourceUrl
+        })
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            const data = await response.json();
+            sendResponse({ success: true, data, status: response.status });
+          } else {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            sendResponse({
+              success: false,
+              status: response.status,
+              error: `Server error: ${response.status} - ${errorText}`
+            });
+          }
+        })
+        .catch((error) => {
+          sendResponse({ success: false, error: error.message || 'Network error' });
+        });
+    });
+    return true; // Keep message channel open for async response
   }
 
-  if (message.action === "openNewTab") {
-    browser.tabs.create({
-      url: message.url,
-      active: true
-    }).then(() => {
-      sendResponse({ status: "tab_opened" });
-    }).catch(error => {
-      console.error("Failed to open tab:", error);
-      sendResponse({ status: "error", error: error.message });
-    });
-    return true;
-  }
+  return false;
 });

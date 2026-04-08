@@ -34,8 +34,52 @@ def get_llm_queue_store(request: Request) -> LLMQueueStore:
     return request.app.state.llm_queue_store
 
 
+class _DisabledTokenStorage(TokenStorage):
+    """No-op token storage used when auth is disabled (SUPER_TOKEN not set).
+
+    All read operations return empty results; writes raise RuntimeError since
+    token management requires auth to be enabled.
+    """
+
+    def __init__(self) -> None:
+        pass  # skip super().__init__() — no DB connection needed
+
+    def prepare(self) -> None:
+        pass
+
+    def find_by_hash(self, token_hash: str):
+        return None
+
+    def get_all_tokens(self):
+        return []
+
+    def create_token(self, *args, **kwargs):
+        raise RuntimeError("Token management requires auth to be enabled (set SUPER_TOKEN).")
+
+    def delete_token(self, *args, **kwargs):
+        raise RuntimeError("Token management requires auth to be enabled (set SUPER_TOKEN).")
+
+
+_disabled_token_storage = _DisabledTokenStorage()
+
+
 def get_token_storage(request: Request) -> TokenStorage:
-    return request.app.state.token_storage
+    """Get token storage from app state.
+
+    When auth is disabled (SUPER_TOKEN not set), returns a no-op stub so that
+    callers can call find_by_hash() safely without a real DB connection.
+    """
+    from handlers.auth_handler import SUPER_TOKEN
+
+    storage = getattr(request.app.state, "token_storage", None)
+    if storage is None and not SUPER_TOKEN:
+        return _disabled_token_storage
+    if storage is None:
+        raise AttributeError(
+            "token_storage not found in app.state. "
+            "Ensure lifespan sets up token_storage or disable auth by not setting SUPER_TOKEN."
+        )
+    return storage
 
 
 def require_submission(

@@ -6,7 +6,7 @@
   let pickCounter = 0;
   let dragSrcIndex = null;
 
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "startSelection") {
       showSelectionToolbar();
       sendResponse({ status: "ready" });
@@ -287,7 +287,7 @@
     submitBtn.textContent = count > 0 ? `Submit (${count})` : 'Submit';
   }
 
-  function submitSelection(event) {
+  async function submitSelection(event) {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
@@ -300,28 +300,33 @@
     const sourceUrl = window.location.href;
     const html = extractStyledHtml(selectedElements.map(({ el }) => el));
 
-    browser.runtime.sendMessage({
-      action: "submitSelection",
-      payload: { html, source_url: sourceUrl }
-    })
-      .then(result => {
-        if (!result || !result.ok) {
-          throw new Error(result && result.error ? result.error : "Unknown error");
-        }
-        const data = result.data;
-        if (!data || !data.redirect_url) {
-          throw new Error('Missing redirect_url in response');
-        }
-        const redirectUrl = `http://127.0.0.1:8000${data.redirect_url}`;
-        browser.runtime.sendMessage({ action: "openNewTab", url: redirectUrl });
-      })
-      .catch(error => {
-        console.error("Error submitting content:", error);
-        alert("Error submitting content: " + error.message);
-      })
-      .finally(() => {
-        cleanupSelection();
+    try {
+      // Send message to background script to make the API call
+      // (Content scripts cannot make cross-origin fetch directly in Manifest V3)
+      const response = await chrome.runtime.sendMessage({
+        action: 'submitContent',
+        html: html,
+        sourceUrl: sourceUrl
       });
+
+      if (!response || !response.success) {
+        if (response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(response?.error || 'Unknown error from background script');
+      }
+
+      if (!response.data || !response.data.redirect_url) {
+        throw new Error('Missing redirect_url in response');
+      }
+
+      window.open(`${API_URL}${response.data.redirect_url}`, '_blank');
+    } catch (error) {
+      console.error("Error submitting content:", error);
+      alert("Error submitting content: " + error.message);
+    } finally {
+      cleanupSelection();
+    }
   }
 
   function cleanupSelection() {

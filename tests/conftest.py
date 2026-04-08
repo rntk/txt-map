@@ -304,3 +304,15 @@ def mock_pdf_to_html():
         mock_extract.return_value = "PDF text content"
 
         yield {"convert": mock_convert, "extract": mock_extract}
+
+
+@pytest.fixture(autouse=True)
+def mock_auth_for_testing(monkeypatch):
+    """Disable authentication for all tests by default.
+
+    Tests that need authentication can set SUPER_TOKEN and mock token storage.
+    """
+    # Disable auth by default for backward compatibility with existing tests
+    # We need to patch the module attribute since it's read at import time
+    with patch("handlers.auth_handler.SUPER_TOKEN", ""):
+        yield

@@ -120,8 +120,14 @@ def _get_session_from_cookie(request: Request) -> dict[str, Any] | None:
     return _verify_session_token(token)
 
 
-def get_current_session(request: Request) -> dict[str, Any] | None:
-    """Get current session from cookie or Authorization header."""
+def get_current_session(
+    request: Request,
+    storage: TokenStorage | None = None,
+) -> dict[str, Any] | None:
+    """Get current session from cookie or Authorization header.
+
+    Supports both session tokens and user tokens (for API access).
+    """
     # First check cookie
     session = _get_session_from_cookie(request)
     if session:
@@ -131,20 +137,35 @@ def get_current_session(request: Request) -> dict[str, Any] | None:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
+
+        # Try to verify as session token first
         session = _verify_session_token(token)
         if session:
             return session
 
+        # If not a session token, try to verify as user token
+        if storage and SUPER_TOKEN:
+            token_hash = _hash_token(token)
+            user_token = storage.find_by_hash(token_hash)
+            if user_token:
+                return {
+                    "type": "user",
+                    "alias": user_token.get("alias"),
+                }
+
     return None
 
 
-def require_auth(request: Request) -> dict[str, Any]:
+def require_auth(
+    request: Request,
+    storage: TokenStorage = Depends(get_token_storage),
+) -> dict[str, Any]:
     """Dependency that requires authentication."""
-    # If no super token configured, allow all
+    # If no super token configured, allow all (skip auth)
     if not SUPER_TOKEN:
         return {"type": "anonymous", "alias": None}
 
-    session = get_current_session(request)
+    session = get_current_session(request, storage)
     if not session:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -161,11 +182,14 @@ def require_superuser(request: Request) -> dict[str, Any]:
     return session
 
 
-def is_authenticated(request: Request) -> bool:
+def is_authenticated(
+    request: Request,
+    storage: TokenStorage = Depends(get_token_storage),
+) -> bool:
     """Check if request is authenticated."""
     if not SUPER_TOKEN:
         return True
-    return get_current_session(request) is not None
+    return get_current_session(request, storage) is not None
 
 
 @router.post("/auth/login")
@@ -191,7 +215,7 @@ def login(
             samesite="lax",
             max_age=SESSION_MAX_AGE,
         )
-        return {"success": True, "is_superuser": True}
+        return {"success": True, "is_superuser": True, "session_token": session_token}
 
     # Check against user tokens in database
     token_hash = _hash_token(body.token)
@@ -213,6 +237,7 @@ def login(
             "success": True,
             "is_superuser": False,
             "alias": user_token.get("alias"),
+            "session_token": session_token,
         }
 
     raise HTTPException(status_code=401, detail="Invalid token")
@@ -226,12 +251,15 @@ def logout(response: Response) -> dict[str, Any]:
 
 
 @router.get("/auth/verify")
-def verify(request: Request) -> AuthStatusResponse:
+def verify(
+    request: Request,
+    storage: TokenStorage = Depends(get_token_storage),
+) -> AuthStatusResponse:
     """Check if current session is valid."""
     if not SUPER_TOKEN:
         return AuthStatusResponse(authenticated=True, is_superuser=False)
 
-    session = get_current_session(request)
+    session = get_current_session(request, storage)
     if not session:
         return AuthStatusResponse(authenticated=False, is_superuser=False)
 
@@ -243,14 +271,17 @@ def verify(request: Request) -> AuthStatusResponse:
 
 
 @router.get("/auth/config")
-def config(request: Request) -> AuthConfigResponse:
+def config(
+    request: Request,
+    storage: TokenStorage = Depends(get_token_storage),
+) -> AuthConfigResponse:
     """Get auth configuration."""
     is_enabled = bool(SUPER_TOKEN)
 
     if not is_enabled:
         return AuthConfigResponse(enabled=False)
 
-    session = get_current_session(request)
+    session = get_current_session(request, storage)
     is_superuser = session is not None and session.get("type") == "superuser"
 
     return AuthConfigResponse(enabled=True, is_superuser=is_superuser)
