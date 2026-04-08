@@ -50,6 +50,9 @@ const EMPTY_ARRAY = [];
  * @property {Array<{start: number, end: number}>} [activeInsightRanges]
  * @property {Set<string> | string[]} [coloredTopicNames]
  * @property {boolean} [showTopicRangeAccents]
+ * @property {Array<number>} [interactiveSentenceIndices]
+ * @property {Array<{start: number, end: number}>} [interactiveHighlightRanges]
+ * @property {string} [interactiveHighlightClassName]
  */
 
 /**
@@ -79,6 +82,9 @@ function TextDisplay({
   activeInsightRanges = EMPTY_ARRAY,
   coloredTopicNames = null,
   showTopicRangeAccents = false,
+  interactiveSentenceIndices = EMPTY_ARRAY,
+  interactiveHighlightRanges = EMPTY_ARRAY,
+  interactiveHighlightClassName = "",
 }) {
   const safeSentences = useMemo(
     () => (Array.isArray(sentences) ? sentences : []),
@@ -135,6 +141,35 @@ function TextDisplay({
             )
         : [],
     [activeInsightRanges],
+  );
+  const interactiveSentenceIndexSet = useMemo(
+    () =>
+      new Set(
+        (Array.isArray(interactiveSentenceIndices)
+          ? interactiveSentenceIndices
+          : []
+        )
+          .filter((value) => Number.isInteger(value))
+          .map((value) => value - 1),
+      ),
+    [interactiveSentenceIndices],
+  );
+  const safeInteractiveHighlightRanges = useMemo(
+    () =>
+      Array.isArray(interactiveHighlightRanges)
+        ? interactiveHighlightRanges
+            .map((range) => ({
+              start: Number(range?.start),
+              end: Number(range?.end),
+            }))
+            .filter(
+              (range) =>
+                Number.isFinite(range.start) &&
+                Number.isFinite(range.end) &&
+                range.end > range.start,
+            )
+        : [],
+    [interactiveHighlightRanges],
   );
 
   // Get highlight words from prop or context
@@ -336,6 +371,8 @@ function TextDisplay({
         effectiveHighlightRanges,
         fadeRanges,
         coloredRanges,
+        safeInteractiveHighlightRanges,
+        interactiveHighlightClassName,
       ),
     [
       rawHtml,
@@ -344,6 +381,8 @@ function TextDisplay({
       effectiveHighlightRanges,
       fadeRanges,
       coloredRanges,
+      safeInteractiveHighlightRanges,
+      interactiveHighlightClassName,
     ],
   );
 
@@ -846,6 +885,8 @@ function TextDisplay({
         handleTextClick={handleTextClick}
         highlightedIndices={highlightedIndices}
         highlightedRawHtml={highlightedRawHtml}
+        interactiveHighlightClassName={interactiveHighlightClassName}
+        interactiveSentenceIndexSet={interactiveSentenceIndexSet}
         onShowTopicSummary={onShowTopicSummary}
         paragraphs={paragraphs}
         safeSentences={safeSentences}
@@ -873,6 +914,8 @@ function TextDisplay({
  * @property {(event: React.MouseEvent<HTMLElement>) => void} handleTextClick
  * @property {Set<number>} highlightedIndices
  * @property {string} highlightedRawHtml
+ * @property {string} interactiveHighlightClassName
+ * @property {Set<number>} interactiveSentenceIndexSet
  * @property {((topic: Object, summary: string) => void) | null | undefined} onShowTopicSummary
  * @property {Array<Array<{ text: string, index: number }>> | null} paragraphs
  * @property {string[]} safeSentences
@@ -896,6 +939,8 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
   handleTextClick,
   highlightedIndices,
   highlightedRawHtml,
+  interactiveHighlightClassName,
+  interactiveSentenceIndexSet,
   onShowTopicSummary,
   paragraphs,
   safeSentences,
@@ -907,6 +952,46 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
   topicStyleSheet,
   topicSummaries,
 }) {
+  const renderInteractiveSentenceContent = useCallback(
+    (text, sentenceIndex) => {
+      if (
+        !interactiveHighlightClassName ||
+        !interactiveSentenceIndexSet.has(sentenceIndex)
+      ) {
+        return (
+          <span
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHTML(text) + " ",
+            }}
+          />
+        );
+      }
+
+      return (
+        <>
+          {`${text} `.split(/(\s+)/).map((segment, segmentIndex) => {
+            if (!segment) {
+              return null;
+            }
+            if (/^\s+$/.test(segment)) {
+              return segment;
+            }
+            return (
+              <span
+                key={`${sentenceIndex}-${segmentIndex}-${segment}`}
+                className={`word-token ${interactiveHighlightClassName}`}
+                data-sentence-index={sentenceIndex}
+              >
+                {segment}
+              </span>
+            );
+          })}
+        </>
+      );
+    },
+    [interactiveHighlightClassName, interactiveSentenceIndexSet],
+  );
+
   if (highlightedRawHtml) {
     return (
       <>
@@ -941,10 +1026,9 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
                   data-sentence-index={index}
                   className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
                   style={getSentenceRuntimeStyle(index)}
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeHTML(text) + " ",
-                  }}
-                />
+                >
+                  {renderInteractiveSentenceContent(text, index)}
+                </span>
                 {sentenceToTopicsEnding.has(index) &&
                   topicSummaries &&
                   onShowTopicSummary &&
@@ -990,11 +1074,7 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
                   words={effectiveHighlightWords}
                 />
               ) : (
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeHTML(sentence) + " ",
-                  }}
-                />
+                renderInteractiveSentenceContent(sentence, index)
               )}
             </span>
             {sentenceToTopicsEnding.has(index) &&

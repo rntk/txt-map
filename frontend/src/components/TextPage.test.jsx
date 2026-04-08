@@ -49,9 +49,13 @@ vi.mock("./RadarChart", () => ({
 vi.mock("./ArticleStructureChart", () => ({
   default: () => <div data-testid="article-structure-chart" />,
 }));
-vi.mock("../utils/summaryTimeline", () => ({
-  buildSummaryTimelineItems: vi.fn(() => []),
-}));
+vi.mock("../utils/summaryTimeline", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    buildSummaryTimelineItems: vi.fn(() => []),
+  };
+});
 
 vi.mock("../utils/summaryMatcher", () => ({
   matchSummaryToTopics: vi.fn(() => []),
@@ -518,16 +522,15 @@ describe("TextPage raw text navigation", () => {
     fireEvent.click(await screen.findByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
 
-    expect(
-      screen.getByRole("heading", { name: "Margin Notes" }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("fullscreen-graph")).toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Synced article scroll area" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Topic overlays")).toBeInTheDocument();
     expect(screen.getAllByText("Alpha Beta Gamma").length).toBeGreaterThan(0);
   });
 
-  it("scrolls from a fullscreen topic row without toggling the main selected topic state", async () => {
+  it("reveals a fullscreen topic overlay without toggling the main selected topic state", async () => {
     render(<TextPage />);
 
     await screen.findByText("Source:");
@@ -540,16 +543,20 @@ describe("TextPage raw text navigation", () => {
     fireEvent.click(await screen.findByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
     fireEvent.click(
-      within(screen.getByLabelText("Synced topics list")).getByRole("button", {
-        name: /Topic1/,
-      }),
+      document.querySelector(
+        'button[data-topic-segment-key][data-topic-name="Topic1"]',
+      ),
     );
 
     expect(topicCheckbox).not.toBeChecked();
-    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        document.querySelector(".topic-article-view__revealed-token"),
+      ).toBeInTheDocument();
+    });
   });
 
-  it("highlights the article range when a fullscreen topic note is hovered or clicked", async () => {
+  it("highlights the article range when a fullscreen topic overlay is hovered or revealed", async () => {
     render(<TextPage />);
 
     await screen.findByText("Source:");
@@ -557,9 +564,9 @@ describe("TextPage raw text navigation", () => {
     fireEvent.click(await screen.findByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
 
-    const topicNote = within(
-      screen.getByLabelText("Synced topics list"),
-    ).getByRole("button", { name: /Topic1/ });
+    const topicNote = document.querySelector(
+      'button[data-topic-segment-key][data-topic-name="Topic1"]',
+    );
     const articleSentence = screen
       .getAllByText("Alpha Beta Gamma")
       .find((element) => element.closest(".reading-article__sentence"))
@@ -570,12 +577,11 @@ describe("TextPage raw text navigation", () => {
     fireEvent.mouseEnter(topicNote);
     expect(articleSentence).toHaveClass("highlighted");
 
-    fireEvent.mouseLeave(topicNote);
     fireEvent.click(topicNote);
     expect(articleSentence).toHaveClass("highlighted");
   });
 
-  it("orders the fullscreen topic list by article position and syncs the active row on article scroll", async () => {
+  it("orders fullscreen topic overlays by article position and syncs the active overlay on article scroll", async () => {
     global.fetch = vi.fn(async (url) => {
       if (String(url).includes("/api/submission/test-submission-id/status")) {
         return {
@@ -619,8 +625,9 @@ describe("TextPage raw text navigation", () => {
     fireEvent.click(await screen.findByRole("button", { name: /View/ }));
     fireEvent.click(screen.getByRole("button", { name: /Topics \+ Article/ }));
 
-    const topicList = screen.getByLabelText("Synced topics list");
-    const topicRows = within(topicList).getAllByRole("button");
+    const topicRows = Array.from(
+      document.querySelectorAll("button[data-topic-segment-key]"),
+    );
     expect(topicRows.map((element) => element.textContent)).toEqual([
       expect.stringContaining("Earlier Topic"),
       expect.stringContaining("Later Topic"),
@@ -667,11 +674,9 @@ describe("TextPage raw text navigation", () => {
     fireEvent.scroll(articleScrollArea);
 
     await waitFor(() => {
+      expect(document.querySelector('button[data-topic-name="Later Topic"]'));
       expect(
-        within(screen.getByLabelText("Synced topics list")).getByRole(
-          "button",
-          { name: /Later Topic/ },
-        ),
+        document.querySelector('button[data-topic-name="Later Topic"]'),
       ).toHaveAttribute("aria-current", "true");
     });
   });

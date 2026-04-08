@@ -39,6 +39,7 @@ const inlineStyleAllowlist = [
   'src/components/shared/TopicSentencesModal.jsx',
   'src/components/SubtopicsRiverChart.jsx',
   'src/components/TopicTreeNode.jsx',
+  'src/components/TopicArticleFullscreenView.jsx',
   'src/components/TopicsTagCloud.jsx',
   'src/components/TextDisplay.jsx',
   'src/components/TopicsBarChart.jsx',

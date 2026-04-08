@@ -36,6 +36,8 @@ import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
  * @property {string} name
  * @property {number} startSentenceIndex
  * @property {number} endSentenceIndex
+ * @property {number|null} startCharIndex
+ * @property {number|null} endCharIndex
  * @property {number} bracketTop
  * @property {number} bracketHeight
  * @property {string[]} pathSegments
@@ -45,18 +47,13 @@ import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
  */
 
 /**
- * @typedef {TopicMeasuredLayout & {
- *   noteTop: number,
- *   noteHeight: number,
- * }} TopicVisibleNoteLayout
- */
-
-/**
  * @typedef {{
  *   segmentKey: string,
  *   name: string,
  *   summary: string,
  *   summaryTop: number,
+ *   startSentenceIndex: number,
+ *   endSentenceIndex: number,
  * }} TopicSummaryCardLayout
  */
 
@@ -82,9 +79,10 @@ import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
  * @property {() => void} onClose
  */
 
-const NOTE_CARD_ESTIMATED_HEIGHT = 84;
-const NOTE_MIN_GAP = 12;
-const NOTE_VIEWPORT_PADDING = 8;
+const OVERLAY_CARD_MIN_HEIGHT = 44;
+const OVERLAY_CLUSTER_MAX_LANES = 4;
+const REVEALED_TOKEN_CLASSNAME = "topic-article-view__revealed-token";
+const REVEALED_READ_TOKEN_CLASSNAME = "topic-article-view__revealed-token--read";
 const NOTE_CARD_BASE_HEIGHT = 58;
 const NOTE_CARD_LINE_HEIGHT = 18;
 const NOTE_CARD_MAX_TITLE_LINES = 3;
@@ -104,7 +102,7 @@ export function estimateTopicNoteHeight(noteTitleLines) {
     ),
   );
   return Math.max(
-    NOTE_CARD_ESTIMATED_HEIGHT,
+    OVERLAY_CARD_MIN_HEIGHT,
     NOTE_CARD_BASE_HEIGHT + lineCount * NOTE_CARD_LINE_HEIGHT,
   );
 }
@@ -268,75 +266,25 @@ function formatSentenceRangeLabel(startSentenceIndex, endSentenceIndex) {
 }
 
 /**
- * @param {HTMLElement|null} root
- * @param {number} sentenceIndex
- * @returns {HTMLElement|null}
+ * @param {TopicMeasuredLayout | { name: string, topic: Object }} layout
+ * @returns {Object}
  */
-function getSentenceNode(root, sentenceIndex) {
-  if (!(root instanceof HTMLElement)) {
-    return null;
-  }
-
-  return (
-    root.querySelector(
-      `#sentence-0-${sentenceIndex}, [data-article-index="0"][data-sentence-index="${sentenceIndex}"]`,
-    ) || document.getElementById(`sentence-0-${sentenceIndex}`)
-  );
-}
-
-/**
- * @param {HTMLElement|null} root
- * @param {number|null} charIndex
- * @returns {HTMLElement|null}
- */
-function getCharNode(root, charIndex) {
-  if (!(root instanceof HTMLElement) || !Number.isFinite(charIndex)) {
-    return null;
-  }
-
-  const exactNode = root.querySelector(
-    `[data-article-index="0"][data-char-start="${charIndex}"]`,
-  );
-  if (exactNode instanceof HTMLElement) {
-    return exactNode;
-  }
-
-  const candidates = Array.from(
-    root.querySelectorAll('[data-article-index="0"][data-char-start]'),
-  )
-    .map((node) => ({
-      node,
-      start: Number(node.getAttribute("data-char-start")),
-    }))
-    .filter((entry) => Number.isFinite(entry.start))
-    .sort((left, right) => left.start - right.start);
-
-  const firstAfter = candidates.find((entry) => entry.start >= charIndex);
-  if (firstAfter?.node instanceof HTMLElement) {
-    return firstAfter.node;
-  }
-
-  return candidates[candidates.length - 1]?.node || null;
-}
-
-/**
- * @param {HTMLElement|null} articleRoot
- * @param {TopicTimelineItem} item
- * @returns {{startNode: HTMLElement | null, endNode: HTMLElement | null}}
- */
-function getTopicBoundaryNodes(articleRoot, item) {
-  const startSentenceNode = getSentenceNode(
-    articleRoot,
-    item.startSentenceIndex,
-  );
-  const endSentenceNode = getSentenceNode(articleRoot, item.endSentenceIndex);
-  if (startSentenceNode && endSentenceNode) {
-    return { startNode: startSentenceNode, endNode: endSentenceNode };
-  }
+function buildNormalizedTopicSelection(layout) {
+  const baseTopic = buildModalSelectionFromTopic({
+    ...layout.topic,
+    displayName: layout.topic?.displayName || layout.name,
+    fullPath: layout.topic?.fullPath || layout.name,
+    sentences: layout.topic?.sentences,
+    sentenceIndices: layout.topic?.sentenceIndices || layout.topic?.sentences,
+  });
 
   return {
-    startNode: getCharNode(articleRoot, item.startCharIndex),
-    endNode: getCharNode(articleRoot, item.endCharIndex),
+    ...baseTopic,
+    canonicalTopicNames:
+      Array.isArray(baseTopic.canonicalTopicNames) &&
+      baseTopic.canonicalTopicNames.length > 0
+        ? baseTopic.canonicalTopicNames
+        : [layout.name],
   };
 }
 
@@ -431,6 +379,8 @@ function buildTopicNoteLayouts(articleRoot, items) {
       name: item.name,
       startSentenceIndex: item.startSentenceIndex,
       endSentenceIndex: item.endSentenceIndex,
+      startCharIndex: item.startCharIndex,
+      endCharIndex: item.endCharIndex,
       bracketTop,
       bracketHeight,
       pathSegments: item.pathSegments,
@@ -466,119 +416,116 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
 }
 
 /**
- * @param {TopicMeasuredLayout[]} layouts
- * @param {number} scrollTop
- * @param {number} viewportHeight
- * @param {string|null} activeSegmentKey
- * @param {number} [mountBuffer] - Extra pixels beyond the viewport to keep cards mounted (hysteresis)
- * @returns {TopicVisibleNoteLayout[]}
+ * @typedef {TopicMeasuredLayout & {
+ *   laneIndex: number,
+ *   laneCount: number,
+ *   clusterIndex: number,
+ * }} TopicOverlayLayout
  */
-function buildVisibleTopicNoteLayouts(
-  layouts,
-  scrollTop,
-  viewportHeight,
-  activeSegmentKey,
-  mountBuffer = 0,
-) {
-  if (layouts.length === 0 || viewportHeight <= 0) {
-    return [];
-  }
 
-  const viewportTop = scrollTop - mountBuffer;
-  const viewportBottom = scrollTop + viewportHeight + mountBuffer;
-  const maxVisibleNotes = Math.max(
-    1,
-    Math.floor(
-      (viewportHeight - NOTE_VIEWPORT_PADDING * 2 + NOTE_MIN_GAP) /
-        (NOTE_CARD_ESTIMATED_HEIGHT + NOTE_MIN_GAP),
-    ),
+/**
+ * @param {TopicMeasuredLayout[]} layouts
+ * @param {Set<string>} revealedSegmentKeys
+ * @returns {TopicOverlayLayout[]}
+ */
+function buildTopicOverlayLayouts(layouts, revealedSegmentKeys) {
+  const visibleLayouts = layouts.filter(
+    (layout) => !revealedSegmentKeys.has(layout.segmentKey),
   );
-  const visibleCandidates = layouts.filter((layout) => {
-    const bracketBottom = layout.bracketTop + layout.bracketHeight;
-    return bracketBottom > viewportTop && layout.bracketTop < viewportBottom;
-  });
-
-  if (visibleCandidates.length === 0) {
+  if (visibleLayouts.length === 0) {
     return [];
   }
 
-  const sortedVisibleCandidates = [...visibleCandidates].sort((left, right) => {
+  const sortedLayouts = [...visibleLayouts].sort((left, right) => {
     if (left.bracketTop !== right.bracketTop) {
       return left.bracketTop - right.bracketTop;
     }
-    if (left.startSentenceIndex !== right.startSentenceIndex) {
-      return left.startSentenceIndex - right.startSentenceIndex;
-    }
-    if (left.endSentenceIndex !== right.endSentenceIndex) {
-      return left.endSentenceIndex - right.endSentenceIndex;
+    if (left.bracketHeight !== right.bracketHeight) {
+      return right.bracketHeight - left.bracketHeight;
     }
     return left.segmentKey.localeCompare(right.segmentKey);
   });
 
-  const limitedCandidates =
-    sortedVisibleCandidates.length <= maxVisibleNotes
-      ? sortedVisibleCandidates
-      : (() => {
-          const focusIndex = Math.max(
-            0,
-            sortedVisibleCandidates.findIndex(
-              (layout) => layout.segmentKey === activeSegmentKey,
-            ),
-          );
-          const startIndex = Math.min(
-            Math.max(0, focusIndex - Math.floor(maxVisibleNotes / 2)),
-            sortedVisibleCandidates.length - maxVisibleNotes,
-          );
-          return sortedVisibleCandidates.slice(
-            startIndex,
-            startIndex + maxVisibleNotes,
-          );
-        })();
+  /** @type {Array<TopicOverlayLayout>} */
+  const assignedLayouts = [];
+  /** @type {Map<number, number>} */
+  const laneCountByCluster = new Map();
+  /** @type {number[]} */
+  let laneBottoms = [];
+  let clusterIndex = -1;
+  let clusterBottom = Number.NEGATIVE_INFINITY;
 
-  // Position clamping always uses the real viewport boundaries (without buffer)
-  // so that cards don't get pushed to off-screen positions.
-  const realViewportTop = scrollTop;
-  const realViewportBottom = scrollTop + viewportHeight;
-  const topEdge = realViewportTop + NOTE_VIEWPORT_PADDING;
-  const noteHeights = limitedCandidates.map((layout) =>
-    estimateTopicNoteHeight(layout.noteTitleLines),
-  );
-  const maxNoteHeight = Math.max(...noteHeights);
-  const bottomEdge = realViewportBottom - NOTE_VIEWPORT_PADDING - maxNoteHeight;
-  const forwardTops = [];
-  limitedCandidates.forEach((layout, index) => {
-    const naturalTop = layout.bracketTop;
-    const clampedTop = Math.min(
-      Math.max(naturalTop, topEdge),
-      Math.max(topEdge, bottomEdge),
-    );
-    if (index === 0) {
-      forwardTops.push(clampedTop);
-      return;
+  sortedLayouts.forEach((layout) => {
+    const layoutBottom = layout.bracketTop + layout.bracketHeight;
+    if (layout.bracketTop >= clusterBottom) {
+      clusterIndex += 1;
+      clusterBottom = layoutBottom;
+      laneBottoms = [];
+    } else {
+      clusterBottom = Math.max(clusterBottom, layoutBottom);
     }
-    forwardTops.push(
-      Math.max(
-        clampedTop,
-        forwardTops[index - 1] + noteHeights[index - 1] + NOTE_MIN_GAP,
-      ),
+
+    let laneIndex = laneBottoms.findIndex(
+      (laneBottom) => laneBottom <= layout.bracketTop,
     );
+    if (laneIndex === -1) {
+      laneIndex = laneBottoms.length;
+    }
+    laneIndex = Math.min(laneIndex, OVERLAY_CLUSTER_MAX_LANES - 1);
+    laneBottoms[laneIndex] = layoutBottom;
+
+    laneCountByCluster.set(
+      clusterIndex,
+      Math.max(laneCountByCluster.get(clusterIndex) || 0, laneIndex + 1),
+    );
+    assignedLayouts.push({
+      ...layout,
+      laneIndex,
+      laneCount: 1,
+      clusterIndex,
+    });
   });
 
-  const positionedTops = new Array(forwardTops.length).fill(topEdge);
-  let nextTop = Math.max(topEdge, bottomEdge);
-  for (let index = forwardTops.length - 1; index >= 0; index -= 1) {
-    positionedTops[index] = Math.max(
-      topEdge,
-      Math.min(forwardTops[index], nextTop),
-    );
-    nextTop = positionedTops[index] - noteHeights[index] - NOTE_MIN_GAP;
+  return assignedLayouts.map((layout) => ({
+    ...layout,
+    laneCount: laneCountByCluster.get(layout.clusterIndex) || 1,
+  }));
+}
+
+/**
+ * @param {TopicMeasuredLayout} layout
+ * @param {number|null} sentenceIndex
+ * @param {number|null} charStart
+ * @param {number|null} charEnd
+ * @returns {boolean}
+ */
+function isEventInsideLayout(layout, sentenceIndex, charStart, charEnd) {
+  if (
+    Number.isInteger(sentenceIndex) &&
+    sentenceIndex >= layout.startSentenceIndex &&
+    sentenceIndex <= layout.endSentenceIndex
+  ) {
+    return true;
   }
 
-  return limitedCandidates.map((layout, index) => ({
-    ...layout,
-    noteTop: positionedTops[index],
-    noteHeight: noteHeights[index],
-  }));
+  if (!Number.isFinite(charStart) && !Number.isFinite(charEnd)) {
+    return false;
+  }
+
+  const layoutStart = layout.startCharIndex;
+  const layoutEnd = layout.endCharIndex;
+  if (!Number.isFinite(layoutStart) || !Number.isFinite(layoutEnd)) {
+    return false;
+  }
+
+  const eventStart = Number.isFinite(charStart) ? charStart : charEnd;
+  const eventEnd = Number.isFinite(charEnd) ? charEnd : charStart;
+  return (
+    Number.isFinite(eventStart) &&
+    Number.isFinite(eventEnd) &&
+    eventStart < layoutEnd &&
+    eventEnd > layoutStart
+  );
 }
 
 /**
@@ -645,6 +592,8 @@ function buildTopicSummaryCardLayout(
     name: layout.name,
     summary: trimmedSummary,
     summaryTop,
+    startSentenceIndex: layout.startSentenceIndex,
+    endSentenceIndex: layout.endSentenceIndex,
   };
 }
 
@@ -656,7 +605,6 @@ function TopicArticleFullscreenView({
   articles,
   safeTopics,
   selectedTopics,
-  hoveredTopic,
   readTopics,
   onToggleRead,
   onToggleTopic,
@@ -680,47 +628,23 @@ function TopicArticleFullscreenView({
   );
   const articleScrollRef = useRef(null);
   const articleRootRef = useRef(null);
-  const articleRangeAccentRefs = useRef({});
-  const noteAnchorRefs = useRef({});
   const animationFrameRef = useRef(0);
   const [activeSegmentKey, setActiveSegmentKey] = useState(
     topicTimelineItems[0]?.segmentKey || null,
   );
   const [noteLayouts, setNoteLayouts] = useState([]);
-  const [visibleSegmentKeys, setVisibleSegmentKeys] = useState([]);
+  const [revealedSegmentKeys, setRevealedSegmentKeys] = useState(
+    () => new Set(),
+  );
   const [previewTopicName, setPreviewTopicName] = useState(null);
   const [previewSegmentKey, setPreviewSegmentKey] = useState(null);
   const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
   const [summaryCardLayout, setSummaryCardLayout] = useState(null);
 
-  // Refs that mirror state for use inside rAF callbacks without stale closures.
-  // Updated synchronously during render so they are always current by the time
-  // any pending animation frame fires.
   const noteLayoutsRef = useRef(noteLayouts);
   const activeSegmentKeyRef = useRef(activeSegmentKey);
-  const prevVisibleSetRef = useRef("");
-  const visibleTopLevelLabelsRef = useRef(visibleTopLevelLabels);
-  // Cached joined key for visibleTopLevelLabels to avoid re-joining on every rAF frame.
-  const visibleTopLevelLabelsKeyRef = useRef("");
-  const summaryCardRef = useRef(null);
-  const summaryCardLayoutRef = useRef(summaryCardLayout);
   noteLayoutsRef.current = noteLayouts;
   activeSegmentKeyRef.current = activeSegmentKey;
-  visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
-  summaryCardLayoutRef.current = summaryCardLayout;
-
-  const effectiveHoveredTopic = useMemo(() => {
-    const hoveredTopicName = previewTopicName || hoveredTopic?.name || null;
-    if (!hoveredTopicName) {
-      return null;
-    }
-
-    return (
-      topicTimelineItems.find((item) => item.name === hoveredTopicName)
-        ?.topic ||
-      hoveredTopic || { name: hoveredTopicName }
-    );
-  }, [hoveredTopic, previewTopicName, topicTimelineItems]);
 
   const noteAccentStyleSheet = useMemo(() => {
     const seen = new Set();
@@ -751,13 +675,7 @@ function TopicArticleFullscreenView({
     [article?.topic_summaries],
   );
   const activeSummaryLayout = useMemo(() => {
-    const preferredSegmentKey = previewSegmentKey;
-    const preferredTopicName = previewTopicName || null;
-
-    if (!preferredSegmentKey && !preferredTopicName) {
-      return null;
-    }
-
+    const preferredSegmentKey = previewSegmentKey || activeSegmentKey;
     if (preferredSegmentKey) {
       const matchingSegment = noteLayouts.find(
         (layout) => layout.segmentKey === preferredSegmentKey,
@@ -767,14 +685,12 @@ function TopicArticleFullscreenView({
       }
     }
 
+    if (!previewTopicName) {
+      return null;
+    }
+
     return (
-      noteLayouts.find(
-        (layout) =>
-          layout.name === preferredTopicName &&
-          layout.segmentKey === activeSegmentKey,
-      ) ||
-      noteLayouts.find((layout) => layout.name === preferredTopicName) ||
-      null
+      noteLayouts.find((layout) => layout.name === previewTopicName) || null
     );
   }, [activeSegmentKey, noteLayouts, previewSegmentKey, previewTopicName]);
   const activeSummary = useMemo(() => {
@@ -785,15 +701,82 @@ function TopicArticleFullscreenView({
     return typeof summary === "string" ? summary.trim() : "";
   }, [activeSummaryLayout, topicSummaryMap]);
 
-  // Stable callbacks for ref assignment — avoids creating new closures each
-  // render which would otherwise cause React to teardown/re-attach DOM refs.
-  const handleNoteAnchorRef = useCallback((segmentKey, node) => {
-    noteAnchorRefs.current[segmentKey] = node;
-  }, []);
-
-  const handleRangeAccentRef = useCallback((segmentKey, node) => {
-    articleRangeAccentRefs.current[segmentKey] = node;
-  }, []);
+  const overlayLayouts = useMemo(
+    () => buildTopicOverlayLayouts(noteLayouts, revealedSegmentKeys),
+    [noteLayouts, revealedSegmentKeys],
+  );
+  const revealedLayouts = useMemo(
+    () =>
+      noteLayouts.filter((layout) =>
+        revealedSegmentKeys.has(layout.segmentKey),
+      ),
+    [noteLayouts, revealedSegmentKeys],
+  );
+  const revealedSentenceIndices = useMemo(() => {
+    const merged = new Set();
+    revealedLayouts.forEach((layout) => {
+      for (
+        let sentenceIndex = layout.startSentenceIndex;
+        sentenceIndex <= layout.endSentenceIndex;
+        sentenceIndex += 1
+      ) {
+        merged.add(sentenceIndex + 1);
+      }
+    });
+    return Array.from(merged).sort((left, right) => left - right);
+  }, [revealedLayouts]);
+  const revealedCharRanges = useMemo(() => {
+    const ranges = [];
+    revealedLayouts.forEach((layout) => {
+      if (
+        Number.isFinite(layout.startCharIndex) &&
+        Number.isFinite(layout.endCharIndex)
+      ) {
+        ranges.push({
+          start: layout.startCharIndex,
+          end: layout.endCharIndex,
+        });
+      }
+    });
+    return ranges;
+  }, [revealedLayouts]);
+  const mergedInsightSentenceIndices = useMemo(() => {
+    const merged = new Set(
+      Array.isArray(activeInsightSentenceIndices)
+        ? activeInsightSentenceIndices.filter((value) =>
+            Number.isInteger(value),
+          )
+        : [],
+    );
+    revealedLayouts.forEach((layout) => {
+      for (
+        let sentenceIndex = layout.startSentenceIndex;
+        sentenceIndex <= layout.endSentenceIndex;
+        sentenceIndex += 1
+      ) {
+        merged.add(sentenceIndex + 1);
+      }
+    });
+    return Array.from(merged).sort((left, right) => left - right);
+  }, [activeInsightSentenceIndices, revealedLayouts]);
+  const mergedInsightRanges = useMemo(() => {
+    const merged = Array.isArray(activeInsightRanges)
+      ? [...activeInsightRanges]
+      : [];
+    revealedLayouts.forEach((layout) => {
+      if (
+        Number.isFinite(layout.startCharIndex) &&
+        Number.isFinite(layout.endCharIndex)
+      ) {
+        merged.push({
+          start: layout.startCharIndex,
+          end: layout.endCharIndex,
+        });
+      }
+    });
+    return merged;
+  }, [activeInsightRanges, revealedLayouts]);
+  const activeSummaryTopic = activeSummaryLayout?.topic || null;
 
   const syncActiveTopicToViewport = useCallback(() => {
     const container = articleScrollRef.current;
@@ -851,12 +834,25 @@ function TopicArticleFullscreenView({
   }, [topicTimelineItems]);
 
   useEffect(() => {
+    setRevealedSegmentKeys((currentValue) => {
+      if (!(currentValue instanceof Set) || currentValue.size === 0) {
+        return currentValue;
+      }
+      const validSegmentKeys = new Set(
+        topicTimelineItems.map((item) => item.segmentKey),
+      );
+      const nextValue = new Set(
+        Array.from(currentValue).filter((key) => validSegmentKeys.has(key)),
+      );
+      return nextValue.size === currentValue.size ? currentValue : nextValue;
+    });
+  }, [topicTimelineItems]);
+
+  useEffect(() => {
     const container = articleScrollRef.current;
     if (!(container instanceof HTMLElement)) {
       return undefined;
     }
-
-    const MOUNT_BUFFER = 40;
 
     const scheduleSync = () => {
       if (animationFrameRef.current) {
@@ -871,17 +867,6 @@ function TopicArticleFullscreenView({
         animationFrameRef.current = 0;
         const scrollTop = container.scrollTop;
         const viewportHeight = container.clientHeight;
-
-        // Compute visible layouts once per frame (pure math — no DOM reads).
-        // mountBuffer keeps cards mounted a bit beyond the viewport edges to
-        // reduce mount/unmount churn at boundaries.
-        const visible = buildVisibleTopicNoteLayouts(
-          noteLayoutsRef.current,
-          scrollTop,
-          viewportHeight,
-          activeSegmentKeyRef.current,
-          MOUNT_BUFFER,
-        );
         const nextVisibleTopLevelLabels = buildVisibleTopLevelLabels(
           noteLayoutsRef.current,
           scrollTop,
@@ -893,64 +878,20 @@ function TopicArticleFullscreenView({
           scrollTop,
           viewportHeight,
         );
-
-        const visibleMap = new Map(
-          visible.map((layout) => [layout.segmentKey, layout]),
-        );
-
-        // Write positions directly to DOM refs, bypassing the React render
-        // cycle entirely. This keeps the notes stable while scrolling.
-        for (let i = 0; i < noteLayoutsRef.current.length; i += 1) {
-          const baseLayout = noteLayoutsRef.current[i];
-          const visibleLayout = visibleMap.get(baseLayout.segmentKey);
-          const anchor = noteAnchorRefs.current[baseLayout.segmentKey];
-          if (anchor instanceof HTMLElement) {
-            const noteTop = visibleLayout?.noteTop ?? baseLayout.bracketTop;
-            const noteHeight =
-              visibleLayout?.noteHeight ??
-              estimateTopicNoteHeight(baseLayout.noteTitleLines);
-            anchor.style.setProperty("--topic-note-top", `${noteTop}px`);
-            anchor.style.setProperty("--topic-note-height", `${noteHeight}px`);
-          }
-          const accent = articleRangeAccentRefs.current[baseLayout.segmentKey];
-          if (accent instanceof HTMLElement) {
-            accent.style.setProperty(
-              "--topic-range-top",
-              `${baseLayout.bracketTop}px`,
-            );
-            accent.style.setProperty(
-              "--topic-range-height",
-              `${baseLayout.bracketHeight}px`,
-            );
-          }
-        }
-        const summaryCardNode = summaryCardRef.current;
-        if (summaryCardNode instanceof HTMLElement && nextSummaryCardLayout) {
-          summaryCardNode.style.setProperty(
-            "--topic-summary-top",
-            `${nextSummaryCardLayout.summaryTop}px`,
-          );
-        }
-
-        const newSet = visible.map((layout) => layout.segmentKey).join("\0");
-        if (newSet !== prevVisibleSetRef.current) {
-          prevVisibleSetRef.current = newSet;
-          setVisibleSegmentKeys(visible.map((layout) => layout.segmentKey));
-        }
-        // Use cached key ref to avoid re-joining on every frame.
-        const nextLabelsKey = nextVisibleTopLevelLabels.join("\0");
-        if (nextLabelsKey !== visibleTopLevelLabelsKeyRef.current) {
-          visibleTopLevelLabelsKeyRef.current = nextLabelsKey;
-          setVisibleTopLevelLabels(nextVisibleTopLevelLabels);
-        }
-        const currentSummaryCardLayout = summaryCardLayoutRef.current;
-        const isSameSummaryCardLayout =
-          currentSummaryCardLayout?.segmentKey ===
-            nextSummaryCardLayout?.segmentKey &&
-          currentSummaryCardLayout?.summary === nextSummaryCardLayout?.summary;
-        if (!isSameSummaryCardLayout) {
-          setSummaryCardLayout(nextSummaryCardLayout);
-        }
+        setVisibleTopLevelLabels((currentValue) => {
+          const currentKey = currentValue.join("\0");
+          const nextKey = nextVisibleTopLevelLabels.join("\0");
+          return currentKey === nextKey
+            ? currentValue
+            : nextVisibleTopLevelLabels;
+        });
+        setSummaryCardLayout((currentValue) => {
+          const isSameSummaryCardLayout =
+            currentValue?.segmentKey === nextSummaryCardLayout?.segmentKey &&
+            currentValue?.summary === nextSummaryCardLayout?.summary &&
+            currentValue?.summaryTop === nextSummaryCardLayout?.summaryTop;
+          return isSameSummaryCardLayout ? currentValue : nextSummaryCardLayout;
+        });
 
         syncActiveTopicToViewport();
       };
@@ -995,30 +936,6 @@ function TopicArticleFullscreenView({
     syncActiveTopicToViewport,
   ]);
 
-  // Seed DOM positions for every note and range so segments stay mounted and
-  // scroll updates only adjust CSS variables.
-  useEffect(() => {
-    for (let i = 0; i < noteLayouts.length; i += 1) {
-      const layout = noteLayouts[i];
-      const anchor = noteAnchorRefs.current[layout.segmentKey];
-      if (anchor instanceof HTMLElement) {
-        anchor.style.setProperty("--topic-note-top", `${layout.bracketTop}px`);
-        anchor.style.setProperty(
-          "--topic-note-height",
-          `${estimateTopicNoteHeight(layout.noteTitleLines)}px`,
-        );
-      }
-      const accent = articleRangeAccentRefs.current[layout.segmentKey];
-      if (accent instanceof HTMLElement) {
-        accent.style.setProperty("--topic-range-top", `${layout.bracketTop}px`);
-        accent.style.setProperty(
-          "--topic-range-height",
-          `${layout.bracketHeight}px`,
-        );
-      }
-    }
-  }, [noteLayouts]);
-
   useEffect(() => {
     return () => {
       if (typeof setHoveredTopic === "function") {
@@ -1027,52 +944,7 @@ function TopicArticleFullscreenView({
     };
   }, [setHoveredTopic]);
 
-  const scrollToTopic = useCallback(
-    (item) => {
-      const container = articleScrollRef.current;
-      const articleRoot = articleRootRef.current;
-      if (!(container instanceof HTMLElement) || !item) {
-        return;
-      }
-
-      setActiveSegmentKey(item.segmentKey);
-      setPreviewTopicName(item.name);
-      setPreviewSegmentKey(item.segmentKey);
-      if (typeof setHoveredTopic === "function") {
-        setHoveredTopic(item.topic);
-      }
-
-      const { startNode: sentenceElement } = getTopicBoundaryNodes(
-        articleRoot,
-        item,
-      );
-      if (!(sentenceElement instanceof HTMLElement)) {
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const targetRect = sentenceElement.getBoundingClientRect();
-      const nextTop =
-        container.scrollTop +
-        (targetRect.top - containerRect.top) -
-        container.clientHeight / 2 +
-        targetRect.height / 2;
-
-      if (typeof container.scrollTo === "function") {
-        container.scrollTo({
-          top: Math.max(0, nextTop),
-          behavior: "smooth",
-        });
-      } else {
-        container.scrollTop = Math.max(0, nextTop);
-      }
-
-      sentenceElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    },
-    [setHoveredTopic],
-  );
-
-  const handleNoteEnter = useCallback(
+  const handleOverlayEnter = useCallback(
     (layout) => {
       if (!layout?.topic?.name) {
         return;
@@ -1086,13 +958,59 @@ function TopicArticleFullscreenView({
     [setHoveredTopic],
   );
 
-  const handleNoteLeave = useCallback(() => {
+  const handleOverlayLeave = useCallback(() => {
     setPreviewSegmentKey(null);
     setPreviewTopicName(null);
     if (typeof setHoveredTopic === "function") {
       setHoveredTopic(null);
     }
   }, [setHoveredTopic]);
+
+  const hideOverlayForSegment = useCallback(
+    (layout) => {
+      if (!layout) {
+        return;
+      }
+      setActiveSegmentKey(layout.segmentKey);
+      setPreviewSegmentKey(layout.segmentKey);
+      setPreviewTopicName(layout.name);
+      setRevealedSegmentKeys((currentValue) => {
+        if (currentValue.has(layout.segmentKey)) {
+          return currentValue;
+        }
+        const nextValue = new Set(currentValue);
+        nextValue.add(layout.segmentKey);
+        return nextValue;
+      });
+      if (typeof setHoveredTopic === "function") {
+        setHoveredTopic(layout.topic);
+      }
+    },
+    [setHoveredTopic],
+  );
+
+  const restoreOverlayForSegment = useCallback(
+    (layout) => {
+      if (!layout) {
+        return;
+      }
+      setActiveSegmentKey(layout.segmentKey);
+      setPreviewSegmentKey(layout.segmentKey);
+      setPreviewTopicName(layout.name);
+      setRevealedSegmentKeys((currentValue) => {
+        if (!currentValue.has(layout.segmentKey)) {
+          return currentValue;
+        }
+        const nextValue = new Set(currentValue);
+        nextValue.delete(layout.segmentKey);
+        return nextValue;
+      });
+      if (typeof setHoveredTopic === "function") {
+        setHoveredTopic(layout.topic);
+      }
+    },
+    [setHoveredTopic],
+  );
 
   useEffect(() => {
     if (!previewSegmentKey && !previewTopicName) {
@@ -1108,12 +1026,12 @@ function TopicArticleFullscreenView({
       ) {
         return;
       }
-      handleNoteLeave();
+      handleOverlayLeave();
     };
 
     const handleEscape = (event) => {
       if (event.key === "Escape") {
-        handleNoteLeave();
+        handleOverlayLeave();
       }
     };
 
@@ -1128,26 +1046,66 @@ function TopicArticleFullscreenView({
       );
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [handleNoteLeave, previewSegmentKey, previewTopicName]);
+  }, [handleOverlayLeave, previewSegmentKey, previewTopicName]);
 
-  const handleSummaryCardRef = useCallback((node) => {
-    summaryCardRef.current = node;
-    if (
-      node instanceof HTMLElement &&
-      summaryCardLayoutRef.current?.summaryTop !== undefined
-    ) {
-      node.style.setProperty(
-        "--topic-summary-top",
-        `${summaryCardLayoutRef.current.summaryTop}px`,
-      );
-    }
-  }, []);
+  const handleArticleClickCapture = useCallback(
+    (event) => {
+      if (
+        revealedLayouts.length === 0 ||
+        !(event.target instanceof HTMLElement)
+      ) {
+        return;
+      }
+
+      const token = event.target.closest(`.${REVEALED_TOKEN_CLASSNAME}`);
+      if (!(token instanceof HTMLElement)) {
+        return;
+      }
+
+      const sentenceIndexRaw = token.getAttribute("data-sentence-index");
+      const charStartRaw = token.getAttribute("data-char-start");
+      const charEndRaw = token.getAttribute("data-char-end");
+      const sentenceIndex = Number.isFinite(Number(sentenceIndexRaw))
+        ? Number(sentenceIndexRaw)
+        : null;
+      const charStart = Number.isFinite(Number(charStartRaw))
+        ? Number(charStartRaw)
+        : null;
+      const charEnd = Number.isFinite(Number(charEndRaw))
+        ? Number(charEndRaw)
+        : null;
+      const preferredSegmentKey = previewSegmentKey || activeSegmentKey;
+      const matchingLayout =
+        revealedLayouts.find(
+          (layout) =>
+            layout.segmentKey === preferredSegmentKey &&
+            isEventInsideLayout(layout, sentenceIndex, charStart, charEnd),
+        ) ||
+        revealedLayouts.find((layout) =>
+          isEventInsideLayout(layout, sentenceIndex, charStart, charEnd),
+        );
+
+      if (!matchingLayout) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      restoreOverlayForSegment(matchingLayout);
+    },
+    [
+      activeSegmentKey,
+      previewSegmentKey,
+      restoreOverlayForSegment,
+      revealedLayouts,
+    ],
+  );
 
   const articleContent = article?.sentences?.length ? (
     <TextDisplay
       sentences={article.sentences}
       selectedTopics={selectedTopics}
-      hoveredTopic={effectiveHoveredTopic}
+      hoveredTopic={null}
       readTopics={readTopics}
       articleTopics={article.topics}
       articleIndex={0}
@@ -1162,9 +1120,12 @@ function TopicArticleFullscreenView({
       tooltipEnabled={tooltipEnabled}
       submissionId={submissionId}
       coloredHighlightMode={coloredHighlightMode}
-      activeInsightSentenceIndices={activeInsightSentenceIndices}
-      activeInsightRanges={activeInsightRanges}
+      activeInsightSentenceIndices={mergedInsightSentenceIndices}
+      activeInsightRanges={mergedInsightRanges}
       coloredTopicNames={coloredTopicNames}
+      interactiveSentenceIndices={revealedSentenceIndices}
+      interactiveHighlightRanges={revealedCharRanges}
+      interactiveHighlightClassName={REVEALED_TOKEN_CLASSNAME}
     />
   ) : (
     <div
@@ -1189,10 +1150,24 @@ function TopicArticleFullscreenView({
                 {visibleTopLevelLabels.length > 0 ? (
                   <CurrentAreaLabel topLevelLabels={visibleTopLevelLabels} />
                 ) : null}
-                {summaryCardLayout ? (
+                {summaryCardLayout && activeSummaryLayout ? (
                   <TopicSummaryCard
                     layout={summaryCardLayout}
-                    onCardRef={handleSummaryCardRef}
+                    topic={activeSummaryTopic}
+                    readTopics={readTopics}
+                    isRevealed={revealedSegmentKeys.has(
+                      activeSummaryLayout.segmentKey,
+                    )}
+                    onToggleRead={onToggleRead}
+                    onToggleReveal={() => {
+                      if (
+                        revealedSegmentKeys.has(activeSummaryLayout.segmentKey)
+                      ) {
+                        restoreOverlayForSegment(activeSummaryLayout);
+                        return;
+                      }
+                      hideOverlayForSegment(activeSummaryLayout);
+                    }}
                   />
                 ) : null}
               </div>
@@ -1200,51 +1175,42 @@ function TopicArticleFullscreenView({
                 <div
                   ref={articleRootRef}
                   className="topic-article-view__article"
+                  onClickCapture={handleArticleClickCapture}
                 >
                   {articleContent}
+                  <div
+                    className="topic-article-view__overlay-layer"
+                    aria-label="Topic overlays"
+                  >
+                    {overlayLayouts.map((layout) => (
+                      <TopicOverlayCard
+                        key={layout.segmentKey}
+                        layout={layout}
+                        isActive={layout.segmentKey === activeSegmentKey}
+                        isHighlighted={layout.segmentKey === previewSegmentKey}
+                        onEnter={handleOverlayEnter}
+                        onLeave={handleOverlayLeave}
+                        onReveal={hideOverlayForSegment}
+                      />
+                    ))}
+                  </div>
                   {noteLayouts.map((layout) => (
                     <RangeAccentDot
                       key={layout.segmentKey}
                       segmentKey={layout.segmentKey}
                       topicName={layout.name}
-                      onRef={handleRangeAccentRef}
+                      top={layout.bracketTop}
+                      height={layout.bracketHeight}
                     />
                   ))}
                 </div>
               </div>
-
-              <aside
-                className="topic-article-view__notes-column"
-                role="region"
-                aria-label="Synced topics list"
-              >
-                {noteLayouts.length > 0 ? (
-                  noteLayouts.map((layout) => (
-                    <TopicNoteCard
-                      key={layout.segmentKey}
-                      layout={layout}
-                      isActive={layout.segmentKey === activeSegmentKey}
-                      isVisible={visibleSegmentKeys.includes(layout.segmentKey)}
-                      isHighlighted={
-                        layout.segmentKey === previewSegmentKey ||
-                        (layout.name === previewTopicName &&
-                          previewSegmentKey === null)
-                      }
-                      readTopics={readTopics}
-                      onToggleRead={onToggleRead}
-                      onEnter={handleNoteEnter}
-                      onLeave={handleNoteLeave}
-                      onScrollTo={scrollToTopic}
-                      onAnchorRef={handleNoteAnchorRef}
-                    />
-                  ))
-                ) : (
-                  <p className="topic-article-view__empty">
-                    No aligned topics available.
-                  </p>
-                )}
-              </aside>
             </div>
+            {noteLayouts.length === 0 ? (
+              <p className="topic-article-view__empty">
+                No aligned topics available.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1253,41 +1219,26 @@ function TopicArticleFullscreenView({
 }
 
 /**
- * @typedef {Object} TopicNoteCardProps
- * @property {TopicVisibleNoteLayout} layout
+ * @typedef {Object} TopicOverlayCardProps
+ * @property {TopicOverlayLayout} layout
  * @property {boolean} isActive
- * @property {boolean} isVisible
  * @property {boolean} isHighlighted
- * @property {Set<string> | string[]} readTopics
- * @property {(topic: Object) => void} onToggleRead
- * @property {(layout: TopicVisibleNoteLayout) => void} onEnter
+ * @property {(layout: TopicMeasuredLayout) => void} onEnter
  * @property {() => void} onLeave
- * @property {(layout: TopicVisibleNoteLayout) => void} onScrollTo
- * @property {(segmentKey: string, node: HTMLElement | null) => void} onAnchorRef
+ * @property {(layout: TopicMeasuredLayout) => void} onReveal
  */
 
-/** @param {TopicNoteCardProps} props */
-const TopicNoteCard = React.memo(function TopicNoteCard({
+/** @param {TopicOverlayCardProps} props */
+const TopicOverlayCard = React.memo(function TopicOverlayCard({
   layout,
   isActive,
-  isVisible,
   isHighlighted,
-  readTopics,
-  onToggleRead,
   onEnter,
   onLeave,
-  onScrollTo,
-  onAnchorRef,
+  onReveal,
 }) {
-  const setRef = useCallback(
-    (node) => onAnchorRef(layout.segmentKey, node),
-    [layout.segmentKey, onAnchorRef],
-  );
   const handleEnter = useCallback(() => onEnter(layout), [layout, onEnter]);
-  const handleClick = useCallback(
-    () => onScrollTo(layout),
-    [layout, onScrollTo],
-  );
+  const handleClick = useCallback(() => onReveal(layout), [layout, onReveal]);
   const handleBlur = useCallback(
     (event) => {
       const nextFocusedElement = event.relatedTarget;
@@ -1301,13 +1252,81 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
     },
     [onLeave],
   );
+  const cssClass = getTopicCSSClass(layout.name);
+
+  return (
+    <div
+      className={`topic-article-view__overlay-anchor ${cssClass}${isActive ? " topic-article-view__overlay-anchor--active" : ""}${isHighlighted ? " topic-article-view__overlay-anchor--highlighted" : ""}`}
+      style={{
+        "--topic-overlay-top": `${layout.bracketTop}px`,
+        "--topic-overlay-height": `${layout.bracketHeight}px`,
+        "--topic-overlay-lane": layout.laneIndex,
+        "--topic-overlay-lane-count": layout.laneCount,
+      }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={onLeave}
+      onFocus={handleEnter}
+      onBlur={handleBlur}
+    >
+      <button
+        type="button"
+        className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
+        data-topic-name={layout.name}
+        data-topic-segment-key={layout.segmentKey}
+        aria-current={isActive ? "true" : undefined}
+        onPointerDown={handleEnter}
+        onClick={handleClick}
+      >
+        <span className="topic-article-view__topic-note-eyebrow">
+          {formatSentenceRangeLabel(
+            layout.startSentenceIndex,
+            layout.endSentenceIndex,
+          )}
+        </span>
+        <span className="topic-article-view__topic-name">
+          {layout.noteTitleLines.map((line, index) => (
+            <span
+              key={`${layout.name}-${index}-${line}`}
+              className="topic-article-view__topic-name-line"
+            >
+              {line}
+            </span>
+          ))}
+        </span>
+      </button>
+    </div>
+  );
+});
+
+/**
+ * @typedef {Object} TopicSummaryCardProps
+ * @property {TopicSummaryCardLayout} layout
+ * @property {Object|null} topic
+ * @property {Set<string> | string[]} readTopics
+ * @property {boolean} isRevealed
+ * @property {(topic: Object) => void} onToggleRead
+ * @property {() => void} onToggleReveal
+ */
+
+/** @param {TopicSummaryCardProps} props */
+const TopicSummaryCard = React.memo(function TopicSummaryCard({
+  layout,
+  topic,
+  readTopics,
+  isRevealed,
+  onToggleRead,
+  onToggleReveal,
+}) {
   const normalizedTopic = useMemo(() => {
+    if (!topic) {
+      return null;
+    }
     const baseTopic = buildModalSelectionFromTopic({
-      ...layout.topic,
-      displayName: layout.topic?.displayName || layout.name,
-      fullPath: layout.topic?.fullPath || layout.name,
-      sentences: layout.topic?.sentences,
-      sentenceIndices: layout.topic?.sentenceIndices || layout.topic?.sentences,
+      ...topic,
+      displayName: topic.displayName || layout.name,
+      fullPath: topic.fullPath || layout.name,
+      sentences: topic.sentences,
+      sentenceIndices: topic.sentenceIndices || topic.sentences,
     });
 
     return {
@@ -1318,102 +1337,60 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
           ? baseTopic.canonicalTopicNames
           : [layout.name],
     };
-  }, [layout.name, layout.topic]);
-  const isRead = isTopicSelectionRead(normalizedTopic, readTopics);
-  const handleToggleRead = useCallback(
-    (event) => {
-      event.stopPropagation();
+  }, [layout.name, topic]);
+  const isRead = normalizedTopic
+    ? isTopicSelectionRead(normalizedTopic, readTopics)
+    : false;
+  const handleToggleRead = useCallback(() => {
+    if (!normalizedTopic) {
+      return;
+    }
 
-      const ranges = normalizedTopic?.ranges;
-      if (Array.isArray(ranges) && ranges.length > 1 && !isRead) {
-        const ok = window.confirm(
-          `"${normalizedTopic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`,
-        );
-        if (!ok) {
-          return;
-        }
+    const ranges = normalizedTopic?.ranges;
+    if (Array.isArray(ranges) && ranges.length > 1 && !isRead) {
+      const ok = window.confirm(
+        `"${normalizedTopic.name}" has ${ranges.length} separate ranges. Some may not be visible on screen. Mark as read?`,
+      );
+      if (!ok) {
+        return;
       }
+    }
 
-      onToggleRead(normalizedTopic);
-    },
-    [isRead, normalizedTopic, onToggleRead],
-  );
-  const cssClass = getTopicCSSClass(layout.name);
+    onToggleRead(normalizedTopic);
+  }, [isRead, normalizedTopic, onToggleRead]);
 
-  return (
-    <div
-      ref={setRef}
-      className={`topic-article-view__note-anchor ${cssClass}${isVisible ? " topic-article-view__note-anchor--visible" : ""}`}
-      onMouseEnter={handleEnter}
-      onMouseLeave={onLeave}
-      onFocus={handleEnter}
-      onBlur={handleBlur}
-    >
-      <div
-        className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
-      >
-        <button
-          type="button"
-          className="topic-article-view__topic-main-action"
-          data-topic-name={layout.name}
-          data-topic-segment-key={layout.segmentKey}
-          aria-current={isActive ? "true" : undefined}
-          aria-pressed={isHighlighted ? "true" : "false"}
-          onPointerDown={handleEnter}
-          onClick={handleClick}
-        >
-          <span className="topic-article-view__topic-name">
-            {layout.noteTitleLines.map((line, index) => (
-              <span
-                key={`${layout.name}-${index}-${line}`}
-                className="topic-article-view__topic-name-line"
-              >
-                {line}
-              </span>
-            ))}
-          </span>
-        </button>
-        <div className="topic-article-view__topic-note-footer">
-          <span className="topic-article-view__topic-range">
-            {formatSentenceRangeLabel(
-              layout.startSentenceIndex,
-              layout.endSentenceIndex,
-            )}
-          </span>
-          <button
-            type="button"
-            className={`topic-article-view__read-btn${isRead ? " topic-article-view__read-btn--active" : ""}`}
-            onPointerDown={handleEnter}
-            onClick={handleToggleRead}
-            title={isRead ? "Mark topic as unread" : "Mark topic as read"}
-          >
-            {isRead ? "Mark unread" : "Mark as read"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-/**
- * @typedef {Object} TopicSummaryCardProps
- * @property {TopicSummaryCardLayout} layout
- * @property {(node: HTMLElement | null) => void} onCardRef
- */
-
-/** @param {TopicSummaryCardProps} props */
-const TopicSummaryCard = React.memo(function TopicSummaryCard({
-  layout,
-  onCardRef,
-}) {
   return (
     <aside
-      ref={onCardRef}
       className="topic-article-view__summary-card"
+      style={{ "--topic-summary-top": `${layout.summaryTop}px` }}
       aria-label={`Summary for ${layout.name}`}
     >
-      <div className="topic-article-view__summary-card-title">Summary</div>
+      <div className="topic-article-view__summary-card-title">
+        {formatSentenceRangeLabel(
+          layout.startSentenceIndex,
+          layout.endSentenceIndex,
+        )}
+      </div>
+      <div className="topic-article-view__summary-card-topic">
+        {layout.name}
+      </div>
       <p className="topic-article-view__summary-card-body">{layout.summary}</p>
+      <div className="topic-article-view__summary-card-actions">
+        <button
+          type="button"
+          className="topic-article-view__summary-action"
+          onClick={onToggleReveal}
+        >
+          {isRevealed ? "Show topic" : "Show source"}
+        </button>
+        <button
+          type="button"
+          className={`topic-article-view__read-btn${isRead ? " topic-article-view__read-btn--active" : ""}`}
+          onClick={handleToggleRead}
+        >
+          {isRead ? "Mark unread" : "Mark as read"}
+        </button>
+      </div>
     </aside>
   );
 });
@@ -1444,20 +1421,20 @@ const CurrentAreaLabel = React.memo(function CurrentAreaLabel({
   );
 });
 
-/** @param {{ segmentKey: string, topicName: string, onRef: (segmentKey: string, node: HTMLElement | null) => void }} props */
+/** @param {{ segmentKey: string, topicName: string, top: number, height: number }} props */
 const RangeAccentDot = React.memo(function RangeAccentDot({
   segmentKey,
   topicName,
-  onRef,
+  top,
+  height,
 }) {
-  const setRef = useCallback(
-    (node) => onRef(segmentKey, node),
-    [onRef, segmentKey],
-  );
   return (
     <div
-      ref={setRef}
       className={`topic-article-view__range-accent ${getTopicCSSClass(topicName)}`}
+      style={{
+        "--topic-range-top": `${top}px`,
+        "--topic-range-height": `${height}px`,
+      }}
       data-topic-segment-key={segmentKey}
       data-topic-name={topicName}
       aria-hidden="true"

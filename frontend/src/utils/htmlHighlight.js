@@ -12,6 +12,8 @@ export function isInAnyRange(start, end, ranges) {
  * @param {Array<{start: number, end: number}>} fadeRanges
  * @param {Array<{start: number, end: number}>} allTopicRanges
  * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
+ * @param {Array<{start: number, end: number}>} [interactiveRanges]
+ * @param {string} [interactiveClassName]
  */
 export function wrapWord(
   htmlWord,
@@ -21,6 +23,8 @@ export function wrapWord(
   fadeRanges,
   allTopicRanges,
   coloredRanges = [],
+  interactiveRanges = [],
+  interactiveClassName = "",
 ) {
   const wordEnd = wordStart + htmlWord.length;
 
@@ -44,6 +48,12 @@ export function wrapWord(
   } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
     classes.push("faded");
   }
+  if (
+    interactiveClassName &&
+    isInAnyRange(wordStart, wordEnd, interactiveRanges)
+  ) {
+    classes.push(interactiveClassName);
+  }
 
   return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
 }
@@ -55,6 +65,8 @@ export function wrapWord(
  * @param {Array<{start: number, end: number}>} highlightRanges
  * @param {Array<{start: number, end: number}>} fadeRanges
  * @param {Array<{start: number, end: number, color: string}>} [coloredRanges]
+ * @param {Array<{start: number, end: number}>} [interactiveRanges]
+ * @param {string} [interactiveClassName]
  */
 export function buildHighlightedRawHtml(
   rawHtml,
@@ -63,6 +75,8 @@ export function buildHighlightedRawHtml(
   highlightRanges,
   fadeRanges,
   coloredRanges = [],
+  interactiveRanges = [],
+  interactiveClassName = "",
 ) {
   if (!rawHtml) return "";
 
@@ -112,6 +126,8 @@ export function buildHighlightedRawHtml(
           fadeRanges,
           allTopicRanges,
           coloredRanges,
+          interactiveRanges,
+          interactiveClassName,
         );
         wordBuffer = "";
         wordStart = -1;
@@ -129,6 +145,8 @@ export function buildHighlightedRawHtml(
             fadeRanges,
             allTopicRanges,
             coloredRanges,
+            interactiveRanges,
+            interactiveClassName,
           );
           wordBuffer = "";
           wordStart = -1;
@@ -150,6 +168,8 @@ export function buildHighlightedRawHtml(
       fadeRanges,
       allTopicRanges,
       coloredRanges,
+      interactiveRanges,
+      interactiveClassName,
     );
   }
 
