@@ -275,6 +275,7 @@ function TextPageContent() {
       if (!matchedTopic) return;
       pendingShowTopicRef.current = matchedTopic;
       closeFullscreenGraph();
+      setGroupedByTopics(false);
       setSelectedTopics((prev) =>
         prev.some((t) => t.name === matchedTopic.name)
           ? prev

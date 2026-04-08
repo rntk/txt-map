@@ -239,6 +239,7 @@ function VisualizationPanels({
           readTopics={readTopics}
           onToggleRead={onToggleRead}
           markup={markup}
+          onShowInArticle={onShowInArticle}
         />
       )}
 
