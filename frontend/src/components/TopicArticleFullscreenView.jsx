@@ -1170,15 +1170,17 @@ function TopicArticleFullscreenView({
             aria-label="Synced article scroll area"
           >
             <div className="topic-article-view__canvas">
-              {visibleTopLevelLabels.length > 0 ? (
-                <CurrentAreaLabel topLevelLabels={visibleTopLevelLabels} />
-              ) : null}
-              {summaryCardLayout ? (
-                <TopicSummaryCard
-                  layout={summaryCardLayout}
-                  onCardRef={handleSummaryCardRef}
-                />
-              ) : null}
+              <div className="topic-article-view__left-rail">
+                {visibleTopLevelLabels.length > 0 ? (
+                  <CurrentAreaLabel topLevelLabels={visibleTopLevelLabels} />
+                ) : null}
+                {summaryCardLayout ? (
+                  <TopicSummaryCard
+                    layout={summaryCardLayout}
+                    onCardRef={handleSummaryCardRef}
+                  />
+                ) : null}
+              </div>
               <div className="topic-article-view__article-column">
                 <div
                   ref={articleRootRef}

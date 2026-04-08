@@ -551,20 +551,21 @@
 }
 
 .topic-article-view__canvas {
-  position: relative;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  column-gap: 12px;
-  width: min(1128px, 100%);
+  grid-template-columns: 280px minmax(0, 1fr) 260px;
+  column-gap: 16px;
   min-height: 100%;
-  margin: 0 auto;
-  padding-right: 0;
   box-sizing: border-box;
+}
+
+.topic-article-view__left-rail {
+  grid-column: 1;
+  position: relative;
+  min-width: 0;
 }
 
 .topic-article-view__article-column {
   grid-column: 2;
-  width: min(100%, 1040px);
   min-width: 0;
 }
 
@@ -624,11 +625,10 @@
 }
 
 .topic-article-view__notes-column {
-  position: absolute;
-  top: 0;
-  right: -270px;
-  width: 250px;
+  grid-column: 3;
+  position: relative;
   height: 100%;
+  min-width: 0;
 }
 
 .topic-article-view__note-anchor {
@@ -775,12 +775,8 @@
 }
 
 .topic-article-view__current-area {
-  grid-column: 1;
   position: sticky;
   top: 18px;
-  align-self: start;
-  width: 100%;
-  overflow: visible;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -791,8 +787,7 @@
 
 .topic-article-view__current-area-label {
   display: inline-block;
-  width: 148px;
-  max-width: none;
+  max-width: 100%;
   padding: 7px 12px;
   border: 1px solid rgba(16, 24, 40, 0.08);
   border-radius: 999px;
@@ -811,9 +806,9 @@
 .topic-article-view__summary-card {
   position: absolute;
   top: var(--topic-summary-top, 0);
-  left: -300px;
+  left: 0;
+  right: 0;
   z-index: 2;
-  width: 285px;
   padding: 14px 14px 16px;
   border: 1px solid rgba(16, 24, 40, 0.08);
   border-radius: 16px;
@@ -873,43 +868,24 @@
     padding-right: 14px;
   }
 
-  .topic-article-view {
-    flex-direction: column;
-  }
-
-  .topic-article-view__body {
-    display: block;
-  }
-
   .topic-article-view__canvas {
-    display: block;
-    padding-left: 0;
-    padding-right: 0;
+    grid-template-columns: 1fr;
   }
 
-  .topic-article-view__article-column {
-    width: 100%;
-  }
-
-  .topic-article-view__article {
-    padding: 16px 18px 24px;
+  .topic-article-view__left-rail {
+    display: none;
   }
 
   .topic-article-view__range-accent {
     display: none;
   }
 
-  .topic-article-view__current-area {
-    display: none;
-  }
-
-  .topic-article-view__summary-card {
-    display: none;
+  .topic-article-view__article {
+    padding: 16px 18px 24px;
   }
 
   .topic-article-view__notes-column {
     position: static;
-    width: 100%;
     height: auto;
     display: flex;
     flex-direction: column;
