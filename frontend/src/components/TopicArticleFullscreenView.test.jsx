@@ -285,8 +285,54 @@ describe("TopicArticleFullscreenView", () => {
     await waitFor(() => {
       expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(2);
     });
-    expect(screen.getByText("Sentences 1-2")).toBeInTheDocument();
-    expect(screen.getByText("Sentences 4-5")).toBeInTheDocument();
+    // Each explicit range segment gets its own overlay and accent dot
+    expect(
+      document.querySelectorAll(".topic-article-view__range-accent"),
+    ).toHaveLength(2);
+  });
+
+  it("prefers explicit non-adjacent ranges over a broad sentence span", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(6),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 2, 3, 4, 5],
+                ranges: [
+                  { sentence_start: 1, sentence_end: 2, start: 0, end: 10 },
+                  { sentence_start: 4, sentence_end: 5, start: 20, end: 30 },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(2);
+    });
+
+    expect(
+      queryTopicButtonBySegment("Science > Biology > Genetics", "::0"),
+    ).not.toBeInTheDocument();
+    expect(
+      queryTopicButtonBySegment(
+        "Science > Biology > Genetics",
+        "Science > Biology > Genetics::0",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      queryTopicButtonBySegment(
+        "Science > Biology > Genetics",
+        "Science > Biology > Genetics::1",
+      ),
+    ).toBeInTheDocument();
     expect(
       document.querySelectorAll(".topic-article-view__range-accent"),
     ).toHaveLength(2);
@@ -329,9 +375,19 @@ describe("TopicArticleFullscreenView", () => {
     );
 
     await waitFor(() => {
-      expect(
-        queryTopicButtonBySegment("Science > Biology > Genetics", firstSegment),
-      ).not.toBeInTheDocument();
+      // Overlay is now hidden with CSS transition instead of removed from DOM
+      // The button has data-topic-segment-key, its parent overlay-anchor has the revealed class
+      const firstButton = queryTopicButtonBySegment(
+        "Science > Biology > Genetics",
+        firstSegment,
+      );
+      expect(firstButton).toBeInTheDocument();
+      const firstOverlay = firstButton.closest(
+        ".topic-article-view__overlay-anchor",
+      );
+      expect(firstOverlay).toHaveClass(
+        "topic-article-view__overlay-anchor--revealed",
+      );
     });
     expect(
       queryTopicButtonBySegment("Science > Biology > Genetics", secondSegment),
@@ -352,6 +408,16 @@ describe("TopicArticleFullscreenView", () => {
       expect(
         queryTopicButtonBySegment("Science > Biology > Genetics", firstSegment),
       ).toBeInTheDocument();
+      const firstButton = queryTopicButtonBySegment(
+        "Science > Biology > Genetics",
+        firstSegment,
+      );
+      const firstOverlay = firstButton.closest(
+        ".topic-article-view__overlay-anchor",
+      );
+      expect(firstOverlay).not.toHaveClass(
+        "topic-article-view__overlay-anchor--revealed",
+      );
     });
     expect(document.getElementById("sentence-0-0")).not.toHaveClass(
       "highlighted",
