@@ -218,13 +218,23 @@ def test_post_refresh(client, mock_storage, mock_task_queue, sample_submission):
     mock_task_queue.create.assert_called_once()
 
 
+from handlers.submission_handler import router, _extract_content_from_upload
+from lib.nlp import compute_word_frequencies
+from unittest.mock import patch, MagicMock
+
+# ... existing code ...
+
+
 def test_get_word_cloud(client, mock_storage, sample_submission):
     submission_id = sample_submission["submission_id"]
     sample_submission["results"]["sentences"] = ["This is a test sentence."]
     sample_submission["results"]["topics"] = [{"name": "Test", "sentences": [1]}]
     mock_storage.get_by_id.return_value = sample_submission
 
-    with patch("handlers.submission_handler.compute_word_frequencies") as mock_compute:
+    with patch(
+        "handlers.submission_handler.compute_word_frequencies",
+        side_effect=compute_word_frequencies,
+    ) as mock_compute:
         mock_compute.return_value = [{"word": "test", "frequency": 1}]
         response = client.get(f"/api/submission/{submission_id}/word-cloud")
 

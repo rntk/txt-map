@@ -37,7 +37,7 @@ def test_convert_pdf_with_internal_links():
     doc.close()
 
     html = convert_pdf_to_html(pdf_bytes)
-    assert 'href="#page-2"' in html
-    assert 'id="page-2"' in html
+    assert 'href="#pdf-page-2"' in html
+    assert 'id="pdf-page-2"' in html
     assert "Go to page 2" in html
     assert "You are on page 2" in html
