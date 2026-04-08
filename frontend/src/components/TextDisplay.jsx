@@ -1003,13 +1003,14 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
       ) {
         classNames.push(interactiveHighlightClassName);
       }
-      if (dimmedHighlightClassName && dimmedSentenceIndexSet.has(sentenceIndex)) {
+      if (
+        dimmedHighlightClassName &&
+        dimmedSentenceIndexSet.has(sentenceIndex)
+      ) {
         classNames.push(dimmedHighlightClassName);
       }
 
-      if (
-        classNames.length === 0
-      ) {
+      if (classNames.length === 0) {
         return (
           <span
             dangerouslySetInnerHTML={{

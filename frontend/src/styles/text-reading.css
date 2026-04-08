@@ -663,9 +663,9 @@
 .topic-article-view__topic-note {
   position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
   height: 100%;
   padding: 8px 14px;
@@ -677,6 +677,15 @@
   pointer-events: auto;
   cursor: pointer;
   overflow: hidden;
+}
+
+.topic-article-view__topic-note-main {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 
 .topic-article-view__topic-note--active,
@@ -702,8 +711,10 @@
     color-mix(in srgb, var(--topic-accent-color, #98a2b3) 32%, white);
 }
 
-.topic-article-view__overlay-anchor--read .topic-article-view__topic-note--active,
-.topic-article-view__overlay-anchor--read .topic-article-view__topic-note--highlighted {
+.topic-article-view__overlay-anchor--read
+  .topic-article-view__topic-note--active,
+.topic-article-view__overlay-anchor--read
+  .topic-article-view__topic-note--highlighted {
   background:
     repeating-linear-gradient(
       135deg,
@@ -738,6 +749,49 @@
 .topic-article-view__topic-name-line {
   display: block;
   word-break: break-word;
+}
+
+.topic-article-view__topic-tags {
+  display: flex;
+  min-width: 96px;
+  max-width: 42%;
+  flex: 0 0 42%;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: flex-end;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.topic-article-view__topic-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  color: rgba(16, 24, 40, 0.82);
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topic-article-view__topic-tag--sm {
+  font-size: 10px;
+}
+
+.topic-article-view__topic-tag--md {
+  font-size: 11px;
+}
+
+.topic-article-view__topic-tag--lg {
+  font-size: 12px;
+}
+
+.topic-article-view__topic-tag--xl {
+  font-size: 13px;
 }
 
 .topic-article-view__revealed-token {

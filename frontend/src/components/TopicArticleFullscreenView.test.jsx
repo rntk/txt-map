@@ -344,7 +344,9 @@ describe("TopicArticleFullscreenView", () => {
       "highlighted",
     );
 
-    fireEvent.click(document.querySelector(".topic-article-view__revealed-token"));
+    fireEvent.click(
+      document.querySelector(".topic-article-view__revealed-token"),
+    );
 
     await waitFor(() => {
       expect(
@@ -431,7 +433,9 @@ describe("TopicArticleFullscreenView", () => {
     const overlayAnchor = document.querySelector(
       ".topic-article-view__overlay-anchor",
     );
-    expect(overlayAnchor).toHaveClass("topic-article-view__overlay-anchor--read");
+    expect(overlayAnchor).toHaveClass(
+      "topic-article-view__overlay-anchor--read",
+    );
 
     fireEvent.click(queryTopicButtons("Science > Biology > Genetics")[0]);
 
@@ -498,6 +502,60 @@ describe("TopicArticleFullscreenView", () => {
         sentenceIndices: [1],
       }),
     );
+  });
+
+  it("renders a topic-specific tf-idf tag cloud in the topic note", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: [
+              "Report genome genome crispr findings.",
+              "Report genome cell editing results.",
+              "Report market stocks rally today.",
+              "Report market bonds shift today.",
+            ],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 2],
+                ranges: [],
+              },
+              {
+                name: "Business > Markets > Equities",
+                sentences: [3, 4],
+                ranges: [],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
+        1,
+      );
+    });
+
+    const geneticsButton = queryTopicButtons("Science > Biology > Genetics")[0];
+    const marketsButton = queryTopicButtons("Business > Markets > Equities")[0];
+
+    expect(within(geneticsButton).getByText("genome")).toBeInTheDocument();
+    expect(within(geneticsButton).getByText("crispr")).toBeInTheDocument();
+    expect(
+      within(geneticsButton).queryByText("market"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(geneticsButton).queryByText("report"),
+    ).not.toBeInTheDocument();
+
+    expect(within(marketsButton).getByText("market")).toBeInTheDocument();
+    expect(within(marketsButton).getByText("stocks")).toBeInTheDocument();
+    expect(within(marketsButton).queryByText("genome")).not.toBeInTheDocument();
   });
 
   it("renders mark unread for read topics in the summary card", async () => {

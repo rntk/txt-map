@@ -107,36 +107,236 @@ export const tokenizeSentence = (sentence) => {
   return text.match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || [];
 };
 
+export const normalizeTagToken = (word) =>
+  String(word || "")
+    .toLowerCase()
+    .replace(/^['-]+|['-]+$/g, "")
+    .trim();
+
+export const isMeaningfulTagToken = (token) => {
+  if (!token) return false;
+  if (COMMON_STOP_WORDS.has(token)) return false;
+  if (/^\d+$/u.test(token)) return false;
+
+  const isAsciiToken = /^[a-z0-9]+$/i.test(token);
+  if (isAsciiToken && token.length < 3) return false;
+
+  return token.length >= 2;
+};
+
+/**
+ * @param {Object} topic
+ * @param {Array<string>} allSentences
+ * @returns {number[]}
+ */
+export const collectTopicSentenceIndices = (topic, allSentences) => {
+  const sentenceCount = allSentences?.length || 0;
+  if (sentenceCount === 0) return [];
+
+  const seen = new Set();
+  const ranges = Array.isArray(topic?.ranges) ? topic.ranges : [];
+
+  const resolveIndices = (assumeZeroBased) => {
+    /** @type {number[]} */
+    const indices = [];
+
+    if (ranges.length > 0) {
+      ranges.forEach((range) => {
+        const startValue = Number(range?.sentence_start);
+        const endValue = Number(range?.sentence_end);
+        if (!Number.isInteger(startValue) || !Number.isInteger(endValue)) {
+          return;
+        }
+        const startIndex = assumeZeroBased ? startValue : startValue - 1;
+        const endIndex = assumeZeroBased ? endValue : endValue - 1;
+        for (
+          let sentenceIndex = startIndex;
+          sentenceIndex <= endIndex;
+          sentenceIndex += 1
+        ) {
+          if (sentenceIndex < 0 || sentenceIndex >= sentenceCount) {
+            continue;
+          }
+          if (seen.has(sentenceIndex)) {
+            continue;
+          }
+          seen.add(sentenceIndex);
+          indices.push(sentenceIndex);
+        }
+      });
+      return indices;
+    }
+
+    (topic?.sentences || []).forEach((idx) => {
+      const value = Number(idx);
+      if (!Number.isInteger(value)) return;
+      const sentenceIndex = assumeZeroBased ? value : value - 1;
+      if (sentenceIndex < 0 || sentenceIndex >= sentenceCount) return;
+      if (seen.has(sentenceIndex)) return;
+      seen.add(sentenceIndex);
+      indices.push(sentenceIndex);
+    });
+
+    return indices;
+  };
+
+  const oneBasedIndices = resolveIndices(false);
+  if (oneBasedIndices.length > 0) {
+    return oneBasedIndices.sort((left, right) => left - right);
+  }
+
+  seen.clear();
+  return resolveIndices(true).sort((left, right) => left - right);
+};
+
 export const collectScopedSentences = (segmentTopics, allSentences) => {
   const sentenceCount = allSentences?.length || 0;
   if (sentenceCount === 0) return [];
 
-  const rawIndices = [];
+  const indices = new Set();
   segmentTopics.forEach((topic) => {
-    (topic.sentences || []).forEach((idx) => {
-      const num = Number(idx);
-      if (Number.isInteger(num)) rawIndices.push(num);
+    collectTopicSentenceIndices(topic, allSentences).forEach(
+      (sentenceIndex) => {
+        indices.add(sentenceIndex);
+      },
+    );
+  });
+
+  return Array.from(indices)
+    .sort((left, right) => left - right)
+    .map((sentenceIndex) => allSentences[sentenceIndex])
+    .filter(Boolean);
+};
+
+/**
+ * @param {Array<string>} allSentences
+ * @returns {{
+ *   sentenceTokens: string[][],
+ *   documentFrequencies: Map<string, number>,
+ *   totalSentenceCount: number,
+ * }}
+ */
+export const buildArticleTfIdfIndex = (allSentences) => {
+  const sentenceTokens = (Array.isArray(allSentences) ? allSentences : []).map(
+    (sentence) => {
+      const normalizedTokens = tokenizeSentence(sentence)
+        .map(normalizeTagToken)
+        .filter(Boolean);
+      const meaningfulTokens = normalizedTokens.filter(isMeaningfulTagToken);
+
+      return meaningfulTokens.length > 0 ? meaningfulTokens : normalizedTokens;
+    },
+  );
+  const documentFrequencies = new Map();
+
+  sentenceTokens.forEach((tokens) => {
+    new Set(tokens).forEach((token) => {
+      documentFrequencies.set(token, (documentFrequencies.get(token) || 0) + 1);
     });
   });
 
-  if (rawIndices.length === 0) return [];
-
-  const resolveByMode = (assumeZeroBased) => {
-    const texts = [];
-    const seen = new Set();
-    rawIndices.forEach((idx) => {
-      const zeroBasedIdx = assumeZeroBased ? idx : idx - 1;
-      if (zeroBasedIdx < 0 || zeroBasedIdx >= sentenceCount) return;
-      if (seen.has(zeroBasedIdx)) return;
-      seen.add(zeroBasedIdx);
-      const sentence = allSentences[zeroBasedIdx];
-      if (sentence) texts.push(sentence);
-    });
-    return texts;
+  return {
+    sentenceTokens,
+    documentFrequencies,
+    totalSentenceCount: Math.max(sentenceTokens.length, 1),
   };
+};
 
-  const oneBased = resolveByMode(false);
-  return oneBased.length > 0 ? oneBased : resolveByMode(true);
+const topicTagSizeClassForScore = (score, minScore, maxScore) => {
+  if (maxScore <= minScore) {
+    return "md";
+  }
+
+  const ratio = (score - minScore) / (maxScore - minScore);
+  if (ratio >= 0.78) return "xl";
+  if (ratio >= 0.52) return "lg";
+  if (ratio >= 0.26) return "md";
+  return "sm";
+};
+
+/**
+ * @param {Object} topic
+ * @param {{
+ *   sentenceTokens: string[][],
+ *   documentFrequencies: Map<string, number>,
+ *   totalSentenceCount: number,
+ * }} articleTfIdfIndex
+ * @param {number} [limit]
+ * @returns {Array<{ label: string, count: number, score: number, sizeClass: string }>}
+ */
+export const buildTopicTagCloud = (topic, articleTfIdfIndex, limit = 6) => {
+  if (!topic || !articleTfIdfIndex) {
+    return [];
+  }
+
+  const { sentenceTokens, documentFrequencies, totalSentenceCount } =
+    articleTfIdfIndex;
+  const topicSentenceIndices = collectTopicSentenceIndices(
+    topic,
+    sentenceTokens,
+  );
+  if (topicSentenceIndices.length === 0) {
+    return [];
+  }
+
+  const termFrequencies = new Map();
+  const topicCoverage = new Map();
+
+  topicSentenceIndices.forEach((sentenceIndex) => {
+    const tokens = sentenceTokens[sentenceIndex] || [];
+    const uniqueTokens = new Set();
+
+    tokens.forEach((token) => {
+      termFrequencies.set(token, (termFrequencies.get(token) || 0) + 1);
+      uniqueTokens.add(token);
+    });
+
+    uniqueTokens.forEach((token) => {
+      topicCoverage.set(token, (topicCoverage.get(token) || 0) + 1);
+    });
+  });
+
+  const rankedTags = Array.from(termFrequencies.entries())
+    .map(([label, count]) => {
+      const documentFrequency = documentFrequencies.get(label) || 1;
+      const idf =
+        Math.log((1 + totalSentenceCount) / (1 + documentFrequency)) + 1;
+
+      return {
+        label,
+        count,
+        score: count * idf,
+        idf,
+        coverage: topicCoverage.get(label) || 0,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.coverage - left.coverage ||
+        right.count - left.count ||
+        left.label.localeCompare(right.label),
+    );
+
+  const meaningfulRankedTags = rankedTags.filter((tag) => tag.idf >= 1.15);
+  const chosenTags =
+    meaningfulRankedTags.length > 0 ? meaningfulRankedTags : rankedTags;
+  const topTags = chosenTags.slice(0, limit);
+
+  if (topTags.length === 0) {
+    return [];
+  }
+
+  const scores = topTags.map((tag) => tag.score);
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+
+  return topTags.map((tag) => ({
+    label: tag.label,
+    count: tag.count,
+    score: tag.score,
+    sizeClass: topicTagSizeClassForScore(tag.score, minScore, maxScore),
+  }));
 };
 
 export const buildTopTags = (segmentTopics, allSentences, limit = 20) => {

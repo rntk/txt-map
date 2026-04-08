@@ -15,6 +15,7 @@ import {
 import { splitTopicPath } from "../utils/summaryTimeline";
 import { isTopicSelectionRead } from "../utils/topicReadUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
+import { buildArticleTfIdfIndex, buildTopicTagCloud } from "../utils/gridUtils";
 
 /**
  * @typedef {Object} TopicTimelineItem
@@ -82,7 +83,8 @@ import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 const OVERLAY_CARD_MIN_HEIGHT = 44;
 const OVERLAY_CLUSTER_MAX_LANES = 4;
 const REVEALED_TOKEN_CLASSNAME = "topic-article-view__revealed-token";
-const REVEALED_READ_TOKEN_CLASSNAME = "topic-article-view__revealed-token--read";
+const REVEALED_READ_TOKEN_CLASSNAME =
+  "topic-article-view__revealed-token--read";
 const NOTE_CARD_BASE_HEIGHT = 58;
 const NOTE_CARD_LINE_HEIGHT = 18;
 const NOTE_CARD_MAX_TITLE_LINES = 3;
@@ -674,6 +676,25 @@ function TopicArticleFullscreenView({
         : {},
     [article?.topic_summaries],
   );
+  const articleTfIdfIndex = useMemo(
+    () => buildArticleTfIdfIndex(article?.sentences || []),
+    [article?.sentences],
+  );
+  const topicTagCloudMap = useMemo(() => {
+    const tagsByTopicName = new Map();
+
+    (article?.topics || safeTopics || []).forEach((topic) => {
+      if (!topic?.name || tagsByTopicName.has(topic.name)) {
+        return;
+      }
+      tagsByTopicName.set(
+        topic.name,
+        buildTopicTagCloud(topic, articleTfIdfIndex),
+      );
+    });
+
+    return tagsByTopicName;
+  }, [article?.topics, articleTfIdfIndex, safeTopics]);
   const activeSummaryLayout = useMemo(() => {
     const preferredSegmentKey = previewSegmentKey || activeSegmentKey;
     if (preferredSegmentKey) {
@@ -1224,6 +1245,7 @@ function TopicArticleFullscreenView({
                       <TopicOverlayCard
                         key={layout.segmentKey}
                         layout={layout}
+                        topicTags={topicTagCloudMap.get(layout.name) || []}
                         isActive={layout.segmentKey === activeSegmentKey}
                         isHighlighted={layout.segmentKey === previewSegmentKey}
                         isRead={isTopicSelectionRead(
@@ -1263,6 +1285,7 @@ function TopicArticleFullscreenView({
 /**
  * @typedef {Object} TopicOverlayCardProps
  * @property {TopicOverlayLayout} layout
+ * @property {Array<{ label: string, count: number, score: number, sizeClass: string }>} topicTags
  * @property {boolean} isActive
  * @property {boolean} isHighlighted
  * @property {boolean} isRead
@@ -1274,6 +1297,7 @@ function TopicArticleFullscreenView({
 /** @param {TopicOverlayCardProps} props */
 const TopicOverlayCard = React.memo(function TopicOverlayCard({
   layout,
+  topicTags,
   isActive,
   isHighlighted,
   isRead,
@@ -1313,14 +1337,16 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
       onBlur={handleBlur}
     >
       <button
-        type="button"
-        className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
-        data-topic-name={layout.name}
-        data-topic-segment-key={layout.segmentKey}
-        aria-current={isActive ? "true" : undefined}
-        onPointerDown={handleEnter}
-        onClick={handleClick}
+      type="button"
+      className={`topic-article-view__topic-note ${cssClass}${isActive ? " topic-article-view__topic-note--active" : ""}${isHighlighted ? " topic-article-view__topic-note--highlighted" : ""}`}
+      data-topic-name={layout.name}
+      data-topic-segment-key={layout.segmentKey}
+      aria-current={isActive ? "true" : undefined}
+      onPointerDown={handleEnter}
+      onClick={handleClick}
+      style={{ fontSize: "120%" }}
       >
+      <span className="topic-article-view__topic-note-main">
         <span className="topic-article-view__topic-note-eyebrow">
           {formatSentenceRangeLabel(
             layout.startSentenceIndex,
@@ -1337,6 +1363,23 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
             </span>
           ))}
         </span>
+      </span>        {topicTags.length > 0 ? (
+          <span
+            className="topic-article-view__topic-tags"
+            aria-label={`Key tags for ${layout.name}`}
+          >
+            {topicTags.map((tag) => (
+              <span
+                key={`${layout.name}-${tag.label}`}
+                className={`topic-article-view__topic-tag topic-article-view__topic-tag--${tag.sizeClass}`}
+                title={`${tag.label} (${tag.count})`}
+                style={{ fontSize: "150%" }}
+              >
+                {tag.label}
+              </span>
+            ))}
+          </span>
+        ) : null}
       </button>
     </div>
   );
