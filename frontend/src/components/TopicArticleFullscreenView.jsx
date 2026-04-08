@@ -1347,13 +1347,7 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
       style={{ fontSize: "120%" }}
       >
       <span className="topic-article-view__topic-note-main">
-        <span className="topic-article-view__topic-note-eyebrow">
-          {formatSentenceRangeLabel(
-            layout.startSentenceIndex,
-            layout.endSentenceIndex,
-          )}
-        </span>
-        <span className="topic-article-view__topic-name">
+        <span className="topic-article-view__topic-name" style={{ fontSize: "120%" }}>
           {layout.noteTitleLines.map((line, index) => (
             <span
               key={`${layout.name}-${index}-${line}`}
@@ -1440,12 +1434,6 @@ const TopicSummaryCard = React.memo(function TopicSummaryCard({
       style={{ "--topic-summary-top": `${layout.summaryTop}px` }}
       aria-label={`Summary for ${layout.name}`}
     >
-      <div className="topic-article-view__summary-card-title">
-        {formatSentenceRangeLabel(
-          layout.startSentenceIndex,
-          layout.endSentenceIndex,
-        )}
-      </div>
       <div className="topic-article-view__summary-card-topic">
         {layout.name}
       </div>
