@@ -54,10 +54,14 @@ class _DisabledTokenStorage(TokenStorage):
         return []
 
     def create_token(self, *args, **kwargs):
-        raise RuntimeError("Token management requires auth to be enabled (set SUPER_TOKEN).")
+        raise RuntimeError(
+            "Token management requires auth to be enabled (set SUPER_TOKEN)."
+        )
 
     def delete_token(self, *args, **kwargs):
-        raise RuntimeError("Token management requires auth to be enabled (set SUPER_TOKEN).")
+        raise RuntimeError(
+            "Token management requires auth to be enabled (set SUPER_TOKEN)."
+        )
 
 
 _disabled_token_storage = _DisabledTokenStorage()

@@ -365,7 +365,9 @@ def test_fetch_url_pdf(client, mock_storage, mock_task_queue):
         )
 
     assert response.status_code == 200
-    mock_extract.assert_called_once_with("document.pdf", fake_pdf_bytes, embed_images=False)
+    mock_extract.assert_called_once_with(
+        "document.pdf", fake_pdf_bytes, embed_images=False
+    )
     call_kwargs = mock_storage.create.call_args.kwargs
     assert call_kwargs["html_content"] == fake_html
     assert call_kwargs["text_content"] == fake_text
