@@ -261,14 +261,14 @@
 .reading-markup__plain-sentence-text--colored {
   background-color: var(--topic-highlight-color);
   border-radius: 2px;
-  padding: 0 2px;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--topic-highlight-color) 72%, transparent);
 }
 
 .reading-article__sentence--insight-active {
   background-color: rgba(255, 235, 153, 0.75);
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgba(171, 138, 0, 0.18);
-  padding: 0 2px;
 }
 
 .reading-markup {
@@ -547,6 +547,8 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: 20px 24px 32px;
 }
 
@@ -556,12 +558,14 @@
   column-gap: 16px;
   min-height: 100%;
   box-sizing: border-box;
+  overflow-x: clip;
 }
 
 .topic-article-view__left-rail {
   grid-column: 1;
   position: relative;
   min-width: 0;
+  overflow-x: clip;
 }
 
 .topic-article-view__article-column {
@@ -577,6 +581,23 @@
   border-radius: 16px;
   background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
   box-shadow: 0 18px 36px rgba(16, 24, 40, 0.08);
+  overflow-x: clip;
+}
+
+.topic-article-view__article .reading-article__content,
+.topic-article-view__article .text-content,
+.topic-article-view__article .article-text,
+.topic-article-view__article .article-paragraph,
+.topic-article-view__article d-article,
+.topic-article-view__article h1 {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.topic-article-view__article .reading-article__content,
+.topic-article-view__article .text-content,
+.topic-article-view__article d-article {
+  overflow-x: clip;
 }
 
 .topic-article-view__range-accent {
@@ -589,10 +610,7 @@
   background: var(--topic-accent-color, #98a2b3);
   opacity: 0.95;
   pointer-events: none;
-  will-change: top, height;
-  transition:
-    top 0.18s ease,
-    height 0.18s ease;
+  will-change: auto;
 }
 
 .topic-article-view__range-accent-top,
@@ -613,17 +631,6 @@
   bottom: 0;
 }
 
-@keyframes topicNoteEnter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .topic-article-view__notes-column {
   grid-column: 3;
   position: relative;
@@ -637,9 +644,12 @@
   left: 0;
   width: 100%;
   min-height: var(--topic-note-height, 84px);
-  will-change: top;
-  transition: top 0.18s ease;
-  animation: topicNoteEnter 0.2s ease both;
+  opacity: 0.84;
+  transition: opacity 0.12s ease;
+}
+
+.topic-article-view__note-anchor--visible {
+  opacity: 1;
 }
 
 .topic-article-view__note-anchor::before {
@@ -652,15 +662,6 @@
   border-radius: 999px;
   background: var(--topic-accent-color, #98a2b3);
   opacity: 0.95;
-}
-
-/* Disable position transitions while the user is actively scrolling so cards
-   track the scroll position immediately and feel live rather than lagging. */
-.topic-article-view__scroll--scrolling .topic-article-view__note-anchor,
-.topic-article-view__scroll--scrolling .topic-article-view__range-accent,
-.topic-article-view__scroll--scrolling .topic-article-view__summary-card {
-  transition: none;
-  animation: none;
 }
 
 .topic-article-view__topic-note {
@@ -800,7 +801,6 @@
   line-height: 1.2;
   text-transform: uppercase;
   word-break: break-word;
-  animation: topicNoteEnter 0.2s ease both;
 }
 
 .topic-article-view__summary-card {
@@ -814,9 +814,7 @@
   border-radius: 16px;
   background: rgba(255, 253, 249, 0.98);
   box-shadow: 0 14px 28px rgba(16, 24, 40, 0.08);
-  will-change: top;
-  transition: top 0.15s ease;
-  animation: topicNoteEnter 0.22s ease both;
+  transition: opacity 0.12s ease;
 }
 
 .topic-article-view__summary-card-title {

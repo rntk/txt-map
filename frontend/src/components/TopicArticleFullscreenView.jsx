@@ -687,13 +687,9 @@ function TopicArticleFullscreenView({
     topicTimelineItems[0]?.segmentKey || null,
   );
   const [noteLayouts, setNoteLayouts] = useState([]);
-  // Controls which TopicNoteCard components are mounted; updated only when the
-  // visible card set changes (not on every scroll pixel).
-  const [mountedLayouts, setMountedLayouts] = useState([]);
+  const [visibleSegmentKeys, setVisibleSegmentKeys] = useState([]);
   const [previewTopicName, setPreviewTopicName] = useState(null);
   const [previewSegmentKey, setPreviewSegmentKey] = useState(null);
-  const [pinnedTopicName, setPinnedTopicName] = useState(null);
-  const [pinnedSegmentKey, setPinnedSegmentKey] = useState(null);
   const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
   const [summaryCardLayout, setSummaryCardLayout] = useState(null);
 
@@ -708,16 +704,13 @@ function TopicArticleFullscreenView({
   const visibleTopLevelLabelsKeyRef = useRef("");
   const summaryCardRef = useRef(null);
   const summaryCardLayoutRef = useRef(summaryCardLayout);
-  // Tracks the debounce timer used to remove the --scrolling CSS class.
-  const scrollingClassTimerRef = useRef(0);
   noteLayoutsRef.current = noteLayouts;
   activeSegmentKeyRef.current = activeSegmentKey;
   visibleTopLevelLabelsRef.current = visibleTopLevelLabels;
   summaryCardLayoutRef.current = summaryCardLayout;
 
   const effectiveHoveredTopic = useMemo(() => {
-    const hoveredTopicName =
-      previewTopicName || pinnedTopicName || hoveredTopic?.name || null;
+    const hoveredTopicName = previewTopicName || hoveredTopic?.name || null;
     if (!hoveredTopicName) {
       return null;
     }
@@ -727,7 +720,7 @@ function TopicArticleFullscreenView({
         ?.topic ||
       hoveredTopic || { name: hoveredTopicName }
     );
-  }, [hoveredTopic, pinnedTopicName, previewTopicName, topicTimelineItems]);
+  }, [hoveredTopic, previewTopicName, topicTimelineItems]);
 
   const noteAccentStyleSheet = useMemo(() => {
     const seen = new Set();
@@ -758,8 +751,8 @@ function TopicArticleFullscreenView({
     [article?.topic_summaries],
   );
   const activeSummaryLayout = useMemo(() => {
-    const preferredSegmentKey = previewSegmentKey || pinnedSegmentKey;
-    const preferredTopicName = previewTopicName || pinnedTopicName || null;
+    const preferredSegmentKey = previewSegmentKey;
+    const preferredTopicName = previewTopicName || null;
 
     if (!preferredSegmentKey && !preferredTopicName) {
       return null;
@@ -783,14 +776,7 @@ function TopicArticleFullscreenView({
       noteLayouts.find((layout) => layout.name === preferredTopicName) ||
       null
     );
-  }, [
-    activeSegmentKey,
-    noteLayouts,
-    pinnedSegmentKey,
-    pinnedTopicName,
-    previewSegmentKey,
-    previewTopicName,
-  ]);
+  }, [activeSegmentKey, noteLayouts, previewSegmentKey, previewTopicName]);
   const activeSummary = useMemo(() => {
     if (!activeSummaryLayout) {
       return "";
@@ -870,7 +856,6 @@ function TopicArticleFullscreenView({
       return undefined;
     }
 
-    const SCROLL_CLASS = "topic-article-view__scroll--scrolling";
     const MOUNT_BUFFER = 40;
 
     const scheduleSync = () => {
@@ -881,14 +866,6 @@ function TopicArticleFullscreenView({
           window.clearTimeout(animationFrameRef.current);
         }
       }
-
-      // Mark the container as actively scrolling so CSS transitions are
-      // suppressed — cards track the viewport live without visual lag.
-      container.classList.add(SCROLL_CLASS);
-      clearTimeout(scrollingClassTimerRef.current);
-      scrollingClassTimerRef.current = setTimeout(() => {
-        container.classList.remove(SCROLL_CLASS);
-      }, 150);
 
       const run = () => {
         animationFrameRef.current = 0;
@@ -917,27 +894,33 @@ function TopicArticleFullscreenView({
           viewportHeight,
         );
 
+        const visibleMap = new Map(
+          visible.map((layout) => [layout.segmentKey, layout]),
+        );
+
         // Write positions directly to DOM refs, bypassing the React render
-        // cycle entirely.  This keeps scroll at 60 fps without re-renders.
-        for (let i = 0; i < visible.length; i += 1) {
-          const layout = visible[i];
-          const anchor = noteAnchorRefs.current[layout.segmentKey];
+        // cycle entirely. This keeps the notes stable while scrolling.
+        for (let i = 0; i < noteLayoutsRef.current.length; i += 1) {
+          const baseLayout = noteLayoutsRef.current[i];
+          const visibleLayout = visibleMap.get(baseLayout.segmentKey);
+          const anchor = noteAnchorRefs.current[baseLayout.segmentKey];
           if (anchor instanceof HTMLElement) {
-            anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
-            anchor.style.setProperty(
-              "--topic-note-height",
-              `${layout.noteHeight}px`,
-            );
+            const noteTop = visibleLayout?.noteTop ?? baseLayout.bracketTop;
+            const noteHeight =
+              visibleLayout?.noteHeight ??
+              estimateTopicNoteHeight(baseLayout.noteTitleLines);
+            anchor.style.setProperty("--topic-note-top", `${noteTop}px`);
+            anchor.style.setProperty("--topic-note-height", `${noteHeight}px`);
           }
-          const accent = articleRangeAccentRefs.current[layout.segmentKey];
+          const accent = articleRangeAccentRefs.current[baseLayout.segmentKey];
           if (accent instanceof HTMLElement) {
             accent.style.setProperty(
               "--topic-range-top",
-              `${layout.bracketTop}px`,
+              `${baseLayout.bracketTop}px`,
             );
             accent.style.setProperty(
               "--topic-range-height",
-              `${layout.bracketHeight}px`,
+              `${baseLayout.bracketHeight}px`,
             );
           }
         }
@@ -949,13 +932,10 @@ function TopicArticleFullscreenView({
           );
         }
 
-        // Trigger a React re-render only when the mounted card *set* changes
-        // (topics entering / leaving the viewport window).  For pure position
-        // changes the direct DOM writes above are sufficient.
         const newSet = visible.map((layout) => layout.segmentKey).join("\0");
         if (newSet !== prevVisibleSetRef.current) {
           prevVisibleSetRef.current = newSet;
-          setMountedLayouts(visible);
+          setVisibleSegmentKeys(visible.map((layout) => layout.segmentKey));
         }
         // Use cached key ref to avoid re-joining on every frame.
         const nextLabelsKey = nextVisibleTopLevelLabels.join("\0");
@@ -997,8 +977,6 @@ function TopicArticleFullscreenView({
 
     return () => {
       clearTimeout(resizeTimeout);
-      clearTimeout(scrollingClassTimerRef.current);
-      container.classList.remove(SCROLL_CLASS);
       container.removeEventListener("scroll", scheduleSync);
       window.removeEventListener("resize", handleResize);
       if (animationFrameRef.current) {
@@ -1017,19 +995,17 @@ function TopicArticleFullscreenView({
     syncActiveTopicToViewport,
   ]);
 
-  // After mountedLayouts changes (new cards mounted), write their initial CSS
-  // custom-property positions to the freshly attached DOM nodes.  The rAF loop
-  // keeps positions current from that point on, so we only need to seed the
-  // values here — no need to recompute layouts from scratch.
+  // Seed DOM positions for every note and range so segments stay mounted and
+  // scroll updates only adjust CSS variables.
   useEffect(() => {
-    for (let i = 0; i < mountedLayouts.length; i += 1) {
-      const layout = mountedLayouts[i];
+    for (let i = 0; i < noteLayouts.length; i += 1) {
+      const layout = noteLayouts[i];
       const anchor = noteAnchorRefs.current[layout.segmentKey];
       if (anchor instanceof HTMLElement) {
-        anchor.style.setProperty("--topic-note-top", `${layout.noteTop}px`);
+        anchor.style.setProperty("--topic-note-top", `${layout.bracketTop}px`);
         anchor.style.setProperty(
           "--topic-note-height",
-          `${layout.noteHeight}px`,
+          `${estimateTopicNoteHeight(layout.noteTitleLines)}px`,
         );
       }
       const accent = articleRangeAccentRefs.current[layout.segmentKey];
@@ -1041,7 +1017,7 @@ function TopicArticleFullscreenView({
         );
       }
     }
-  }, [mountedLayouts]);
+  }, [noteLayouts]);
 
   useEffect(() => {
     return () => {
@@ -1060,8 +1036,8 @@ function TopicArticleFullscreenView({
       }
 
       setActiveSegmentKey(item.segmentKey);
-      setPinnedTopicName(item.name);
-      setPinnedSegmentKey(item.segmentKey);
+      setPreviewTopicName(item.name);
+      setPreviewSegmentKey(item.segmentKey);
       if (typeof setHoveredTopic === "function") {
         setHoveredTopic(item.topic);
       }
@@ -1114,18 +1090,57 @@ function TopicArticleFullscreenView({
     setPreviewSegmentKey(null);
     setPreviewTopicName(null);
     if (typeof setHoveredTopic === "function") {
-      const nextTopic =
-        topicTimelineItems.find((item) => item.segmentKey === pinnedSegmentKey)
-          ?.topic ||
-        topicTimelineItems.find((item) => item.name === pinnedTopicName)
-          ?.topic ||
-        null;
-      setHoveredTopic(nextTopic);
+      setHoveredTopic(null);
     }
-  }, [pinnedSegmentKey, pinnedTopicName, setHoveredTopic, topicTimelineItems]);
+  }, [setHoveredTopic]);
+
+  useEffect(() => {
+    if (!previewSegmentKey && !previewTopicName) {
+      return undefined;
+    }
+
+    const handlePointerDownOutside = (event) => {
+      const scrollRoot = articleScrollRef.current;
+      if (
+        scrollRoot instanceof HTMLElement &&
+        event.target instanceof Node &&
+        scrollRoot.contains(event.target)
+      ) {
+        return;
+      }
+      handleNoteLeave();
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        handleNoteLeave();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDownOutside, true);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDownOutside,
+        true,
+      );
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [handleNoteLeave, previewSegmentKey, previewTopicName]);
 
   const handleSummaryCardRef = useCallback((node) => {
     summaryCardRef.current = node;
+    if (
+      node instanceof HTMLElement &&
+      summaryCardLayoutRef.current?.summaryTop !== undefined
+    ) {
+      node.style.setProperty(
+        "--topic-summary-top",
+        `${summaryCardLayoutRef.current.summaryTop}px`,
+      );
+    }
   }, []);
 
   const articleContent = article?.sentences?.length ? (
@@ -1187,7 +1202,7 @@ function TopicArticleFullscreenView({
                   className="topic-article-view__article"
                 >
                   {articleContent}
-                  {mountedLayouts.map((layout) => (
+                  {noteLayouts.map((layout) => (
                     <RangeAccentDot
                       key={layout.segmentKey}
                       segmentKey={layout.segmentKey}
@@ -1203,19 +1218,17 @@ function TopicArticleFullscreenView({
                 role="region"
                 aria-label="Synced topics list"
               >
-                {mountedLayouts.length > 0 ? (
-                  mountedLayouts.map((layout) => (
+                {noteLayouts.length > 0 ? (
+                  noteLayouts.map((layout) => (
                     <TopicNoteCard
                       key={layout.segmentKey}
                       layout={layout}
                       isActive={layout.segmentKey === activeSegmentKey}
+                      isVisible={visibleSegmentKeys.includes(layout.segmentKey)}
                       isHighlighted={
                         layout.segmentKey === previewSegmentKey ||
-                        layout.segmentKey === pinnedSegmentKey ||
                         (layout.name === previewTopicName &&
-                          previewSegmentKey === null) ||
-                        (layout.name === pinnedTopicName &&
-                          pinnedSegmentKey === null)
+                          previewSegmentKey === null)
                       }
                       readTopics={readTopics}
                       onToggleRead={onToggleRead}
@@ -1225,11 +1238,11 @@ function TopicArticleFullscreenView({
                       onAnchorRef={handleNoteAnchorRef}
                     />
                   ))
-                ) : noteLayouts.length === 0 ? (
+                ) : (
                   <p className="topic-article-view__empty">
                     No aligned topics available.
                   </p>
-                ) : null}
+                )}
               </aside>
             </div>
           </div>
@@ -1243,6 +1256,7 @@ function TopicArticleFullscreenView({
  * @typedef {Object} TopicNoteCardProps
  * @property {TopicVisibleNoteLayout} layout
  * @property {boolean} isActive
+ * @property {boolean} isVisible
  * @property {boolean} isHighlighted
  * @property {Set<string> | string[]} readTopics
  * @property {(topic: Object) => void} onToggleRead
@@ -1256,6 +1270,7 @@ function TopicArticleFullscreenView({
 const TopicNoteCard = React.memo(function TopicNoteCard({
   layout,
   isActive,
+  isVisible,
   isHighlighted,
   readTopics,
   onToggleRead,
@@ -1328,7 +1343,7 @@ const TopicNoteCard = React.memo(function TopicNoteCard({
   return (
     <div
       ref={setRef}
-      className={`topic-article-view__note-anchor ${cssClass}`}
+      className={`topic-article-view__note-anchor ${cssClass}${isVisible ? " topic-article-view__note-anchor--visible" : ""}`}
       onMouseEnter={handleEnter}
       onMouseLeave={onLeave}
       onFocus={handleEnter}

@@ -23,6 +23,7 @@ import "../styles/text-reading.css";
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
+const EMPTY_ARRAY = [];
 
 /**
  * @typedef {Object} TextDisplayProps
@@ -74,8 +75,8 @@ function TextDisplay({
   onShowSentences,
   highlightWords,
   coloredHighlightMode = false,
-  activeInsightSentenceIndices = [],
-  activeInsightRanges = [],
+  activeInsightSentenceIndices = EMPTY_ARRAY,
+  activeInsightRanges = EMPTY_ARRAY,
   coloredTopicNames = null,
   showTopicRangeAccents = false,
 }) {
@@ -423,6 +424,8 @@ function TextDisplay({
     useTooltip(tooltipEnabled);
   const tooltipContainerRef = useRef(null);
   const textContentRef = useRef(null);
+  const tooltipRef = useRef(tooltip);
+  tooltipRef.current = tooltip;
 
   const getTooltipPosition = useCallback((clientX, clientY) => {
     // Keep the tooltip close enough to the pointer so it feels anchored to the
@@ -628,7 +631,7 @@ function TextDisplay({
       }
 
       // Toggle: clicking the same token again hides the tooltip
-      if (token === lastTargetRef.current && tooltip) {
+      if (token === lastTargetRef.current && tooltipRef.current) {
         hideTooltip();
         return;
       }
@@ -664,7 +667,7 @@ function TextDisplay({
       hideTooltip,
       lastTargetRef,
       showTooltip,
-      tooltip,
+      tooltipRef,
       tooltipEnabled,
     ],
   );
@@ -831,9 +834,82 @@ function TextDisplay({
     return sortedParagraphIndices.map((paraIdx) => groups.get(paraIdx));
   }, [safeParagraphMap, safeSentences]);
 
+  return (
+    <div className="text-display reading-article">
+      <TextDisplayBody
+        activeInsightSentenceIndexSet={activeInsightSentenceIndexSet}
+        articleIndex={articleIndex}
+        coloredHighlightMode={coloredHighlightMode}
+        effectiveHighlightWords={effectiveHighlightWords}
+        fadedIndices={fadedIndices}
+        getSentenceRuntimeStyle={getSentenceRuntimeStyle}
+        handleTextClick={handleTextClick}
+        highlightedIndices={highlightedIndices}
+        highlightedRawHtml={highlightedRawHtml}
+        onShowTopicSummary={onShowTopicSummary}
+        paragraphs={paragraphs}
+        safeSentences={safeSentences}
+        sentenceAccentMap={sentenceAccentMap}
+        sentenceColorMap={sentenceColorMap}
+        sentenceToTopicsEnding={sentenceToTopicsEnding}
+        showTopicRangeAccents={showTopicRangeAccents}
+        textContentRef={textContentRef}
+        topicStyleSheet={topicStyleSheet}
+        topicSummaries={topicSummaries}
+      />
+      {tooltipEl}
+    </div>
+  );
+}
+
+/**
+ * @typedef {Object} TextDisplayBodyProps
+ * @property {Set<number>} activeInsightSentenceIndexSet
+ * @property {number} articleIndex
+ * @property {boolean} coloredHighlightMode
+ * @property {string[] | null} effectiveHighlightWords
+ * @property {Set<number>} fadedIndices
+ * @property {(index: number) => React.CSSProperties | undefined} getSentenceRuntimeStyle
+ * @property {(event: React.MouseEvent<HTMLElement>) => void} handleTextClick
+ * @property {Set<number>} highlightedIndices
+ * @property {string} highlightedRawHtml
+ * @property {((topic: Object, summary: string) => void) | null | undefined} onShowTopicSummary
+ * @property {Array<Array<{ text: string, index: number }>> | null} paragraphs
+ * @property {string[]} safeSentences
+ * @property {Map<number, string> | null} sentenceAccentMap
+ * @property {Map<number, string> | null} sentenceColorMap
+ * @property {Map<number, Array<Object>>} sentenceToTopicsEnding
+ * @property {boolean} showTopicRangeAccents
+ * @property {React.RefObject<HTMLDivElement | null>} textContentRef
+ * @property {string | null} topicStyleSheet
+ * @property {Object | null | undefined} topicSummaries
+ */
+
+/** @param {TextDisplayBodyProps} props */
+const TextDisplayBody = React.memo(function TextDisplayBody({
+  activeInsightSentenceIndexSet,
+  articleIndex,
+  coloredHighlightMode,
+  effectiveHighlightWords,
+  fadedIndices,
+  getSentenceRuntimeStyle,
+  handleTextClick,
+  highlightedIndices,
+  highlightedRawHtml,
+  onShowTopicSummary,
+  paragraphs,
+  safeSentences,
+  sentenceAccentMap,
+  sentenceColorMap,
+  sentenceToTopicsEnding,
+  showTopicRangeAccents,
+  textContentRef,
+  topicStyleSheet,
+  topicSummaries,
+}) {
   if (highlightedRawHtml) {
     return (
-      <div className="text-display reading-article">
+      <>
         {topicStyleSheet && <style>{topicStyleSheet}</style>}
         <div
           ref={textContentRef}
@@ -841,113 +917,106 @@ function TextDisplay({
           dangerouslySetInnerHTML={{ __html: highlightedRawHtml }}
           onClick={handleTextClick}
         />
-        {tooltipEl}
-      </div>
+      </>
     );
   }
 
   if (paragraphs) {
     return (
-      <div className="text-display reading-article">
-        <div
-          ref={textContentRef}
-          className="text-content reading-article__content"
-          onClick={handleTextClick}
-        >
-          {paragraphs.map((para, paraIdx) => (
-            <p
-              key={paraIdx}
-              className="article-paragraph reading-article__paragraph"
-            >
-              {para.map(({ text, index }) => (
-                <React.Fragment key={index}>
-                  <span
-                    id={`sentence-${articleIndex}-${index}`}
-                    data-article-index={articleIndex}
-                    data-sentence-index={index}
-                    className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
-                    style={getSentenceRuntimeStyle(index)}
-                    dangerouslySetInnerHTML={{
-                      __html: sanitizeHTML(text) + " ",
-                    }}
-                  />
-                  {sentenceToTopicsEnding.has(index) &&
-                    topicSummaries &&
-                    onShowTopicSummary &&
-                    sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
-                      <button
-                        key={`${index}-${tIdx}`}
-                        className="topic-summary-link"
-                        onClick={() =>
-                          onShowTopicSummary(topic, topicSummaries[topic.name])
-                        }
-                        title={`View summary for topic: ${topic.name}`}
-                      >
-                        [📝 {topic.name}]
-                      </button>
-                    ))}
-                </React.Fragment>
-              ))}
-            </p>
-          ))}
-        </div>
-        {tooltipEl}
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-display reading-article">
       <div
         ref={textContentRef}
         className="text-content reading-article__content"
         onClick={handleTextClick}
       >
-        <p className="article-text">
-          {safeSentences.map((sentence, index) => (
-            <React.Fragment key={index}>
-              <span
-                id={`sentence-${articleIndex}-${index}`}
-                data-article-index={articleIndex}
-                data-sentence-index={index}
-                className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
-                style={getSentenceRuntimeStyle(index)}
-              >
-                {effectiveHighlightWords ? (
-                  <HighlightedText
-                    text={sentence}
-                    words={effectiveHighlightWords}
-                  />
-                ) : (
-                  <span
-                    dangerouslySetInnerHTML={{
-                      __html: sanitizeHTML(sentence) + " ",
-                    }}
-                  />
-                )}
-              </span>
-              {sentenceToTopicsEnding.has(index) &&
-                topicSummaries &&
-                onShowTopicSummary &&
-                sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
-                  <button
-                    key={`${index}-${tIdx}`}
-                    className="topic-summary-link"
-                    onClick={() =>
-                      onShowTopicSummary(topic, topicSummaries[topic.name])
-                    }
-                    title={`View summary for topic: ${topic.name}`}
-                  >
-                    [📝 {topic.name}]
-                  </button>
-                ))}
-            </React.Fragment>
-          ))}
-        </p>
+        {paragraphs.map((para, paraIdx) => (
+          <p
+            key={paraIdx}
+            className="article-paragraph reading-article__paragraph"
+          >
+            {para.map(({ text, index }) => (
+              <React.Fragment key={index}>
+                <span
+                  id={`sentence-${articleIndex}-${index}`}
+                  data-article-index={articleIndex}
+                  data-sentence-index={index}
+                  className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
+                  style={getSentenceRuntimeStyle(index)}
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHTML(text) + " ",
+                  }}
+                />
+                {sentenceToTopicsEnding.has(index) &&
+                  topicSummaries &&
+                  onShowTopicSummary &&
+                  sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                    <button
+                      key={`${index}-${tIdx}`}
+                      className="topic-summary-link"
+                      onClick={() =>
+                        onShowTopicSummary(topic, topicSummaries[topic.name])
+                      }
+                      title={`View summary for topic: ${topic.name}`}
+                    >
+                      [📝 {topic.name}]
+                    </button>
+                  ))}
+              </React.Fragment>
+            ))}
+          </p>
+        ))}
       </div>
-      {tooltipEl}
+    );
+  }
+
+  return (
+    <div
+      ref={textContentRef}
+      className="text-content reading-article__content"
+      onClick={handleTextClick}
+    >
+      <p className="article-text">
+        {safeSentences.map((sentence, index) => (
+          <React.Fragment key={index}>
+            <span
+              id={`sentence-${articleIndex}-${index}`}
+              data-article-index={articleIndex}
+              data-sentence-index={index}
+              className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
+              style={getSentenceRuntimeStyle(index)}
+            >
+              {effectiveHighlightWords ? (
+                <HighlightedText
+                  text={sentence}
+                  words={effectiveHighlightWords}
+                />
+              ) : (
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHTML(sentence) + " ",
+                  }}
+                />
+              )}
+            </span>
+            {sentenceToTopicsEnding.has(index) &&
+              topicSummaries &&
+              onShowTopicSummary &&
+              sentenceToTopicsEnding.get(index).map((topic, tIdx) => (
+                <button
+                  key={`${index}-${tIdx}`}
+                  className="topic-summary-link"
+                  onClick={() =>
+                    onShowTopicSummary(topic, topicSummaries[topic.name])
+                  }
+                  title={`View summary for topic: ${topic.name}`}
+                >
+                  [📝 {topic.name}]
+                </button>
+              ))}
+          </React.Fragment>
+        ))}
+      </p>
     </div>
   );
-}
+});
 
 export default React.memo(TextDisplay);

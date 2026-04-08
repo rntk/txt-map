@@ -85,6 +85,14 @@ function queryTopicButtonBySegment(topicName, segmentKey) {
   );
 }
 
+function queryTopicAnchorBySegment(topicName, segmentKey) {
+  return (
+    queryTopicButtonBySegment(topicName, segmentKey)?.closest(
+      ".topic-article-view__note-anchor",
+    ) || null
+  );
+}
+
 function queryTopicReadButton(topicName) {
   return (
     Array.from(document.querySelectorAll(".topic-article-view__read-btn")).find(
@@ -326,7 +334,7 @@ describe("TopicArticleFullscreenView", () => {
     ).toHaveLength(2);
   });
 
-  it("hides a topic note between separated explicit ranges and remounts it on the visible segment", async () => {
+  it("keeps separated explicit-range notes mounted and updates their visible state across scroll", async () => {
     renderAndTriggerLayout(
       <TopicArticleFullscreenView
         {...defaultProps}
@@ -358,9 +366,11 @@ describe("TopicArticleFullscreenView", () => {
       ).toBeInTheDocument();
     });
     expect(screen.getByText("Sentence 1")).toBeInTheDocument();
-    expect(screen.getByLabelText("Current topic areas")).toHaveTextContent(
-      "Science",
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("Current topic areas")).toHaveTextContent(
+        "Science",
+      );
+    });
 
     const scrollRegion = screen.getByRole("region", {
       name: "Synced article scroll area",
@@ -370,7 +380,18 @@ describe("TopicArticleFullscreenView", () => {
     fireEvent.scroll(scrollRegion);
 
     await waitFor(() => {
-      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(0);
+      expect(
+        queryTopicAnchorBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::0",
+        ),
+      ).not.toHaveClass("topic-article-view__note-anchor--visible");
+      expect(
+        queryTopicAnchorBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::1",
+        ),
+      ).not.toHaveClass("topic-article-view__note-anchor--visible");
     });
     expect(
       screen.queryByLabelText("Current topic areas"),
@@ -381,11 +402,11 @@ describe("TopicArticleFullscreenView", () => {
 
     await waitFor(() => {
       expect(
-        queryTopicButtonBySegment(
+        queryTopicAnchorBySegment(
           "Science > Biology > Genetics",
           "Science > Biology > Genetics::1",
         ),
-      ).toBeInTheDocument();
+      ).toHaveClass("topic-article-view__note-anchor--visible");
     });
     expect(screen.getByText("Sentence 10")).toBeInTheDocument();
     expect(screen.getByLabelText("Current topic areas")).toHaveTextContent(
@@ -393,7 +414,7 @@ describe("TopicArticleFullscreenView", () => {
     );
   });
 
-  it("splits non-consecutive sentence lists into separate visible note segments when ranges are absent", async () => {
+  it("keeps split sentence-list segments mounted and updates their visible state when ranges are absent", async () => {
     renderAndTriggerLayout(
       <TopicArticleFullscreenView
         {...defaultProps}
@@ -415,7 +436,7 @@ describe("TopicArticleFullscreenView", () => {
 
     await waitFor(() => {
       expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
-        1,
+        2,
       );
     });
     expect(screen.getByText("Sentences 2-3")).toBeInTheDocument();
@@ -428,18 +449,24 @@ describe("TopicArticleFullscreenView", () => {
     fireEvent.scroll(scrollRegion);
 
     await waitFor(() => {
-      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
-        0,
-      );
+      expect(
+        queryTopicAnchorBySegment(
+          "Business > Markets > Equities",
+          "Business > Markets > Equities::0",
+        ),
+      ).not.toHaveClass("topic-article-view__note-anchor--visible");
     });
 
     scrollRegion.scrollTop = 1280;
     fireEvent.scroll(scrollRegion);
 
     await waitFor(() => {
-      expect(queryTopicButtons("Business > Markets > Equities")).toHaveLength(
-        1,
-      );
+      expect(
+        queryTopicAnchorBySegment(
+          "Business > Markets > Equities",
+          "Business > Markets > Equities::1",
+        ),
+      ).toHaveClass("topic-article-view__note-anchor--visible");
     });
     expect(screen.getByText("Sentences 9-10")).toBeInTheDocument();
   });
@@ -481,10 +508,13 @@ describe("TopicArticleFullscreenView", () => {
       expect(summaryCard).toHaveTextContent(
         "A short explanation of the genetics topic.",
       );
+      expect(
+        summaryCard.style.getPropertyValue("--topic-summary-top"),
+      ).not.toBe("");
     });
   });
 
-  it("keeps the summary card visible after click when the pointer leaves", async () => {
+  it("hides the summary card after click when the pointer leaves", async () => {
     renderAndTriggerLayout(
       <TopicArticleFullscreenView
         {...defaultProps}
@@ -517,9 +547,129 @@ describe("TopicArticleFullscreenView", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText("Summary for Science > Biology > Genetics"),
-      ).toHaveTextContent("Pinned summary text remains visible.");
+        screen.queryByLabelText("Summary for Science > Biology > Genetics"),
+      ).not.toBeInTheDocument();
     });
+  });
+
+  it("clears the transient summary on outside pointer down after clicking a topic", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1],
+                ranges: [],
+              },
+            ],
+            topic_summaries: {
+              "Science > Biology > Genetics":
+                "Outside interaction clears this.",
+            },
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(queryTopicButtons("Science > Biology > Genetics")).toHaveLength(1);
+    });
+
+    fireEvent.click(queryTopicButtons("Science > Biology > Genetics")[0]);
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Summary for Science > Biology > Genetics"),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.pointerDown(document.body);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByLabelText("Summary for Science > Biology > Genetics"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps note DOM nodes mounted across scroll changes", async () => {
+    renderAndTriggerLayout(
+      <TopicArticleFullscreenView
+        {...defaultProps}
+        articles={[
+          {
+            ...defaultProps.articles[0],
+            sentences: buildSentences(10),
+            topics: [
+              {
+                name: "Science > Biology > Genetics",
+                sentences: [1, 10],
+                ranges: [
+                  { sentence_start: 1, sentence_end: 1, start: 0, end: 10 },
+                  { sentence_start: 10, sentence_end: 10, start: 20, end: 30 },
+                ],
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryTopicAnchorBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::0",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        queryTopicAnchorBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::1",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    const firstAnchor = queryTopicAnchorBySegment(
+      "Science > Biology > Genetics",
+      "Science > Biology > Genetics::0",
+    );
+    const secondAnchor = queryTopicAnchorBySegment(
+      "Science > Biology > Genetics",
+      "Science > Biology > Genetics::1",
+    );
+
+    const scrollRegion = screen.getByRole("region", {
+      name: "Synced article scroll area",
+    });
+    scrollRegion.scrollTop = 1280;
+    fireEvent.scroll(scrollRegion);
+
+    await waitFor(() => {
+      expect(
+        queryTopicAnchorBySegment(
+          "Science > Biology > Genetics",
+          "Science > Biology > Genetics::1",
+        ),
+      ).toHaveClass("topic-article-view__note-anchor--visible");
+    });
+
+    expect(
+      queryTopicAnchorBySegment(
+        "Science > Biology > Genetics",
+        "Science > Biology > Genetics::0",
+      ),
+    ).toBe(firstAnchor);
+    expect(
+      queryTopicAnchorBySegment(
+        "Science > Biology > Genetics",
+        "Science > Biology > Genetics::1",
+      ),
+    ).toBe(secondAnchor);
   });
 
   it("does not render a summary card when the topic has no summary", async () => {

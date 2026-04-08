@@ -792,6 +792,49 @@ describe("TextDisplay", () => {
       expect(screen.getByText("Topic1")).toBeInTheDocument();
     });
 
+    it("keeps the raw HTML content node stable when opening a tooltip", () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          rawHtml="<p>Hello world</p>"
+          articleTopics={[
+            {
+              name: "Topic1",
+              sentences: [],
+              ranges: [{ start: 0, end: 11 }],
+            },
+          ]}
+        />,
+      );
+
+      const textContent = document.querySelector(".text-content");
+      const wordToken = document.querySelector(".word-token");
+
+      fireEvent.click(wordToken, { clientX: 10, clientY: 10 });
+
+      expect(screen.getByText("Topic1")).toBeInTheDocument();
+      expect(document.querySelector(".text-content")).toBe(textContent);
+      expect(document.querySelector(".word-token")).toBe(wordToken);
+    });
+
+    it("keeps the sentence content node stable when opening a tooltip", () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          articleTopics={[{ name: "Topic1", sentences: [1], ranges: [] }]}
+        />,
+      );
+
+      const textContent = document.querySelector(".text-content");
+      const sentenceToken = document.getElementById("sentence-0-0");
+
+      fireEvent.click(sentenceToken, { clientX: 10, clientY: 10 });
+
+      expect(screen.getByText("Topic1")).toBeInTheDocument();
+      expect(document.querySelector(".text-content")).toBe(textContent);
+      expect(document.getElementById("sentence-0-0")).toBe(sentenceToken);
+    });
+
     it("does not show tooltip when tooltipEnabled is false", () => {
       render(
         <TextDisplay
