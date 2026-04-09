@@ -1213,6 +1213,7 @@ function TextPageContent() {
               readTopics={readTopics}
               onToggleRead={toggleRead}
               onClose={closeFullscreenGraph}
+              onShowInArticle={handleShowInArticle}
             />
           )}
 

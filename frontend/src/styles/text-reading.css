@@ -1297,7 +1297,9 @@
 
 .topic-index-view__tile-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 6px;
   padding: 14px 18px 14px 0;
   flex: 0 0 auto;
 }
@@ -1333,6 +1335,44 @@
 .topic-index-view__read-btn--active:hover {
   background: #d8ead8;
   border-color: #98c898;
+}
+
+.topic-index-view__sentences-btn {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: 1px solid rgba(16, 24, 40, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475467;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.topic-index-view__sentences-btn:hover {
+  background: rgba(31, 32, 29, 0.04);
+  border-color: rgba(29, 30, 27, 0.18);
+}
+
+.topic-index-view__tile-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: text-decoration 0.15s ease;
+}
+
+.topic-index-view__tile-name-link:hover {
+  text-decoration: underline;
 }
 
 .topic-index-view__empty {

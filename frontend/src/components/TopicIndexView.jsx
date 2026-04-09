@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import FullScreenGraph from "./FullScreenGraph";
+import TopicSentencesModal from "./shared/TopicSentencesModal";
 import {
   getTopicAccentColor,
   getTopicCSSClass,
@@ -14,6 +15,7 @@ import { splitTopicPath } from "../utils/summaryTimeline";
 import { isTopicRead } from "../utils/topicReadUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 import { buildArticleTfIdfIndex, buildTopicTagCloud } from "../utils/gridUtils";
+import { useArticle } from "../contexts/ArticleContext";
 
 const MIN_TILE_HEIGHT = 44;
 const PER_RANGE_CHAR_PX = 0.28;
@@ -46,6 +48,7 @@ const MAX_TILE_HEIGHT = 180;
  * @property {Set<string> | string[]} readTopics
  * @property {(topic: Object) => void} onToggleRead
  * @property {() => void} onClose
+ * @property {(topic: Object) => void} [onShowInArticle]
  */
 
 /**
@@ -229,9 +232,12 @@ function TopicIndexView({
   readTopics,
   onToggleRead,
   onClose,
+  onShowInArticle,
 }) {
+  const articleContext = useArticle();
   const article =
     Array.isArray(articles) && articles.length > 0 ? articles[0] : null;
+  const contextMarkup = articleContext?.markup;
   const articleSentences = useMemo(
     () =>
       (Array.isArray(article?.sentences) ? article.sentences : []).map(
@@ -344,6 +350,15 @@ function TopicIndexView({
 
   const scrollRef = useRef(null);
   const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
+  const [sentencesModalTopic, setSentencesModalTopic] = useState(null);
+
+  const handleCloseSentencesModal = useCallback(() => {
+    setSentencesModalTopic(null);
+  }, []);
+
+  const handleShowSentences = useCallback((topic) => {
+    setSentencesModalTopic(buildModalSelectionFromTopic(topic));
+  }, []);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -479,7 +494,22 @@ function TopicIndexView({
                                   key={`${topic.name}-${index}-${line}`}
                                   className="topic-index-view__tile-name-line"
                                 >
-                                  {line}
+                                  {onShowInArticle ? (
+                                    <button
+                                      type="button"
+                                      className="topic-index-view__tile-name-link"
+                                      onClick={() => {
+                                        onShowInArticle(
+                                          buildNormalizedTopicSelection(topic),
+                                        );
+                                      }}
+                                      title="Show in article"
+                                    >
+                                      {line}
+                                    </button>
+                                  ) : (
+                                    line
+                                  )}
                                 </span>
                               ))}
                             </span>
@@ -513,6 +543,14 @@ function TopicIndexView({
                           >
                             {isRead ? "Mark unread" : "Mark as read"}
                           </button>
+                          <button
+                            type="button"
+                            className="topic-index-view__sentences-btn"
+                            onClick={() => handleShowSentences(topic)}
+                            title="View sentences"
+                          >
+                            View sentences
+                          </button>
                         </div>
                       </div>
                     );
@@ -523,6 +561,18 @@ function TopicIndexView({
           </div>
         </div>
       </div>
+      {sentencesModalTopic && (
+        <TopicSentencesModal
+          topic={sentencesModalTopic}
+          sentences={sentencesModalTopic._sentences || articleSentences}
+          onClose={handleCloseSentencesModal}
+          onShowInArticle={onShowInArticle}
+          markup={contextMarkup}
+          allTopics={safeTopics}
+          readTopics={readTopics}
+          onToggleRead={onToggleRead}
+        />
+      )}
     </FullScreenGraph>
   );
 }
