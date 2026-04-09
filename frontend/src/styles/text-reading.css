@@ -567,7 +567,7 @@
   position: sticky;
   top: 0;
   min-width: 0;
-  overflow-x: clip;
+  overflow: visible;
   z-index: 2;
 }
 
@@ -1056,6 +1056,7 @@
   .topic-article-view__summary-card {
     position: static;
     margin-top: 12px;
+    transform: none;
   }
 
   .reading-page__minimap-panel {
