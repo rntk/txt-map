@@ -81,7 +81,7 @@ import { buildArticleTfIdfIndex, buildTopicTagCloud } from "../utils/gridUtils";
  */
 
 const OVERLAY_CARD_MIN_HEIGHT = 44;
-const OVERLAY_STACK_GAP_PX = 2;
+const OVERLAY_STACK_GAP_PX = 0;
 const REVEALED_TOKEN_CLASSNAME = "topic-article-view__revealed-token";
 const REVEALED_READ_TOKEN_CLASSNAME =
   "topic-article-view__revealed-token--read";
@@ -285,7 +285,7 @@ function buildNormalizedTopicSelection(layout) {
     ...baseTopic,
     canonicalTopicNames:
       Array.isArray(baseTopic.canonicalTopicNames) &&
-      baseTopic.canonicalTopicNames.length > 0
+        baseTopic.canonicalTopicNames.length > 0
         ? baseTopic.canonicalTopicNames
         : [layout.name],
   };
@@ -351,6 +351,57 @@ function buildTopicNoteLayouts(articleRoot, items) {
     return best.node;
   };
 
+  /**
+   * Calculates the accurate height of a sentence range by summing individual sentence heights
+   * and accounting for vertical gaps between sentences. This avoids the cumulative error that
+   * occurs when using just start/end rects which can include extra spacing.
+   * @param {number} startIndex
+   * @param {number} endIndex
+   * @returns {{ top: number, height: number }}
+   */
+  const calculateRangeHeight = (startIndex, endIndex) => {
+    const startNode = getSentenceNodeCached(startIndex);
+    const endNode = getSentenceNodeCached(endIndex);
+    if (!startNode || !endNode) {
+      return null;
+    }
+
+    const startRect = startNode.getBoundingClientRect();
+    const firstTop = startRect.top - articleRect.top + articleRoot.scrollTop;
+
+    // Single sentence case - use its bounding rect
+    if (startIndex === endIndex) {
+      const height = Math.max(24, startRect.height);
+      return { top: firstTop, height };
+    }
+
+    // Multiple sentences - iterate through each to get accurate cumulative height
+    let totalHeight = 0;
+    let prevBottom = 0;
+    for (let idx = startIndex; idx <= endIndex; idx++) {
+      const node = getSentenceNodeCached(idx);
+      if (!node) continue;
+
+      const rect = node.getBoundingClientRect();
+      const nodeTop = rect.top - articleRect.top + articleRoot.scrollTop;
+      const nodeHeight = rect.height;
+
+      if (idx === startIndex) {
+        totalHeight = nodeHeight;
+        prevBottom = nodeTop + nodeHeight;
+      } else {
+        // Account for the gap between sentences
+        const gap = nodeTop - prevBottom;
+        // Only add the gap if there's positive overlap or tight spacing
+        // (negative gap means overlap, which shouldn't happen but handle it)
+        totalHeight += Math.max(0, nodeHeight + gap);
+        prevBottom = nodeTop + nodeHeight;
+      }
+    }
+
+    return { top: firstTop, height: Math.max(24, totalHeight) };
+  };
+
   /** @type {TopicMeasuredLayout[]} */
   const results = [];
   for (let i = 0; i < items.length; i += 1) {
@@ -370,12 +421,37 @@ function buildTopicNoteLayouts(articleRoot, items) {
       continue;
     }
 
-    const startRect = startNode.getBoundingClientRect();
-    const endRect = endNode.getBoundingClientRect();
-    const bracketTop = startRect.top - articleRect.top + articleRoot.scrollTop;
-    const bracketBottom =
-      endRect.bottom - articleRect.top + articleRoot.scrollTop;
-    const bracketHeight = Math.max(24, bracketBottom - bracketTop);
+    let bracketTop;
+    let bracketHeight;
+
+    // Use the more accurate range height calculation when we have valid sentence indices
+    const hasValidSentenceIndices =
+      Number.isInteger(item.startSentenceIndex) &&
+      item.startSentenceIndex >= 0 &&
+      Number.isInteger(item.endSentenceIndex) &&
+      item.endSentenceIndex >= 0;
+
+    if (hasValidSentenceIndices) {
+      const rangeMetrics = calculateRangeHeight(
+        item.startSentenceIndex,
+        item.endSentenceIndex,
+      );
+
+      if (rangeMetrics) {
+        bracketTop = rangeMetrics.top;
+        bracketHeight = rangeMetrics.height;
+      }
+    }
+
+    // Fallback: use bounding rect directly (original method) for char-based positions
+    if (bracketTop === undefined || bracketHeight === undefined) {
+      const startRect = startNode.getBoundingClientRect();
+      const endRect = endNode.getBoundingClientRect();
+      bracketTop = startRect.top - articleRect.top + articleRoot.scrollTop;
+      const bracketBottom =
+        endRect.bottom - articleRect.top + articleRoot.scrollTop;
+      bracketHeight = Math.max(24, bracketBottom - bracketTop);
+    }
 
     results.push({
       segmentKey: item.segmentKey,
@@ -461,6 +537,7 @@ function buildTopicOverlayLayouts(layouts, revealedSegmentKeys) {
   sortedLayouts.forEach((layout, index) => {
     const stackedTop = Math.max(layout.bracketTop, nextAvailableTop);
     const stackedHeight = layout.bracketHeight;
+    const noteHeight = estimateTopicNoteHeight(layout.noteTitleLines);
 
     stackedLayouts.push({
       ...layout,
@@ -471,7 +548,8 @@ function buildTopicOverlayLayouts(layouts, revealedSegmentKeys) {
       clusterIndex: index,
     });
 
-    nextAvailableTop = stackedTop + stackedHeight + OVERLAY_STACK_GAP_PX;
+    nextAvailableTop =
+      stackedTop + Math.min(stackedHeight, noteHeight) + OVERLAY_STACK_GAP_PX;
   });
 
   return stackedLayouts;
@@ -794,8 +872,8 @@ function TopicArticleFullscreenView({
     const merged = new Set(
       Array.isArray(activeInsightSentenceIndices)
         ? activeInsightSentenceIndices.filter((value) =>
-            Number.isInteger(value),
-          )
+          Number.isInteger(value),
+        )
         : [],
     );
     revealedLayouts.forEach((layout) => {

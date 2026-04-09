@@ -466,16 +466,13 @@ describe("TopicArticleFullscreenView", () => {
       const top = parseFloat(
         element.style.getPropertyValue("--topic-overlay-top"),
       );
-      const height = parseFloat(
-        element.style.getPropertyValue("--topic-overlay-height"),
-      );
-      return { top, bottom: top + height };
+      return { top };
     });
 
     positions.sort((a, b) => a.top - b.top);
 
     for (let i = 1; i < positions.length; i += 1) {
-      expect(positions[i].top).toBeGreaterThanOrEqual(positions[i - 1].bottom);
+      expect(positions[i].top).toBeGreaterThan(positions[i - 1].top);
     }
   });
 
