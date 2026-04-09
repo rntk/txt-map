@@ -282,10 +282,53 @@ export function useTextPageData(
     () => (Array.isArray(results.sentences) ? results.sentences : []),
     [results.sentences],
   );
-  const safeTopics = useMemo(
-    () => (Array.isArray(results.topics) ? results.topics : []),
-    [results.topics],
-  );
+  const safeTopics = useMemo(() => {
+    const rawTopics = Array.isArray(results.topics) ? results.topics : [];
+    const claimedSentences = new Set();
+
+    return rawTopics.map((topic) => {
+      const sentences = Array.isArray(topic.sentences) ? topic.sentences : [];
+      const exclusiveSentences = sentences.filter((s) => {
+        if (claimedSentences.has(s)) return false;
+        claimedSentences.add(s);
+        return true;
+      });
+
+      const exclusiveSentenceSet = new Set(exclusiveSentences);
+      const sentenceSpans = Array.isArray(topic.sentence_spans)
+        ? topic.sentence_spans
+        : [];
+
+      let ranges;
+      if (sentenceSpans.length > 0) {
+        // Build exact character ranges for each exclusive sentence to avoid spanning gaps
+        ranges = sentenceSpans
+          .filter((span) => exclusiveSentenceSet.has(span.sentence))
+          .map((span) => ({
+            start: span.start,
+            end: span.end,
+            sentence_start: span.sentence,
+            sentence_end: span.sentence,
+          }))
+          .filter(
+            (range) =>
+              Number.isFinite(range.start) && Number.isFinite(range.end),
+          );
+      } else {
+        // Fallback for older backend data without sentence_spans
+        ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
+      }
+
+      return {
+        ...topic,
+        sentences: exclusiveSentences,
+        sentence_spans: sentenceSpans.filter((span) =>
+          exclusiveSentenceSet.has(span.sentence),
+        ),
+        ranges,
+      };
+    });
+  }, [results.topics]);
   const insights = useMemo(() => {
     const rawInsights = Array.isArray(results.insights) ? results.insights : [];
     return rawInsights.map((insight) => ({
