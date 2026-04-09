@@ -114,6 +114,7 @@ function TextPageContent() {
     useState([]);
   const [activeInsightRanges, setActiveInsightRanges] = useState([]);
   const [focusedSummaryTopicName, setFocusedSummaryTopicName] = useState(null);
+  const [topicIndexScrollTarget, setTopicIndexScrollTarget] = useState(null);
   const pendingMinimapSentenceRef = useRef(null);
   const pendingSummaryTopicRef = useRef(null);
   const rightColumnRef = useRef(null);
@@ -137,6 +138,14 @@ function TextPageContent() {
     setActiveTab("article");
     setFocusedSummaryTopicName(null);
     pendingSummaryTopicRef.current = null;
+  }, []);
+
+  const handleBackToTopicIndex = useCallback((topicName) => {
+    if (topicName) {
+      setTopicIndexScrollTarget(topicName);
+    }
+    setFullscreenGraph("topic_index");
+    setActiveTab("topic_index");
   }, []);
 
   const handleTabClick = useCallback((tabKey) => {
@@ -275,6 +284,10 @@ function TextPageContent() {
         normalizedSelection?.displayName;
       const matchedTopic = safeTopics.find((t) => t.name === topicName);
       if (!matchedTopic) return;
+      const fromTopicIndex = fullscreenGraph === "topic_index";
+      if (fromTopicIndex) {
+        setTopicIndexScrollTarget(topicName);
+      }
       pendingShowTopicRef.current = matchedTopic;
       closeFullscreenGraph();
       setGroupedByTopics(false);
@@ -284,7 +297,7 @@ function TextPageContent() {
           : [...prev, matchedTopic],
       );
     },
-    [safeTopics, closeFullscreenGraph],
+    [safeTopics, closeFullscreenGraph, fullscreenGraph],
   );
 
   useEffect(() => {
@@ -1060,6 +1073,8 @@ function TextPageContent() {
                           highlightAllTopics || highlightInsightTopics
                         }
                         coloredTopicNames={coloredTopicNames}
+                        topicIndexScrollTarget={topicIndexScrollTarget}
+                        onBackToTopicIndex={handleBackToTopicIndex}
                       />
                     ) : groupedByTopics ? (
                       <GroupedByTopicsView
@@ -1121,6 +1136,8 @@ function TextPageContent() {
                             }
                             activeInsightRanges={activeInsightRanges}
                             coloredTopicNames={coloredTopicNames}
+                            topicIndexScrollTarget={topicIndexScrollTarget}
+                            onBackToTopicIndex={handleBackToTopicIndex}
                           />
                         ),
                       )
@@ -1214,6 +1231,8 @@ function TextPageContent() {
               onToggleRead={toggleRead}
               onClose={closeFullscreenGraph}
               onShowInArticle={handleShowInArticle}
+              scrollToTopic={topicIndexScrollTarget}
+              onScrolledToTopic={() => setTopicIndexScrollTarget(null)}
             />
           )}
 

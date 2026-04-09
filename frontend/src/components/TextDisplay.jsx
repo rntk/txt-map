@@ -56,6 +56,8 @@ const EMPTY_ARRAY = [];
  * @property {Array<number>} [dimmedSentenceIndices]
  * @property {Array<{start: number, end: number}>} [dimmedHighlightRanges]
  * @property {string} [dimmedHighlightClassName]
+ * @property {string|null} [topicIndexScrollTarget] - Topic name to show "Back to Index" for
+ * @property {(topicName: string) => void} [onBackToTopicIndex] - Navigate back to topic index
  */
 
 /**
@@ -91,6 +93,8 @@ function TextDisplay({
   dimmedSentenceIndices = EMPTY_ARRAY,
   dimmedHighlightRanges = EMPTY_ARRAY,
   dimmedHighlightClassName = "",
+  topicIndexScrollTarget = null,
+  onBackToTopicIndex,
 }) {
   const safeSentences = useMemo(
     () => (Array.isArray(sentences) ? sentences : []),
@@ -862,6 +866,24 @@ function TextDisplay({
                 </div>
               );
             })}
+          {onBackToTopicIndex &&
+            topicIndexScrollTarget &&
+            tooltip.topics.some(
+              ({ topic }) => topic.name === topicIndexScrollTarget,
+            ) && (
+              <div className="text-topic-tooltip-footer">
+                <button
+                  className="text-topic-tooltip-btn"
+                  onClick={() => {
+                    onBackToTopicIndex(topicIndexScrollTarget);
+                    hideTooltip();
+                  }}
+                  title="Return to topic index"
+                >
+                  Back to Index
+                </button>
+              </div>
+            )}
           {tooltip.meta?.linkHref && (
             <div className="text-topic-tooltip-footer">
               <a

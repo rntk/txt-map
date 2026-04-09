@@ -183,6 +183,8 @@ function ArticleMarkupPlainBlock({
  * @property {(topic: Object) => void} onShowSentences
  * @property {(topic: Object) => void} [onOpenTopicSummaries]
  * @property {boolean} tooltipEnabled
+ * @property {string|null} [topicIndexScrollTarget]
+ * @property {(topicName: string) => void} [onBackToTopicIndex]
  */
 function MarkupTopicBlock({
   block,
@@ -195,6 +197,8 @@ function MarkupTopicBlock({
   onOpenTopicSummaries,
   tooltipEnabled,
   coloredHighlightMode = false,
+  topicIndexScrollTarget = null,
+  onBackToTopicIndex,
 }) {
   const readTopicsSet = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
@@ -382,6 +386,24 @@ function MarkupTopicBlock({
               </div>
             );
           })}
+          {onBackToTopicIndex &&
+            topicIndexScrollTarget &&
+            tooltip.topics.some(
+              ({ topic }) => topic.name === topicIndexScrollTarget,
+            ) && (
+              <div className="text-topic-tooltip-footer">
+                <button
+                  className="text-topic-tooltip-btn"
+                  onClick={() => {
+                    onBackToTopicIndex(topicIndexScrollTarget);
+                    hideTooltip();
+                  }}
+                  title="Return to topic index"
+                >
+                  Back to Index
+                </button>
+              </div>
+            )}
         </div>,
         document.body,
       )
@@ -429,6 +451,8 @@ function MarkupTopicBlock({
  * @property {boolean} tooltipEnabled
  * @property {boolean} [coloredHighlightMode]
  * @property {Set<string>|string[]} [coloredTopicNames]
+ * @property {string|null} [topicIndexScrollTarget]
+ * @property {(topicName: string) => void} [onBackToTopicIndex]
  */
 function ArticleMarkupView({
   safeSentences,
@@ -444,6 +468,8 @@ function ArticleMarkupView({
   tooltipEnabled,
   coloredHighlightMode = false,
   coloredTopicNames = null,
+  topicIndexScrollTarget = null,
+  onBackToTopicIndex,
 }) {
   const safeColoredTopicNames = useMemo(
     () =>
@@ -498,6 +524,8 @@ function ArticleMarkupView({
                 onOpenTopicSummaries={onOpenTopicSummaries}
                 tooltipEnabled={tooltipEnabled}
                 coloredHighlightMode={coloredHighlightMode}
+                topicIndexScrollTarget={topicIndexScrollTarget}
+                onBackToTopicIndex={onBackToTopicIndex}
               />
             ) : null
           ) : (

@@ -49,6 +49,8 @@ const MAX_TILE_HEIGHT = 180;
  * @property {(topic: Object) => void} onToggleRead
  * @property {() => void} onClose
  * @property {(topic: Object) => void} [onShowInArticle]
+ * @property {string|null} [scrollToTopic] - Topic name to scroll into view
+ * @property {() => void} [onScrolledToTopic] - Called after scrolling completes
  */
 
 /**
@@ -233,6 +235,8 @@ function TopicIndexView({
   onToggleRead,
   onClose,
   onShowInArticle,
+  scrollToTopic,
+  onScrolledToTopic,
 }) {
   const articleContext = useArticle();
   const article =
@@ -399,6 +403,25 @@ function TopicIndexView({
 
     return () => container.removeEventListener("scroll", updateVisibleLabels);
   }, [rangeTiles]);
+
+  useEffect(() => {
+    if (!scrollToTopic) {
+      return;
+    }
+    const container = scrollRef.current;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const targetEl = container.querySelector(
+      `[data-topic-name="${CSS.escape(scrollToTopic)}"]`,
+    );
+    if (targetEl instanceof HTMLElement) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (onScrolledToTopic) {
+        onScrolledToTopic();
+      }
+    }
+  }, [scrollToTopic, onScrolledToTopic, rangeTiles]);
 
   const handleToggleRead = useCallback(
     (topic) => {
