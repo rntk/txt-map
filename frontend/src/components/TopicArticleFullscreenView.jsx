@@ -206,16 +206,25 @@ function buildSentenceRangeSegments(ranges) {
  * }>}
  */
 function getTopicSegments(topic) {
+  const sentenceSegments = buildConsecutiveSentenceSegments(topic?.sentences);
   const rangeSegments = buildSentenceRangeSegments(topic?.ranges);
+
+  // Prefer range-based segments when available — they preserve non-adjacent
+  // ranges as separate segments, while sentence-based segments may merge
+  // them into one contiguous block when the sentences array is a flat list.
   if (rangeSegments.length > 0) {
     return rangeSegments;
   }
 
-  return buildConsecutiveSentenceSegments(topic?.sentences).map((segment) => ({
-    ...segment,
-    startCharIndex: null,
-    endCharIndex: null,
-  }));
+  if (sentenceSegments.length > 0) {
+    return sentenceSegments.map((segment) => ({
+      ...segment,
+      startCharIndex: null,
+      endCharIndex: null,
+    }));
+  }
+
+  return [];
 }
 
 /**
@@ -584,6 +593,7 @@ function TopicArticleFullscreenView({
   articles,
   safeTopics,
   selectedTopics,
+  hoveredTopic,
   readTopics,
   onToggleRead,
   onToggleTopic,
@@ -1213,7 +1223,7 @@ function TopicArticleFullscreenView({
     <TextDisplay
       sentences={article.sentences}
       selectedTopics={selectedTopics}
-      hoveredTopic={null}
+      hoveredTopic={hoveredTopic}
       readTopics={readTopics}
       articleTopics={article.topics}
       articleIndex={0}
