@@ -564,9 +564,11 @@
 
 .topic-article-view__left-rail {
   grid-column: 1;
-  position: relative;
+  position: sticky;
+  top: 0;
   min-width: 0;
   overflow-x: clip;
+  z-index: 2;
 }
 
 .topic-article-view__article-column {
