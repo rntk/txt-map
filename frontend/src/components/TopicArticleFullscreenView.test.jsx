@@ -424,7 +424,7 @@ describe("TopicArticleFullscreenView", () => {
     );
   });
 
-  it("assigns separate overlay lanes to overlapping topic ranges", async () => {
+  it("stacks overlapping topic tiles without vertical overlap", async () => {
     renderAndTriggerLayout(
       <TopicArticleFullscreenView
         {...defaultProps}
@@ -461,11 +461,22 @@ describe("TopicArticleFullscreenView", () => {
     const anchors = Array.from(
       document.querySelectorAll(".topic-article-view__overlay-anchor"),
     );
-    const laneValues = anchors.map((element) =>
-      element.style.getPropertyValue("--topic-overlay-lane"),
-    );
 
-    expect(new Set(laneValues).size).toBeGreaterThan(1);
+    const positions = anchors.map((element) => {
+      const top = parseFloat(
+        element.style.getPropertyValue("--topic-overlay-top"),
+      );
+      const height = parseFloat(
+        element.style.getPropertyValue("--topic-overlay-height"),
+      );
+      return { top, bottom: top + height };
+    });
+
+    positions.sort((a, b) => a.top - b.top);
+
+    for (let i = 1; i < positions.length; i += 1) {
+      expect(positions[i].top).toBeGreaterThanOrEqual(positions[i - 1].bottom);
+    }
   });
 
   it("renders read topics with the read-state overlay treatment and dims revealed read source text", async () => {

@@ -655,9 +655,10 @@
 .topic-article-view__overlay-anchor {
   position: absolute;
   top: var(--topic-overlay-top, 0);
-  left: calc(var(--topic-overlay-lane, 0) * 12px);
+  left: 4px;
   right: 20px;
   height: var(--topic-overlay-height, 44px);
+  z-index: 2;
   transition:
     top 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     height 0.2s cubic-bezier(0.22, 1, 0.36, 1),
@@ -667,6 +668,19 @@
 }
 
 .topic-article-view__overlay-anchor {
+  pointer-events: none;
+}
+
+.topic-article-view__topic-note::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 12px 0 0 12px;
+  background: var(--topic-accent-color, #98a2b3);
+  opacity: 0.7;
   pointer-events: none;
 }
 
@@ -1033,7 +1047,7 @@
   }
 
   .topic-article-view__overlay-anchor {
-    left: calc(var(--topic-overlay-lane, 0) * 8px);
+    left: 2px;
     right: 12px;
   }
 

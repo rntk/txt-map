@@ -81,7 +81,7 @@ import { buildArticleTfIdfIndex, buildTopicTagCloud } from "../utils/gridUtils";
  */
 
 const OVERLAY_CARD_MIN_HEIGHT = 44;
-const OVERLAY_CLUSTER_MAX_LANES = 4;
+const OVERLAY_STACK_GAP_PX = 2;
 const REVEALED_TOKEN_CLASSNAME = "topic-article-view__revealed-token";
 const REVEALED_READ_TOKEN_CLASSNAME =
   "topic-article-view__revealed-token--read";
@@ -411,6 +411,8 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
 
 /**
  * @typedef {TopicMeasuredLayout & {
+ *   stackedTop: number,
+ *   stackedHeight: number,
  *   laneIndex: number,
  *   laneCount: number,
  *   clusterIndex: number,
@@ -424,20 +426,16 @@ function areNoteLayoutsEqual(previousLayouts, nextLayouts) {
  * @returns {TopicOverlayLayout[]}
  */
 function buildTopicOverlayLayouts(layouts, revealedSegmentKeys) {
-  // Include all layouts, marking revealed ones for CSS transition
+  if (layouts.length === 0) {
+    return [];
+  }
+
   const allLayouts = layouts.map((layout) => ({
     ...layout,
     isRevealed: revealedSegmentKeys.has(layout.segmentKey),
   }));
 
-  if (allLayouts.length === 0) {
-    return [];
-  }
-
-  // Only compute lane assignments for non-revealed (visible) layouts
-  const visibleLayouts = allLayouts.filter((layout) => !layout.isRevealed);
-
-  const sortedLayouts = [...visibleLayouts].sort((left, right) => {
+  const sortedLayouts = [...allLayouts].sort((left, right) => {
     if (left.bracketTop !== right.bracketTop) {
       return left.bracketTop - right.bracketTop;
     }
@@ -448,63 +446,26 @@ function buildTopicOverlayLayouts(layouts, revealedSegmentKeys) {
   });
 
   /** @type {Array<TopicOverlayLayout>} */
-  const assignedLayouts = [];
-  /** @type {Map<number, number>} */
-  const laneCountByCluster = new Map();
-  /** @type {number[]} */
-  let laneBottoms = [];
-  let clusterIndex = -1;
-  let clusterBottom = Number.NEGATIVE_INFINITY;
+  const stackedLayouts = [];
+  let nextAvailableTop = Number.NEGATIVE_INFINITY;
 
-  sortedLayouts.forEach((layout) => {
-    const layoutBottom = layout.bracketTop + layout.bracketHeight;
-    if (layout.bracketTop >= clusterBottom) {
-      clusterIndex += 1;
-      clusterBottom = layoutBottom;
-      laneBottoms = [];
-    } else {
-      clusterBottom = Math.max(clusterBottom, layoutBottom);
-    }
+  sortedLayouts.forEach((layout, index) => {
+    const stackedTop = Math.max(layout.bracketTop, nextAvailableTop);
+    const stackedHeight = layout.bracketHeight;
 
-    let laneIndex = laneBottoms.findIndex(
-      (laneBottom) => laneBottom <= layout.bracketTop,
-    );
-    if (laneIndex === -1) {
-      laneIndex = laneBottoms.length;
-    }
-    laneIndex = Math.min(laneIndex, OVERLAY_CLUSTER_MAX_LANES - 1);
-    laneBottoms[laneIndex] = layoutBottom;
-
-    laneCountByCluster.set(
-      clusterIndex,
-      Math.max(laneCountByCluster.get(clusterIndex) || 0, laneIndex + 1),
-    );
-    assignedLayouts.push({
+    stackedLayouts.push({
       ...layout,
-      laneIndex,
-      laneCount: 1,
-      clusterIndex,
-    });
-  });
-
-  // Map visible layouts with their lane counts
-  const visibleWithLaneCount = assignedLayouts.map((layout) => ({
-    ...layout,
-    laneCount: laneCountByCluster.get(layout.clusterIndex) || 1,
-  }));
-
-  // Add revealed layouts with default lane values (they'll be hidden but maintain position)
-  const revealedOverlayLayouts = allLayouts
-    .filter((layout) => layout.isRevealed)
-    .map((layout) => ({
-      ...layout,
+      stackedTop,
+      stackedHeight,
       laneIndex: 0,
       laneCount: 1,
-      clusterIndex: 0,
-    }));
+      clusterIndex: index,
+    });
 
-  // Return visible first (position-ordered), then revealed (stable order for transitions)
-  return [...visibleWithLaneCount, ...revealedOverlayLayouts];
+    nextAvailableTop = stackedTop + stackedHeight + OVERLAY_STACK_GAP_PX;
+  });
+
+  return stackedLayouts;
 }
 
 /**
@@ -1420,10 +1381,8 @@ const TopicOverlayCard = React.memo(function TopicOverlayCard({
     <div
       className={`topic-article-view__overlay-anchor ${cssClass}${isActive ? " topic-article-view__overlay-anchor--active" : ""}${isHighlighted ? " topic-article-view__overlay-anchor--highlighted" : ""}${isRevealed ? " topic-article-view__overlay-anchor--revealed" : ""}${isRead ? " topic-article-view__overlay-anchor--read" : ""}`}
       style={{
-        "--topic-overlay-top": `${layout.bracketTop}px`,
-        "--topic-overlay-height": `${layout.bracketHeight}px`,
-        "--topic-overlay-lane": layout.laneIndex,
-        "--topic-overlay-lane-count": layout.laneCount,
+        "--topic-overlay-top": `${layout.stackedTop}px`,
+        "--topic-overlay-height": `${layout.stackedHeight}px`,
       }}
       onMouseEnter={handleEnter}
       onMouseLeave={onLeave}
