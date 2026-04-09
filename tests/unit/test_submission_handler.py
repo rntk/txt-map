@@ -3,6 +3,9 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 import uuid
+from handlers.submission_handler import _extract_content_from_upload
+from lib.nlp import compute_word_frequencies
+
 
 
 # Mock dependencies before importing app - must be at module level to catch import-time operations
@@ -89,7 +92,6 @@ def test_post_upload(client, mock_storage, mock_task_queue):
 
 
 def test_extract_content_from_upload_allows_image_only_pdf_html():
-    from handlers.submission_handler import _extract_content_from_upload
 
     html_content = (
         '<!DOCTYPE html><html><body><img src="data:image/png;base64,AAAA" '
@@ -112,7 +114,6 @@ def test_extract_content_from_upload_allows_image_only_pdf_html():
 
 
 def test_extract_content_from_upload_rejects_empty_pdf_without_text_or_images():
-    from handlers.submission_handler import _extract_content_from_upload
 
     html_content = "<!DOCTYPE html><html><body></body></html>"
 
@@ -216,11 +217,6 @@ def test_post_refresh(client, mock_storage, mock_task_queue, sample_submission):
     mock_storage.clear_results.assert_called_once()
     mock_task_queue.delete_by_submission.assert_called_once()
     mock_task_queue.create.assert_called_once()
-
-
-from handlers.submission_handler import router, _extract_content_from_upload
-from lib.nlp import compute_word_frequencies
-from unittest.mock import patch, MagicMock
 
 # ... existing code ...
 
