@@ -19,6 +19,7 @@ import ArticleTabHeader from "./ArticleTabHeader";
 import ArticleSummaryView from "./ArticleSummaryView";
 import ArticleMarkupView from "./ArticleMarkupView";
 import TopicArticleFullscreenView from "./TopicArticleFullscreenView";
+import TopicIndexView from "./TopicIndexView";
 import RawTextView from "./RawTextView";
 import WordSelectionPopup from "./WordSelectionPopup";
 import ArticleMinimap from "./grid/ArticleMinimap";
@@ -38,6 +39,7 @@ import "../styles/text-reading.css";
 
 const FULLSCREEN_TABS = [
   { key: "topic_article_view", label: "Topics + Article" },
+  { key: "topic_index", label: "Index" },
   { key: "topic_summary_timeline", label: "Topic Summaries" },
   { key: "insights", label: "Insights" },
   { key: "topics", label: "Topics" },
@@ -1200,6 +1202,16 @@ function TextPageContent() {
               coloredHighlightMode={
                 highlightAllTopics || highlightInsightTopics
               }
+              onClose={closeFullscreenGraph}
+            />
+          )}
+
+          {fullscreenGraph === "topic_index" && (
+            <TopicIndexView
+              articles={articles}
+              safeTopics={safeTopics}
+              readTopics={readTopics}
+              onToggleRead={toggleRead}
               onClose={closeFullscreenGraph}
             />
           )}
