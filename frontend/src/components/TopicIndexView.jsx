@@ -485,9 +485,6 @@ function TopicIndexView({
                       >
                         <div className="topic-index-view__tile-content">
                           <div className="topic-index-view__tile-info">
-                            <span className="topic-index-view__tile-eyebrow">
-                              {topLevelLabel}
-                            </span>
                             <span className="topic-index-view__tile-name">
                               {noteTitleLines.map((line, index) => (
                                 <span
@@ -512,10 +509,6 @@ function TopicIndexView({
                                   )}
                                 </span>
                               ))}
-                            </span>
-                            <span className="topic-index-view__tile-count">
-                              {tile.sentenceCount} sentence
-                              {tile.sentenceCount !== 1 ? "s" : ""}
                             </span>
                           </div>
                           {tags.length > 0 ? (
