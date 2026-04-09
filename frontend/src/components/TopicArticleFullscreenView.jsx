@@ -705,8 +705,14 @@ function TopicArticleFullscreenView({
   const [revealedSegmentKeys, setRevealedSegmentKeys] = useState(
     () => new Set(),
   );
-  const [previewTopicName, setPreviewTopicName] = useState(null);
   const [previewSegmentKey, setPreviewSegmentKey] = useState(null);
+  const [previewTopicName, setPreviewTopicName] = useState(null);
+  const [pinnedSegmentKey, setPinnedSegmentKey] = useState(
+    topicTimelineItems[0]?.segmentKey || null,
+  );
+  const [pinnedTopicName, setPinnedTopicName] = useState(
+    topicTimelineItems[0]?.name || null,
+  );
   const [visibleTopLevelLabels, setVisibleTopLevelLabels] = useState([]);
   const [summaryCardLayout, setSummaryCardLayout] = useState(null);
 
@@ -714,6 +720,8 @@ function TopicArticleFullscreenView({
   const activeSegmentKeyRef = useRef(activeSegmentKey);
   const previewSegmentKeyRef = useRef(previewSegmentKey);
   const previewTopicNameRef = useRef(previewTopicName);
+  const pinnedSegmentKeyRef = useRef(pinnedSegmentKey);
+  const pinnedTopicNameRef = useRef(pinnedTopicName);
   const topicSummaryMapRef = useRef(null);
   const hoverEnterTimeoutRef = useRef(0);
   const hoverLeaveTimeoutRef = useRef(0);
@@ -721,6 +729,8 @@ function TopicArticleFullscreenView({
   activeSegmentKeyRef.current = activeSegmentKey;
   previewSegmentKeyRef.current = previewSegmentKey;
   previewTopicNameRef.current = previewTopicName;
+  pinnedSegmentKeyRef.current = pinnedSegmentKey;
+  pinnedTopicNameRef.current = pinnedTopicName;
 
   const noteAccentStyleSheet = useMemo(() => {
     const seen = new Set();
@@ -771,7 +781,8 @@ function TopicArticleFullscreenView({
     return tagsByTopicName;
   }, [article?.topics, articleTfIdfIndex, safeTopics]);
   const activeSummaryLayout = useMemo(() => {
-    const preferredSegmentKey = previewSegmentKey || activeSegmentKey;
+    const preferredSegmentKey =
+      previewSegmentKey || pinnedSegmentKey || activeSegmentKey;
     if (preferredSegmentKey) {
       const matchingSegment = noteLayouts.find(
         (layout) => layout.segmentKey === preferredSegmentKey,
@@ -781,14 +792,20 @@ function TopicArticleFullscreenView({
       }
     }
 
-    if (!previewTopicName) {
+    const preferredName = previewTopicName || pinnedTopicName;
+    if (!preferredName) {
       return null;
     }
 
-    return (
-      noteLayouts.find((layout) => layout.name === previewTopicName) || null
-    );
-  }, [activeSegmentKey, noteLayouts, previewSegmentKey, previewTopicName]);
+    return noteLayouts.find((layout) => layout.name === preferredName) || null;
+  }, [
+    activeSegmentKey,
+    noteLayouts,
+    pinnedSegmentKey,
+    pinnedTopicName,
+    previewSegmentKey,
+    previewTopicName,
+  ]);
   const activeSummary = useMemo(() => {
     if (!activeSummaryLayout) {
       return "";
@@ -1005,6 +1022,27 @@ function TopicArticleFullscreenView({
   }, [topicTimelineItems]);
 
   useEffect(() => {
+    setPinnedSegmentKey((currentValue) => {
+      if (
+        currentValue &&
+        topicTimelineItems.some((item) => item.segmentKey === currentValue)
+      ) {
+        return currentValue;
+      }
+      return topicTimelineItems[0]?.segmentKey || null;
+    });
+    setPinnedTopicName((currentValue) => {
+      if (
+        currentValue &&
+        topicTimelineItems.some((item) => item.name === currentValue)
+      ) {
+        return currentValue;
+      }
+      return topicTimelineItems[0]?.name || null;
+    });
+  }, [topicTimelineItems]);
+
+  useEffect(() => {
     setRevealedSegmentKeys((currentValue) => {
       if (!(currentValue instanceof Set) || currentValue.size === 0) {
         return currentValue;
@@ -1053,12 +1091,18 @@ function TopicArticleFullscreenView({
         syncActiveTopicToViewport();
 
         const preferredKey =
-          previewSegmentKeyRef.current || activeSegmentKeyRef.current;
+          previewSegmentKeyRef.current ||
+          pinnedSegmentKeyRef.current ||
+          activeSegmentKeyRef.current;
         let summaryLayout =
           layouts.find((l) => l.segmentKey === preferredKey) || null;
-        if (!summaryLayout && previewTopicNameRef.current) {
-          summaryLayout =
-            layouts.find((l) => l.name === previewTopicNameRef.current) || null;
+        if (
+          !summaryLayout &&
+          (previewTopicNameRef.current || pinnedTopicNameRef.current)
+        ) {
+          const preferredName =
+            previewTopicNameRef.current || pinnedTopicNameRef.current;
+          summaryLayout = layouts.find((l) => l.name === preferredName) || null;
         }
         const summaryText = summaryLayout
           ? typeof topicSummaryMapRef.current[summaryLayout.name] === "string"
@@ -1157,6 +1201,8 @@ function TopicArticleFullscreenView({
       }
       setPreviewSegmentKey(layout.segmentKey);
       setPreviewTopicName(layout.topic.name);
+      setPinnedSegmentKey(layout.segmentKey);
+      setPinnedTopicName(layout.topic.name);
       if (typeof setHoveredTopic === "function") {
         setHoveredTopic(layout.topic);
       }
@@ -1213,6 +1259,8 @@ function TopicArticleFullscreenView({
       setActiveSegmentKey(layout.segmentKey);
       setPreviewSegmentKey(layout.segmentKey);
       setPreviewTopicName(layout.name);
+      setPinnedSegmentKey(layout.segmentKey);
+      setPinnedTopicName(layout.name);
       setRevealedSegmentKeys((currentValue) => {
         if (currentValue.has(layout.segmentKey)) {
           return currentValue;
@@ -1237,6 +1285,8 @@ function TopicArticleFullscreenView({
       setActiveSegmentKey(layout.segmentKey);
       setPreviewSegmentKey(layout.segmentKey);
       setPreviewTopicName(layout.name);
+      setPinnedSegmentKey(layout.segmentKey);
+      setPinnedTopicName(layout.name);
       setRevealedSegmentKeys((currentValue) => {
         if (!currentValue.has(layout.segmentKey)) {
           return currentValue;
