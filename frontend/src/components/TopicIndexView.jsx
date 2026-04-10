@@ -131,6 +131,7 @@ function buildSentenceRangeSegments(ranges) {
       startSentenceIndex: Number(range?.sentence_start) - 1,
       endSentenceIndex: Number(range?.sentence_end) - 1,
       sourceIndex,
+      charStart: Number(range?.start),
     }))
     .filter(
       (range) =>
@@ -140,6 +141,13 @@ function buildSentenceRangeSegments(ranges) {
         range.endSentenceIndex >= range.startSentenceIndex,
     )
     .sort((left, right) => {
+      if (
+        Number.isFinite(left.charStart) &&
+        Number.isFinite(right.charStart) &&
+        left.charStart !== right.charStart
+      ) {
+        return left.charStart - right.charStart;
+      }
       if (left.startSentenceIndex !== right.startSentenceIndex) {
         return left.startSentenceIndex - right.startSentenceIndex;
       }
@@ -325,6 +333,13 @@ function TopicIndexView({
       });
     });
     tiles.sort((a, b) => {
+      if (
+        Number.isFinite(a.segment.charStart) &&
+        Number.isFinite(b.segment.charStart) &&
+        a.segment.charStart !== b.segment.charStart
+      ) {
+        return a.segment.charStart - b.segment.charStart;
+      }
       if (a.segment.startSentenceIndex !== b.segment.startSentenceIndex) {
         return a.segment.startSentenceIndex - b.segment.startSentenceIndex;
       }
