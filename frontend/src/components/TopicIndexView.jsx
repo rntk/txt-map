@@ -230,6 +230,7 @@ function computeSegmentCharCount(sentences, segment, topic) {
 /** @param {TopicIndexViewProps} props */
 function TopicIndexView({
   articles,
+  submissionId,
   safeTopics,
   readTopics,
   onToggleRead,
@@ -542,15 +543,23 @@ function TopicIndexView({
                               className="topic-index-view__tile-tags"
                               aria-label={`Key tags for ${topic.name}`}
                             >
-                              {tags.map((tag) => (
-                                <span
-                                  key={`${topic.name}-${tag.label}`}
-                                  className={`topic-index-view__tile-tag topic-index-view__tile-tag--${tag.sizeClass}`}
-                                  title={`${tag.label} (${tag.count})`}
-                                >
-                                  {tag.label}
-                                </span>
-                              ))}
+                              {tags.map((tag) => {
+                                const label = tag.label;
+                                const displayLabel =
+                                  label.length > 10
+                                    ? `${label.substring(0, 7)}...`
+                                    : label;
+                                return (
+                                  <a
+                                    key={`${topic.name}-${label}`}
+                                    className={`topic-index-view__tile-tag topic-index-view__tile-tag--${tag.sizeClass}`}
+                                    href={`/page/word/${submissionId || "unknown"}/${encodeURIComponent(label)}`}
+                                    title={`${label} (${tag.count})`}
+                                  >
+                                    {displayLabel}
+                                  </a>
+                                );
+                              })}
                             </span>
                           ) : null}
                         </div>

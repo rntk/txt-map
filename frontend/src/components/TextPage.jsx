@@ -1226,6 +1226,7 @@ function TextPageContent() {
           {fullscreenGraph === "topic_index" && (
             <TopicIndexView
               articles={articles}
+              submissionId={submissionId}
               safeTopics={safeTopics}
               readTopics={readTopics}
               onToggleRead={toggleRead}
