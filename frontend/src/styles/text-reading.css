@@ -1245,6 +1245,18 @@
   text-overflow: ellipsis;
 }
 
+.topic-index-view__tile-name-line--parent {
+  font-size: 0.75em;
+  font-weight: 500;
+  color: rgba(16, 24, 40, 0.55);
+}
+
+.topic-index-view__tile-name-line--leaf {
+  font-size: 1em;
+  font-weight: 700;
+  color: #101828;
+}
+
 .topic-index-view__tile-count {
   color: rgba(52, 64, 84, 0.6);
   font-size: 11px;

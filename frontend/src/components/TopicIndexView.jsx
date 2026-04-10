@@ -509,29 +509,32 @@ function TopicIndexView({
                         <div className="topic-index-view__tile-content">
                           <div className="topic-index-view__tile-info">
                             <span className="topic-index-view__tile-name">
-                              {noteTitleLines.map((line, index) => (
-                                <span
-                                  key={`${topic.name}-${index}-${line}`}
-                                  className="topic-index-view__tile-name-line"
-                                >
-                                  {onShowInArticle ? (
-                                    <button
-                                      type="button"
-                                      className="topic-index-view__tile-name-link"
-                                      onClick={() => {
-                                        onShowInArticle(
-                                          buildNormalizedTopicSelection(topic),
-                                        );
-                                      }}
-                                      title="Show in article"
-                                    >
-                                      {line}
-                                    </button>
-                                  ) : (
-                                    line
-                                  )}
-                                </span>
-                              ))}
+                              {noteTitleLines.map((line, index) => {
+                                const isLeaf = index === noteTitleLines.length - 1;
+                                return (
+                                  <span
+                                    key={`${topic.name}-${index}-${line}`}
+                                    className={`topic-index-view__tile-name-line ${isLeaf ? 'topic-index-view__tile-name-line--leaf' : 'topic-index-view__tile-name-line--parent'}`}
+                                  >
+                                    {onShowInArticle ? (
+                                      <button
+                                        type="button"
+                                        className="topic-index-view__tile-name-link"
+                                        onClick={() => {
+                                          onShowInArticle(
+                                            buildNormalizedTopicSelection(topic),
+                                          );
+                                        }}
+                                        title="Show in article"
+                                      >
+                                        {line}
+                                      </button>
+                                    ) : (
+                                      line
+                                    )}
+                                  </span>
+                                );
+                              })}
                             </span>
                           </div>
                           {tags.length > 0 ? (
