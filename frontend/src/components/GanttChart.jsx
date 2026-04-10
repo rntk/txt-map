@@ -400,6 +400,7 @@ const GanttChart = ({
     handleTopicClick,
     parentBands,
     scopedData,
+    topics,
   ]);
 
   return (

@@ -1,5 +1,4 @@
 import React from "react";
-import { getLevelLabel } from "../../utils/topicHierarchy";
 import "./TopicLevelSwitcher.css";
 
 function TopicLevelSwitcher({
