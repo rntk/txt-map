@@ -1149,8 +1149,7 @@
   align-items: stretch;
   justify-content: space-between;
   gap: 14px;
-  height: var(--topic-row-height, 44px);
-  min-height: 44px;
+  min-height: var(--topic-row-height, 44px);
   border-radius: 12px;
   background: linear-gradient(
     180deg,
@@ -1234,15 +1233,11 @@
   font-size: 23px;
   font-weight: 700;
   line-height: 1.22;
-  overflow: hidden;
 }
 
 .topic-index-view__tile-name-line {
   display: block;
   word-break: break-word;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .topic-index-view__tile-name-line--parent {
