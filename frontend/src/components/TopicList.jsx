@@ -557,11 +557,15 @@ function TopicList({
                     ? insight.sourceSentences.length
                     : 0;
 
+              const isInsightRead =
+                topicNames.length > 0 &&
+                topicNames.every((name) => isTopicRead(name, safeReadTopics));
+
               return (
                 <li key={insight.id} className="topic-nav-insight">
                   <button
                     type="button"
-                    className={`topic-nav-insight__card${activeInsightId === insight.id ? " topic-nav-insight__card--active" : ""}`}
+                    className={`topic-nav-insight__card${activeInsightId === insight.id ? " topic-nav-insight__card--active" : ""}${isInsightRead ? " topic-nav-insight__card--read" : ""}`}
                     onClick={() => onSelectInsight(insight)}
                   >
                     <div className="topic-nav-insight__header">
