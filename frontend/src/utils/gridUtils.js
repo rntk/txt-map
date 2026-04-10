@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from "./sanitize";
+
 export const COMMON_STOP_WORDS = new Set([
   "a",
   "an",
@@ -93,7 +95,7 @@ export const segmentIsLeaf = (topics, currentPath, segment) => {
 };
 
 export const tokenizeSentence = (sentence) => {
-  const text = String(sentence || "").toLowerCase();
+  const text = decodeHtmlEntities(String(sentence || "")).toLowerCase();
   if (!text) return [];
 
   if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
@@ -107,15 +109,26 @@ export const tokenizeSentence = (sentence) => {
   return text.match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || [];
 };
 
+const HTML_ENTITY_FRAGMENT_TOKENS = new Set([
+  "nbsp",
+  "amp",
+  "lt",
+  "gt",
+  "quot",
+  "apos",
+]);
+
 export const normalizeTagToken = (word) =>
   String(word || "")
     .toLowerCase()
     .replace(/^['-]+|['-]+$/g, "")
+    .replace(/^&+|;+$/g, "")
     .trim();
 
 export const isMeaningfulTagToken = (token) => {
   if (!token) return false;
   if (COMMON_STOP_WORDS.has(token)) return false;
+  if (HTML_ENTITY_FRAGMENT_TOKENS.has(token)) return false;
   if (/^\d+$/u.test(token)) return false;
 
   const isAsciiToken = /^[a-z0-9]+$/i.test(token);

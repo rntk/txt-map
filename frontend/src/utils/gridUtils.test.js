@@ -1,9 +1,11 @@
 import {
   buildHierarchy,
+  buildTopicTagCloud,
   segmentIsLeaf,
   truncateWithEllipsis,
   getFirstScopedSentence,
   collectScopedSentences,
+  buildArticleTfIdfIndex,
   COMMON_STOP_WORDS,
 } from "./gridUtils";
 
@@ -115,5 +117,29 @@ describe("COMMON_STOP_WORDS", () => {
   test("does not contain content words", () => {
     expect(COMMON_STOP_WORDS.has("science")).toBe(false);
     expect(COMMON_STOP_WORDS.has("biology")).toBe(false);
+  });
+});
+
+describe("buildTopicTagCloud", () => {
+  test("ignores html entity fragments and keeps meaningful words", () => {
+    const sentences = [
+      "Alpha&nbsp;Beta keeps showing up.",
+      "nbsp; should never become a tag.",
+      "&amp; encoded values should decode to ampersands.",
+      "Beta appears again with Alpha.",
+    ];
+    const topic = { name: "Science", sentences: [1, 2, 3, 4] };
+
+    const tags = buildTopicTagCloud(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      8,
+    );
+    const labels = tags.map((tag) => tag.label);
+
+    expect(labels).toContain("alpha");
+    expect(labels).toContain("beta");
+    expect(labels).not.toContain("nbsp");
+    expect(labels).not.toContain("amp");
   });
 });
