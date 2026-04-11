@@ -384,7 +384,9 @@ class TestGenerateGroundedHtmlForRange:
         assert "<p>" in html
         assert "Hi" in html
 
-    def test_generate_grounded_html_for_range_retries_on_validation_failure(self) -> None:
+    def test_generate_grounded_html_for_range_retries_on_validation_failure(
+        self,
+    ) -> None:
         call_count = 0
 
         class RetryMockLLM:

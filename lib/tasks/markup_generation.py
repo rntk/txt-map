@@ -33,6 +33,15 @@ oli  ordered list item (numbered step)
 bq   blockquote / quoted speech
 code code snippet or technical literal
 hr   horizontal rule / section separator (e.g. "---", "***", "===")
+table table (multi-line structure)
+tr   table row
+td   table cell / table data
+th   table header cell
+thead table header section
+tbody table body section
+tfoot table footer section
+
+You can also use other semantic HTML5 labels like: note, warning, aside, figure, figcaption, section, article, etc.
 
 ### OUTPUT FORMAT
 Return exactly one classification per input line:
@@ -68,7 +77,7 @@ Return exactly one classification per input line:
 No other text. No explanation.
 
 ### BLOCK TYPES
-h1  h2  h3  p  li  oli  bq  code  hr
+h1  h2  h3  p  li  oli  bq  code  hr  table  tr  td  th  thead  tbody  tfoot  (or any semantic HTML5 label)
 
 ### TEXT TO CLASSIFY
 
@@ -97,7 +106,7 @@ _INVISIBLE_CHARS_RE = re.compile(
     "]"
 )
 
-_VALID_LABELS = frozenset({"h1", "h2", "h3", "p", "li", "oli", "bq", "code", "hr"})
+# Whitelist removed — LLM can output any label (e.g., 'table', 'tr', 'td', 'th', or custom semantic labels)
 
 
 @dataclass(frozen=True)
@@ -218,7 +227,22 @@ def _split_line_for_markup(line: str) -> List[str]:
         if current_word_count < 8:
             continue
 
-        if current_word_count >= 18 or part.endswith((".", "!", "?", ",", ";", ":", "\u3002", "\uff01", "\uff1f", "\uff1b", "\uff1a", "\uff0c")):
+        if current_word_count >= 18 or part.endswith(
+            (
+                ".",
+                "!",
+                "?",
+                ",",
+                ";",
+                ":",
+                "\u3002",
+                "\uff01",
+                "\uff1f",
+                "\uff1b",
+                "\uff1a",
+                "\uff0c",
+            )
+        ):
             merged_lines.append(current_line)
             current_parts = []
 
@@ -247,7 +271,7 @@ def _parse_label_output(output: str, line_count: int) -> Tuple[Dict[int, str], i
         num = int(m.group(1))
         label = m.group(2).lower()
         if 1 <= num <= line_count:
-            labels[num] = label if label in _VALID_LABELS else "p"
+            labels[num] = label  # Accept any label (whitelist removed)
             parsed += 1
     for i in range(1, line_count + 1):
         labels.setdefault(i, "p")
@@ -294,7 +318,24 @@ def _build_html_from_labels(lines: List[str], labels: Dict[int, str]) -> str:
             parts.append("<hr>")
             i += 1
 
-        else:  # p or unrecognised
+        elif label in (
+            "table",
+            "tr",
+            "td",
+            "th",
+            "thead",
+            "tbody",
+            "tfoot",
+            "table_row",
+            "table_cell",
+            "table_header",
+        ):
+            # Pass through table-related labels as div wrappers for now (tables need structural analysis)
+            parts.append(f"<div data-label='{label}'>{text}</div>")
+            i += 1
+
+        else:  # p, unknown label, or custom semantic labels
+            # Unknown labels default to paragraph; custom semantic labels (e.g., "note", "warning") also wrap as <p>
             parts.append(f"<p>{text}</p>")
             i += 1
 
@@ -393,9 +434,7 @@ def _apply_abbreviations(html: str, abbr_dict: Dict[str, str]) -> str:
         # Only replace if not inside an existing <abbr> tag
         html = pattern.sub(replacer, html)
         # Clean up any double <abbr> tags
-        html = re.sub(
-            r"<abbr[^>]*>(<abbr[^>]*>.*?</abbr>)</abbr>", r"\1", html
-        )
+        html = re.sub(r"<abbr[^>]*>(<abbr[^>]*>.*?</abbr>)</abbr>", r"\1", html)
 
     return html
 
@@ -504,7 +543,9 @@ def _substitute_table_blocks(
             placeholder = f"[TABLE_{table_num}]"
             if placeholder in table_blocks:
                 # Record this position — tables will be injected after HTML generation
-                table_injections.append((len(modified_lines), table_blocks[placeholder]))
+                table_injections.append(
+                    (len(modified_lines), table_blocks[placeholder])
+                )
                 continue
         modified_lines.append(line)
 
@@ -619,7 +660,9 @@ def _generate_grounded_html_for_range(
                 if table_injections or _is_grounded(cleaned_text, candidate):
                     # Inject tables back into the HTML if present
                     if table_injections:
-                        candidate = _inject_tables_into_html(candidate, table_injections)
+                        candidate = _inject_tables_into_html(
+                            candidate, table_injections
+                        )
                     return candidate
                 logger.warning(
                     "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
@@ -673,7 +716,9 @@ def _render_markup_candidate(
     if parsed_count > 0:
         candidate = _build_html_from_labels(content_lines, labels)
         # Skip grounding check if tables are present (they're authoritative from source)
-        if (table_injections and table_injections) or _is_grounded(cleaned_text, candidate):
+        if (table_injections and table_injections) or _is_grounded(
+            cleaned_text, candidate
+        ):
             # Inject tables back into the HTML if present
             if table_injections:
                 candidate = _inject_tables_into_html(candidate, table_injections)

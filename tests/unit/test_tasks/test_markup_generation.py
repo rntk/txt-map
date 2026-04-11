@@ -117,11 +117,14 @@ def test_parse_label_output_defaults_missing_lines_to_p() -> None:
     assert count == 1
 
 
-def test_parse_label_output_unknown_label_falls_back_to_p() -> None:
-    labels, count = _parse_label_output("1: marquee", 1)
+def test_parse_label_output_accepts_any_label() -> None:
+    # Whitelist removed — unknown labels like "marquee" are now accepted and preserved
+    labels, count = _parse_label_output("1: marquee\n2: table\n3: custom_semantic", 3)
 
-    assert labels[1] == "p"
-    assert count == 1
+    assert labels[1] == "marquee"
+    assert labels[2] == "table"
+    assert labels[3] == "custom_semantic"
+    assert count == 3
 
 
 def test_parse_label_output_returns_zero_count_on_unparseable_output() -> None:
@@ -573,12 +576,16 @@ def test_process_markup_generation_submits_all_topics_before_waiting(
         return MockFuture("1: p\n2: p", llm)
 
     monkeypatch.setattr(llm, "submit", fake_submit)
-    monkeypatch.setattr(llm, "with_namespace", lambda namespace, prompt_version=None: llm)
+    monkeypatch.setattr(
+        llm, "with_namespace", lambda namespace, prompt_version=None: llm
+    )
     monkeypatch.setattr(
         llm,
         "call",
         lambda messages, temperature=0.0: (_ for _ in ()).throw(
-            AssertionError("call() should not be used for successful first-pass results")
+            AssertionError(
+                "call() should not be used for successful first-pass results"
+            )
         ),
     )
 
