@@ -225,7 +225,12 @@ def test_cleanup_text_for_llm_collapses_excessive_newlines() -> None:
 
 def test_cleanup_text_for_llm_strips_trailing_whitespace_per_line() -> None:
     text = "hello  \n  world  "
-    assert _cleanup_text_for_llm(text) == "hello\n\nworld"
+    assert _cleanup_text_for_llm(text) == "hello\nworld"
+
+
+def test_cleanup_text_for_llm_preserves_single_newlines() -> None:
+    text = "line one\nline two\nline three"
+    assert _cleanup_text_for_llm(text) == "line one\nline two\nline three"
 
 
 def test_cleanup_text_for_llm_cleans_email_artifact_noise() -> None:
@@ -240,4 +245,4 @@ def test_cleanup_text_for_llm_cleans_email_artifact_noise() -> None:
     assert "\u200c" not in result
     assert "Brewvery Unsubscribe Feb 8, 2026" in result
     assert "Midjourney illustration." in result
-    assert result == "Brewvery Unsubscribe Feb 8, 2026\n\nMidjourney illustration.\n"
+    assert result == "Brewvery Unsubscribe Feb 8, 2026\n\nMidjourney illustration."

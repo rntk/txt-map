@@ -160,8 +160,8 @@ def _cleanup_text_for_llm(text: str) -> str:
     cleaned = _INVISIBLE_CHARS_RE.sub("", cleaned)
     lines = cleaned.splitlines()
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in lines]
-    lines = [line for line in lines if line]
-    cleaned = "\n\n".join(lines)
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 
