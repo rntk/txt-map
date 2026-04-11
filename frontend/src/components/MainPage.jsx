@@ -379,7 +379,6 @@ function UploadCard() {
         />
         Embed PDF images
       </label>
-
     </button>
   );
 }

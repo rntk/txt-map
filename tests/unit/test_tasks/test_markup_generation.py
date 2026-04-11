@@ -3,6 +3,7 @@ import logging
 from lib.tasks.markup_generation import (
     _build_markup_generation_prompt,
     _build_plain_html,
+    _cleanup_text_for_llm,
     _extract_topic_ranges,
     _is_grounded,
     _markdown_to_html,
@@ -186,3 +187,57 @@ def test_process_markup_generation_retries_with_correction_and_falls_back(
     assert "Markup falling back to plain HTML for topic 'topic-a' range 1" in (
         caplog.text
     )
+
+
+def test_cleanup_text_for_llm_strips_html_entities() -> None:
+    assert _cleanup_text_for_llm("hello&nbsp;&amp;&lt;world") == "hello &<world"
+
+
+def test_cleanup_text_for_llm_replaces_nbsp() -> None:
+    assert _cleanup_text_for_llm("hello\xa0world") == "hello world"
+
+
+def test_cleanup_text_for_llm_strips_zero_width_chars() -> None:
+    text = "hello\u200b\u200c\u200d\u200fworld"
+    assert _cleanup_text_for_llm(text) == "helloworld"
+
+
+def test_cleanup_text_for_llm_strips_bom_and_soft_hyphen() -> None:
+    text = "\ufeffhello\u00adworld"
+    assert _cleanup_text_for_llm(text) == "helloworld"
+
+
+def test_cleanup_text_for_llm_removes_whitespace_only_lines() -> None:
+    text = "hello\n   \nworld"
+    assert _cleanup_text_for_llm(text) == "hello\n\nworld"
+
+
+def test_cleanup_text_for_llm_removes_zero_width_spacer_lines() -> None:
+    spacer = " \u200c \u200c \u200c "
+    text = f"hello\n{spacer}\nworld"
+    assert _cleanup_text_for_llm(text) == "hello\n\nworld"
+
+
+def test_cleanup_text_for_llm_collapses_excessive_newlines() -> None:
+    text = "hello\n\n\n\nworld"
+    assert _cleanup_text_for_llm(text) == "hello\n\nworld"
+
+
+def test_cleanup_text_for_llm_strips_trailing_whitespace_per_line() -> None:
+    text = "hello  \n  world  "
+    assert _cleanup_text_for_llm(text) == "hello\n\nworld"
+
+
+def test_cleanup_text_for_llm_cleans_email_artifact_noise() -> None:
+    text = (
+        "Brewvery Unsubscribe Feb 8, 2026\n"
+        " \u200c \u200c \u200c \u200c \u200c \n"
+        "\n"
+        "  \n"
+        "Midjourney illustration."
+    )
+    result = _cleanup_text_for_llm(text)
+    assert "\u200c" not in result
+    assert "Brewvery Unsubscribe Feb 8, 2026" in result
+    assert "Midjourney illustration." in result
+    assert result == "Brewvery Unsubscribe Feb 8, 2026\n\nMidjourney illustration.\n"

@@ -7,7 +7,6 @@ from handlers.submission_handler import _extract_content_from_upload
 from lib.nlp import compute_word_frequencies
 
 
-
 # Mock dependencies before importing app - must be at module level to catch import-time operations
 @pytest.fixture(autouse=True)
 def mock_env(monkeypatch):
@@ -217,6 +216,7 @@ def test_post_refresh(client, mock_storage, mock_task_queue, sample_submission):
     mock_storage.clear_results.assert_called_once()
     mock_task_queue.delete_by_submission.assert_called_once()
     mock_task_queue.create.assert_called_once()
+
 
 # ... existing code ...
 

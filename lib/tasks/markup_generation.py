@@ -86,6 +86,18 @@ _MARKDOWN_FENCE_RE = re.compile(r"^\s*```[a-zA-Z0-9_-]*\s*(.*?)\s*```\s*$", re.D
 _RAW_HTML_TAG_RE = re.compile(r"</?[A-Za-z][^>]*>")
 _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
+_INVISIBLE_CHARS_RE = re.compile(
+    "["
+    "\u0000-\u0008\u000b\u000c\u000e-\u001f"
+    "\u007f-\u009f"
+    "\u00ad"
+    "\u200b-\u200f"
+    "\u2028-\u202f"
+    "\u2060-\u206f"
+    "\ufeff"
+    "\ufff9-\ufffb"
+    "]"
+)
 
 
 @dataclass(frozen=True)
@@ -140,6 +152,17 @@ def _call_llm_cached(
         )
     )
     return response
+
+
+def _cleanup_text_for_llm(text: str) -> str:
+    cleaned = html_module.unescape(text or "")
+    cleaned = cleaned.replace("\xa0", " ")
+    cleaned = _INVISIBLE_CHARS_RE.sub("", cleaned)
+    lines = cleaned.splitlines()
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in lines]
+    lines = [line for line in lines if line]
+    cleaned = "\n\n".join(lines)
+    return cleaned.strip()
 
 
 def _build_markup_generation_prompt(content: str) -> str:
@@ -282,7 +305,8 @@ def _generate_grounded_html_for_range(
     namespace: str,
     max_retries: int,
 ) -> str:
-    prompt = _build_markup_generation_prompt(topic_range.text)
+    cleaned_text = _cleanup_text_for_llm(topic_range.text)
+    prompt = _build_markup_generation_prompt(cleaned_text)
     temperatures = [0.0, 0.3, 0.5]
     skip_cache = False
     previous_output = ""
@@ -301,14 +325,14 @@ def _generate_grounded_html_for_range(
                 )
             else:
                 correction_prompt = _build_markup_correction_prompt(
-                    topic_range.text,
+                    cleaned_text,
                     previous_output,
                 )
                 response = llm.call([correction_prompt], temperature=temperature)
 
             markdown_text = _strip_markdown_fences(response)
             html = _markdown_to_html(markdown_text)
-            if _is_grounded(topic_range.text, html):
+            if _is_grounded(cleaned_text, html):
                 return html
 
             previous_output = markdown_text
@@ -338,7 +362,7 @@ def _generate_grounded_html_for_range(
         topic_name,
         topic_range.range_index,
     )
-    return _build_plain_html(topic_range.text)
+    return _build_plain_html(cleaned_text)
 
 
 def _process_topic(

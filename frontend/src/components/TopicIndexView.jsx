@@ -526,11 +526,12 @@ function TopicIndexView({
                           <div className="topic-index-view__tile-info">
                             <span className="topic-index-view__tile-name">
                               {noteTitleLines.map((line, index) => {
-                                const isLeaf = index === noteTitleLines.length - 1;
+                                const isLeaf =
+                                  index === noteTitleLines.length - 1;
                                 return (
                                   <span
                                     key={`${topic.name}-${index}-${line}`}
-                                    className={`topic-index-view__tile-name-line ${isLeaf ? 'topic-index-view__tile-name-line--leaf' : 'topic-index-view__tile-name-line--parent'}`}
+                                    className={`topic-index-view__tile-name-line ${isLeaf ? "topic-index-view__tile-name-line--leaf" : "topic-index-view__tile-name-line--parent"}`}
                                   >
                                     {onShowInArticle ? (
                                       <button
@@ -538,7 +539,9 @@ function TopicIndexView({
                                         className="topic-index-view__tile-name-link"
                                         onClick={() => {
                                           onShowInArticle(
-                                            buildNormalizedTopicSelection(topic),
+                                            buildNormalizedTopicSelection(
+                                              topic,
+                                            ),
                                           );
                                         }}
                                         title="Show in article"
