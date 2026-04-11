@@ -23,6 +23,14 @@ class LLamaCPP(LLMClient):
         token: Optional[str] = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
+        temperature: float = 0.8,
+        min_p: float = 0.05,
+        repeat_penalty: float = 1.1,
+        repeat_last_n: int = 64,
+        dry_multiplier: float = 0.8,
+        dry_base: float = 1.75,
+        dry_allowed_length: int = 2,
+        stop: Optional[List[str]] = None,
     ) -> None:
         super().__init__(
             max_context_tokens=max_context_tokens,
@@ -35,6 +43,14 @@ class LLamaCPP(LLMClient):
         self.__model = model
         # Token can be passed in explicitly or read from the environment variable TOKEN
         self.__token = token or os.getenv("TOKEN")
+        self.__temperature = temperature
+        self.__min_p = min_p
+        self.__repeat_penalty = repeat_penalty
+        self.__repeat_last_n = repeat_last_n
+        self.__dry_multiplier = dry_multiplier
+        self.__dry_base = dry_base
+        self.__dry_allowed_length = dry_allowed_length
+        self.__stop = stop or ["User:", "\n\n"]
 
     @property
     def provider_name(self) -> str:
@@ -90,6 +106,13 @@ class LLamaCPP(LLMClient):
                     "messages": [{"role": "user", "content": user_msgs[0]}],
                     "temperature": temperature,
                     "cache_prompt": True,
+                    "min_p": self.__min_p,
+                    "repeat_penalty": self.__repeat_penalty,
+                    "repeat_last_n": self.__repeat_last_n,
+                    "dry_multiplier": self.__dry_multiplier,
+                    "dry_base": self.__dry_base,
+                    "dry_allowed_length": self.__dry_allowed_length,
+                    #"stop": self.__stop,
                 }
             )
             headers = {"Content-type": "application/json"}
@@ -102,6 +125,7 @@ class LLamaCPP(LLMClient):
                 err_msg = f"{res.status} - {res.reason} - {resp_body}"
                 logging.error(err_msg)
                 raise RuntimeError(f"LLM API error: {res.status} {res.reason}")
+
             resp = json.loads(resp_body)
 
             reasoning, content = self._extract_reasoning_and_content(resp)
