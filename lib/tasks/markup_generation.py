@@ -32,6 +32,7 @@ li   unordered list item (bullet point)
 oli  ordered list item (numbered step)
 bq   blockquote / quoted speech
 code code snippet or technical literal
+hr   horizontal rule / section separator (e.g. "---", "***", "===")
 
 ### OUTPUT FORMAT
 Return exactly one classification per input line:
@@ -67,7 +68,7 @@ Return exactly one classification per input line:
 No other text. No explanation.
 
 ### BLOCK TYPES
-h1  h2  h3  p  li  oli  bq  code
+h1  h2  h3  p  li  oli  bq  code  hr
 
 ### TEXT TO CLASSIFY
 
@@ -80,8 +81,7 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LABEL_LINE_RE = re.compile(r"^(\d+)\s*:\s*(\w+)$")
 _CLAUSE_BOUNDARY_RE = re.compile(
-    r"(?:(?<=[.!?;:])\s+|(?<=,)\s+(?=(?:and|but|or|so|yet|for|nor|because|although|though|while|whereas|which|who|that)\b))",
-    re.IGNORECASE,
+    r"(?:(?<=[.!?;:\u3002\uff01\uff1f\uff1b\uff1a])\s+|(?<=,)\s+|(?<=\uff0c)\s*)"
 )
 _INVISIBLE_CHARS_RE = re.compile(
     "["
@@ -96,7 +96,7 @@ _INVISIBLE_CHARS_RE = re.compile(
     "]"
 )
 
-_VALID_LABELS = frozenset({"h1", "h2", "h3", "p", "li", "oli", "bq", "code"})
+_VALID_LABELS = frozenset({"h1", "h2", "h3", "p", "li", "oli", "bq", "code", "hr"})
 
 
 @dataclass(frozen=True)
@@ -217,7 +217,7 @@ def _split_line_for_markup(line: str) -> List[str]:
         if current_word_count < 8:
             continue
 
-        if current_word_count >= 18 or part.endswith((".", "!", "?", ",", ";", ":")):
+        if current_word_count >= 18 or part.endswith((".", "!", "?", ",", ";", ":", "\u3002", "\uff01", "\uff1f", "\uff1b", "\uff1a", "\uff0c")):
             merged_lines.append(current_line)
             current_parts = []
 
@@ -287,6 +287,10 @@ def _build_html_from_labels(lines: List[str], labels: Dict[int, str]) -> str:
 
         elif label in ("h1", "h2", "h3"):
             parts.append(f"<{label}>{text}</{label}>")
+            i += 1
+
+        elif label == "hr":
+            parts.append("<hr>")
             i += 1
 
         else:  # p or unrecognised

@@ -27,6 +27,13 @@ def test_build_markup_generation_prompt_includes_numbered_lines() -> None:
     assert "No other text" in prompt
 
 
+def test_build_markup_generation_prompt_includes_hr_type() -> None:
+    prompt = _build_markup_generation_prompt("1: Test")
+
+    assert "hr" in prompt
+    assert "horizontal rule" in prompt.lower()
+
+
 def test_build_numbered_lines_numbers_non_empty_lines() -> None:
     lines, numbered = _build_numbered_lines("Title\nBody.\n\nNext para.")
 
@@ -59,6 +66,19 @@ def test_split_line_for_markup_splits_long_sentence_on_clauses() -> None:
         "and Beta adds a supporting point that clarifies the tradeoff,",
         "while Gamma closes with a practical next step for the team.",
     ]
+
+
+def test_split_line_for_markup_splits_on_cjk_terminal_punctuation() -> None:
+    # Use mixed text with CJK punctuation and space-separated tokens for word counting
+    # Need > 20 words to trigger splitting logic
+    line = (
+        "Alpha beta gamma delta epsilon。 Foo bar baz qux quux， "
+        "One two three four five six seven eight。 Zeta eta theta iota kappa"
+    )
+    result = _split_line_for_markup(line)
+
+    # Should split on CJK period (。) and comma (，) even without conjunction check
+    assert len(result) > 1
 
 
 def test_build_numbered_lines_splits_long_single_line_into_granular_parts() -> None:
@@ -153,6 +173,15 @@ def test_build_html_from_labels_blockquote() -> None:
     html = _build_html_from_labels(lines, labels)
 
     assert html == "<blockquote><p>To be or not to be.</p></blockquote>"
+
+
+def test_build_html_from_labels_hr() -> None:
+    lines = ["---"]
+    labels = {1: "hr"}
+
+    html = _build_html_from_labels(lines, labels)
+
+    assert html == "<hr>"
 
 
 def test_build_html_from_labels_escapes_html_in_content() -> None:
