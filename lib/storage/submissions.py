@@ -120,6 +120,7 @@ class SubmissionsStorage:
                 "insights": [],
                 "annotations": {},
                 "markup": {},
+                "table_blocks": {},
                 "clusters": [],
                 "topic_model": {},
             },

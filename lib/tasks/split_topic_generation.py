@@ -3,6 +3,7 @@ Combined text splitting and topic generation task.
 """
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -11,6 +12,11 @@ from lib.storage.submissions import SubmissionsStorage
 from txt_splitt import Tracer
 
 logger = logging.getLogger(__name__)
+
+_TABLE_RE = re.compile(
+    r"<table\b[^>]*>.*?</table>",
+    re.IGNORECASE | re.DOTALL
+)
 
 
 def _truncate_for_log(value: Any, limit: int = 500) -> str:
@@ -38,6 +44,27 @@ def _span_attributes_by_name(spans: list[Any], name: str) -> dict[str, Any]:
             if isinstance(attributes, dict):
                 last_match = attributes
     return last_match
+
+
+def _extract_table_blocks(html: str) -> tuple[str, dict[str, str]]:
+    """Extract <table> blocks from HTML and replace with placeholders.
+
+    Returns (modified_html, {placeholder: original_table_html}).
+    Tables are replaced with \n[TABLE_N]\n to be processed as single sentences.
+    """
+    table_blocks: dict[str, str] = {}
+    counter = 1
+
+    def replace_table(match):
+        nonlocal counter
+        table_html = match.group(0)
+        placeholder = f"[TABLE_{counter}]"
+        table_blocks[placeholder] = table_html
+        counter += 1
+        return f"\n{placeholder}\n"
+
+    modified_html = _TABLE_RE.sub(replace_table, html)
+    return modified_html, table_blocks
 
 
 def _log_failure_diagnostics(
@@ -117,6 +144,9 @@ def process_split_topic_generation(
     if not source:
         raise ValueError("No text content to process")
 
+    # Extract table blocks before processing to preserve them through sentence splitting.
+    source, table_blocks = _extract_table_blocks(source)
+
     logger.info(f"Processing split_topic_generation for submission {submission_id}")
     logger.info(
         f"Source length: {len(source)} chars (html_content: {bool(html_content)}, text_content: {bool(text_content)})"
@@ -179,6 +209,7 @@ def process_split_topic_generation(
         {
             "sentences": result.sentences,
             "topics": result.topics,
+            "table_blocks": table_blocks,
         },
     )
 

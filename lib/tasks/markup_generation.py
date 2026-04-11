@@ -80,6 +80,7 @@ _RAW_HTML_TAG_RE = re.compile(r"</?[A-Za-z][^>]*>")
 _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LABEL_LINE_RE = re.compile(r"^(\d+)\s*:\s*(\w+)$")
+_TABLE_PLACEHOLDER_RE = re.compile(r"^\[TABLE_(\d+)\]$")
 _CLAUSE_BOUNDARY_RE = re.compile(
     r"(?:(?<=[.!?;:\u3002\uff01\uff1f\uff1b\uff1a])\s+|(?<=,)\s+|(?<=\uff0c)\s*)"
 )
@@ -343,6 +344,62 @@ def _is_grounded(source_text: str, generated_html: str) -> bool:
     )
 
 
+def _auto_detect_abbreviations(text: str) -> Dict[str, str]:
+    """Auto-detect abbreviations in format: "Phrase (ABBR)" or "phrase (ABBR)".
+
+    Returns {abbreviation: full_phrase}.
+    """
+    abbrs: Dict[str, str] = {}
+    # Pattern: word or phrase in parentheses, usually short (2-5 chars), all or mostly uppercase
+    pattern = re.compile(r"(.+?)\s*\(([A-Z][A-Z0-9]*)\)")
+    for match in pattern.finditer(text):
+        phrase = match.group(1).strip()
+        abbr = match.group(2)
+        # Only keep if abbreviation is short and likely a real abbreviation
+        if 2 <= len(abbr) <= 10 and len(phrase) > len(abbr):
+            abbrs[abbr] = phrase
+    return abbrs
+
+
+def _apply_abbreviations(html: str, abbr_dict: Dict[str, str]) -> str:
+    """Wrap known abbreviations in <abbr title="..."> tags.
+
+    Args:
+        html: HTML string to process
+        abbr_dict: {abbreviation: expansion} mapping
+
+    Returns: HTML with abbreviations wrapped in <abbr> tags.
+    """
+    if not abbr_dict:
+        return html
+
+    # Sort by length descending to match longer abbreviations first
+    for term, expansion in sorted(abbr_dict.items(), key=lambda x: -len(x[0])):
+        # Match the term with word boundaries, avoiding matches inside existing tags
+        # Negative lookbehind to avoid matching inside HTML tags
+        pattern = re.compile(
+            rf"(?<![\w<])({re.escape(term)})(?![\w>])",
+            re.IGNORECASE,
+        )
+
+        def replacer(match):
+            matched_term = match.group(1)
+            # Check if we're inside an HTML tag by counting < and > before this position
+            return (
+                f'<abbr title="{html_module.escape(expansion, quote=True)}">'
+                f"{matched_term}</abbr>"
+            )
+
+        # Only replace if not inside an existing <abbr> tag
+        html = pattern.sub(replacer, html)
+        # Clean up any double <abbr> tags
+        html = re.sub(
+            r"<abbr[^>]*>(<abbr[^>]*>.*?</abbr>)</abbr>", r"\1", html
+        )
+
+    return html
+
+
 def _build_plain_html(source_text: str) -> str:
     lines = [line.strip() for line in (source_text or "").splitlines()]
     blocks: List[str] = []
@@ -427,6 +484,75 @@ def _extract_topic_ranges(
     return ranges
 
 
+def _substitute_table_blocks(
+    content_lines: List[str],
+    table_blocks: Dict[str, str],
+) -> tuple[List[str], List[tuple[int, str]]]:
+    """Replace table placeholders with actual HTML.
+
+    Returns (modified_lines, [(modified_index, table_html), ...]).
+    Placeholders like "[TABLE_1]" are replaced with their HTML equivalents.
+    modified_index is the position in modified_lines where the table should be injected.
+    """
+    table_injections: List[tuple[int, str]] = []
+    modified_lines: List[str] = []
+
+    for i, line in enumerate(content_lines):
+        m = _TABLE_PLACEHOLDER_RE.match(line.strip())
+        if m:
+            table_num = m.group(1)
+            placeholder = f"[TABLE_{table_num}]"
+            if placeholder in table_blocks:
+                # Record this position — tables will be injected after HTML generation
+                table_injections.append((len(modified_lines), table_blocks[placeholder]))
+                continue
+        modified_lines.append(line)
+
+    return modified_lines, table_injections
+
+
+def _inject_tables_into_html(
+    html: str,
+    table_injections: List[tuple[int, str]],
+) -> str:
+    """Inject table HTML back into generated markup.
+
+    Args:
+        html: Generated HTML from LLM classification (for modified_lines without tables)
+        table_injections: [(position_in_modified_lines, table_html), ...] from _substitute_table_blocks
+
+    Returns: HTML with tables injected at correct positions.
+    """
+    if not table_injections:
+        return html
+
+    # Build a map of positions where tables should be inserted
+    injections_map = {pos: tbl for pos, tbl in table_injections}
+
+    # Split HTML into block-level chunks
+    parts = html.split("\n")
+
+    # Reconstruct with tables injected at the right positions
+    result: List[str] = []
+    html_idx = 0
+
+    max_pos = max(injections_map.keys()) if injections_map else -1
+    for pos in range(max_pos + 1):
+        if pos in injections_map:
+            result.append(injections_map[pos])
+        else:
+            if html_idx < len(parts):
+                result.append(parts[html_idx])
+                html_idx += 1
+
+    # Append any remaining HTML
+    while html_idx < len(parts):
+        result.append(parts[html_idx])
+        html_idx += 1
+
+    return "\n".join(result)
+
+
 def _generate_grounded_html_for_range(
     topic_name: str,
     topic_range: TopicRange,
@@ -434,9 +560,31 @@ def _generate_grounded_html_for_range(
     cache_store: Any,
     namespace: str,
     max_retries: int,
+    table_blocks: Optional[Dict[str, str]] = None,
 ) -> str:
+    if table_blocks is None:
+        table_blocks = {}
+
     cleaned_text = _cleanup_text_for_llm(topic_range.text)
     content_lines, numbered_text = _build_numbered_lines(cleaned_text)
+
+    # Check for and substitute table blocks
+    modified_lines, table_injections = _substitute_table_blocks(
+        content_lines, table_blocks
+    )
+
+    # If the entire range is just a table, return it directly
+    if not modified_lines and len(table_injections) == 1:
+        return table_injections[0][1]
+
+    # If no content lines remain after table extraction, build plain HTML
+    if not modified_lines and table_injections:
+        return "\n".join(tbl for _, tbl in table_injections)
+
+    # Use modified lines for LLM if tables were found
+    if table_injections:
+        content_lines = modified_lines
+        _, numbered_text = _build_numbered_lines("\n".join(content_lines))
 
     if not content_lines:
         return _build_plain_html(cleaned_text)
@@ -467,7 +615,11 @@ def _generate_grounded_html_for_range(
             labels, parsed_count = _parse_label_output(response, len(content_lines))
             if parsed_count > 0:
                 candidate = _build_html_from_labels(content_lines, labels)
-                if _is_grounded(cleaned_text, candidate):
+                # Skip grounding check if tables are present (they're authoritative from source)
+                if table_injections or _is_grounded(cleaned_text, candidate):
+                    # Inject tables back into the HTML if present
+                    if table_injections:
+                        candidate = _inject_tables_into_html(candidate, table_injections)
                     return candidate
                 logger.warning(
                     "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
@@ -515,11 +667,16 @@ def _render_markup_candidate(
     response: str,
     attempt: int,
     max_retries: int,
+    table_injections: Optional[List[tuple[int, str]]] = None,
 ) -> Optional[str]:
     labels, parsed_count = _parse_label_output(response, len(content_lines))
     if parsed_count > 0:
         candidate = _build_html_from_labels(content_lines, labels)
-        if _is_grounded(cleaned_text, candidate):
+        # Skip grounding check if tables are present (they're authoritative from source)
+        if (table_injections and table_injections) or _is_grounded(cleaned_text, candidate):
+            # Inject tables back into the HTML if present
+            if table_injections:
+                candidate = _inject_tables_into_html(candidate, table_injections)
             return candidate
         logger.warning(
             "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
@@ -546,9 +703,31 @@ def _generate_grounded_html_for_range_parallel(
     llm: Any,
     max_retries: int,
     initial_response: str,
+    table_blocks: Optional[Dict[str, str]] = None,
 ) -> str:
+    if table_blocks is None:
+        table_blocks = {}
+
     cleaned_text = _cleanup_text_for_llm(topic_range.text)
     content_lines, numbered_text = _build_numbered_lines(cleaned_text)
+
+    # Check for and substitute table blocks
+    modified_lines, table_injections = _substitute_table_blocks(
+        content_lines, table_blocks
+    )
+
+    # If the entire range is just a table, return it directly
+    if not modified_lines and len(table_injections) == 1:
+        return table_injections[0][1]
+
+    # If no content lines remain after table extraction, build plain HTML
+    if not modified_lines and table_injections:
+        return "\n".join(tbl for _, tbl in table_injections)
+
+    # Use modified lines for LLM if tables were found
+    if table_injections:
+        content_lines = modified_lines
+        _, numbered_text = _build_numbered_lines("\n".join(content_lines))
 
     if not content_lines:
         return _build_plain_html(cleaned_text)
@@ -564,6 +743,7 @@ def _generate_grounded_html_for_range_parallel(
         response=initial_response,
         attempt=1,
         max_retries=max_retries,
+        table_injections=table_injections,
     )
     if candidate is not None:
         return candidate
@@ -582,6 +762,7 @@ def _generate_grounded_html_for_range_parallel(
                 response=response,
                 attempt=attempt + 1,
                 max_retries=max_retries,
+                table_injections=table_injections,
             )
             if candidate is not None:
                 return candidate
@@ -630,11 +811,15 @@ def _process_topic(
     cache_store: Any,
     namespace: str,
     max_retries: int,
+    table_blocks: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     topic_name = topic.get("name", "Unknown")
     ranges = _extract_topic_ranges(topic, all_sentences)
     if not ranges:
         return {"ranges": []}
+
+    if table_blocks is None:
+        table_blocks = {}
 
     rendered_ranges: List[Dict[str, Any]] = []
     for topic_range in ranges:
@@ -645,6 +830,7 @@ def _process_topic(
             cache_store=cache_store,
             namespace=namespace,
             max_retries=max_retries,
+            table_blocks=table_blocks,
         )
         rendered_ranges.append(
             {
@@ -663,11 +849,15 @@ def _process_topic_parallel(
     all_sentences: List[str],
     llm: Any,
     max_retries: int,
+    table_blocks: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     topic_name = topic.get("name", "Unknown")
     ranges = _extract_topic_ranges(topic, all_sentences)
     if not ranges:
         return {"ranges": []}
+
+    if table_blocks is None:
+        table_blocks = {}
 
     pending_ranges: List[tuple[TopicRange, Any]] = []
     for topic_range in ranges:
@@ -692,6 +882,7 @@ def _process_topic_parallel(
                 llm=llm,
                 max_retries=max_retries,
                 initial_response=response,
+                table_blocks=table_blocks,
             )
         )
 
@@ -717,7 +908,11 @@ def _process_all_topics_parallel(
     all_sentences: List[str],
     llm: Any,
     max_retries: int,
+    table_blocks: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
+    if table_blocks is None:
+        table_blocks = {}
+
     topic_ranges_map: Dict[str, List[TopicRange]] = {}
     pending_ranges: List[tuple[str, TopicRange, Any]] = []
 
@@ -748,6 +943,7 @@ def _process_all_topics_parallel(
                 llm=llm,
                 max_retries=max_retries,
                 initial_response=response,
+                table_blocks=table_blocks,
             )
         )
 
@@ -786,6 +982,7 @@ def process_markup_generation(
     results = submission.get("results", {})
     all_sentences: List[str] = results.get("sentences", [])
     topics: List[Dict[str, Any]] = results.get("topics", [])
+    table_blocks: Dict[str, str] = results.get("table_blocks", {})
 
     if not all_sentences or not topics:
         logger.warning(
@@ -817,6 +1014,7 @@ def process_markup_generation(
             all_sentences=all_sentences,
             llm=parallel_llm,
             max_retries=max_retries,
+            table_blocks=table_blocks,
         )
     else:
         markup: Dict[str, Any] = {}
@@ -836,7 +1034,20 @@ def process_markup_generation(
                 cache_store=cache_store,
                 namespace=namespace,
                 max_retries=max_retries,
+                table_blocks=table_blocks,
             )
+
+    # Apply abbreviations to the generated markup
+    abbr_dict = submission.get("abbr_dict")
+    if abbr_dict is None:
+        # Auto-detect abbreviations from source text
+        joined_sentences = " ".join(all_sentences)
+        abbr_dict = _auto_detect_abbreviations(joined_sentences)
+
+    if abbr_dict:
+        for topic_name, topic_data in markup.items():
+            for rng in topic_data.get("ranges", []):
+                rng["html"] = _apply_abbreviations(rng["html"], abbr_dict)
 
     storage.update_results(submission_id, {"markup": markup})
     logger.info(
