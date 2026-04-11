@@ -14,10 +14,11 @@ import RadarChart from "./RadarChart";
 import ArticleStructureChart from "./ArticleStructureChart";
 import TreemapChart from "./TreemapChart";
 import TopicsVennChart from "./TopicsVennChart";
+import TopicHierarchyFlowChart from "./TopicHierarchyFlowChart";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -263,6 +264,23 @@ function VisualizationPanels({
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body">
               <TreemapChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
+            </div>
+          </div>
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === "topic_hierarchy_flow" && (
+        <FullScreenGraph title="Topic Hierarchy Flow" onClose={onClose}>
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body chart-surface__panel-body--padded">
+              <TopicHierarchyFlowChart
                 topics={safeTopics}
                 sentences={safeSentences}
                 onShowInArticle={onShowInArticle}

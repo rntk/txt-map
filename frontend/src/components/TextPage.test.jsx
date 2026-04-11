@@ -49,6 +49,9 @@ vi.mock("./RadarChart", () => ({
 vi.mock("./ArticleStructureChart", () => ({
   default: () => <div data-testid="article-structure-chart" />,
 }));
+vi.mock("./TopicHierarchyFlowChart", () => ({
+  default: () => <div data-testid="topic-hierarchy-flow-chart" />,
+}));
 vi.mock("../utils/summaryTimeline", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -512,6 +515,21 @@ describe("TextPage raw text navigation", () => {
 
     expect(screen.getByText("Important connection")).toBeInTheDocument();
     expect(screen.getAllByText("Alpha Beta Gamma").length).toBeGreaterThan(0);
+  });
+
+  it("opens the topic hierarchy flow chart from the View menu", async () => {
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Topic Hierarchy Flow/ }),
+    );
+
+    expect(
+      screen.getByTestId("topic-hierarchy-flow-chart"),
+    ).toBeInTheDocument();
   });
 
   it("opens the fullscreen topics plus article view from the View menu", async () => {

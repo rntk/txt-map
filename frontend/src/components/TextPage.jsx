@@ -55,6 +55,7 @@ const FULLSCREEN_TABS = [
   { key: "grid_view", label: "Grid View" },
   { key: "article_structure", label: "Article Structure" },
   { key: "treemap", label: "Treemap" },
+  { key: "topic_hierarchy_flow", label: "Topic Hierarchy Flow" },
 ];
 
 function TextPageContent() {
