@@ -15,6 +15,119 @@
   margin-bottom: 0;
 }
 
+.markup-rendered {
+  color: var(--text-primary);
+}
+
+.markup-rendered > :first-child {
+  margin-top: 0;
+}
+
+.markup-rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.markup-rendered p,
+.markup-rendered ul,
+.markup-rendered ol,
+.markup-rendered blockquote,
+.markup-rendered pre,
+.markup-rendered table,
+.markup-rendered hr {
+  margin: 0 0 var(--space-5);
+}
+
+.markup-rendered h1,
+.markup-rendered h2,
+.markup-rendered h3,
+.markup-rendered h4,
+.markup-rendered h5,
+.markup-rendered h6 {
+  margin: 0 0 var(--space-4);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+}
+
+.markup-rendered h1,
+.markup-rendered h2 {
+  font-size: var(--text-2xl);
+}
+
+.markup-rendered h3 {
+  font-size: var(--text-xl);
+}
+
+.markup-rendered h4,
+.markup-rendered h5,
+.markup-rendered h6 {
+  font-size: var(--text-lg);
+}
+
+.markup-rendered p,
+.markup-rendered li {
+  font-size: var(--text-base);
+  line-height: var(--leading-loose);
+}
+
+.markup-rendered ul,
+.markup-rendered ol {
+  padding-left: var(--space-7);
+}
+
+.markup-rendered li + li {
+  margin-top: var(--space-2);
+}
+
+.markup-rendered blockquote {
+  padding: var(--space-4) var(--space-5);
+  border-left: 4px solid var(--color-primary-400);
+  background: var(--bg-secondary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.markup-rendered pre,
+.markup-rendered code {
+  font-family: var(--font-family-mono);
+}
+
+.markup-rendered pre {
+  padding: var(--space-4);
+  overflow-x: auto;
+  background: var(--gray-900);
+  color: var(--gray-50);
+  border-radius: var(--radius-md);
+}
+
+.markup-rendered :not(pre) > code {
+  padding: 0.15rem 0.35rem;
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+}
+
+.markup-rendered table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.markup-rendered th,
+.markup-rendered td {
+  padding: var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.markup-rendered th {
+  background: var(--bg-secondary);
+  font-weight: var(--font-semibold);
+}
+
+.markup-rendered a {
+  color: var(--color-primary-700);
+}
+
 .markup-topic-block {
   cursor: pointer;
   border-radius: var(--radius-md);

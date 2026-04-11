@@ -2,8 +2,7 @@ import React, { useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import MarkupRenderer from "./markup/MarkupRenderer";
 import {
-  buildEnrichedRangeGroupsWithFallbacks,
-  buildGroupMarkup,
+  getTopicMarkupRanges,
   resolveTopicMarkup,
 } from "./markup/topicMarkupUtils";
 import { useTooltip } from "../hooks/useTooltip";
@@ -14,14 +13,6 @@ import "../styles/text-reading.css";
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
-
-function hasNonPlainMarkup(topicMarkup) {
-  return Boolean(
-    topicMarkup &&
-    Array.isArray(topicMarkup.segments) &&
-    topicMarkup.segments.some((segment) => segment?.type !== "plain"),
-  );
-}
 
 function buildArticleMarkupBlocks(sentences, topics, markup) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
@@ -36,38 +27,20 @@ function buildArticleMarkupBlocks(sentences, topics, markup) {
 
   safeTopics.forEach((topic, topicIndex) => {
     const topicMarkup = resolveTopicMarkup(markup, topic);
-    if (!hasNonPlainMarkup(topicMarkup)) {
+    const markupRanges = getTopicMarkupRanges(topicMarkup);
+    if (markupRanges.length === 0) {
       return;
     }
 
-    const rangeGroups = buildEnrichedRangeGroupsWithFallbacks(
-      Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],
-      Array.isArray(topic?.sentences) ? topic.sentences : [],
-      Array.isArray(topic?.ranges) ? topic.ranges : [],
-    );
-
-    rangeGroups.forEach((rangeGroup, rangeIndex) => {
-      if (
-        !Number.isInteger(rangeGroup?.firstSourceSentenceIndex) ||
-        !Number.isInteger(rangeGroup?.lastSourceSentenceIndex)
-      ) {
-        return;
-      }
-
-      const groupMarkup = buildGroupMarkup(topicMarkup, rangeGroup);
-      if (!hasNonPlainMarkup(groupMarkup)) {
-        return;
-      }
-
+    markupRanges.forEach((range, rangeIndex) => {
       candidateBlocks.push({
         kind: "markup",
-        key: `${topic?.name || "topic"}-${topicIndex}-${rangeIndex}-${rangeGroup.firstSourceSentenceIndex}-${rangeGroup.lastSourceSentenceIndex}`,
+        key: `${topic?.name || "topic"}-${topicIndex}-${rangeIndex}-${range.sentence_start}-${range.sentence_end}`,
         topic,
-        rangeCount: rangeGroups.length,
-        startSentenceIndex: rangeGroup.firstSourceSentenceIndex,
-        endSentenceIndex: rangeGroup.lastSourceSentenceIndex,
-        sentences: groupMarkup.positions.map((position) => position.text || ""),
-        segments: groupMarkup.segments,
+        rangeCount: markupRanges.length,
+        startSentenceIndex: range.sentence_start,
+        endSentenceIndex: range.sentence_end,
+        html: range.html,
       });
     });
   });
@@ -172,8 +145,7 @@ function ArticleMarkupPlainBlock({
  *   rangeCount: number,
  *   startSentenceIndex: number,
  *   endSentenceIndex: number,
- *   sentences: string[],
- *   segments: Array,
+ *   html: string,
  * }} block
  * @property {Array<{ name: string }>} selectedTopics
  * @property {Set<string>|string[]} readTopics
@@ -429,7 +401,7 @@ function MarkupTopicBlock({
         tabIndex={0}
         aria-label={`Show topic actions for ${block.topic.name}`}
       >
-        <MarkupRenderer segments={block.segments} sentences={block.sentences} />
+        <MarkupRenderer html={block.html} />
       </div>
       {tooltipEl}
     </>

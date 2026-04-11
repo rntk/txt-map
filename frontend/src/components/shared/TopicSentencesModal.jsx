@@ -3,8 +3,7 @@ import "./TopicSentencesModal.css";
 import ArticleMinimap from "../grid/ArticleMinimap";
 import MarkupRenderer from "../markup/MarkupRenderer";
 import {
-  buildEnrichedRangeGroupsWithFallbacks,
-  buildGroupMarkup,
+  getTopicMarkupRanges,
   resolveTopicMarkup,
 } from "../markup/topicMarkupUtils";
 import { getTopicHighlightColor } from "../../utils/topicColorUtils";
@@ -88,12 +87,18 @@ function TopicSentencesModal({
   onToggleRead: onToggleReadProp,
 }) {
   const article = useArticle();
-  const sentences = sentencesProp ?? article?.sentences ?? [];
+  const sentences = useMemo(() => {
+    const candidate = sentencesProp ?? article?.sentences;
+    return Array.isArray(candidate) ? candidate : [];
+  }, [article?.sentences, sentencesProp]);
   const markup = markupProp ?? article?.markup;
   const allTopics = allTopicsProp ?? article?.topics ?? [];
   const readTopics = readTopicsProp ?? article?.readTopics ?? new Set();
   const onToggleRead = onToggleReadProp ?? article?.toggleRead;
-  const globalTopicSummaries = article?.topicSummaries ?? {};
+  const globalTopicSummaries = useMemo(() => {
+    const candidate = article?.topicSummaries;
+    return candidate && typeof candidate === "object" ? candidate : {};
+  }, [article?.topicSummaries]);
   const [extendedIndices, setExtendedIndices] = useState(new Set());
   const [activeTab, setActiveTab] = useState("sentences");
   const [pendingScrollIndex, setPendingScrollIndex] = useState(null);
@@ -133,25 +138,8 @@ function TopicSentencesModal({
     : false;
   const indicesList = normalizedTopic?.sentenceIndices || [];
   const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
-  const hasHtmlMarkup =
-    typeof topicMarkup?.html === "string" && topicMarkup.html.length > 0;
-  const hasEnrichedMarkup =
-    hasHtmlMarkup ||
-    Boolean(
-      topicMarkup &&
-      Array.isArray(topicMarkup.segments) &&
-      topicMarkup.segments.some((segment) => segment?.type !== "plain"),
-    );
-  const enrichedRangeGroups = hasEnrichedMarkup
-    ? buildEnrichedRangeGroupsWithFallbacks(
-        Array.isArray(topicMarkup?.positions) ? topicMarkup.positions : [],
-        normalizedTopic?.sentenceIndices || [],
-        Array.isArray(normalizedTopic?.ranges) ? normalizedTopic.ranges : [],
-      )
-    : [];
-  const markupUnits = Array.isArray(topicMarkup?.positions)
-    ? topicMarkup.positions.map((position) => position.text || "")
-    : modalSentences;
+  const markupRanges = getTopicMarkupRanges(topicMarkup);
+  const hasEnrichedMarkup = markupRanges.length > 0;
   const canToggleRead =
     Boolean(onToggleRead) &&
     Array.isArray(normalizedTopic?.canonicalTopicNames) &&
@@ -399,51 +387,27 @@ function TopicSentencesModal({
                 </div>
               ) : activeTab === "enriched" && hasEnrichedMarkup ? (
                 <div className="topic-sentences-modal__enriched-groups">
-                  {(enrichedRangeGroups.length > 0
-                    ? enrichedRangeGroups
-                    : [
-                        {
-                          groupNumber: 1,
-                          firstSourceSentenceIndex: 1,
-                          lastSourceSentenceIndex: markupUnits.length,
-                          positions: Array.isArray(topicMarkup?.positions)
-                            ? topicMarkup.positions
-                            : [],
-                        },
-                      ]
-                  ).map((rangeGroup) => {
-                    const groupMarkup = buildGroupMarkup(
-                      topicMarkup,
-                      rangeGroup,
-                    );
-                    const groupMarkupUnits = groupMarkup.positions.map(
-                      (position) => position.text || "",
-                    );
-                    return (
-                      <section
-                        key={`${rangeGroup.groupNumber}-${rangeGroup.firstSourceSentenceIndex}-${rangeGroup.lastSourceSentenceIndex}`}
-                        className="topic-sentences-modal__enriched-range"
-                      >
-                        <header className="topic-sentences-modal__enriched-range-header">
-                          <span className="topic-sentences-modal__enriched-range-badge">
-                            Range {rangeGroup.groupNumber}
-                          </span>
-                          <span className="topic-sentences-modal__enriched-range-title">
-                            {formatSentenceSpan(
-                              rangeGroup.firstSourceSentenceIndex,
-                              rangeGroup.lastSourceSentenceIndex,
-                            )}
-                          </span>
-                        </header>
-                        <div className="topic-sentences-modal__enriched-range-body">
-                          <MarkupRenderer
-                            segments={groupMarkup.segments}
-                            sentences={groupMarkupUnits}
-                          />
-                        </div>
-                      </section>
-                    );
-                  })}
+                  {markupRanges.map((range) => (
+                    <section
+                      key={`${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
+                      className="topic-sentences-modal__enriched-range"
+                    >
+                      <header className="topic-sentences-modal__enriched-range-header">
+                        <span className="topic-sentences-modal__enriched-range-badge">
+                          Range {range.range_index ?? 1}
+                        </span>
+                        <span className="topic-sentences-modal__enriched-range-title">
+                          {formatSentenceSpan(
+                            range.sentence_start,
+                            range.sentence_end,
+                          )}
+                        </span>
+                      </header>
+                      <div className="topic-sentences-modal__enriched-range-body">
+                        <MarkupRenderer html={range.html} />
+                      </div>
+                    </section>
+                  ))}
                 </div>
               ) : activeTab === "raw" && hasEnrichedMarkup ? (
                 <pre className="topic-sentences-modal__raw-json">
