@@ -7,14 +7,17 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from txt_splitt.cache import CacheEntry, _build_cache_key
 
+from lib.llm_queue.client import QueuedLLMClient
 from lib.storage.submissions import SubmissionsStorage
 
 
 logger = logging.getLogger(__name__)
+
+_PROMPT_VERSION = "markup_annotation_v1"
 
 MARKUP_GENERATION_PROMPT_TEMPLATE = """You are a text formatting assistant.
 
@@ -76,6 +79,10 @@ _RAW_HTML_TAG_RE = re.compile(r"</?[A-Za-z][^>]*>")
 _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LABEL_LINE_RE = re.compile(r"^(\d+)\s*:\s*(\w+)$")
+_CLAUSE_BOUNDARY_RE = re.compile(
+    r"(?:(?<=[.!?;:])\s+|(?<=,)\s+(?=(?:and|but|or|so|yet|for|nor|because|although|though|while|whereas|which|who|that)\b))",
+    re.IGNORECASE,
+)
 _INVISIBLE_CHARS_RE = re.compile(
     "["
     "\u0000-\u0008\u000b\u000c\u000e-\u001f"
@@ -114,7 +121,6 @@ def _call_llm_cached(
     skip_cache_read: bool = False,
 ) -> str:
     model_id = getattr(llm, "model_id", "unknown")
-    prompt_version = "markup_annotation_v1"
 
     if cache_store is None:
         return llm.call([prompt], temperature=temperature)
@@ -122,7 +128,7 @@ def _call_llm_cached(
     cache_key = _build_cache_key(
         namespace=namespace,
         model_id=model_id,
-        prompt_version=prompt_version,
+        prompt_version=_PROMPT_VERSION,
         prompt=prompt,
         temperature=temperature,
     )
@@ -139,11 +145,15 @@ def _call_llm_cached(
             created_at=time.time(),
             namespace=namespace,
             model_id=model_id,
-            prompt_version=prompt_version,
+            prompt_version=_PROMPT_VERSION,
             temperature=temperature,
         )
     )
     return response
+
+
+def _supports_parallel_submission(llm: Any) -> bool:
+    return isinstance(llm, QueuedLLMClient)
 
 
 def _cleanup_text_for_llm(text: str) -> str:
@@ -169,12 +179,56 @@ def _build_numbered_lines(cleaned_text: str) -> Tuple[List[str], str]:
     counter = 1
     for line in raw_lines:
         if line.strip():
-            content_lines.append(line)
-            numbered_parts.append(f"{counter}: {line}")
-            counter += 1
+            granular_lines = _split_line_for_markup(line)
+            for granular_line in granular_lines:
+                content_lines.append(granular_line)
+                numbered_parts.append(f"{counter}: {granular_line}")
+                counter += 1
         else:
             numbered_parts.append("")
     return content_lines, "\n".join(numbered_parts)
+
+
+def _split_line_for_markup(line: str) -> List[str]:
+    stripped_line = line.strip()
+    if not stripped_line:
+        return []
+
+    word_count = len(stripped_line.split())
+    if word_count <= 20:
+        return [stripped_line]
+
+    split_lines = [
+        part.strip()
+        for part in _CLAUSE_BOUNDARY_RE.split(stripped_line)
+        if part.strip()
+    ]
+    if len(split_lines) <= 1:
+        return [stripped_line]
+
+    merged_lines: List[str] = []
+    current_parts: List[str] = []
+
+    for part in split_lines:
+        current_parts.append(part)
+        current_line = " ".join(current_parts).strip()
+        current_word_count = len(current_line.split())
+
+        if current_word_count < 8:
+            continue
+
+        if current_word_count >= 18 or part.endswith((".", "!", "?", ",", ";", ":")):
+            merged_lines.append(current_line)
+            current_parts = []
+
+    if current_parts:
+        remainder = " ".join(current_parts).strip()
+        if merged_lines and len(remainder.split()) < 6:
+            merged_lines[-1] = f"{merged_lines[-1]} {remainder}".strip()
+        else:
+            merged_lines.append(remainder)
+
+    return merged_lines or [stripped_line]
 
 
 def _parse_label_output(output: str, line_count: int) -> Tuple[Dict[int, str], int]:
@@ -448,6 +502,123 @@ def _generate_grounded_html_for_range(
     return _build_plain_html(cleaned_text)
 
 
+def _render_markup_candidate(
+    *,
+    topic_name: str,
+    topic_range: TopicRange,
+    cleaned_text: str,
+    content_lines: List[str],
+    response: str,
+    attempt: int,
+    max_retries: int,
+) -> Optional[str]:
+    labels, parsed_count = _parse_label_output(response, len(content_lines))
+    if parsed_count > 0:
+        candidate = _build_html_from_labels(content_lines, labels)
+        if _is_grounded(cleaned_text, candidate):
+            return candidate
+        logger.warning(
+            "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
+            topic_name,
+            topic_range.range_index,
+            attempt,
+            max_retries,
+        )
+    else:
+        logger.warning(
+            "Markup label parsing yielded no results for topic '%s' range %d (%d/%d)",
+            topic_name,
+            topic_range.range_index,
+            attempt,
+            max_retries,
+        )
+
+    return None
+
+
+def _generate_grounded_html_for_range_parallel(
+    topic_name: str,
+    topic_range: TopicRange,
+    llm: Any,
+    max_retries: int,
+    initial_response: str,
+) -> str:
+    cleaned_text = _cleanup_text_for_llm(topic_range.text)
+    content_lines, numbered_text = _build_numbered_lines(cleaned_text)
+
+    if not content_lines:
+        return _build_plain_html(cleaned_text)
+
+    if len(content_lines) == 1:
+        return f"<p>{html_module.escape(content_lines[0], quote=False)}</p>"
+
+    candidate = _render_markup_candidate(
+        topic_name=topic_name,
+        topic_range=topic_range,
+        cleaned_text=cleaned_text,
+        content_lines=content_lines,
+        response=initial_response,
+        attempt=1,
+        max_retries=max_retries,
+    )
+    if candidate is not None:
+        return candidate
+
+    for attempt in range(1, max_retries):
+        try:
+            correction_prompt = MARKUP_CORRECTION_PROMPT_TEMPLATE.format(
+                numbered_lines=numbered_text,
+            )
+            response = llm.call([correction_prompt], temperature=0.0)
+            candidate = _render_markup_candidate(
+                topic_name=topic_name,
+                topic_range=topic_range,
+                cleaned_text=cleaned_text,
+                content_lines=content_lines,
+                response=response,
+                attempt=attempt + 1,
+                max_retries=max_retries,
+            )
+            if candidate is not None:
+                return candidate
+        except Exception as exc:
+            logger.warning(
+                "Markup generation failed for topic '%s' range %d (%d/%d): %s",
+                topic_name,
+                topic_range.range_index,
+                attempt + 1,
+                max_retries,
+                exc,
+            )
+
+        if attempt < max_retries - 1:
+            time.sleep(float(attempt))
+
+    logger.warning(
+        "Markup falling back to plain HTML for topic '%s' range %d",
+        topic_name,
+        topic_range.range_index,
+    )
+    return _build_plain_html(cleaned_text)
+
+
+def _submit_markup_range_request(
+    topic_range: TopicRange,
+    llm: Any,
+) -> Optional[Any]:
+    cleaned_text = _cleanup_text_for_llm(topic_range.text)
+    content_lines, numbered_text = _build_numbered_lines(cleaned_text)
+
+    if len(content_lines) <= 1:
+        return None
+
+    prompt = _build_markup_generation_prompt(numbered_text)
+    submit = getattr(llm, "submit", None)
+    if not callable(submit):
+        return None
+    return submit(prompt, 0.0)
+
+
 def _process_topic(
     topic: Dict[str, Any],
     all_sentences: List[str],
@@ -483,6 +654,121 @@ def _process_topic(
     return {"ranges": rendered_ranges}
 
 
+def _process_topic_parallel(
+    topic: Dict[str, Any],
+    all_sentences: List[str],
+    llm: Any,
+    max_retries: int,
+) -> Dict[str, Any]:
+    topic_name = topic.get("name", "Unknown")
+    ranges = _extract_topic_ranges(topic, all_sentences)
+    if not ranges:
+        return {"ranges": []}
+
+    pending_ranges: List[tuple[TopicRange, Any]] = []
+    for topic_range in ranges:
+        future = _submit_markup_range_request(topic_range, llm)
+        if future is not None:
+            pending_ranges.append((topic_range, future))
+
+    if pending_ranges:
+        logger.info(
+            "markup_generation: submitted %d ranges in parallel for topic '%s'",
+            len(pending_ranges),
+            topic_name,
+        )
+
+    resolved_html: Dict[int, str] = {}
+    for topic_range, future in pending_ranges:
+        response = future.result()
+        resolved_html[topic_range.range_index] = (
+            _generate_grounded_html_for_range_parallel(
+                topic_name=topic_name,
+                topic_range=topic_range,
+                llm=llm,
+                max_retries=max_retries,
+                initial_response=response,
+            )
+        )
+
+    rendered_ranges: List[Dict[str, Any]] = []
+    for topic_range in ranges:
+        html = resolved_html.get(topic_range.range_index)
+        if html is None:
+            html = _build_plain_html(_cleanup_text_for_llm(topic_range.text))
+        rendered_ranges.append(
+            {
+                "range_index": topic_range.range_index,
+                "sentence_start": topic_range.sentence_start,
+                "sentence_end": topic_range.sentence_end,
+                "html": html,
+            }
+        )
+
+    return {"ranges": rendered_ranges}
+
+
+def _process_all_topics_parallel(
+    topics: List[Dict[str, Any]],
+    all_sentences: List[str],
+    llm: Any,
+    max_retries: int,
+) -> Dict[str, Any]:
+    topic_ranges_map: Dict[str, List[TopicRange]] = {}
+    pending_ranges: List[tuple[str, TopicRange, Any]] = []
+
+    for index, topic in enumerate(topics):
+        topic_name = topic.get("name", f"topic_{index}")
+        ranges = _extract_topic_ranges(topic, all_sentences)
+        topic_ranges_map[topic_name] = ranges
+        for topic_range in ranges:
+            future = _submit_markup_range_request(topic_range, llm)
+            if future is not None:
+                pending_ranges.append((topic_name, topic_range, future))
+
+    if pending_ranges:
+        logger.info(
+            "markup_generation: submitted %d ranges in parallel across %d topics",
+            len(pending_ranges),
+            len(topic_ranges_map),
+        )
+
+    resolved_html: Dict[str, Dict[int, str]] = {}
+    for topic_name, topic_range, future in pending_ranges:
+        response = future.result()
+        topic_resolved = resolved_html.setdefault(topic_name, {})
+        topic_resolved[topic_range.range_index] = (
+            _generate_grounded_html_for_range_parallel(
+                topic_name=topic_name,
+                topic_range=topic_range,
+                llm=llm,
+                max_retries=max_retries,
+                initial_response=response,
+            )
+        )
+
+    markup: Dict[str, Any] = {}
+    for index, topic in enumerate(topics):
+        topic_name = topic.get("name", f"topic_{index}")
+        ranges = topic_ranges_map.get(topic_name, [])
+        rendered_ranges: List[Dict[str, Any]] = []
+        for topic_range in ranges:
+            html = resolved_html.get(topic_name, {}).get(topic_range.range_index)
+            if html is None:
+                html = _build_plain_html(_cleanup_text_for_llm(topic_range.text))
+            rendered_ranges.append(
+                {
+                    "range_index": topic_range.range_index,
+                    "sentence_start": topic_range.sentence_start,
+                    "sentence_end": topic_range.sentence_end,
+                    "html": html,
+                }
+            )
+        markup[topic_name] = {"ranges": rendered_ranges}
+
+    return markup
+
+
 def process_markup_generation(
     submission: Dict[str, Any],
     db: Any,
@@ -506,25 +792,47 @@ def process_markup_generation(
         return
 
     namespace = _cache_namespace(llm)
-    markup: Dict[str, Any] = {}
+    parallel_llm = (
+        llm.with_namespace(namespace, prompt_version=_PROMPT_VERSION)
+        if isinstance(llm, QueuedLLMClient)
+        else llm
+    )
 
-    for index, topic in enumerate(topics):
-        topic_name = topic.get("name", f"topic_{index}")
-        logger.info(
-            "[%s] markup_generation: formatting topic %d/%d '%s'",
-            submission_id,
-            index + 1,
-            len(topics),
-            topic_name,
-        )
-        markup[topic_name] = _process_topic(
-            topic=topic,
+    if _supports_parallel_submission(parallel_llm):
+        for index, topic in enumerate(topics):
+            topic_name = topic.get("name", f"topic_{index}")
+            logger.info(
+                "[%s] markup_generation: queueing topic %d/%d '%s'",
+                submission_id,
+                index + 1,
+                len(topics),
+                topic_name,
+            )
+        markup = _process_all_topics_parallel(
+            topics=topics,
             all_sentences=all_sentences,
-            llm=llm,
-            cache_store=cache_store,
-            namespace=namespace,
+            llm=parallel_llm,
             max_retries=max_retries,
         )
+    else:
+        markup: Dict[str, Any] = {}
+        for index, topic in enumerate(topics):
+            topic_name = topic.get("name", f"topic_{index}")
+            logger.info(
+                "[%s] markup_generation: formatting topic %d/%d '%s'",
+                submission_id,
+                index + 1,
+                len(topics),
+                topic_name,
+            )
+            markup[topic_name] = _process_topic(
+                topic=topic,
+                all_sentences=all_sentences,
+                llm=llm,
+                cache_store=cache_store,
+                namespace=namespace,
+                max_retries=max_retries,
+            )
 
     storage.update_results(submission_id, {"markup": markup})
     logger.info(

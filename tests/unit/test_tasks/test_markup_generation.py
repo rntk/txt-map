@@ -1,5 +1,7 @@
 import logging
+from unittest.mock import MagicMock
 
+from lib.llm_queue.client import QueuedLLMClient
 from lib.tasks.markup_generation import (
     _build_html_from_labels,
     _build_markup_generation_prompt,
@@ -11,6 +13,7 @@ from lib.tasks.markup_generation import (
     _markdown_to_html,
     _normalize_grounding_text,
     _parse_label_output,
+    _split_line_for_markup,
     process_markup_generation,
 )
 
@@ -36,6 +39,47 @@ def test_build_numbered_lines_empty_text() -> None:
 
     assert lines == []
     assert numbered == ""
+
+
+def test_split_line_for_markup_keeps_short_line_intact() -> None:
+    line = "Short sentence with a small amount of text."
+
+    assert _split_line_for_markup(line) == [line]
+
+
+def test_split_line_for_markup_splits_long_sentence_on_clauses() -> None:
+    line = (
+        "Alpha opens the discussion with a long introduction, and Beta adds a "
+        "supporting point that clarifies the tradeoff, while Gamma closes with a "
+        "practical next step for the team."
+    )
+
+    assert _split_line_for_markup(line) == [
+        "Alpha opens the discussion with a long introduction,",
+        "and Beta adds a supporting point that clarifies the tradeoff,",
+        "while Gamma closes with a practical next step for the team.",
+    ]
+
+
+def test_build_numbered_lines_splits_long_single_line_into_granular_parts() -> None:
+    text = (
+        "Alpha opens the discussion with a long introduction, and Beta adds a "
+        "supporting point that clarifies the tradeoff, while Gamma closes with a "
+        "practical next step for the team."
+    )
+
+    lines, numbered = _build_numbered_lines(text)
+
+    assert lines == [
+        "Alpha opens the discussion with a long introduction,",
+        "and Beta adds a supporting point that clarifies the tradeoff,",
+        "while Gamma closes with a practical next step for the team.",
+    ]
+    assert numbered == (
+        "1: Alpha opens the discussion with a long introduction,\n"
+        "2: and Beta adds a supporting point that clarifies the tradeoff,\n"
+        "3: while Gamma closes with a practical next step for the team."
+    )
 
 
 def test_parse_label_output_parses_valid_labels() -> None:
@@ -288,6 +332,256 @@ def test_process_markup_generation_retries_with_correction_and_falls_back(
     assert "Markup falling back to plain HTML for topic 'topic-a' range 1" in (
         caplog.text
     )
+
+
+def test_process_markup_generation_splits_long_single_sentence_before_llm(
+    monkeypatch,
+) -> None:
+    captured_results: dict[str, object] = {}
+
+    def fake_update_results(
+        self, submission_id: str, results: dict[str, object]
+    ) -> bool:
+        assert submission_id == "sub-123"
+        captured_results.update(results)
+        return True
+
+    monkeypatch.setattr(
+        "lib.tasks.markup_generation.SubmissionsStorage.update_results",
+        fake_update_results,
+    )
+
+    class MockLLM:
+        model_id = "test-model"
+
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def call(self, messages, temperature=0.0):
+            del temperature
+            prompt = messages[0]
+            self.prompts.append(prompt)
+            assert "1: Alpha opens the discussion with a long introduction," in prompt
+            assert (
+                "2: and Beta adds a supporting point that clarifies the tradeoff,"
+                in prompt
+            )
+            assert (
+                "3: while Gamma closes with a practical next step for the team."
+                in prompt
+            )
+            return "1: p\n2: p\n3: p"
+
+    submission = {
+        "submission_id": "sub-123",
+        "results": {
+            "sentences": [
+                (
+                    "Alpha opens the discussion with a long introduction, and Beta "
+                    "adds a supporting point that clarifies the tradeoff, while "
+                    "Gamma closes with a practical next step for the team."
+                )
+            ],
+            "topics": [{"name": "topic-a", "sentences": [1]}],
+        },
+    }
+
+    process_markup_generation(submission, db=object(), llm=MockLLM())
+
+    markup = captured_results["markup"]
+    assert (
+        markup["topic-a"]["ranges"][0]["html"]
+        == "<p>Alpha opens the discussion with a long introduction,</p>\n"
+        "<p>and Beta adds a supporting point that clarifies the tradeoff,</p>\n"
+        "<p>while Gamma closes with a practical next step for the team.</p>"
+    )
+
+
+def test_process_markup_generation_submits_multiple_ranges_in_parallel(
+    monkeypatch,
+) -> None:
+    captured_results: dict[str, object] = {}
+
+    def fake_update_results(
+        self, submission_id: str, results: dict[str, object]
+    ) -> bool:
+        assert submission_id == "sub-123"
+        captured_results.update(results)
+        return True
+
+    monkeypatch.setattr(
+        "lib.tasks.markup_generation.SubmissionsStorage.update_results",
+        fake_update_results,
+    )
+
+    class MockFuture:
+        def __init__(self, response: str, owner: object) -> None:
+            self._response = response
+            self._owner = owner
+
+        def result(self, timeout=None) -> str:
+            del timeout
+            self._owner.result_calls += 1
+            assert len(self._owner.submit_prompts) == 2
+            return self._response
+
+    queue_store = MagicMock()
+    llm = QueuedLLMClient(
+        store=queue_store,
+        model_id="test-model",
+        max_context_tokens=128000,
+    )
+    llm.submit_prompts = []
+    llm.result_calls = 0
+
+    def fake_submit(prompt: str, temperature: float = 0.0) -> MockFuture:
+        assert temperature == 0.0
+        llm.submit_prompts.append(prompt)
+        response = "1: p\n2: p"
+        return MockFuture(response, llm)
+
+    monkeypatch.setattr(llm, "submit", fake_submit)
+    monkeypatch.setattr(
+        llm,
+        "with_namespace",
+        lambda namespace, prompt_version=None: llm,
+    )
+
+    def fail_call(messages, temperature=0.0):
+        del messages, temperature
+        raise AssertionError(
+            "call() should not be used for successful first-pass results"
+        )
+
+    monkeypatch.setattr(llm, "call", fail_call)
+
+    submission = {
+        "submission_id": "sub-123",
+        "results": {
+            "sentences": [
+                (
+                    "Alpha opens with a long setup for the discussion, and Beta "
+                    "adds a clarifying detail about the main tradeoff, while "
+                    "Gamma closes with a concrete next step for delivery."
+                ),
+                (
+                    "Delta frames the rollout timeline for the project, and "
+                    "Epsilon adds the operational constraint from the platform "
+                    "team, while Zeta ends with the implementation checkpoint."
+                ),
+            ],
+            "topics": [
+                {
+                    "name": "topic-a",
+                    "ranges": [
+                        {"sentence_start": 1, "sentence_end": 1},
+                        {"sentence_start": 2, "sentence_end": 2},
+                    ],
+                }
+            ],
+        },
+    }
+
+    process_markup_generation(submission, db=object(), llm=llm)
+
+    assert len(llm.submit_prompts) == 2
+    assert llm.result_calls == 2
+    markup = captured_results["markup"]
+    assert (
+        markup["topic-a"]["ranges"][0]["html"]
+        == "<p>Alpha opens with a long setup for the discussion,</p>\n"
+        "<p>and Beta adds a clarifying detail about the main tradeoff,</p>\n"
+        "<p>while Gamma closes with a concrete next step for delivery.</p>"
+    )
+    assert (
+        markup["topic-a"]["ranges"][1]["html"]
+        == "<p>Delta frames the rollout timeline for the project,</p>\n"
+        "<p>and Epsilon adds the operational constraint from the platform team,</p>\n"
+        "<p>while Zeta ends with the implementation checkpoint.</p>"
+    )
+
+
+def test_process_markup_generation_submits_all_topics_before_waiting(
+    monkeypatch,
+) -> None:
+    captured_results: dict[str, object] = {}
+
+    def fake_update_results(
+        self, submission_id: str, results: dict[str, object]
+    ) -> bool:
+        assert submission_id == "sub-123"
+        captured_results.update(results)
+        return True
+
+    monkeypatch.setattr(
+        "lib.tasks.markup_generation.SubmissionsStorage.update_results",
+        fake_update_results,
+    )
+
+    class MockFuture:
+        def __init__(self, response: str, owner: object) -> None:
+            self._response = response
+            self._owner = owner
+
+        def result(self, timeout=None) -> str:
+            del timeout
+            self._owner.result_calls += 1
+            assert len(self._owner.submit_prompts) == 2
+            return self._response
+
+    queue_store = MagicMock()
+    llm = QueuedLLMClient(
+        store=queue_store,
+        model_id="test-model",
+        max_context_tokens=128000,
+    )
+    llm.submit_prompts = []
+    llm.result_calls = 0
+
+    def fake_submit(prompt: str, temperature: float = 0.0) -> MockFuture:
+        assert temperature == 0.0
+        llm.submit_prompts.append(prompt)
+        return MockFuture("1: p\n2: p", llm)
+
+    monkeypatch.setattr(llm, "submit", fake_submit)
+    monkeypatch.setattr(llm, "with_namespace", lambda namespace, prompt_version=None: llm)
+    monkeypatch.setattr(
+        llm,
+        "call",
+        lambda messages, temperature=0.0: (_ for _ in ()).throw(
+            AssertionError("call() should not be used for successful first-pass results")
+        ),
+    )
+
+    submission = {
+        "submission_id": "sub-123",
+        "results": {
+            "sentences": [
+                (
+                    "Alpha opens with a long setup for the discussion, and Beta "
+                    "adds a clarifying detail about the main tradeoff, while "
+                    "Gamma closes with a concrete next step for delivery."
+                ),
+                (
+                    "Delta frames the rollout timeline for the project, and "
+                    "Epsilon adds the operational constraint from the platform "
+                    "team, while Zeta ends with the implementation checkpoint."
+                ),
+            ],
+            "topics": [
+                {"name": "topic-a", "sentences": [1]},
+                {"name": "topic-b", "sentences": [2]},
+            ],
+        },
+    }
+
+    process_markup_generation(submission, db=object(), llm=llm)
+
+    assert len(llm.submit_prompts) == 2
+    assert llm.result_calls == 2
+    markup = captured_results["markup"]
+    assert markup["topic-a"]["ranges"][0]["sentence_start"] == 1
+    assert markup["topic-b"]["ranges"][0]["sentence_start"] == 2
 
 
 def test_cleanup_text_for_llm_strips_html_entities() -> None:
