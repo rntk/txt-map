@@ -40,7 +40,6 @@ const inlineStyleAllowlist = [
   'src/components/SubtopicsRiverChart.jsx',
   'src/components/TopicTreeNode.jsx',
   'src/components/TopicIndexView.jsx',
-  'src/components/TopicArticleFullscreenView.jsx',
   'src/components/TopicsTagCloud.jsx',
   'src/components/TextDisplay.jsx',
   'src/components/TopicsBarChart.jsx',

@@ -18,7 +18,6 @@ import TextPageToolbar from "./TextPageToolbar";
 import ArticleTabHeader from "./ArticleTabHeader";
 import ArticleSummaryView from "./ArticleSummaryView";
 import ArticleMarkupView from "./ArticleMarkupView";
-import TopicArticleFullscreenView from "./TopicArticleFullscreenView";
 import TopicIndexView from "./TopicIndexView";
 import RawTextView from "./RawTextView";
 import WordSelectionPopup from "./WordSelectionPopup";
@@ -38,7 +37,6 @@ import {
 import "../styles/text-reading.css";
 
 const FULLSCREEN_TABS = [
-  { key: "topic_article_view", label: "Topics + Article" },
   { key: "topic_index", label: "Index" },
   { key: "topic_summary_timeline", label: "Topic Summaries" },
   { key: "insights", label: "Insights" },
@@ -1196,31 +1194,6 @@ function TextPageContent() {
               readTopics={readTopics}
               onToggleRead={toggleRead}
               markup={submission?.results?.markup}
-            />
-          )}
-
-          {fullscreenGraph === "topic_article_view" && (
-            <TopicArticleFullscreenView
-              articles={articles}
-              safeTopics={safeTopics}
-              selectedTopics={selectedTopics}
-              hoveredTopic={hoveredTopic}
-              setHoveredTopic={setHoveredTopic}
-              readTopics={readTopics}
-              onToggleRead={toggleRead}
-              onToggleTopic={toggleTopic}
-              onNavigateTopic={navigateTopicSentence}
-              onShowSentences={handleShowTopicSentences}
-              onOpenTopicSummaries={handleOpenTopicSummaries}
-              tooltipEnabled={tooltipEnabled}
-              submissionId={submissionId}
-              activeInsightSentenceIndices={activeInsightSentenceIndices}
-              activeInsightRanges={activeInsightRanges}
-              coloredTopicNames={coloredTopicNames}
-              coloredHighlightMode={
-                highlightAllTopics || highlightInsightTopics
-              }
-              onClose={closeFullscreenGraph}
             />
           )}
 
