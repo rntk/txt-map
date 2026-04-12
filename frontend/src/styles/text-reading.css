@@ -861,6 +861,45 @@
   font-size: 21px;
 }
 
+.topic-index-view__tile-keyphrases {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 6px;
+}
+
+.topic-index-view__tile-keyphrase {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #101828;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.topic-index-view__tile-keyphrase:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.topic-index-view__tile-excerpt {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  width: 100%;
+  color: rgba(16, 24, 40, 0.6);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .topic-index-view__tile-summary {
   display: -webkit-box;
   margin: 0;

@@ -14,20 +14,18 @@ import {
 import { splitTopicPath } from "../utils/summaryTimeline";
 import { isTopicRead } from "../utils/topicReadUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
-import { buildArticleTfIdfIndex, buildTopicTagCloud } from "../utils/gridUtils";
+import {
+  buildArticleTfIdfIndex,
+  buildTopicKeyPhrases,
+  buildTopicTagCloud,
+} from "../utils/gridUtils";
 import { useArticle } from "../contexts/ArticleContext";
 
 const MIN_TILE_HEIGHT = 44;
 const PER_RANGE_CHAR_PX = 0.28;
 const ESTIMATED_SENTENCE_CHAR_COUNT = 90;
 const MAX_TILE_HEIGHT = 180;
-const TOPIC_TILE_META_ORDER = [
-  "tags",
-  "summary",
-  "subtopics",
-  "latent_topics",
-  "clusters",
-];
+const TOPIC_TILE_META_ORDER = ["key_phrases", "subtopics", "tags"];
 
 /**
  * @typedef {Object} TopicIndexRangeSegment
@@ -62,29 +60,21 @@ const TOPIC_TILE_META_ORDER = [
  */
 
 /**
- * @typedef {Object} TopicIndexLatentTopicItem
- * @property {number} id
- * @property {string[]} keywords
+ * @typedef {Object} TopicIndexKeyPhraseItem
+ * @property {string} label
  * @property {number} score
- * @property {number} weight
- */
-
-/**
- * @typedef {Object} TopicIndexClusterItem
- * @property {number} clusterId
- * @property {string[]} keywords
- * @property {number} sentenceCount
+ * @property {string} sizeClass
+ * @property {boolean} isBigram
  */
 
 /**
  * @typedef {Object} TopicIndexMetaCategory
- * @property {"tags"|"summary"|"subtopics"|"latent_topics"|"clusters"} key
+ * @property {"key_phrases"|"subtopics"|"tags"} key
  * @property {string} label
- * @property {TopicIndexTagItem[]=} tags
- * @property {string=} summary
+ * @property {TopicIndexKeyPhraseItem[]=} phrases
+ * @property {string=} representativeSentence
  * @property {TopicIndexSubtopicItem[]=} subtopics
- * @property {TopicIndexLatentTopicItem[]=} latentTopics
- * @property {TopicIndexClusterItem[]=} clusters
+ * @property {TopicIndexTagItem[]=} tags
  */
 
 /**
@@ -298,65 +288,33 @@ function stopTileClickPropagation(event) {
  * @param {number} limit
  * @returns {string[]}
  */
-function sliceKeywords(keywords, limit) {
-  return (Array.isArray(keywords) ? keywords : [])
-    .filter((keyword) => typeof keyword === "string" && keyword.trim())
-    .slice(0, limit);
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function truncateTileText(value) {
-  const text = typeof value === "string" ? value.trim() : "";
-  if (text.length <= 160) {
-    return text;
-  }
-  return `${text.slice(0, 157).trimEnd()}...`;
-}
-
 /**
  * @param {Object} topic
+ * @param {Map<string, { phrases: TopicIndexKeyPhraseItem[], representativeSentence: string }>} topicKeyPhrasesMap
  * @param {Map<string, TopicIndexTagItem[]>} topicTagCloudMap
- * @param {Record<string, string>} topicSummaries
  * @param {Map<string, TopicIndexSubtopicItem[]>} subtopicsByParent
- * @param {Map<string, TopicIndexLatentTopicItem[]>} latentTopicsByTopic
- * @param {Map<string, TopicIndexClusterItem[]>} clustersByTopic
  * @returns {TopicIndexMetaCategory[]}
  */
 function buildTopicTileMetaCategories(
   topic,
+  topicKeyPhrasesMap,
   topicTagCloudMap,
-  topicSummaries,
   subtopicsByParent,
-  latentTopicsByTopic,
-  clustersByTopic,
 ) {
   /** @type {Record<string, TopicIndexMetaCategory|null>} */
   const categoriesByKey = {
-    tags: null,
-    summary: null,
+    key_phrases: null,
     subtopics: null,
-    latent_topics: null,
-    clusters: null,
+    tags: null,
   };
 
-  const tags = topicTagCloudMap.get(topic.name) || [];
-  if (tags.length > 0) {
-    categoriesByKey.tags = {
-      key: "tags",
-      label: "Tags",
-      tags,
-    };
-  }
-
-  const summary = truncateTileText(topicSummaries[topic.name] || "");
-  if (summary) {
-    categoriesByKey.summary = {
-      key: "summary",
-      label: "Summary",
-      summary,
+  const keyPhraseData = topicKeyPhrasesMap.get(topic.name);
+  if (keyPhraseData && keyPhraseData.phrases.length > 0) {
+    categoriesByKey.key_phrases = {
+      key: "key_phrases",
+      label: "Key Phrases",
+      phrases: keyPhraseData.phrases,
+      representativeSentence: keyPhraseData.representativeSentence,
     };
   }
 
@@ -369,21 +327,12 @@ function buildTopicTileMetaCategories(
     };
   }
 
-  const latentTopics = latentTopicsByTopic.get(topic.name) || [];
-  if (latentTopics.length > 0) {
-    categoriesByKey.latent_topics = {
-      key: "latent_topics",
-      label: "Latent Topics",
-      latentTopics,
-    };
-  }
-
-  const clusters = clustersByTopic.get(topic.name) || [];
-  if (clusters.length > 0) {
-    categoriesByKey.clusters = {
-      key: "clusters",
-      label: "Clusters",
-      clusters,
+  const tags = topicTagCloudMap.get(topic.name) || [];
+  if (tags.length > 0) {
+    categoriesByKey.tags = {
+      key: "tags",
+      label: "Tags",
+      tags,
     };
   }
 
@@ -409,7 +358,6 @@ function TopicIndexView({
     Array.isArray(articles) && articles.length > 0 ? articles[0] : null;
   const submissionResults = articleContext?.submission?.results || {};
   const contextMarkup = articleContext?.markup;
-  const topicSummaries = articleContext?.topicSummaries || {};
   const articleSentences = useMemo(
     () =>
       (Array.isArray(article?.sentences) ? article.sentences : []).map(
@@ -489,114 +437,20 @@ function TopicIndexView({
     return groupedSubtopics;
   }, [submissionResults?.subtopics]);
 
-  const latentTopicsByTopic = useMemo(() => {
-    /** @type {Map<number, { id: number, keywords: string[], weight: number }>} */
-    const latentTopicById = new Map();
-    const rawLatentTopics = Array.isArray(
-      submissionResults?.topic_model?.latent_topics,
-    )
-      ? submissionResults.topic_model.latent_topics
-      : [];
-    const rawTopicMappings = Array.isArray(
-      submissionResults?.topic_model?.topic_mapping,
-    )
-      ? submissionResults.topic_model.topic_mapping
-      : [];
-
-    rawLatentTopics.forEach((latentTopic) => {
-      if (!Number.isInteger(latentTopic?.id)) {
-        return;
-      }
-      latentTopicById.set(latentTopic.id, {
-        id: latentTopic.id,
-        keywords: sliceKeywords(latentTopic?.keywords, 4),
-        weight: Number(latentTopic?.weight) || 0,
-      });
-    });
-
-    /** @type {Map<string, TopicIndexLatentTopicItem[]>} */
-    const groupedLatentTopics = new Map();
-    rawTopicMappings.forEach((mapping) => {
-      const topicName =
-        typeof mapping?.topic_name === "string" ? mapping.topic_name : "";
-      if (!topicName) {
-        return;
-      }
-
-      const relevantItems = (
-        Array.isArray(mapping?.latent_topic_ids) ? mapping.latent_topic_ids : []
-      )
-        .map((latentTopicId, index) => {
-          const latentTopic = latentTopicById.get(latentTopicId);
-          if (!latentTopic) {
-            return null;
-          }
-          return {
-            id: latentTopic.id,
-            keywords: latentTopic.keywords,
-            score: Number(mapping?.scores?.[index]) || 0,
-            weight: latentTopic.weight,
-          };
-        })
-        .filter(Boolean)
-        .sort((left, right) => right.score - left.score)
-        .slice(0, 2);
-
-      if (relevantItems.length > 0) {
-        groupedLatentTopics.set(topicName, relevantItems);
-      }
-    });
-
-    return groupedLatentTopics;
-  }, [
-    submissionResults?.topic_model?.latent_topics,
-    submissionResults?.topic_model?.topic_mapping,
-  ]);
-
-  const clustersByTopic = useMemo(() => {
-    /** @type {Map<string, TopicIndexClusterItem[]>} */
-    const groupedClusters = new Map();
-    const rawClusters = Array.isArray(submissionResults?.clusters)
-      ? submissionResults.clusters
-      : [];
-
+  const topicKeyPhrasesMap = useMemo(() => {
+    /** @type {Map<string, { phrases: TopicIndexKeyPhraseItem[], representativeSentence: string }>} */
+    const phrasesByTopicName = new Map();
     deduplicatedTopics.forEach((topic) => {
-      const topicSentenceSet = new Set(
-        Array.isArray(topic?.sentences) ? topic.sentences : [],
-      );
-      if (topicSentenceSet.size === 0) {
+      if (!topic?.name || phrasesByTopicName.has(topic.name)) {
         return;
       }
-
-      const relevantClusters = rawClusters
-        .map((cluster) => {
-          const overlappingSentenceCount = (
-            Array.isArray(cluster?.sentence_indices)
-              ? cluster.sentence_indices
-              : []
-          ).filter((sentenceIndex) =>
-            topicSentenceSet.has(sentenceIndex),
-          ).length;
-          if (overlappingSentenceCount === 0) {
-            return null;
-          }
-          return {
-            clusterId: Number(cluster?.cluster_id) || 0,
-            keywords: sliceKeywords(cluster?.keywords, 3),
-            sentenceCount: overlappingSentenceCount,
-          };
-        })
-        .filter(Boolean)
-        .sort((left, right) => right.sentenceCount - left.sentenceCount)
-        .slice(0, 2);
-
-      if (relevantClusters.length > 0) {
-        groupedClusters.set(topic.name, relevantClusters);
-      }
+      phrasesByTopicName.set(
+        topic.name,
+        buildTopicKeyPhrases(topic, articleTfIdfIndex, articleSentences),
+      );
     });
-
-    return groupedClusters;
-  }, [deduplicatedTopics, submissionResults?.clusters]);
+    return phrasesByTopicName;
+  }, [deduplicatedTopics, articleTfIdfIndex, articleSentences]);
 
   const tileMetaCategoriesByTopic = useMemo(() => {
     /** @type {Map<string, TopicIndexMetaCategory[]>} */
@@ -606,22 +460,18 @@ function TopicIndexView({
         topic.name,
         buildTopicTileMetaCategories(
           topic,
+          topicKeyPhrasesMap,
           topicTagCloudMap,
-          topicSummaries,
           subtopicsByParent,
-          latentTopicsByTopic,
-          clustersByTopic,
         ),
       );
     });
     return categoriesByTopicName;
   }, [
     deduplicatedTopics,
+    topicKeyPhrasesMap,
     topicTagCloudMap,
-    topicSummaries,
     subtopicsByParent,
-    latentTopicsByTopic,
-    clustersByTopic,
   ]);
 
   const noteAccentStyleSheet = useMemo(() => {
@@ -1005,30 +855,38 @@ function TopicIndexView({
                                   );
                                 }}
                               >
-                                {activeMetaCategory.key === "tags"
-                                  ? activeMetaCategory.tags.map((tag) => {
-                                      const label = tag.label;
-                                      const displayLabel =
-                                        label.length > 10
-                                          ? `${label.substring(0, 10)}...`
-                                          : label;
-                                      return (
-                                        <a
-                                          key={`${topic.name}-${label}`}
-                                          className={`topic-index-view__tile-tag topic-index-view__tile-tag--${tag.sizeClass}`}
-                                          href={`/page/word/${submissionId || "unknown"}/${encodeURIComponent(label)}`}
-                                          title={`${label} (${tag.count})`}
-                                          onClick={stopTileClickPropagation}
-                                        >
-                                          {displayLabel}
-                                        </a>
-                                      );
-                                    })
-                                  : null}
-                                {activeMetaCategory.key === "summary" ? (
-                                  <p className="topic-index-view__tile-summary">
-                                    {activeMetaCategory.summary}
-                                  </p>
+                                {activeMetaCategory.key === "key_phrases" ? (
+                                  <>
+                                    <div className="topic-index-view__tile-keyphrases">
+                                      {activeMetaCategory.phrases.map(
+                                        (phrase) => {
+                                          const label = phrase.label;
+                                          const displayLabel =
+                                            label.length > 25
+                                              ? `${label.substring(0, 25)}...`
+                                              : label;
+                                          return (
+                                            <a
+                                              key={`${topic.name}-${label}`}
+                                              className={`topic-index-view__tile-keyphrase topic-index-view__tile-tag--${phrase.sizeClass}`}
+                                              href={`/page/word/${submissionId || "unknown"}/${encodeURIComponent(label)}`}
+                                              title={label}
+                                              onClick={stopTileClickPropagation}
+                                            >
+                                              {displayLabel}
+                                            </a>
+                                          );
+                                        },
+                                      )}
+                                    </div>
+                                    {activeMetaCategory.representativeSentence ? (
+                                      <p className="topic-index-view__tile-excerpt">
+                                        {
+                                          activeMetaCategory.representativeSentence
+                                        }
+                                      </p>
+                                    ) : null}
+                                  </>
                                 ) : null}
                                 {activeMetaCategory.key === "subtopics"
                                   ? activeMetaCategory.subtopics.map(
@@ -1050,59 +908,25 @@ function TopicIndexView({
                                       ),
                                     )
                                   : null}
-                                {activeMetaCategory.key === "latent_topics"
-                                  ? activeMetaCategory.latentTopics.map(
-                                      (latentTopic) => {
-                                        const targetKeyword =
-                                          latentTopic.keywords[0] ||
-                                          `Latent Topic ${latentTopic.id + 1}`;
-                                        return (
-                                          <a
-                                            key={`${topic.name}-${latentTopic.id}`}
-                                            className="topic-index-view__tile-meta-item topic-index-view__tile-meta-item--link"
-                                            href={`/page/word/${submissionId || "unknown"}/${encodeURIComponent(targetKeyword)}`}
-                                            onClick={stopTileClickPropagation}
-                                          >
-                                            <span className="topic-index-view__tile-meta-item-title">
-                                              {targetKeyword}
-                                            </span>
-                                            <span className="topic-index-view__tile-meta-item-detail">
-                                              {sliceKeywords(
-                                                latentTopic.keywords,
-                                                3,
-                                              ).join(", ")}
-                                              {` · ${(
-                                                latentTopic.score * 100
-                                              ).toFixed(1)}%`}
-                                            </span>
-                                          </a>
-                                        );
-                                      },
-                                    )
-                                  : null}
-                                {activeMetaCategory.key === "clusters"
-                                  ? activeMetaCategory.clusters.map(
-                                      (cluster) => (
-                                        <div
-                                          key={`${topic.name}-cluster-${cluster.clusterId}`}
-                                          className="topic-index-view__tile-meta-item"
+                                {activeMetaCategory.key === "tags"
+                                  ? activeMetaCategory.tags.map((tag) => {
+                                      const label = tag.label;
+                                      const displayLabel =
+                                        label.length > 10
+                                          ? `${label.substring(0, 10)}...`
+                                          : label;
+                                      return (
+                                        <a
+                                          key={`${topic.name}-${label}`}
+                                          className={`topic-index-view__tile-tag topic-index-view__tile-tag--${tag.sizeClass}`}
+                                          href={`/page/word/${submissionId || "unknown"}/${encodeURIComponent(label)}`}
+                                          title={`${label} (${tag.count})`}
+                                          onClick={stopTileClickPropagation}
                                         >
-                                          <span className="topic-index-view__tile-meta-item-title">
-                                            Cluster {cluster.clusterId + 1}
-                                          </span>
-                                          <span className="topic-index-view__tile-meta-item-detail">
-                                            {cluster.keywords.join(", ")}
-                                            {cluster.keywords.length > 0
-                                              ? " · "
-                                              : ""}
-                                            {cluster.sentenceCount} sentence
-                                            {cluster.sentenceCount === 1
-                                              ? ""
-                                              : "s"}
-                                          </span>
-                                        </div>
-                                      ),
-                                    )
+                                          {displayLabel}
+                                        </a>
+                                      );
+                                    })
                                   : null}
                               </div>
                             </div>

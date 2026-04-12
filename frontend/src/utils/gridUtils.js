@@ -236,8 +236,15 @@ export const buildArticleTfIdfIndex = (allSentences) => {
         .map(normalizeTagToken)
         .filter(Boolean);
       const meaningfulTokens = normalizedTokens.filter(isMeaningfulTagToken);
+      const finalTokens =
+        meaningfulTokens.length > 0 ? meaningfulTokens : normalizedTokens;
 
-      return meaningfulTokens.length > 0 ? meaningfulTokens : normalizedTokens;
+      const bigrams = [];
+      for (let i = 0; i < meaningfulTokens.length - 1; i++) {
+        bigrams.push(`${meaningfulTokens[i]} ${meaningfulTokens[i + 1]}`);
+      }
+
+      return [...finalTokens, ...bigrams];
     },
   );
   const documentFrequencies = new Map();
@@ -310,6 +317,7 @@ export const buildTopicTagCloud = (topic, articleTfIdfIndex, limit = 6) => {
   });
 
   const rankedTags = Array.from(termFrequencies.entries())
+    .filter(([label]) => !label.includes(" "))
     .map(([label, count]) => {
       const documentFrequency = documentFrequencies.get(label) || 1;
       const idf =
@@ -350,6 +358,164 @@ export const buildTopicTagCloud = (topic, articleTfIdfIndex, limit = 6) => {
     score: tag.score,
     sizeClass: topicTagSizeClassForScore(tag.score, minScore, maxScore),
   }));
+};
+
+/**
+ * @param {Object} topic
+ * @param {{
+ *   sentenceTokens: string[][],
+ *   documentFrequencies: Map<string, number>,
+ *   totalSentenceCount: number,
+ * }} articleTfIdfIndex
+ * @param {Array<string>} allSentences - original sentence texts for excerpt selection
+ * @param {number} [limit]
+ * @returns {{
+ *   phrases: Array<{ label: string, score: number, sizeClass: string, isBigram: boolean }>,
+ *   representativeSentence: string,
+ * }}
+ */
+export const buildTopicKeyPhrases = (
+  topic,
+  articleTfIdfIndex,
+  allSentences,
+  limit = 5,
+) => {
+  if (!topic || !articleTfIdfIndex) {
+    return { phrases: [], representativeSentence: "" };
+  }
+
+  const { sentenceTokens, documentFrequencies, totalSentenceCount } =
+    articleTfIdfIndex;
+  const topicSentenceIndices = collectTopicSentenceIndices(
+    topic,
+    sentenceTokens,
+  );
+
+  if (topicSentenceIndices.length === 0) {
+    return { phrases: [], representativeSentence: "" };
+  }
+
+  const termFrequencies = new Map();
+  const topicCoverage = new Map();
+
+  topicSentenceIndices.forEach((sentenceIndex) => {
+    const tokens = sentenceTokens[sentenceIndex] || [];
+    const uniqueTokens = new Set();
+
+    tokens.forEach((token) => {
+      termFrequencies.set(token, (termFrequencies.get(token) || 0) + 1);
+      uniqueTokens.add(token);
+    });
+
+    uniqueTokens.forEach((token) => {
+      topicCoverage.set(token, (topicCoverage.get(token) || 0) + 1);
+    });
+  });
+
+  const rankedTerms = Array.from(termFrequencies.entries())
+    .map(([label, count]) => {
+      const documentFrequency = documentFrequencies.get(label) || 1;
+      const idf =
+        Math.log((1 + totalSentenceCount) / (1 + documentFrequency)) + 1;
+      const isBigram = label.includes(" ");
+
+      return {
+        label,
+        count,
+        // slight score boost for bigrams -- they carry more context
+        score: count * idf * (isBigram ? 1.2 : 1.0),
+        idf,
+        coverage: topicCoverage.get(label) || 0,
+        isBigram,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.coverage - left.coverage ||
+        right.count - left.count ||
+        left.label.localeCompare(right.label),
+    );
+
+  const meaningfulTerms = rankedTerms.filter((term) => term.idf >= 1.15);
+  const candidateTerms =
+    meaningfulTerms.length > 0 ? meaningfulTerms : rankedTerms;
+
+  // Subsumption: bigrams suppress their component words from the result.
+  // Walk candidates in score order, collecting up to limit * 2 to allow room
+  // for retroactive removals. When a bigram is added, retroactively drop any
+  // already-selected unigrams that are its components, then keep filling.
+  const selectedTerms = [];
+  const suppressedUnigrams = new Set();
+  let candidateIndex = 0;
+
+  while (
+    selectedTerms.length < limit &&
+    candidateIndex < candidateTerms.length
+  ) {
+    const term = candidateTerms[candidateIndex];
+    candidateIndex += 1;
+
+    if (!term.isBigram && suppressedUnigrams.has(term.label)) {
+      continue;
+    }
+
+    selectedTerms.push(term);
+
+    if (term.isBigram) {
+      const parts = term.label.split(" ");
+      parts.forEach((part) => suppressedUnigrams.add(part));
+
+      // Retroactively remove any unigram components already in the list
+      for (let i = selectedTerms.length - 2; i >= 0; i -= 1) {
+        if (!selectedTerms[i].isBigram && suppressedUnigrams.has(selectedTerms[i].label)) {
+          selectedTerms.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  const scores = selectedTerms.map((t) => t.score);
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+
+  const phrases = selectedTerms.map((term) => ({
+    label: term.label,
+    score: term.score,
+    isBigram: term.isBigram,
+    sizeClass: topicTagSizeClassForScore(term.score, minScore, maxScore),
+  }));
+
+  // Representative sentence: the one with the highest sum of IDF scores for its unique unigram tokens
+  const sentenceTexts = Array.isArray(allSentences) ? allSentences : [];
+  let bestSentenceIndex = topicSentenceIndices[0];
+  let bestSentenceScore = -Infinity;
+
+  topicSentenceIndices.forEach((sentenceIndex) => {
+    const tokens = sentenceTokens[sentenceIndex] || [];
+    const uniqueUnigrams = new Set(tokens.filter((t) => !t.includes(" ")));
+    let sentenceScore = 0;
+
+    uniqueUnigrams.forEach((token) => {
+      const df = documentFrequencies.get(token) || 1;
+      const idf =
+        Math.log((1 + totalSentenceCount) / (1 + df)) + 1;
+      sentenceScore += idf;
+    });
+
+    if (sentenceScore > bestSentenceScore) {
+      bestSentenceScore = sentenceScore;
+      bestSentenceIndex = sentenceIndex;
+    }
+  });
+
+  const rawSentence = sentenceTexts[bestSentenceIndex] || "";
+  const representativeSentence =
+    rawSentence.length > 120
+      ? `${rawSentence.substring(0, 120).trimEnd()}…`
+      : rawSentence;
+
+  return { phrases, representativeSentence };
 };
 
 export const buildTopTags = (segmentTopics, allSentences, limit = 20) => {

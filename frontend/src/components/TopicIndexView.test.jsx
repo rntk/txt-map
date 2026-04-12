@@ -231,7 +231,7 @@ describe("TopicIndexView", () => {
     expect(onToggleRead).not.toHaveBeenCalled();
   });
 
-  it("defaults the tile metadata switcher to tags", () => {
+  it("defaults the tile metadata switcher to Key Phrases", () => {
     renderTopicIndex({
       submissionId: "submission-1",
       safeTopics: [
@@ -244,31 +244,17 @@ describe("TopicIndexView", () => {
 
     const tile = getTiles()[0];
     expect(
-      within(tile).getByText("Tags", {
+      within(tile).getByText("Key Phrases", {
         selector: ".topic-index-view__tile-meta-title",
       }),
     ).toBeInTheDocument();
+    // Key phrase pills should be rendered in the keyphrases container
     expect(
-      within(tile).getByRole("link", { name: /markets/i }),
-    ).toHaveAttribute("href", "/page/word/submission-1/markets");
+      tile.querySelector(".topic-index-view__tile-keyphrases"),
+    ).toBeInTheDocument();
   });
 
   it("switches tile metadata independently per tile", () => {
-    setArticleContext({
-      submission: {
-        results: {
-          topic_summaries: {
-            "Alpha > Markets": "Markets summary text.",
-            "Beta > Research": "Research summary text.",
-          },
-        },
-      },
-      topicSummaries: {
-        "Alpha > Markets": "Markets summary text.",
-        "Beta > Research": "Research summary text.",
-      },
-    });
-
     renderTopicIndex({
       safeTopics: [
         {
@@ -283,26 +269,26 @@ describe("TopicIndexView", () => {
     });
 
     const [firstTile, secondTile] = getTiles();
+    // Advance first tile to Tags (next after Key Phrases, with no subtopics)
     fireEvent.click(
       within(firstTile).getByRole("button", {
-        name: "Show next Summary for Alpha > Markets",
+        name: "Show next Tags for Alpha > Markets",
       }),
     );
 
-    expect(within(firstTile).getByText("Summary")).toBeInTheDocument();
+    expect(within(firstTile).getByText("Tags")).toBeInTheDocument();
+    // Second tile stays at Key Phrases
     expect(
-      within(firstTile).getByText("Markets summary text."),
+      within(secondTile).getByText("Key Phrases", {
+        selector: ".topic-index-view__tile-meta-title",
+      }),
     ).toBeInTheDocument();
-    expect(within(secondTile).getByText("Tags")).toBeInTheDocument();
   });
 
   it("rotates metadata categories with next and previous buttons", () => {
     setArticleContext({
       submission: {
         results: {
-          topic_summaries: {
-            "Alpha > Markets": "Markets summary text.",
-          },
           subtopics: [
             {
               parent_topic: "Alpha > Markets",
@@ -311,9 +297,6 @@ describe("TopicIndexView", () => {
             },
           ],
         },
-      },
-      topicSummaries: {
-        "Alpha > Markets": "Markets summary text.",
       },
     });
 
@@ -326,14 +309,8 @@ describe("TopicIndexView", () => {
       ],
     });
 
+    // Order: key_phrases (0) -> subtopics (1) -> tags (2)
     const tile = getTiles()[0];
-    fireEvent.click(
-      within(tile).getByRole("button", {
-        name: "Show next Summary for Alpha > Markets",
-      }),
-    );
-    expect(within(tile).getByText("Summary")).toBeInTheDocument();
-
     fireEvent.click(
       within(tile).getByRole("button", {
         name: "Show next Subtopics for Alpha > Markets",
@@ -344,26 +321,27 @@ describe("TopicIndexView", () => {
 
     fireEvent.click(
       within(tile).getByRole("button", {
-        name: "Show previous Summary for Alpha > Markets",
+        name: "Show next Tags for Alpha > Markets",
       }),
     );
-    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+    expect(within(tile).getByText("Tags")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show previous Subtopics for Alpha > Markets",
+      }),
+    );
+    expect(within(tile).getByText("Subtopics")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show previous Key Phrases for Alpha > Markets",
+      }),
+    );
+    expect(within(tile).getByText("Key Phrases")).toBeInTheDocument();
   });
 
   it("advances metadata when the content block is clicked", () => {
-    setArticleContext({
-      submission: {
-        results: {
-          topic_summaries: {
-            "Alpha > Markets": "Markets summary text.",
-          },
-        },
-      },
-      topicSummaries: {
-        "Alpha > Markets": "Markets summary text.",
-      },
-    });
-
     renderTopicIndex({
       safeTopics: [
         {
@@ -373,18 +351,17 @@ describe("TopicIndexView", () => {
       ],
     });
 
+    // With no subtopics, categories are: key_phrases -> tags
     const tile = getTiles()[0];
+    expect(within(tile).getByText("Key Phrases")).toBeInTheDocument();
     fireEvent.click(tile.querySelector(".topic-index-view__tile-meta-content"));
-    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+    expect(within(tile).getByText("Tags")).toBeInTheDocument();
   });
 
-  it("skips empty metadata categories and renders compact topic-analysis content", () => {
+  it("skips removed metadata categories and cycles key_phrases > subtopics > tags", () => {
     setArticleContext({
       submission: {
         results: {
-          topic_summaries: {
-            "Alpha > Markets": "Markets summary text.",
-          },
           subtopics: [
             {
               parent_topic: "Alpha > Markets",
@@ -392,21 +369,16 @@ describe("TopicIndexView", () => {
               sentences: [1, 2],
             },
           ],
+          // clusters and topic_model are no longer shown in tiles
           clusters: [
             {
               cluster_id: 0,
-              keywords: ["stocks", "trading", "futures"],
+              keywords: ["stocks", "trading"],
               sentence_indices: [1, 2],
             },
           ],
           topic_model: {
-            latent_topics: [
-              {
-                id: 4,
-                keywords: ["macro", "rates", "policy"],
-                weight: 0.42,
-              },
-            ],
+            latent_topics: [{ id: 4, keywords: ["macro", "rates"], weight: 0.42 }],
             topic_mapping: [
               {
                 topic_name: "Alpha > Markets",
@@ -416,9 +388,6 @@ describe("TopicIndexView", () => {
             ],
           },
         },
-      },
-      topicSummaries: {
-        "Alpha > Markets": "Markets summary text.",
       },
     });
 
@@ -432,33 +401,30 @@ describe("TopicIndexView", () => {
       ],
     });
 
+    // Categories: key_phrases (0) -> subtopics (1) -> tags (2)
     const tile = getTiles()[0];
+    expect(within(tile).getByText("Key Phrases")).toBeInTheDocument();
+
     const nextButton = within(tile).getByRole("button", {
-      name: "Show next Summary for Alpha > Markets",
+      name: "Show next Subtopics for Alpha > Markets",
     });
-
-    fireEvent.click(nextButton);
-    expect(within(tile).getByText("Summary")).toBeInTheDocument();
-
     fireEvent.click(nextButton);
     expect(within(tile).getByText("Subtopics")).toBeInTheDocument();
+    expect(within(tile).getByText("Open")).toBeInTheDocument();
 
-    fireEvent.click(nextButton);
-    expect(within(tile).getByText("Latent Topics")).toBeInTheDocument();
-    expect(within(tile).getByRole("link", { name: /macro/i })).toHaveAttribute(
-      "href",
-      "/page/word/submission-2/macro",
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show next Tags for Alpha > Markets",
+      }),
     );
-
-    fireEvent.click(nextButton);
-    expect(within(tile).getByText("Clusters")).toBeInTheDocument();
-    expect(within(tile).getByText(/Cluster 1/)).toBeInTheDocument();
-
-    fireEvent.click(nextButton);
     expect(within(tile).getByText("Tags")).toBeInTheDocument();
+
+    // Latent Topics and Clusters are no longer in the tile cycle
+    expect(within(tile).queryByText("Latent Topics")).not.toBeInTheDocument();
+    expect(within(tile).queryByText("Clusters")).not.toBeInTheDocument();
   });
 
-  it("does not render switch buttons when only one metadata category is available", () => {
+  it("shows switch buttons when key_phrases and tags are both available", () => {
     renderTopicIndex({
       safeTopics: [
         {
@@ -469,11 +435,13 @@ describe("TopicIndexView", () => {
     });
 
     const tile = getTiles()[0];
-    expect(within(tile).getByText("Tags")).toBeInTheDocument();
+    // Key Phrases is the default
+    expect(within(tile).getByText("Key Phrases")).toBeInTheDocument();
+    // Switch buttons are present since both key_phrases and tags are available
     expect(
-      within(tile).queryByRole("button", {
-        name: "Show next Summary for Alpha > Markets",
+      within(tile).getByRole("button", {
+        name: "Show next Tags for Alpha > Markets",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 });

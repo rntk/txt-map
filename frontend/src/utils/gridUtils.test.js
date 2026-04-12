@@ -1,6 +1,7 @@
 import {
   buildHierarchy,
   buildTopicTagCloud,
+  buildTopicKeyPhrases,
   segmentIsLeaf,
   truncateWithEllipsis,
   getFirstScopedSentence,
@@ -141,5 +142,154 @@ describe("buildTopicTagCloud", () => {
     expect(labels).toContain("beta");
     expect(labels).not.toContain("nbsp");
     expect(labels).not.toContain("amp");
+  });
+
+  test("returns only unigrams even when index contains bigrams", () => {
+    const sentences = [
+      "Machine learning drives modern artificial intelligence.",
+      "Machine learning is widely used today.",
+      "Other topics appear here.",
+    ];
+    const topic = { name: "ML", sentences: [1, 2] };
+    const tags = buildTopicTagCloud(topic, buildArticleTfIdfIndex(sentences), 10);
+    const labels = tags.map((tag) => tag.label);
+
+    labels.forEach((label) => {
+      expect(label).not.toContain(" ");
+    });
+  });
+});
+
+describe("buildArticleTfIdfIndex bigrams", () => {
+  test("includes bigrams in sentenceTokens", () => {
+    const sentences = ["Machine learning drives results.", "Other sentence here."];
+    const index = buildArticleTfIdfIndex(sentences);
+
+    const hasBigram = index.sentenceTokens[0].some((token) =>
+      token.includes(" "),
+    );
+    expect(hasBigram).toBe(true);
+  });
+
+  test("bigrams appear in documentFrequencies", () => {
+    const sentences = ["Machine learning drives results.", "Machine learning is everywhere."];
+    const index = buildArticleTfIdfIndex(sentences);
+
+    expect(index.documentFrequencies.has("machine learning")).toBe(true);
+    expect(index.documentFrequencies.get("machine learning")).toBe(2);
+  });
+
+  test("does not produce bigrams from single-token sentences", () => {
+    const sentences = ["Hello.", "World."];
+    const index = buildArticleTfIdfIndex(sentences);
+
+    const allTokens = index.sentenceTokens.flat();
+    const bigrams = allTokens.filter((t) => t.includes(" "));
+    expect(bigrams).toHaveLength(0);
+  });
+});
+
+describe("buildTopicKeyPhrases", () => {
+  const sentences = [
+    "Machine learning algorithms process large datasets efficiently.",
+    "Deep learning neural networks require significant computational power.",
+    "Machine learning models generalize from training data.",
+    "Unrelated topic about cooking recipes.",
+  ];
+  const topic = { name: "ML", sentences: [1, 2, 3] };
+
+  test("returns phrases and representativeSentence", () => {
+    const result = buildTopicKeyPhrases(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+    );
+
+    expect(result).toHaveProperty("phrases");
+    expect(result).toHaveProperty("representativeSentence");
+    expect(Array.isArray(result.phrases)).toBe(true);
+    expect(typeof result.representativeSentence).toBe("string");
+  });
+
+  test("includes bigrams in phrases", () => {
+    const result = buildTopicKeyPhrases(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+    );
+    const hasBigram = result.phrases.some((p) => p.isBigram);
+    expect(hasBigram).toBe(true);
+  });
+
+  test("does not include a unigram that is part of a selected bigram", () => {
+    const result = buildTopicKeyPhrases(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+      10,
+    );
+    const labels = result.phrases.map((p) => p.label);
+    const bigramLabels = result.phrases
+      .filter((p) => p.isBigram)
+      .map((p) => p.label);
+
+    bigramLabels.forEach((bigram) => {
+      const parts = bigram.split(" ");
+      parts.forEach((part) => {
+        expect(labels).not.toContain(part);
+      });
+    });
+  });
+
+  test("returns empty result for topic with no matching sentences", () => {
+    const emptyTopic = { name: "Empty", sentences: [] };
+    const result = buildTopicKeyPhrases(
+      emptyTopic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+    );
+
+    expect(result.phrases).toHaveLength(0);
+    expect(result.representativeSentence).toBe("");
+  });
+
+  test("handles single-sentence topic gracefully", () => {
+    const singleTopic = { name: "Single", sentences: [4] };
+    const result = buildTopicKeyPhrases(
+      singleTopic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+    );
+
+    expect(result.phrases.length).toBeGreaterThan(0);
+    expect(result.representativeSentence).toBe(sentences[3]);
+  });
+
+  test("truncates long representative sentences to 120 chars with ellipsis", () => {
+    const longSentences = [
+      "This is a very long sentence that exceeds one hundred and twenty characters in total length and should be truncated properly by the function.",
+      "Short sentence.",
+    ];
+    const longTopic = { name: "Long", sentences: [1] };
+    const result = buildTopicKeyPhrases(
+      longTopic,
+      buildArticleTfIdfIndex(longSentences),
+      longSentences,
+    );
+
+    expect(result.representativeSentence.length).toBeLessThanOrEqual(121);
+    expect(result.representativeSentence.endsWith("…")).toBe(true);
+  });
+
+  test("each phrase has a valid sizeClass", () => {
+    const result = buildTopicKeyPhrases(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      sentences,
+    );
+    const validSizes = new Set(["sm", "md", "lg", "xl"]);
+    result.phrases.forEach((phrase) => {
+      expect(validSizes.has(phrase.sizeClass)).toBe(true);
+    });
   });
 });
