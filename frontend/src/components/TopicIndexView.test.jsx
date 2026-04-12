@@ -1,6 +1,13 @@
 import React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+
+const mockUseArticle = vi.fn();
+
+vi.mock("../contexts/ArticleContext", () => ({
+  useArticle: () => mockUseArticle(),
+}));
+
 import TopicIndexView from "./TopicIndexView";
 
 vi.mock("./FullScreenGraph", () => ({
@@ -33,17 +40,54 @@ const defaultProps = {
   onClose: vi.fn(),
 };
 
+const defaultArticleContextValue = {
+  submission: {
+    results: {
+      topic_summaries: {},
+      subtopics: [],
+      clusters: [],
+      topic_model: {},
+    },
+  },
+  topicSummaries: {},
+  markup: {},
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
+  mockUseArticle.mockReturnValue(defaultArticleContextValue);
 });
 
 function renderTopicIndex(overrides = {}) {
   return render(<TopicIndexView {...defaultProps} {...overrides} />);
 }
 
+function setArticleContext(overrides = {}) {
+  mockUseArticle.mockReturnValue({
+    ...defaultArticleContextValue,
+    ...overrides,
+    submission: {
+      ...defaultArticleContextValue.submission,
+      ...(overrides.submission || {}),
+      results: {
+        ...defaultArticleContextValue.submission.results,
+        ...(overrides.submission?.results || {}),
+      },
+    },
+    topicSummaries: {
+      ...defaultArticleContextValue.topicSummaries,
+      ...(overrides.topicSummaries || {}),
+    },
+  });
+}
+
 function getTiles() {
   return Array.from(document.querySelectorAll(".topic-index-view__tile"));
 }
+
+beforeEach(() => {
+  mockUseArticle.mockReturnValue(defaultArticleContextValue);
+});
 
 describe("TopicIndexView", () => {
   it("renders one tile per explicit separated range", () => {
@@ -185,5 +229,251 @@ describe("TopicIndexView", () => {
       '"Science > Biology > Genetics" has 2 separate ranges. Some may not be visible on screen. Mark as read?',
     );
     expect(onToggleRead).not.toHaveBeenCalled();
+  });
+
+  it("defaults the tile metadata switcher to tags", () => {
+    renderTopicIndex({
+      submissionId: "submission-1",
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+      ],
+    });
+
+    const tile = getTiles()[0];
+    expect(
+      within(tile).getByText("Tags", {
+        selector: ".topic-index-view__tile-meta-title",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(tile).getByRole("link", { name: /markets/i }),
+    ).toHaveAttribute("href", "/page/word/submission-1/markets");
+  });
+
+  it("switches tile metadata independently per tile", () => {
+    setArticleContext({
+      submission: {
+        results: {
+          topic_summaries: {
+            "Alpha > Markets": "Markets summary text.",
+            "Beta > Research": "Research summary text.",
+          },
+        },
+      },
+      topicSummaries: {
+        "Alpha > Markets": "Markets summary text.",
+        "Beta > Research": "Research summary text.",
+      },
+    });
+
+    renderTopicIndex({
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+        {
+          name: "Beta > Research",
+          sentences: [3, 4],
+        },
+      ],
+    });
+
+    const [firstTile, secondTile] = getTiles();
+    fireEvent.click(
+      within(firstTile).getByRole("button", {
+        name: "Show next Summary for Alpha > Markets",
+      }),
+    );
+
+    expect(within(firstTile).getByText("Summary")).toBeInTheDocument();
+    expect(
+      within(firstTile).getByText("Markets summary text."),
+    ).toBeInTheDocument();
+    expect(within(secondTile).getByText("Tags")).toBeInTheDocument();
+  });
+
+  it("rotates metadata categories with next and previous buttons", () => {
+    setArticleContext({
+      submission: {
+        results: {
+          topic_summaries: {
+            "Alpha > Markets": "Markets summary text.",
+          },
+          subtopics: [
+            {
+              parent_topic: "Alpha > Markets",
+              name: "Open",
+              sentences: [1],
+            },
+          ],
+        },
+      },
+      topicSummaries: {
+        "Alpha > Markets": "Markets summary text.",
+      },
+    });
+
+    renderTopicIndex({
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+      ],
+    });
+
+    const tile = getTiles()[0];
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show next Summary for Alpha > Markets",
+      }),
+    );
+    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show next Subtopics for Alpha > Markets",
+      }),
+    );
+    expect(within(tile).getByText("Subtopics")).toBeInTheDocument();
+    expect(within(tile).getByText("Open")).toBeInTheDocument();
+
+    fireEvent.click(
+      within(tile).getByRole("button", {
+        name: "Show previous Summary for Alpha > Markets",
+      }),
+    );
+    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+  });
+
+  it("advances metadata when the content block is clicked", () => {
+    setArticleContext({
+      submission: {
+        results: {
+          topic_summaries: {
+            "Alpha > Markets": "Markets summary text.",
+          },
+        },
+      },
+      topicSummaries: {
+        "Alpha > Markets": "Markets summary text.",
+      },
+    });
+
+    renderTopicIndex({
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+      ],
+    });
+
+    const tile = getTiles()[0];
+    fireEvent.click(tile.querySelector(".topic-index-view__tile-meta-content"));
+    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+  });
+
+  it("skips empty metadata categories and renders compact topic-analysis content", () => {
+    setArticleContext({
+      submission: {
+        results: {
+          topic_summaries: {
+            "Alpha > Markets": "Markets summary text.",
+          },
+          subtopics: [
+            {
+              parent_topic: "Alpha > Markets",
+              name: "Open",
+              sentences: [1, 2],
+            },
+          ],
+          clusters: [
+            {
+              cluster_id: 0,
+              keywords: ["stocks", "trading", "futures"],
+              sentence_indices: [1, 2],
+            },
+          ],
+          topic_model: {
+            latent_topics: [
+              {
+                id: 4,
+                keywords: ["macro", "rates", "policy"],
+                weight: 0.42,
+              },
+            ],
+            topic_mapping: [
+              {
+                topic_name: "Alpha > Markets",
+                latent_topic_ids: [4],
+                scores: [0.61],
+              },
+            ],
+          },
+        },
+      },
+      topicSummaries: {
+        "Alpha > Markets": "Markets summary text.",
+      },
+    });
+
+    renderTopicIndex({
+      submissionId: "submission-2",
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+      ],
+    });
+
+    const tile = getTiles()[0];
+    const nextButton = within(tile).getByRole("button", {
+      name: "Show next Summary for Alpha > Markets",
+    });
+
+    fireEvent.click(nextButton);
+    expect(within(tile).getByText("Summary")).toBeInTheDocument();
+
+    fireEvent.click(nextButton);
+    expect(within(tile).getByText("Subtopics")).toBeInTheDocument();
+
+    fireEvent.click(nextButton);
+    expect(within(tile).getByText("Latent Topics")).toBeInTheDocument();
+    expect(within(tile).getByRole("link", { name: /macro/i })).toHaveAttribute(
+      "href",
+      "/page/word/submission-2/macro",
+    );
+
+    fireEvent.click(nextButton);
+    expect(within(tile).getByText("Clusters")).toBeInTheDocument();
+    expect(within(tile).getByText(/Cluster 1/)).toBeInTheDocument();
+
+    fireEvent.click(nextButton);
+    expect(within(tile).getByText("Tags")).toBeInTheDocument();
+  });
+
+  it("does not render switch buttons when only one metadata category is available", () => {
+    renderTopicIndex({
+      safeTopics: [
+        {
+          name: "Alpha > Markets",
+          sentences: [1, 2],
+        },
+      ],
+    });
+
+    const tile = getTiles()[0];
+    expect(within(tile).getByText("Tags")).toBeInTheDocument();
+    expect(
+      within(tile).queryByRole("button", {
+        name: "Show next Summary for Alpha > Markets",
+      }),
+    ).not.toBeInTheDocument();
   });
 });
