@@ -60,12 +60,11 @@ Select tags based on content cues. For example:
 
 IMPORTANT CLARIFICATIONS
 
-Tags can nest (e.g., li ranges inside a ul range, kbd range inside a p range). Nesting is normal and expected.
+Nesting: Tags can nest (e.g., li ranges inside a ul range, kbd range inside a p range). Nesting is expressed by providing overlapping ranges for each tag. Output each tag on its own line; the order of lines does not matter.
 
 Punctuation attached to words (e.g., "word," or "word.") stays with that word in tag ranges.
 
-When data structure is unclear or ambiguous, prefer simpler wrapping (just use p for a paragraph)
-over guessing complex structures (tables, definition lists) you cannot clearly infer.
+Complexity: When data structure is unclear, ambiguous, or too complex to easily map (e.g., nested tables or deep definitions), prefer simpler wrapping (use p or ul/li) over guessing complex structures you cannot clearly infer. DO NOT use tables if you are unsure of the column/row alignment.
 
 OUTPUT FORMAT — one line per tag:
   START-END: tagname   (wrap words START through END inclusive)
@@ -86,7 +85,7 @@ EXAMPLES
     3-5: li
     6-8: li
 
-  Example 2
+  Example 2 (Nesting / Overlapping)
   Annotated: API{{1}} Response{{2}} Status{{3}} 200{{4}} Body{{5}} ok{{6}}
   Output:
     1-2: h3
@@ -139,15 +138,13 @@ EXAMPLES
 """
 
 MARKUP_ANCHOR_CORRECTION_TEMPLATE = """\
-Your previous output could not be parsed. Please try again with the correct format.
+<correction_request>
+Your previous response could not be parsed. Please look at your previous attempt and the instructions above, then provide a fixed version.
+Return ONLY tag-range instructions in the correct format. Do NOT rewrite the article text or provide explanations.
 
 FORMAT:
   START-END: tagname   or   N: tagname   or   NONE
-Return tag-range instructions only. Do not rewrite the article text. No other text.
-
-<annotated_content>
-{anchored_text}
-</annotated_content>
+</correction_request>
 """
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -640,10 +637,12 @@ def _generate_html_for_range(
                     skip_cache_read=skip_cache,
                 )
             else:
-                correction_prompt = MARKUP_ANCHOR_CORRECTION_TEMPLATE.format(
-                    anchored_text=anchored_text,
+                full_correction_prompt = (
+                    f"{prompt}\n\n"
+                    f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
+                    f"{MARKUP_ANCHOR_CORRECTION_TEMPLATE}"
                 )
-                response = llm.call([correction_prompt], temperature=0.0)
+                response = llm.call([full_correction_prompt], temperature=0.0)
 
             tags = _parse_tag_output(response)
             if tags is not None:
@@ -703,7 +702,10 @@ def _generate_html_for_range_from_response(
     if not words:
         return _build_plain_html(cleaned_text)
 
-    tags = _parse_tag_output(initial_response)
+    prompt = _build_anchor_markup_prompt(cleaned_text, anchored_text)
+    response = initial_response
+
+    tags = _parse_tag_output(response)
     if tags is not None:
         if not tags:
             return _build_plain_html(cleaned_text)
@@ -727,10 +729,12 @@ def _generate_html_for_range_from_response(
 
     for attempt in range(1, max_retries):
         try:
-            correction_prompt = MARKUP_ANCHOR_CORRECTION_TEMPLATE.format(
-                anchored_text=anchored_text,
+            full_correction_prompt = (
+                f"{prompt}\n\n"
+                f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
+                f"{MARKUP_ANCHOR_CORRECTION_TEMPLATE}"
             )
-            response = llm.call([correction_prompt], temperature=0.0)
+            response = llm.call([full_correction_prompt], temperature=0.0)
             tags = _parse_tag_output(response)
             if tags is not None:
                 if not tags:

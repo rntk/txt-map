@@ -1,8 +1,7 @@
 """Tests for the anchor-based HTML markup generation pipeline."""
-
 from lib.tasks.markup_generation import (
     _build_anchor_markup_prompt,
-    _generate_grounded_html_for_range,
+    _generate_html_for_range as _generate_grounded_html_for_range,
     _insert_anchors,
     _is_grounded,
     _parse_tag_output,
