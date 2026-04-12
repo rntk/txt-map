@@ -112,7 +112,7 @@ class LLamaCPP(LLMClient):
                     "dry_multiplier": self.__dry_multiplier,
                     "dry_base": self.__dry_base,
                     "dry_allowed_length": self.__dry_allowed_length,
-                    #"stop": self.__stop,
+                    # "stop": self.__stop,
                 }
             )
             headers = {"Content-type": "application/json"}

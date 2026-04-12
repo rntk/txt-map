@@ -13,10 +13,7 @@ from txt_splitt import Tracer
 
 logger = logging.getLogger(__name__)
 
-_TABLE_RE = re.compile(
-    r"<table\b[^>]*>.*?</table>",
-    re.IGNORECASE | re.DOTALL
-)
+_TABLE_RE = re.compile(r"<table\b[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
 
 
 def _truncate_for_log(value: Any, limit: int = 500) -> str:
