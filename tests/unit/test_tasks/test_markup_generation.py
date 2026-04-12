@@ -82,6 +82,30 @@ def test_build_anchor_markup_prompt_uses_xml_boundaries() -> None:
     assert "<annotated_content>" in prompt
 
 
+def test_build_anchor_markup_prompt_example5_p_not_wrapping_ul() -> None:
+    """Example 5 in the prompt should show p covering 1-2, not 1-6 (which would wrap ul).
+
+    Regression test for Bug 1: the original Example 5 incorrectly had p wrapping the ul,
+    which violates the HTML spec (p is phrasing content and cannot contain block children).
+    This test verifies the fix.
+    """
+    prompt = _build_anchor_markup_prompt("text", "text{1}")
+
+    # Find the Example 5 section
+    assert "Example 5" in prompt
+    # The correct output has "1-2: p" followed by "3-6: ul"
+    # (p covers only the intro, ul is a sibling, not a child)
+    example5_start = prompt.find("Example 5")
+    example5_end = prompt.find("Example 6", example5_start)
+    example5 = prompt[example5_start:example5_end]
+
+    # Verify the fixed version: 1-2: p, then 3-6: ul
+    assert "1-2: p" in example5
+    assert "3-6: ul" in example5
+    # Verify the wrong version is NOT there
+    assert "1-6: p" not in example5 or example5.find("1-2: p") < example5.find("1-6: p")
+
+
 # ---------------------------------------------------------------------------
 # _parse_tag_output
 # ---------------------------------------------------------------------------
@@ -287,6 +311,41 @@ def test_reconstruct_html_list() -> None:
     assert "<ul>" in html
     assert "<li>apple</li>" in html
     assert "<li>banana</li>" in html
+
+
+def test_reconstruct_html_same_span_tags_close_lifo() -> None:
+    """Same-span tags should close in LIFO order (last-opened closes first).
+
+    Regression test for Bug 2: when (1,3,"p") and (1,3,"strong") both close at position 3,
+    strong must close before p (LIFO), not in insertion order.
+    """
+    words = ["A", "B", "C"]
+    tags = [(1, 3, "p"), (1, 3, "strong")]
+
+    html = _reconstruct_html(words, tags)
+
+    # Correct LIFO closing: strong closes before p
+    assert html == "<p><strong>A B C</strong></p>"
+    # Verify wrong output is NOT produced
+    assert html != "<p><strong>A B C</p></strong>"
+
+
+def test_reconstruct_html_block_not_inside_p() -> None:
+    """Block-level elements (like ul) should not be wrapped inside <p>.
+
+    This is a validation-level check, but we verify the reconstructor produces
+    valid HTML given proper input. The prompt Example 5 was fixed to avoid this case.
+    """
+    words = ["Features", "include:", "Free,", "Open", "source,", "Fast."]
+    # Correct tagging: p covers 1-2, ul covers 3-6 (separate, not nested)
+    tags = [(1, 2, "p"), (3, 6, "ul"), (3, 3, "li"), (4, 5, "li"), (6, 6, "li")]
+
+    html = _reconstruct_html(words, tags)
+
+    # Verify proper nesting: p and ul are siblings, not p wrapping ul
+    assert html.startswith("<p>Features include:</p>")
+    assert "<ul>" in html
+    assert html.index("</p>") < html.index("<ul>")
 
 
 # ---------------------------------------------------------------------------

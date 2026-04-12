@@ -17,7 +17,7 @@ from lib.storage.submissions import SubmissionsStorage
 
 logger = logging.getLogger(__name__)
 
-_PROMPT_VERSION = "markup_anchor_v3"
+_PROMPT_VERSION = "markup_anchor_v5"
 
 MARKUP_ANCHOR_PROMPT_TEMPLATE = """\
 <system>
@@ -58,18 +58,21 @@ Select tags based on content cues. For example:
   - use time for dates or timestamps when the text clearly represents them
   - use figure/figcaption or aside for side notes, examples, captions, or supporting context when the text suggests that structure
 
+IMPORTANT CLARIFICATIONS
+
+Tags can nest (e.g., li ranges inside a ul range, kbd range inside a p range). Nesting is normal and expected.
+
+Punctuation attached to words (e.g., "word," or "word.") stays with that word in tag ranges.
+
+When data structure is unclear or ambiguous, prefer simpler wrapping (just use p for a paragraph)
+over guessing complex structures (tables, definition lists) you cannot clearly infer.
+
 OUTPUT FORMAT — one line per tag:
   START-END: tagname   (wrap words START through END inclusive)
   N: tagname           (self-closing tag after word N, for example hr or br)
   NONE                 (if no formatting is needed)
 
-Important output constraints:
-  - return only tag-range instructions, never rewritten or copied article text
-  - do not generate the full HTML document
-  - do not paraphrase, summarize, or continue the input
-  - if uncertain, prefer fewer high-confidence tags
-
-No other text. No explanations.
+Output tag-range instructions only. No explanations, no other text.
 
 FORBIDDEN TAGS (never emit these):
   script style iframe object embed form base svg noscript title textarea applet link meta
@@ -107,6 +110,23 @@ EXAMPLES
     1-9: p
     1-3: dfn
     5-5: abbr
+
+  Example 5 (nesting)
+  Annotated: Features{{1}} include:{{2}} Free{{3}}, Open{{4}} source,{{5}} Fast{{6}}. Details{{7}} below.{{8}}
+  Output:
+    1-2: p
+    3-6: ul
+    3-3: li
+    4-5: li
+    6-6: li
+    7-8: p
+  (Note: li ranges nest inside ul; punctuation attached to words stays with them; p does not wrap the ul)
+
+  Example 6 (ambiguous structure — use simpler markup)
+  Annotated: Row{{1}} A{{2}} Row{{3}} B{{4}} Row{{5}} C{{6}} Value{{7}} X{{8}} Value{{9}} Y{{10}}
+  Output:
+    1-10: p
+  (Note: when structure is ambiguous from flattened text, prefer simple wrapping over guessing complex structures)
 </system>
 
 <clean_content>
@@ -449,38 +469,44 @@ def _reconstruct_html(words: List[str], tags: List[Tuple[int, int, str]]) -> str
     Words are 1-indexed. Range (start, end, tag) wraps words start..end inclusive.
     Self-closing tags are inserted after the word at their position.
     All word content is HTML-escaped.
+
+    For same-span tags (e.g., both (1,3,"p") and (1,3,"strong")), closing order
+    is LIFO: the last-opened tag closes first. This is enforced by using the
+    insertion index as a tiebreaker in the close sort.
     """
     if not words:
         return ""
 
     # Build maps: which tags open/close/self-close at each word position
-    opens_at: Dict[int, List[Tuple[int, int, str]]] = {}
-    closes_at: Dict[int, List[Tuple[int, int, str]]] = {}
+    # Store tuple as (idx, start, end, tag) to enable LIFO tiebreaking on closes
+    opens_at: Dict[int, List[Tuple[int, int, int, str]]] = {}
+    closes_at: Dict[int, List[Tuple[int, int, int, str]]] = {}
     self_at: Dict[int, List[str]] = {}
 
-    for start, end, tag in tags:
+    for idx, (start, end, tag) in enumerate(tags):
         if tag in _SELF_CLOSING_TAGS:
             self_at.setdefault(start, []).append(tag)
         else:
-            opens_at.setdefault(start, []).append((start, end, tag))
-            closes_at.setdefault(end, []).append((start, end, tag))
+            opens_at.setdefault(start, []).append((idx, start, end, tag))
+            closes_at.setdefault(end, []).append((idx, start, end, tag))
 
-    # Opens: outer first (larger span); closes: inner first (smaller span)
+    # Opens: outer first (larger span), then by insertion order on ties
+    # Closes: inner first (smaller span), then reverse insertion order (LIFO)
     for pos in opens_at:
-        opens_at[pos].sort(key=lambda t: -(t[1] - t[0]))
+        opens_at[pos].sort(key=lambda t: (-(t[2] - t[1]), t[0]))
     for pos in closes_at:
-        closes_at[pos].sort(key=lambda t: t[1] - t[0])
+        closes_at[pos].sort(key=lambda t: (t[2] - t[1], -t[0]))
 
     parts: List[str] = []
     n = len(words)
 
     for i, word in enumerate(words, start=1):
-        for _, _, tag in opens_at.get(i, []):
+        for _, _, _, tag in opens_at.get(i, []):
             parts.append(f"<{tag}>")
         parts.append(html_module.escape(word, quote=False))
         for tag in self_at.get(i, []):
             parts.append(f"<{tag}>")
-        for _, _, tag in closes_at.get(i, []):
+        for _, _, _, tag in closes_at.get(i, []):
             parts.append(f"</{tag}>")
         if i < n:
             parts.append(" ")
