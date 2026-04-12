@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 from lib.tasks.markup_generation import (
     _generate_html_for_range,
     TopicRange,
-    MARKUP_ANCHOR_CORRECTION_TEMPLATE,
 )
 
 

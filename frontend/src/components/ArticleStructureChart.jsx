@@ -57,9 +57,9 @@ function ArticleStructureChart({
   markup: markupProp,
 }) {
   const article = useArticle();
-  const topics = topicsProp ?? article?.enrichedTopics ?? [];
-  const sentences = sentencesProp ?? article?.sentences ?? [];
-  const readTopics = readTopicsProp ?? article?.readTopics ?? new Set();
+  const topics = useMemo(() => topicsProp ?? article?.enrichedTopics ?? [], [topicsProp, article?.enrichedTopics]);
+  const sentences = useMemo(() => sentencesProp ?? article?.sentences ?? [], [sentencesProp, article?.sentences]);
+  const readTopics = useMemo(() => readTopicsProp ?? article?.readTopics ?? new Set(), [readTopicsProp, article?.readTopics]);
   const onToggleRead = onToggleReadProp ?? article?.toggleRead;
   const markup = markupProp ?? article?.markup;
   const { scopePath, navigateTo, drillInto } = useScopeNavigation();
