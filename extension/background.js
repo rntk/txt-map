@@ -1,9 +1,10 @@
 /**
- * Background service worker for RSS Submission Analyzer Extension.
- * Acts as a cross-origin fetch proxy for content scripts (required in Manifest V3).
+ * Background script for RSS Submission Analyzer Extension.
+ * Acts as a cross-origin fetch proxy for content scripts.
+ * Note: config.js is loaded before this script via manifest.json
  */
 
-importScripts('config.js');
+const API_BASE = typeof API_URL !== 'undefined' ? API_URL : 'http://localhost:8000';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'submitContent') {
@@ -13,7 +14,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
 
-      fetch(`${API_URL}/api/submit`, {
+      fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${sessionToken}`,

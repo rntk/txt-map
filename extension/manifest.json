@@ -4,14 +4,14 @@
   "version": "1.0",
   "description": "Browser extension for RSS Submission Analyzer API",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["__API_URL__/*"],
+  "host_permissions": ["http://localhost:8000/*"],
   "options_page": "options.html",
   "action": {
     "default_popup": "popup.html",
     "default_title": "RSS Submission Analyzer"
   },
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["config.js", "background.js"]
   },
   "content_scripts": [
     {
