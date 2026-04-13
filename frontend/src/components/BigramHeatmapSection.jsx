@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./TopicHeatmap.css";
 
 /**
@@ -63,6 +63,19 @@ function buildBigramHighlightHref(submissionId, rowWord, columnWord) {
 }
 
 /**
+ * @param {string} word
+ * @param {string} filterValue
+ * @returns {boolean}
+ */
+function matchesWordFilter(word, filterValue) {
+  if (!filterValue) {
+    return true;
+  }
+
+  return word.toLowerCase().includes(filterValue);
+}
+
+/**
  * @param {{
  *   submissionId: string | null,
  *   heatmapState: BigramHeatmapState,
@@ -83,7 +96,14 @@ function BigramHeatmapSection({
   emptyMessage = "No heatmap data available.",
   fillAvailableHeight = false,
 }) {
+  const [columnFilterValue, setColumnFilterValue] = useState("");
+  const [rowFilterValue, setRowFilterValue] = useState("");
   const heatmapData = heatmapState.data;
+
+  useEffect(() => {
+    setColumnFilterValue("");
+    setRowFilterValue("");
+  }, [submissionId, heatmapData]);
 
   if (heatmapState.loading) {
     return <p className="topic-heatmap-status">Loading heatmap…</p>;
@@ -112,15 +132,27 @@ function BigramHeatmapSection({
   const matrix = Array.isArray(heatmapData.matrix) ? heatmapData.matrix : [];
   const defaultVisibleWordCount = heatmapData.default_visible_word_count || 40;
   const totalWordCount = heatmapData.total_word_count || allRowWords.length;
-  const visibleWordCount = showAllWords
-    ? allRowWords.length
-    : Math.min(defaultVisibleWordCount, allRowWords.length);
-  const words = allRowWords.slice(0, visibleWordCount);
-  const colWords = allColWords.slice(0, visibleWordCount);
-  const visibleMatrix = matrix
-    .slice(0, visibleWordCount)
-    .map((row) => row.slice(0, visibleWordCount));
+  const normalizedColumnFilterValue = columnFilterValue.trim().toLowerCase();
+  const normalizedRowFilterValue = rowFilterValue.trim().toLowerCase();
+  const filteredRowEntries = allRowWords
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) =>
+      matchesWordFilter(entry.word, normalizedRowFilterValue),
+    );
+  const filteredColumnEntries = allColWords
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) =>
+      matchesWordFilter(entry.word, normalizedColumnFilterValue),
+    );
+  const visibleRowEntries = showAllWords
+    ? filteredRowEntries
+    : filteredRowEntries.slice(0, defaultVisibleWordCount);
+  const visibleColumnEntries = showAllWords
+    ? filteredColumnEntries
+    : filteredColumnEntries.slice(0, defaultVisibleWordCount);
   const showWordCountToggle = totalWordCount > defaultVisibleWordCount;
+  const hasVisibleRows = visibleRowEntries.length > 0;
+  const hasVisibleColumns = visibleColumnEntries.length > 0;
 
   return (
     <div
@@ -153,9 +185,32 @@ function BigramHeatmapSection({
           <thead>
             <tr>
               <th scope="col" className="topic-heatmap-corner">
-                Word
+                <label className="topic-heatmap-filter">
+                  <span className="topic-heatmap-filter__label">Columns</span>
+                  <input
+                    type="search"
+                    value={columnFilterValue}
+                    onChange={(event) =>
+                      setColumnFilterValue(event.target.value)
+                    }
+                    className="topic-heatmap-filter__input"
+                    placeholder="Filter columns"
+                    aria-label="Filter columns"
+                  />
+                </label>
+                <label className="topic-heatmap-filter">
+                  <span className="topic-heatmap-filter__label">Rows</span>
+                  <input
+                    type="search"
+                    value={rowFilterValue}
+                    onChange={(event) => setRowFilterValue(event.target.value)}
+                    className="topic-heatmap-filter__input"
+                    placeholder="Filter rows"
+                    aria-label="Filter rows"
+                  />
+                </label>
               </th>
-              {colWords.map((entry) => (
+              {visibleColumnEntries.map(({ entry }) => (
                 <th
                   key={`column-${entry.word}`}
                   scope="col"
@@ -172,53 +227,66 @@ function BigramHeatmapSection({
             </tr>
           </thead>
           <tbody>
-            {words.map((rowEntry, rowIndex) => (
-              <tr key={`row-${rowEntry.word}`}>
-                <th
-                  scope="row"
-                  className="topic-heatmap-row-header"
-                  title={`${rowEntry.word} (${rowEntry.frequency})`}
+            {!hasVisibleRows || !hasVisibleColumns ? (
+              <tr>
+                <td
+                  colSpan={visibleColumnEntries.length + 1}
+                  className="topic-heatmap-empty-results"
                 >
-                  <a
-                    href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
-                    className="topic-heatmap-word-link"
-                  >
-                    {rowEntry.word}
-                  </a>
-                </th>
-                {colWords.map((columnEntry, columnIndex) => {
-                  const cellValue = visibleMatrix[rowIndex]?.[columnIndex] || 0;
-                  const heatLevelClassName = getHeatLevelClassName(
-                    cellValue,
-                    heatmapData.max_value,
-                  );
-                  const cellHref = buildBigramHighlightHref(
-                    submissionId,
-                    rowEntry.word,
-                    columnEntry.word,
-                  );
-
-                  return (
-                    <td
-                      key={`cell-${rowEntry.word}-${columnEntry.word}`}
-                      className={`topic-heatmap-cell ${heatLevelClassName}${rowEntry.word === columnEntry.word ? " is-diagonal" : ""}`}
-                    >
-                      {cellHref ? (
-                        <a
-                          href={cellHref}
-                          className="topic-heatmap-cell-link"
-                          aria-label={`Highlight ${rowEntry.word} ${columnEntry.word} in article`}
-                        >
-                          {cellValue}
-                        </a>
-                      ) : (
-                        cellValue
-                      )}
-                    </td>
-                  );
-                })}
+                  No matching rows or columns.
+                </td>
               </tr>
-            ))}
+            ) : (
+              visibleRowEntries.map(({ entry: rowEntry, index: rowIndex }) => (
+                <tr key={`row-${rowEntry.word}`}>
+                  <th
+                    scope="row"
+                    className="topic-heatmap-row-header"
+                    title={`${rowEntry.word} (${rowEntry.frequency})`}
+                  >
+                    <a
+                      href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
+                      className="topic-heatmap-word-link"
+                    >
+                      {rowEntry.word}
+                    </a>
+                  </th>
+                  {visibleColumnEntries.map(
+                    ({ entry: columnEntry, index: columnIndex }) => {
+                      const cellValue = matrix[rowIndex]?.[columnIndex] || 0;
+                      const heatLevelClassName = getHeatLevelClassName(
+                        cellValue,
+                        heatmapData.max_value,
+                      );
+                      const cellHref = buildBigramHighlightHref(
+                        submissionId,
+                        rowEntry.word,
+                        columnEntry.word,
+                      );
+
+                      return (
+                        <td
+                          key={`cell-${rowEntry.word}-${columnEntry.word}`}
+                          className={`topic-heatmap-cell ${heatLevelClassName}${rowEntry.word === columnEntry.word ? " is-diagonal" : ""}`}
+                        >
+                          {cellHref ? (
+                            <a
+                              href={cellHref}
+                              className="topic-heatmap-cell-link"
+                              aria-label={`Highlight ${rowEntry.word} ${columnEntry.word} in article`}
+                            >
+                              {cellValue}
+                            </a>
+                          ) : (
+                            cellValue
+                          )}
+                        </td>
+                      );
+                    },
+                  )}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
