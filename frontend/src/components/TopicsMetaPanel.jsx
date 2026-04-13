@@ -9,6 +9,7 @@ import React, { useEffect, useState, useMemo } from "react";
  * @typedef {{ name: string, sentences: number[], parent_topic: string }} Subtopic
  * @typedef {{ latent_topics: LatentTopic[], topic_mapping: TopicMapping[] }} TopicModel
  * @typedef {{ topics: Topic[], clusters: Cluster[], sentences: string[], topic_model: TopicModel, subtopics: Subtopic[], topic_summaries: Record<string, string> }} TopicAnalysisData
+ * @typedef {{ ranges: Array<{ marker_spans: Array<{ start_word: number, end_word: number, text: string }>, summary_text: string }> }} MarkerTopicSummary
  */
 
 /**
@@ -154,6 +155,32 @@ function PanelTagCloud({ submissionId, sentences, sentenceIndices }) {
 }
 
 /**
+ * @param {{ submissionId: string, keywords: string[] }} props
+ */
+function PanelSummaryKeywords({ submissionId, keywords }) {
+  if (!keywords || keywords.length === 0) {
+    return (
+      <p className="topics-meta-panel__empty">
+        No summary keywords for this topic.
+      </p>
+    );
+  }
+  return (
+    <div className="topics-meta-panel__tag-cloud">
+      {keywords.map((kw) => (
+        <a
+          key={kw}
+          href={`/page/word/${submissionId}/${encodeURIComponent(kw)}`}
+          className="topics-meta-panel__tag-cloud-item topics-meta-panel__tag-cloud-item--interactive"
+        >
+          {kw}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/**
  * @param {{ summary: string|null }} props
  */
 function PanelSummary({ summary }) {
@@ -196,9 +223,13 @@ function PanelSubtopics({ subtopics }) {
 }
 
 /**
- * @param {{ submissionId: string, selectedTopicName: string|null }} props
+ * @param {{ submissionId: string, selectedTopicName: string|null, topicMarkerSummaries: Record<string, MarkerTopicSummary>|null }} props
  */
-export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
+export default function TopicsMetaPanel({
+  submissionId,
+  selectedTopicName,
+  topicMarkerSummaries,
+}) {
   /** @type {[TopicAnalysisData|null, React.Dispatch<React.SetStateAction<TopicAnalysisData|null>>]} */
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -270,6 +301,24 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
     );
   }, [data, selectedTopic]);
 
+  const summaryKeywords = useMemo(() => {
+    if (!selectedTopic || !topicMarkerSummaries) return [];
+    const topicSummary = topicMarkerSummaries[selectedTopic.name];
+    if (!topicSummary || !Array.isArray(topicSummary.ranges)) return [];
+    const seen = new Set();
+    const keywords = [];
+    for (const range of topicSummary.ranges) {
+      for (const span of range.marker_spans || []) {
+        const text = (span.text || "").trim();
+        if (text && !seen.has(text)) {
+          seen.add(text);
+          keywords.push(text);
+        }
+      }
+    }
+    return keywords;
+  }, [selectedTopic, topicMarkerSummaries]);
+
   if (loading) {
     return (
       <aside
@@ -316,6 +365,16 @@ export default function TopicsMetaPanel({ submissionId, selectedTopicName }) {
         <section className="topics-meta-panel__section">
           <div className="topics-meta-panel__section-title">Summary</div>
           <PanelSummary summary={topicSummary} />
+        </section>
+
+        <section className="topics-meta-panel__section">
+          <div className="topics-meta-panel__section-title">
+            Summary Keywords
+          </div>
+          <PanelSummaryKeywords
+            submissionId={submissionId}
+            keywords={summaryKeywords}
+          />
         </section>
 
         <section className="topics-meta-panel__section">
