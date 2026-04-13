@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { sanitizeHTML } from "../utils/sanitize";
-import { buildHighlightedRawHtml } from "../utils/htmlHighlight";
+import { buildHighlightedRawHtml, buildTopicMarkerData } from "../utils/htmlHighlight";
 import {
   getTopicAccentColor,
   getTopicHighlightColor,
@@ -473,6 +473,12 @@ function TextDisplay({
     [highlightRanges, safeActiveInsightRanges],
   );
 
+  // Build topic-specific marker data for word-based highlighting from topic_marker_summaries
+  const topicMarkerData = useMemo(
+    () => buildTopicMarkerData(safeArticleTopics, safeSelectedTopics, hoveredTopic),
+    [safeArticleTopics, safeSelectedTopics, hoveredTopic],
+  );
+
   const highlightedRawHtml = useMemo(
     () =>
       buildHighlightedRawHtml(
@@ -488,6 +494,7 @@ function TextDisplay({
         safeDimmedHighlightRanges,
         dimmedHighlightClassName,
         effectiveHighlightWords,
+        topicMarkerData,
       ),
     [
       rawHtml,
@@ -502,6 +509,7 @@ function TextDisplay({
       safeDimmedHighlightRanges,
       dimmedHighlightClassName,
       effectiveHighlightWords,
+      topicMarkerData,
     ],
   );
 

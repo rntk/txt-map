@@ -5,6 +5,86 @@ export function isInAnyRange(start, end, ranges) {
 }
 
 /**
+ * Normalize a word for comparison by removing punctuation and lowercasing
+ * @param {string} word
+ * @returns {string}
+ */
+function normalizeWordForMatch(word) {
+  if (!word || typeof word !== "string") return "";
+  // Remove punctuation and normalize whitespace, but keep letters, numbers, and internal hyphens/apostrophes
+  return word
+    .replace(/[^\p{L}\p{N}\-']/gu, "") // Remove all non-letter, non-number, non-hyphen, non-apostrophe chars
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Build topic-specific marker word data for highlighting
+ * Each entry contains the topic's ranges and its marker words
+ * @param {Array} articleTopics - Topics with marker_spans and ranges
+ * @param {Array} selectedTopics - Currently selected topics
+ * @param {{ name: string }|null} hoveredTopic - Hovered topic
+ * @returns {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} - Topic-specific marker data
+ */
+export function buildTopicMarkerData(articleTopics, selectedTopics, hoveredTopic) {
+  const topicMarkerData = [];
+
+  if (!Array.isArray(articleTopics) || articleTopics.length === 0) {
+    return topicMarkerData;
+  }
+
+  // Determine which topics should have their markers highlighted
+  const topicNamesToHighlight = new Set();
+
+  if (Array.isArray(selectedTopics)) {
+    selectedTopics.forEach((t) => {
+      if (t?.name) topicNamesToHighlight.add(t.name);
+    });
+  }
+
+  if (hoveredTopic?.name) {
+    topicNamesToHighlight.add(hoveredTopic.name);
+  }
+
+  if (topicNamesToHighlight.size === 0) {
+    return topicMarkerData;
+  }
+
+  // Extract marker words and ranges from matching topics
+  articleTopics.forEach((topic) => {
+    if (!topicNamesToHighlight.has(topic.name)) {
+      return;
+    }
+
+    const markerSpans = topic.marker_spans;
+    if (!Array.isArray(markerSpans) || markerSpans.length === 0) {
+      return;
+    }
+
+    const markerWords = new Set();
+    markerSpans.forEach((span) => {
+      if (span?.text) {
+        const normalized = normalizeWordForMatch(span.text);
+        if (normalized.length > 0) {
+          markerWords.add(normalized);
+        }
+      }
+    });
+
+    if (markerWords.size > 0) {
+      // Get the topic's ranges - use the processed ranges from useTextPageData
+      const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
+      topicMarkerData.push({
+        ranges,
+        markerWords,
+      });
+    }
+  });
+
+  return topicMarkerData;
+}
+
+/**
  * @param {string} htmlWord
  * @param {number} wordStart
  * @param {number} articleIndex
@@ -18,6 +98,7 @@ export function isInAnyRange(start, end, ranges) {
  * @param {Array<{start: number, end: number}>} [dimmedRanges]
  * @param {string} [dimmedClassName]
  * @param {string[]} [highlightWords]
+ * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [topicMarkerData] - Topic-specific marker data
  */
 export function wrapWord(
   htmlWord,
@@ -33,10 +114,12 @@ export function wrapWord(
   dimmedRanges = [],
   dimmedClassName = "",
   highlightWords = [],
+  topicMarkerData = null,
 ) {
   const wordEnd = wordStart + htmlWord.length;
 
   const classes = ["word-token"];
+  let isSummaryWord = false;
 
   // Word-based highlighting (URL param)
   if (Array.isArray(highlightWords) && highlightWords.length > 0) {
@@ -47,6 +130,28 @@ export function wrapWord(
     ) {
       classes.push("word-highlight");
     }
+  }
+
+  // Marker word highlighting (from topic_marker_summaries) - topic-specific
+  if (Array.isArray(topicMarkerData) && topicMarkerData.length > 0) {
+    const normalizedWord = normalizeWordForMatch(htmlWord);
+    if (normalizedWord.length > 0) {
+      // Check if word matches a marker word AND is within that topic's ranges
+      for (const topicData of topicMarkerData) {
+        if (
+          topicData.markerWords.has(normalizedWord) &&
+          isInAnyRange(wordStart, wordEnd, topicData.ranges)
+        ) {
+          isSummaryWord = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Fallback: also check using character ranges for backward compatibility
+  if (!isSummaryWord && isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)) {
+    isSummaryWord = true;
   }
 
   if (coloredRanges.length > 0) {
@@ -61,9 +166,10 @@ export function wrapWord(
 
   if (
     isInAnyRange(wordStart, wordEnd, allTopicRanges) ||
-    classes.includes("word-highlight")
+    classes.includes("word-highlight") ||
+    isSummaryWord
   ) {
-    if (isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)) {
+    if (isSummaryWord) {
       classes.push("reading-article__summary-word-highlight");
     }
     if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
@@ -94,12 +200,13 @@ export function wrapWord(
  * @param {Array<{start: number, end: number}>} highlightRanges
  * @param {Array<{start: number, end: number}>} fadeRanges
  * @param {Array<{start: number, end: number}>} [summaryHighlightRanges]
- * @param {Array<{start: number, end: number, color: string}>} [coloredRanges]
+ * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
  * @param {Array<{start: number, end: number}>} [interactiveRanges]
  * @param {string} [interactiveClassName]
  * @param {Array<{start: number, end: number}>} [dimmedRanges]
  * @param {string} [dimmedClassName]
  * @param {string[]} [highlightWords]
+ * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [topicMarkerData] - Topic-specific marker data
  */
 export function buildHighlightedRawHtml(
   rawHtml,
@@ -114,6 +221,7 @@ export function buildHighlightedRawHtml(
   dimmedRanges = [],
   dimmedClassName = "",
   highlightWords = [],
+  topicMarkerData = null,
 ) {
   if (!rawHtml) return "";
   const safeSummaryHighlightRanges = Array.isArray(summaryHighlightRanges)
@@ -122,6 +230,7 @@ export function buildHighlightedRawHtml(
   const safeHighlightWords = Array.isArray(highlightWords)
     ? highlightWords
     : [];
+  const safeTopicMarkerData = Array.isArray(topicMarkerData) ? topicMarkerData : null;
 
   const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
   const allTopicRanges = [];
@@ -139,7 +248,8 @@ export function buildHighlightedRawHtml(
     allTopicRanges.length === 0 &&
     coloredRanges.length === 0 &&
     safeSummaryHighlightRanges.length === 0 &&
-    safeHighlightWords.length === 0
+    safeHighlightWords.length === 0 &&
+    (!safeTopicMarkerData || safeTopicMarkerData.length === 0)
   ) {
     return sanitizeHTML(rawHtml);
   }
@@ -180,6 +290,7 @@ export function buildHighlightedRawHtml(
           dimmedRanges,
           dimmedClassName,
           safeHighlightWords,
+          safeTopicMarkerData,
         );
         wordBuffer = "";
         wordStart = -1;
@@ -203,6 +314,7 @@ export function buildHighlightedRawHtml(
             dimmedRanges,
             dimmedClassName,
             safeHighlightWords,
+            safeTopicMarkerData,
           );
           wordBuffer = "";
           wordStart = -1;
@@ -230,6 +342,7 @@ export function buildHighlightedRawHtml(
       dimmedRanges,
       dimmedClassName,
       safeHighlightWords,
+      safeTopicMarkerData,
     );
   }
 

@@ -597,6 +597,17 @@ export function useTextPageData(
         ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
       }
 
+      // Extract marker_spans from topic_marker_summaries for word-based highlighting
+      const topicMarkerSummary = results.topic_marker_summaries?.[topic.name];
+      const markerSpans = [];
+      if (topicMarkerSummary?.ranges) {
+        topicMarkerSummary.ranges.forEach((range) => {
+          if (range?.marker_spans) {
+            markerSpans.push(...range.marker_spans);
+          }
+        });
+      }
+
       return {
         ...topic,
         sentences: exclusiveSentences,
@@ -604,12 +615,13 @@ export function useTextPageData(
           exclusiveSentenceSet.has(span.sentence),
         ),
         ranges,
+        marker_spans: markerSpans,
         summaryHighlightRanges: getTopicMarkerSummaryHighlightRanges(
           rawText,
           resultSentences,
           sentenceCharacterRanges,
           sourceRanges,
-          results.topic_marker_summaries?.[topic.name],
+          topicMarkerSummary,
         ),
       };
     });
