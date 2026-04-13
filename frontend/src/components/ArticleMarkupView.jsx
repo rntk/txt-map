@@ -104,8 +104,18 @@ function ArticleMarkupPlainBlock({
   sentences,
   startSentenceIndex,
   sentenceColorMap,
+  activeInsightSentenceIndices = [],
 }) {
   const safeSentences = Array.isArray(sentences) ? sentences : [];
+  const activeInsightSentenceSet = useMemo(
+    () =>
+      new Set(
+        activeInsightSentenceIndices
+          .filter((value) => Number.isInteger(value))
+          .map((value) => value - 1),
+      ),
+    [activeInsightSentenceIndices],
+  );
 
   return (
     <div className="markup-segment">
@@ -115,11 +125,12 @@ function ArticleMarkupPlainBlock({
         const sentenceStyle = color
           ? { "--topic-highlight-color": color }
           : undefined;
+        const isInsightActive = activeInsightSentenceSet.has(sentenceNum - 1);
 
         return (
           <div
             key={`${sentenceNum}-${sentence}`}
-            className="markup-plain__sentence reading-markup__plain-sentence"
+            className={`markup-plain__sentence reading-markup__plain-sentence${isInsightActive ? " reading-markup__plain-sentence--insight-active" : ""}`}
           >
             <span className="markup-plain__num reading-markup__plain-sentence-num">
               {sentenceNum}.
@@ -148,6 +159,7 @@ function ArticleMarkupPlainBlock({
  *   html: string,
  * }} block
  * @property {Array<{ name: string }>} selectedTopics
+ * @property {{ name: string }|null} [hoveredTopic]
  * @property {Set<string>|string[]} readTopics
  * @property {(topic: Object) => void} onToggleRead
  * @property {(topic: Object) => void} onToggleTopic
@@ -157,10 +169,13 @@ function ArticleMarkupPlainBlock({
  * @property {boolean} tooltipEnabled
  * @property {string|null} [topicIndexScrollTarget]
  * @property {(topicName: string) => void} [onBackToTopicIndex]
+ * @property {boolean} [isInsightActive]
+ * @property {string} [submissionId]
  */
 function MarkupTopicBlock({
   block,
   selectedTopics,
+  hoveredTopic,
   readTopics,
   onToggleRead,
   onToggleTopic,
@@ -171,6 +186,8 @@ function MarkupTopicBlock({
   coloredHighlightMode = false,
   topicIndexScrollTarget = null,
   onBackToTopicIndex,
+  isInsightActive = false,
+  _submissionId,
 }) {
   const readTopicsSet = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
@@ -179,6 +196,10 @@ function MarkupTopicBlock({
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
     [selectedTopics],
+  );
+  const isHovered = hoveredTopic?.name === block.topic.name;
+  const _isSelected = safeSelectedTopics.some(
+    (selectedTopic) => selectedTopic.name === block.topic.name,
   );
   const { tooltip, lastTargetRef, showTooltip, hideTooltip } =
     useTooltip(tooltipEnabled);
@@ -200,7 +221,7 @@ function MarkupTopicBlock({
   }, []);
 
   const openTooltip = useCallback(
-    (target, clientX, clientY) => {
+    (target, clientX, clientY, link = null) => {
       if (!block?.topic) {
         hideTooltip();
         return;
@@ -213,7 +234,10 @@ function MarkupTopicBlock({
 
       lastTargetRef.current = target;
       const { x, y } = getTooltipPosition(clientX, clientY);
-      showTooltip([{ topic: block.topic, rangeCount: block.rangeCount }], x, y);
+      const meta = link
+        ? { linkHref: link.href, linkText: link.textContent?.trim() }
+        : undefined;
+      showTooltip([{ topic: block.topic, rangeCount: block.rangeCount }], x, y, meta);
     },
     [
       block,
@@ -231,7 +255,13 @@ function MarkupTopicBlock({
         return;
       }
 
-      openTooltip(blockRef.current, event.clientX, event.clientY);
+      // Check if user clicked on (or inside) a link
+      const link = event.target.closest("a[href]");
+      if (link) {
+        event.preventDefault();
+      }
+
+      openTooltip(blockRef.current, event.clientX, event.clientY, link);
     },
     [blockRef, openTooltip, tooltipEnabled],
   );
@@ -376,6 +406,18 @@ function MarkupTopicBlock({
                 </button>
               </div>
             )}
+          {tooltip.meta?.linkHref && (
+            <div className="text-topic-tooltip-footer">
+              <a
+                className="text-topic-tooltip-btn text-topic-tooltip-link"
+                href={tooltip.meta.linkHref}
+                onClick={hideTooltip}
+                rel="noopener noreferrer"
+              >
+                Go to: {tooltip.meta.linkText || tooltip.meta.linkHref}
+              </a>
+            </div>
+          )}
         </div>,
         document.body,
       )
@@ -385,9 +427,9 @@ function MarkupTopicBlock({
     <>
       <div
         ref={blockRef}
-        className={`markup-topic-block${coloredHighlightMode ? " reading-markup__topic-block--colored" : ""}`}
+        className={`markup-topic-block${_isSelected && !coloredHighlightMode ? " highlighted" : ""}${coloredHighlightMode || isHovered ? " reading-markup__topic-block--colored" : ""}${isInsightActive ? " reading-markup__topic-block--insight-active" : ""}`}
         style={
-          coloredHighlightMode
+          coloredHighlightMode || isHovered
             ? {
                 "--topic-highlight-color": getTopicHighlightColor(
                   block.topic.name,
@@ -414,6 +456,7 @@ function MarkupTopicBlock({
  * @property {Array} safeTopics
  * @property {Object} markup
  * @property {Array<{ name: string }>} selectedTopics
+ * @property {{ name: string }|null} [hoveredTopic]
  * @property {Set<string>|string[]} readTopics
  * @property {(topic: Object) => void} onToggleRead
  * @property {(topic: Object) => void} onToggleTopic
@@ -425,12 +468,16 @@ function MarkupTopicBlock({
  * @property {Set<string>|string[]} [coloredTopicNames]
  * @property {string|null} [topicIndexScrollTarget]
  * @property {(topicName: string) => void} [onBackToTopicIndex]
+ * @property {Array<number>} [activeInsightSentenceIndices]
+ * @property {Array<{start: number, end: number}>} [activeInsightRanges]
+ * @property {string} [submissionId]
  */
 function ArticleMarkupView({
   safeSentences,
   safeTopics,
   markup,
   selectedTopics,
+  hoveredTopic,
   readTopics,
   onToggleRead,
   onToggleTopic,
@@ -442,6 +489,9 @@ function ArticleMarkupView({
   coloredTopicNames = null,
   topicIndexScrollTarget = null,
   onBackToTopicIndex,
+  activeInsightSentenceIndices = [],
+  _activeInsightRanges = [],
+  _submissionId,
 }) {
   const safeColoredTopicNames = useMemo(
     () =>
@@ -477,6 +527,29 @@ function ArticleMarkupView({
     return map;
   }, [coloredHighlightMode, safeColoredTopicNames, safeTopics]);
 
+  // Active insight sentence set (0-based indices)
+  const activeInsightSentenceSet = useMemo(
+    () =>
+      new Set(
+        activeInsightSentenceIndices
+          .filter((value) => Number.isInteger(value))
+          .map((value) => value - 1),
+      ),
+    [activeInsightSentenceIndices],
+  );
+
+  // Check if a markup block has any active insight sentences
+  const getBlockInsightActive = useCallback(
+    (block) => {
+      if (activeInsightSentenceSet.size === 0) return false;
+      for (let i = block.startSentenceIndex; i <= block.endSentenceIndex; i++) {
+        if (activeInsightSentenceSet.has(i - 1)) return true;
+      }
+      return false;
+    },
+    [activeInsightSentenceSet],
+  );
+
   return (
     <div className="summary-content reading-markup">
       <div className="markup-content reading-markup__content">
@@ -488,6 +561,7 @@ function ArticleMarkupView({
                 key={block.key}
                 block={block}
                 selectedTopics={selectedTopics}
+                hoveredTopic={hoveredTopic}
                 readTopics={readTopics}
                 onToggleRead={onToggleRead}
                 onToggleTopic={onToggleTopic}
@@ -498,6 +572,8 @@ function ArticleMarkupView({
                 coloredHighlightMode={coloredHighlightMode}
                 topicIndexScrollTarget={topicIndexScrollTarget}
                 onBackToTopicIndex={onBackToTopicIndex}
+                isInsightActive={getBlockInsightActive(block)}
+                submissionId={_submissionId}
               />
             ) : null
           ) : (
@@ -506,6 +582,7 @@ function ArticleMarkupView({
               sentences={block.sentences}
               startSentenceIndex={block.startSentenceIndex}
               sentenceColorMap={sentenceColorMap}
+              activeInsightSentenceIndices={activeInsightSentenceIndices}
             />
           ),
         )}
