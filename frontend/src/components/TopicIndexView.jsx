@@ -25,7 +25,12 @@ const MIN_TILE_HEIGHT = 44;
 const PER_RANGE_CHAR_PX = 0.28;
 const ESTIMATED_SENTENCE_CHAR_COUNT = 90;
 const MAX_TILE_HEIGHT = 180;
-const TOPIC_TILE_META_ORDER = ["key_phrases", "subtopics", "tags"];
+const TOPIC_TILE_META_ORDER = [
+  "marker_summary",
+  "key_phrases",
+  "subtopics",
+  "tags",
+];
 
 /**
  * @typedef {Object} TopicIndexRangeSegment
@@ -68,13 +73,20 @@ const TOPIC_TILE_META_ORDER = ["key_phrases", "subtopics", "tags"];
  */
 
 /**
+ * @typedef {Object} TopicIndexMarkerSpanItem
+ * @property {string} text
+ */
+
+/**
  * @typedef {Object} TopicIndexMetaCategory
- * @property {"key_phrases"|"subtopics"|"tags"} key
+ * @property {"key_phrases"|"subtopics"|"tags"|"marker_summary"} key
  * @property {string} label
  * @property {TopicIndexKeyPhraseItem[]=} phrases
  * @property {string=} representativeSentence
  * @property {TopicIndexSubtopicItem[]=} subtopics
  * @property {TopicIndexTagItem[]=} tags
+ * @property {TopicIndexMarkerSpanItem[]=} markerSpans
+ * @property {string=} summaryText
  */
 
 /**
@@ -293,6 +305,7 @@ function stopTileClickPropagation(event) {
  * @param {Map<string, { phrases: TopicIndexKeyPhraseItem[], representativeSentence: string }>} topicKeyPhrasesMap
  * @param {Map<string, TopicIndexTagItem[]>} topicTagCloudMap
  * @param {Map<string, TopicIndexSubtopicItem[]>} subtopicsByParent
+ * @param {Map<string, {ranges: Array<{marker_spans: Array<{text: string}>, summary_text: string}>}>} markerSummariesByTopic
  * @returns {TopicIndexMetaCategory[]}
  */
 function buildTopicTileMetaCategories(
@@ -300,12 +313,14 @@ function buildTopicTileMetaCategories(
   topicKeyPhrasesMap,
   topicTagCloudMap,
   subtopicsByParent,
+  markerSummariesByTopic,
 ) {
   /** @type {Record<string, TopicIndexMetaCategory|null>} */
   const categoriesByKey = {
     key_phrases: null,
     subtopics: null,
     tags: null,
+    marker_summary: null,
   };
 
   const keyPhraseData = topicKeyPhrasesMap.get(topic.name);
@@ -334,6 +349,19 @@ function buildTopicTileMetaCategories(
       label: "Tags",
       tags,
     };
+  }
+
+  const markerData = markerSummariesByTopic.get(topic.name);
+  if (markerData?.ranges?.length > 0) {
+    const firstRange = markerData.ranges[0];
+    if (firstRange.summary_text || firstRange.marker_spans?.length > 0) {
+      categoriesByKey.marker_summary = {
+        key: "marker_summary",
+        label: "Highlights",
+        markerSpans: firstRange.marker_spans || [],
+        summaryText: firstRange.summary_text || "",
+      };
+    }
   }
 
   return TOPIC_TILE_META_ORDER.map((key) => categoriesByKey[key]).filter(
@@ -437,6 +465,22 @@ function TopicIndexView({
     return groupedSubtopics;
   }, [submissionResults?.subtopics]);
 
+  const topicMarkerSummariesByTopic = useMemo(() => {
+    /** @type {Map<string, {ranges: Array<{marker_spans: Array<{text: string}>, summary_text: string}>}>} */
+    const markerSummariesByTopicName = new Map();
+    const markerSummaries = submissionResults?.topic_marker_summaries || {};
+    deduplicatedTopics.forEach((topic) => {
+      if (!topic?.name || markerSummariesByTopicName.has(topic.name)) {
+        return;
+      }
+      const topicMarkerData = markerSummaries[topic.name];
+      if (topicMarkerData?.ranges?.length > 0) {
+        markerSummariesByTopicName.set(topic.name, topicMarkerData);
+      }
+    });
+    return markerSummariesByTopicName;
+  }, [deduplicatedTopics, submissionResults?.topic_marker_summaries]);
+
   const topicKeyPhrasesMap = useMemo(() => {
     /** @type {Map<string, { phrases: TopicIndexKeyPhraseItem[], representativeSentence: string }>} */
     const phrasesByTopicName = new Map();
@@ -463,6 +507,7 @@ function TopicIndexView({
           topicKeyPhrasesMap,
           topicTagCloudMap,
           subtopicsByParent,
+          topicMarkerSummariesByTopic,
         ),
       );
     });
@@ -472,6 +517,7 @@ function TopicIndexView({
     topicKeyPhrasesMap,
     topicTagCloudMap,
     subtopicsByParent,
+    topicMarkerSummariesByTopic,
   ]);
 
   const noteAccentStyleSheet = useMemo(() => {
@@ -927,6 +973,27 @@ function TopicIndexView({
                                         </a>
                                       );
                                     })
+                                  : null}
+                                {activeMetaCategory.key === "marker_summary" &&
+                                activeMetaCategory.markerSpans?.length > 0
+                                  ? activeMetaCategory.markerSpans.map(
+                                      (span, index) => {
+                                        const label = span.text;
+                                        const displayLabel =
+                                          label.length > 25
+                                            ? `${label.substring(0, 25)}...`
+                                            : label;
+                                        return (
+                                          <span
+                                            key={`${topic.name}-marker-${index}-${label}`}
+                                            className="topic-index-view__tile-tag topic-index-view__tile-tag--md"
+                                            title={label}
+                                          >
+                                            {displayLabel}
+                                          </span>
+                                        );
+                                      },
+                                    )
                                   : null}
                               </div>
                             </div>
