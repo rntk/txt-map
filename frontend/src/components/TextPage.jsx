@@ -90,6 +90,16 @@ function TextPageContent() {
   } = useArticle();
 
   const [activeTab, setActiveTab] = useState("article");
+  const highlightWords = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const wordsParam =
+      searchParams.get("words") || searchParams.get("highlight");
+    if (!wordsParam) return [];
+    return wordsParam
+      .split(",")
+      .map((w) => w.trim())
+      .filter(Boolean);
+  }, []);
   const [sidebarTab, setSidebarTab] = useState("topics");
   const [groupedByTopics, setGroupedByTopics] = useState(false);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
@@ -1134,6 +1144,7 @@ function TextPageContent() {
                             paragraphMap={article.paragraph_map}
                             rawHtml={article.raw_html}
                             markerWordIndices={article.marker_word_indices}
+                            highlightWords={highlightWords}
                             onToggleRead={toggleRead}
                             onToggleTopic={toggleTopic}
                             onNavigateTopic={navigateTopicSentence}

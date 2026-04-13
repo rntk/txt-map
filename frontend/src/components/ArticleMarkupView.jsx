@@ -237,7 +237,12 @@ function MarkupTopicBlock({
       const meta = link
         ? { linkHref: link.href, linkText: link.textContent?.trim() }
         : undefined;
-      showTooltip([{ topic: block.topic, rangeCount: block.rangeCount }], x, y, meta);
+      showTooltip(
+        [{ topic: block.topic, rangeCount: block.rangeCount }],
+        x,
+        y,
+        meta,
+      );
     },
     [
       block,

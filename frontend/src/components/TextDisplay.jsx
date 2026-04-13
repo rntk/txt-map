@@ -411,6 +411,7 @@ function TextDisplay({
         interactiveHighlightClassName,
         safeDimmedHighlightRanges,
         dimmedHighlightClassName,
+        effectiveHighlightWords,
       ),
     [
       rawHtml,
@@ -423,6 +424,7 @@ function TextDisplay({
       interactiveHighlightClassName,
       safeDimmedHighlightRanges,
       dimmedHighlightClassName,
+      effectiveHighlightWords,
     ],
   );
 

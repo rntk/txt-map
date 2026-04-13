@@ -378,7 +378,9 @@ describe("TopicIndexView", () => {
             },
           ],
           topic_model: {
-            latent_topics: [{ id: 4, keywords: ["macro", "rates"], weight: 0.42 }],
+            latent_topics: [
+              { id: 4, keywords: ["macro", "rates"], weight: 0.42 },
+            ],
             topic_mapping: [
               {
                 topic_name: "Alpha > Markets",

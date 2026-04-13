@@ -388,6 +388,13 @@
   font-size: 1.2em;
 }
 
+.word-highlight {
+  background-color: #ffd700 !important; /* Gold/Deep yellow */
+  box-shadow: 0 0 0 2px #ff4500; /* Orange-red outline */
+  border-radius: 2px;
+  font-weight: bold;
+}
+
 .summary-paragraph-highlighted {
   background-color: #fffacd;
   border-left: 3px solid #f0c040;

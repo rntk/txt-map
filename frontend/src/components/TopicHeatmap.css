@@ -110,6 +110,17 @@
   min-width: 40px;
 }
 
+.topic-heatmap-cell-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.topic-heatmap-cell-link:hover,
+.topic-heatmap-cell-link:focus-visible {
+  text-decoration: underline;
+}
+
 .topic-heatmap-cell.is-diagonal {
   font-weight: 600;
 }

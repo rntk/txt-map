@@ -627,6 +627,12 @@ describe("TextPage raw text navigation", () => {
 
     const gammaLinks = await screen.findAllByRole("link", { name: "gamma" });
     expect(gammaLinks).toHaveLength(2);
+    expect(
+      screen.getByRole("link", { name: /Highlight alpha beta in article/i }),
+    ).toHaveAttribute(
+      "href",
+      "/page/text/test-submission-id?words=alpha%2Cbeta",
+    );
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
   });
 

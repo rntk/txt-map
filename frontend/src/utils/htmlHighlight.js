@@ -16,6 +16,7 @@ export function isInAnyRange(start, end, ranges) {
  * @param {string} [interactiveClassName]
  * @param {Array<{start: number, end: number}>} [dimmedRanges]
  * @param {string} [dimmedClassName]
+ * @param {string[]} [highlightWords]
  */
 export function wrapWord(
   htmlWord,
@@ -29,40 +30,56 @@ export function wrapWord(
   interactiveClassName = "",
   dimmedRanges = [],
   dimmedClassName = "",
+  highlightWords = [],
 ) {
   const wordEnd = wordStart + htmlWord.length;
+
+  const classes = ["word-token"];
+
+  // Word-based highlighting (URL param)
+  if (Array.isArray(highlightWords) && highlightWords.length > 0) {
+    const cleanWord = htmlWord.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "").toLowerCase();
+    if (
+      cleanWord.length > 0 &&
+      highlightWords.some((w) => w.toLowerCase() === cleanWord)
+    ) {
+      classes.push("word-highlight");
+    }
+  }
 
   if (coloredRanges.length > 0) {
     const matchingColored = coloredRanges.find(
       (r) => wordStart < r.end && wordEnd > r.start,
     );
     if (matchingColored) {
-      return `<span class="word-token ${matchingColored.cssClass}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
+      classes.push(matchingColored.cssClass);
+      return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
     }
-    return htmlWord;
   }
 
-  if (!isInAnyRange(wordStart, wordEnd, allTopicRanges)) {
-    return htmlWord;
-  }
-
-  const classes = ["word-token"];
-  if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
-    classes.push("highlighted");
-  } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
-    classes.push("faded");
-  }
   if (
-    interactiveClassName &&
-    isInAnyRange(wordStart, wordEnd, interactiveRanges)
+    isInAnyRange(wordStart, wordEnd, allTopicRanges) ||
+    classes.includes("word-highlight")
   ) {
-    classes.push(interactiveClassName);
-  }
-  if (dimmedClassName && isInAnyRange(wordStart, wordEnd, dimmedRanges)) {
-    classes.push(dimmedClassName);
+    if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
+      classes.push("highlighted");
+    } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
+      classes.push("faded");
+    }
+    if (
+      interactiveClassName &&
+      isInAnyRange(wordStart, wordEnd, interactiveRanges)
+    ) {
+      classes.push(interactiveClassName);
+    }
+    if (dimmedClassName && isInAnyRange(wordStart, wordEnd, dimmedRanges)) {
+      classes.push(dimmedClassName);
+    }
+
+    return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
   }
 
-  return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
+  return htmlWord;
 }
 
 /**
@@ -76,6 +93,7 @@ export function wrapWord(
  * @param {string} [interactiveClassName]
  * @param {Array<{start: number, end: number}>} [dimmedRanges]
  * @param {string} [dimmedClassName]
+ * @param {string[]} [highlightWords]
  */
 export function buildHighlightedRawHtml(
   rawHtml,
@@ -88,6 +106,7 @@ export function buildHighlightedRawHtml(
   interactiveClassName = "",
   dimmedRanges = [],
   dimmedClassName = "",
+  highlightWords = [],
 ) {
   if (!rawHtml) return "";
 
@@ -103,7 +122,11 @@ export function buildHighlightedRawHtml(
     });
   });
 
-  if (allTopicRanges.length === 0 && coloredRanges.length === 0) {
+  if (
+    allTopicRanges.length === 0 &&
+    coloredRanges.length === 0 &&
+    highlightWords.length === 0
+  ) {
     return sanitizeHTML(rawHtml);
   }
 
@@ -141,6 +164,7 @@ export function buildHighlightedRawHtml(
           interactiveClassName,
           dimmedRanges,
           dimmedClassName,
+          highlightWords,
         );
         wordBuffer = "";
         wordStart = -1;
@@ -162,6 +186,7 @@ export function buildHighlightedRawHtml(
             interactiveClassName,
             dimmedRanges,
             dimmedClassName,
+            highlightWords,
           );
           wordBuffer = "";
           wordStart = -1;
@@ -187,6 +212,7 @@ export function buildHighlightedRawHtml(
       interactiveClassName,
       dimmedRanges,
       dimmedClassName,
+      highlightWords,
     );
   }
 

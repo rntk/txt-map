@@ -193,8 +193,13 @@ describe("TopicAnalysisPage", () => {
     const highlightedCells = screen.getAllByText("2");
     expect(highlightedCells.length).toBeGreaterThan(0);
     expect(
-      highlightedCells.some((cell) => cell.className.includes("heat-8")),
+      highlightedCells.some((cell) =>
+        cell.closest("td")?.className.includes("heat-8"),
+      ),
     ).toBe(true);
+    expect(
+      screen.getByRole("link", { name: /Highlight run cat in article/i }),
+    ).toHaveAttribute("href", "/page/text/sub-123?words=run%2Ccat");
     expect(screen.queryAllByText("0").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: /Show all 3 words/i }),

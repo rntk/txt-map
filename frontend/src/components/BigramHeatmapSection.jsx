@@ -46,6 +46,23 @@ function getHeatLevelClassName(value, maxValue) {
 }
 
 /**
+ * @param {string | null} submissionId
+ * @param {string} rowWord
+ * @param {string} columnWord
+ * @returns {string | null}
+ */
+function buildBigramHighlightHref(submissionId, rowWord, columnWord) {
+  if (!submissionId) {
+    return null;
+  }
+
+  const searchParams = new URLSearchParams({
+    words: `${rowWord},${columnWord}`,
+  });
+  return `/page/text/${submissionId}?${searchParams.toString()}`;
+}
+
+/**
  * @param {{
  *   submissionId: string | null,
  *   heatmapState: BigramHeatmapState,
@@ -175,13 +192,28 @@ function BigramHeatmapSection({
                     cellValue,
                     heatmapData.max_value,
                   );
+                  const cellHref = buildBigramHighlightHref(
+                    submissionId,
+                    rowEntry.word,
+                    columnEntry.word,
+                  );
 
                   return (
                     <td
                       key={`cell-${rowEntry.word}-${columnEntry.word}`}
                       className={`topic-heatmap-cell ${heatLevelClassName}${rowEntry.word === columnEntry.word ? " is-diagonal" : ""}`}
                     >
-                      {cellValue}
+                      {cellHref ? (
+                        <a
+                          href={cellHref}
+                          className="topic-heatmap-cell-link"
+                          aria-label={`Highlight ${rowEntry.word} ${columnEntry.word} in article`}
+                        >
+                          {cellValue}
+                        </a>
+                      ) : (
+                        cellValue
+                      )}
                     </td>
                   );
                 })}

@@ -468,7 +468,10 @@ export const buildTopicKeyPhrases = (
 
       // Retroactively remove any unigram components already in the list
       for (let i = selectedTerms.length - 2; i >= 0; i -= 1) {
-        if (!selectedTerms[i].isBigram && suppressedUnigrams.has(selectedTerms[i].label)) {
+        if (
+          !selectedTerms[i].isBigram &&
+          suppressedUnigrams.has(selectedTerms[i].label)
+        ) {
           selectedTerms.splice(i, 1);
         }
       }
@@ -498,8 +501,7 @@ export const buildTopicKeyPhrases = (
 
     uniqueUnigrams.forEach((token) => {
       const df = documentFrequencies.get(token) || 1;
-      const idf =
-        Math.log((1 + totalSentenceCount) / (1 + df)) + 1;
+      const idf = Math.log((1 + totalSentenceCount) / (1 + df)) + 1;
       sentenceScore += idf;
     });
 

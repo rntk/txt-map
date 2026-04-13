@@ -151,7 +151,11 @@ describe("buildTopicTagCloud", () => {
       "Other topics appear here.",
     ];
     const topic = { name: "ML", sentences: [1, 2] };
-    const tags = buildTopicTagCloud(topic, buildArticleTfIdfIndex(sentences), 10);
+    const tags = buildTopicTagCloud(
+      topic,
+      buildArticleTfIdfIndex(sentences),
+      10,
+    );
     const labels = tags.map((tag) => tag.label);
 
     labels.forEach((label) => {
@@ -162,7 +166,10 @@ describe("buildTopicTagCloud", () => {
 
 describe("buildArticleTfIdfIndex bigrams", () => {
   test("includes bigrams in sentenceTokens", () => {
-    const sentences = ["Machine learning drives results.", "Other sentence here."];
+    const sentences = [
+      "Machine learning drives results.",
+      "Other sentence here.",
+    ];
     const index = buildArticleTfIdfIndex(sentences);
 
     const hasBigram = index.sentenceTokens[0].some((token) =>
@@ -172,7 +179,10 @@ describe("buildArticleTfIdfIndex bigrams", () => {
   });
 
   test("bigrams appear in documentFrequencies", () => {
-    const sentences = ["Machine learning drives results.", "Machine learning is everywhere."];
+    const sentences = [
+      "Machine learning drives results.",
+      "Machine learning is everywhere.",
+    ];
     const index = buildArticleTfIdfIndex(sentences);
 
     expect(index.documentFrequencies.has("machine learning")).toBe(true);
