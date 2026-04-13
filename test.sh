@@ -72,8 +72,15 @@ if $run_direct; then
     if $REBUILD; then
         echo "--rebuild is ignored in direct mode." >&2
     fi
-    (cd "$PROJECT_DIR" && PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" pytest "${PYTEST_ARGS[@]}")
-    exit 0
+    EXIT_CODE=0
+    (cd "$PROJECT_DIR" && PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" pytest "${PYTEST_ARGS[@]}") || EXIT_CODE=$?
+    if [ "$EXIT_CODE" -ne 0 ]; then
+        echo ""
+        echo "========================================" >&2
+        echo "  TESTS FAILED (exit code: $EXIT_CODE)" >&2
+        echo "========================================" >&2
+    fi
+    exit "$EXIT_CODE"
 fi
 
 if docker compose version >/dev/null 2>&1; then
@@ -90,4 +97,14 @@ if $REBUILD; then
     "${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" build tests
 fi
 
-"${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" run --rm tests pytest "${PYTEST_ARGS[@]}"
+EXIT_CODE=0
+"${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" run --rm tests pytest "${PYTEST_ARGS[@]}" || EXIT_CODE=$?
+
+if [ "$EXIT_CODE" -ne 0 ]; then
+    echo ""
+    echo "========================================" >&2
+    echo "  TESTS FAILED (exit code: $EXIT_CODE)" >&2
+    echo "========================================" >&2
+fi
+
+exit "$EXIT_CODE"
