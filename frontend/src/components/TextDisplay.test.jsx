@@ -154,6 +154,35 @@ describe("TextDisplay", () => {
       expect(accentValue).toContain(getTopicAccentColor("Topic1"));
       expect(accentValue).toContain(getTopicAccentColor("Topic2"));
     });
+
+    it("highlights marker-summary words with a distinct class in Article view", () => {
+      const props = {
+        ...defaultProps,
+        rawText: "Alpha Beta Gamma",
+        sentences: ["Alpha Beta Gamma"],
+        selectedTopics: [{ name: "Topic1" }],
+        articleTopics: [
+          {
+            name: "Topic1",
+            sentences: [1],
+            ranges: [{ start: 6, end: 10 }],
+            summaryHighlightRanges: [{ start: 6, end: 10 }],
+          },
+        ],
+      };
+
+      render(<TextDisplay {...props} />);
+
+      const summaryHighlight = document.querySelector(
+        ".reading-article__summary-word-highlight",
+      );
+
+      expect(summaryHighlight).toBeInTheDocument();
+      expect(summaryHighlight).toHaveTextContent("Beta");
+      expect(
+        summaryHighlight.closest(".reading-article__sentence"),
+      ).toHaveClass("highlighted");
+    });
   });
 
   describe("Highlighted vs faded precedence", () => {

@@ -6,6 +6,7 @@ Tests Worker class, main function, and constants.
 
 import pytest
 import signal
+import itertools
 from datetime import datetime, UTC
 from unittest.mock import MagicMock, patch
 
@@ -44,6 +45,12 @@ class TestTaskDependencies:
         """prefix_tree depends on split_topic_generation."""
         assert TASK_DEPENDENCIES["prefix_tree"] == ["split_topic_generation"]
 
+    def test_topic_marker_summary_generation_depends_on_split_topic_generation(self):
+        """topic_marker_summary_generation depends on split_topic_generation."""
+        assert TASK_DEPENDENCIES["topic_marker_summary_generation"] == [
+            "split_topic_generation"
+        ]
+
     def test_all_task_types_are_defined(self):
         """All task types from TASK_HANDLERS have dependencies defined."""
         for task_type in TASK_HANDLERS.keys():
@@ -76,6 +83,10 @@ class TestTaskPriorities:
     def test_insights_generation_has_priority_4(self):
         """insights_generation has priority 4."""
         assert TASK_PRIORITIES["insights_generation"] == 4
+
+    def test_topic_marker_summary_generation_has_priority_4(self):
+        """topic_marker_summary_generation has priority 4."""
+        assert TASK_PRIORITIES["topic_marker_summary_generation"] == 4
 
     def test_all_task_types_have_priorities(self):
         """All task types from TASK_HANDLERS have priorities defined."""
@@ -115,6 +126,11 @@ class TestTaskHandlers:
         """Handler for insights_generation exists."""
         assert "insights_generation" in TASK_HANDLERS
         assert callable(TASK_HANDLERS["insights_generation"])
+
+    def test_topic_marker_summary_generation_handler_exists(self):
+        """Handler for topic_marker_summary_generation exists."""
+        assert "topic_marker_summary_generation" in TASK_HANDLERS
+        assert callable(TASK_HANDLERS["topic_marker_summary_generation"])
 
 
 class TestWorkerInit:
@@ -580,17 +596,10 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [
-            None,
-            mock_task,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ]
+        worker.db.task_queue.find_one_and_update.side_effect = itertools.chain(
+            [None, mock_task],
+            itertools.repeat(None),
+        )
 
         worker.claim_task()
 
@@ -603,17 +612,17 @@ class TestWorkerClaimTask:
             "task_type": "subtopics_generation",
             "submission_id": "sub-123",
         }
-        worker.db.task_queue.find_one_and_update.side_effect = [
-            None,
-            mock_task,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ]
+        call_count = {"value": 0}
+
+        def find_one_and_update_side_effect(*args, **kwargs):
+            call_count["value"] += 1
+            if call_count["value"] == 2:
+                return mock_task
+            return None
+
+        worker.db.task_queue.find_one_and_update.side_effect = (
+            find_one_and_update_side_effect
+        )
         worker._dependencies_met.return_value = False
 
         result = worker.claim_task()

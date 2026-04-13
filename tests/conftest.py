@@ -85,6 +85,7 @@ def mock_submissions_storage(mock_db):
         "prefix_tree",
         "insights_generation",
         "markup_generation",
+        "topic_marker_summary_generation",
         "clustering_generation",
         "topic_modeling_generation",
     ]
@@ -96,6 +97,7 @@ def mock_submissions_storage(mock_db):
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "markup_generation": ["split_topic_generation"],
+        "topic_marker_summary_generation": ["split_topic_generation"],
         "clustering_generation": ["split_topic_generation"],
         "topic_modeling_generation": ["split_topic_generation"],
     }
@@ -155,6 +157,12 @@ def sample_submission():
                 "completed_at": None,
                 "error": None,
             },
+            "topic_marker_summary_generation": {
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "error": None,
+            },
             "clustering_generation": {
                 "status": "pending",
                 "started_at": None,
@@ -185,6 +193,7 @@ def sample_submission():
             "insights": [],
             "annotations": {},
             "markup": {},
+            "topic_marker_summaries": {},
         },
     }
 

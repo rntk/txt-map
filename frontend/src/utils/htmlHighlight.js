@@ -10,6 +10,7 @@ export function isInAnyRange(start, end, ranges) {
  * @param {number} articleIndex
  * @param {Array<{start: number, end: number}>} highlightRanges
  * @param {Array<{start: number, end: number}>} fadeRanges
+ * @param {Array<{start: number, end: number}>} summaryHighlightRanges
  * @param {Array<{start: number, end: number}>} allTopicRanges
  * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
  * @param {Array<{start: number, end: number}>} [interactiveRanges]
@@ -24,6 +25,7 @@ export function wrapWord(
   articleIndex,
   highlightRanges,
   fadeRanges,
+  summaryHighlightRanges,
   allTopicRanges,
   coloredRanges = [],
   interactiveRanges = [],
@@ -61,6 +63,9 @@ export function wrapWord(
     isInAnyRange(wordStart, wordEnd, allTopicRanges) ||
     classes.includes("word-highlight")
   ) {
+    if (isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)) {
+      classes.push("reading-article__summary-word-highlight");
+    }
     if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
       classes.push("highlighted");
     } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
@@ -88,6 +93,7 @@ export function wrapWord(
  * @param {number} articleIndex
  * @param {Array<{start: number, end: number}>} highlightRanges
  * @param {Array<{start: number, end: number}>} fadeRanges
+ * @param {Array<{start: number, end: number}>} [summaryHighlightRanges]
  * @param {Array<{start: number, end: number, color: string}>} [coloredRanges]
  * @param {Array<{start: number, end: number}>} [interactiveRanges]
  * @param {string} [interactiveClassName]
@@ -101,6 +107,7 @@ export function buildHighlightedRawHtml(
   articleIndex,
   highlightRanges,
   fadeRanges,
+  summaryHighlightRanges = [],
   coloredRanges = [],
   interactiveRanges = [],
   interactiveClassName = "",
@@ -109,6 +116,12 @@ export function buildHighlightedRawHtml(
   highlightWords = [],
 ) {
   if (!rawHtml) return "";
+  const safeSummaryHighlightRanges = Array.isArray(summaryHighlightRanges)
+    ? summaryHighlightRanges
+    : [];
+  const safeHighlightWords = Array.isArray(highlightWords)
+    ? highlightWords
+    : [];
 
   const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
   const allTopicRanges = [];
@@ -125,7 +138,8 @@ export function buildHighlightedRawHtml(
   if (
     allTopicRanges.length === 0 &&
     coloredRanges.length === 0 &&
-    highlightWords.length === 0
+    safeSummaryHighlightRanges.length === 0 &&
+    safeHighlightWords.length === 0
   ) {
     return sanitizeHTML(rawHtml);
   }
@@ -158,13 +172,14 @@ export function buildHighlightedRawHtml(
           articleIndex,
           highlightRanges,
           fadeRanges,
+          safeSummaryHighlightRanges,
           allTopicRanges,
           coloredRanges,
           interactiveRanges,
           interactiveClassName,
           dimmedRanges,
           dimmedClassName,
-          highlightWords,
+          safeHighlightWords,
         );
         wordBuffer = "";
         wordStart = -1;
@@ -180,13 +195,14 @@ export function buildHighlightedRawHtml(
             articleIndex,
             highlightRanges,
             fadeRanges,
+            safeSummaryHighlightRanges,
             allTopicRanges,
             coloredRanges,
             interactiveRanges,
             interactiveClassName,
             dimmedRanges,
             dimmedClassName,
-            highlightWords,
+            safeHighlightWords,
           );
           wordBuffer = "";
           wordStart = -1;
@@ -206,13 +222,14 @@ export function buildHighlightedRawHtml(
       articleIndex,
       highlightRanges,
       fadeRanges,
+      safeSummaryHighlightRanges,
       allTopicRanges,
       coloredRanges,
       interactiveRanges,
       interactiveClassName,
       dimmedRanges,
       dimmedClassName,
-      highlightWords,
+      safeHighlightWords,
     );
   }
 

@@ -18,6 +18,7 @@ class SubmissionsStorage:
         "prefix_tree": ["split_topic_generation"],
         "insights_generation": ["split_topic_generation"],
         "markup_generation": ["split_topic_generation"],
+        "topic_marker_summary_generation": ["split_topic_generation"],
         "clustering_generation": ["split_topic_generation"],
         "topic_modeling_generation": ["split_topic_generation"],
     }
@@ -92,6 +93,12 @@ class SubmissionsStorage:
                     "completed_at": None,
                     "error": None,
                 },
+                "topic_marker_summary_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None,
+                },
                 "clustering_generation": {
                     "status": "pending",
                     "started_at": None,
@@ -120,6 +127,7 @@ class SubmissionsStorage:
                 "insights": [],
                 "annotations": {},
                 "markup": {},
+                "topic_marker_summaries": {},
                 "table_blocks": {},
                 "clusters": [],
                 "topic_model": {},
@@ -224,6 +232,9 @@ class SubmissionsStorage:
 
         if "markup_generation" in names:
             update_fields["results.markup"] = {}
+
+        if "topic_marker_summary_generation" in names:
+            update_fields["results.topic_marker_summaries"] = {}
 
         if "clustering_generation" in names:
             update_fields["results.clusters"] = []

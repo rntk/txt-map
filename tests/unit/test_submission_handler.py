@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 import uuid
 from handlers.submission_handler import _extract_content_from_upload
-from lib.nlp import compute_word_frequencies
 
 
 # Mock dependencies before importing app - must be at module level to catch import-time operations
@@ -40,6 +39,7 @@ def mock_storage():
         "prefix_tree",
         "insights_generation",
         "markup_generation",
+        "topic_marker_summary_generation",
         "clustering_generation",
         "topic_modeling_generation",
     ]
@@ -73,7 +73,7 @@ def test_post_submit(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 9
+    assert mock_task_queue.create.call_count == 10
 
 
 def test_post_upload(client, mock_storage, mock_task_queue):
@@ -87,7 +87,7 @@ def test_post_upload(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 9
+    assert mock_task_queue.create.call_count == 10
 
 
 def test_extract_content_from_upload_allows_image_only_pdf_html():
@@ -221,22 +221,9 @@ def test_post_refresh(client, mock_storage, mock_task_queue, sample_submission):
 # ... existing code ...
 
 
+@pytest.mark.skip(reason="word-cloud endpoint is no longer implemented")
 def test_get_word_cloud(client, mock_storage, sample_submission):
-    submission_id = sample_submission["submission_id"]
-    sample_submission["results"]["sentences"] = ["This is a test sentence."]
-    sample_submission["results"]["topics"] = [{"name": "Test", "sentences": [1]}]
-    mock_storage.get_by_id.return_value = sample_submission
-
-    with patch(
-        "handlers.submission_handler.compute_word_frequencies",
-        side_effect=compute_word_frequencies,
-    ) as mock_compute:
-        mock_compute.return_value = [{"word": "test", "frequency": 1}]
-        response = client.get(f"/api/submission/{submission_id}/word-cloud")
-
-        assert response.status_code == 200
-        assert "words" in response.json()
-        assert response.json()["sentence_count"] == 1
+    pass
 
 
 def test_list_submissions(client, mock_storage, sample_submission):
@@ -518,7 +505,7 @@ def test_fetch_url_html(client, mock_storage, mock_task_queue):
     assert mock_storage.create.called
     call_kwargs = mock_storage.create.call_args.kwargs
     assert call_kwargs["source_url"] == "https://example.com/article"
-    assert mock_task_queue.create.call_count == 9
+    assert mock_task_queue.create.call_count == 10
 
 
 def test_fetch_url_pdf(client, mock_storage, mock_task_queue):

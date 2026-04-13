@@ -81,6 +81,9 @@ function TopicTreeNode({
     topic && safeSelectedTopics.some((t) => t.name === topic.name),
   );
   const isLeafRead = Boolean(topic && safeReadTopics.has(topic.name));
+  const topicHighlightStyle = topic
+    ? { "--topic-highlight-color": getTopicHighlightColor(topic.name) }
+    : undefined;
 
   const childProps = {
     searchQuery,
@@ -120,10 +123,7 @@ function TopicTreeNode({
     .filter(Boolean)
     .join(" ");
 
-  const titleStyle =
-    highlightAllTopics && topic
-      ? { "--topic-highlight-color": getTopicHighlightColor(topic.name) }
-      : undefined;
+  const titleStyle = highlightAllTopics ? topicHighlightStyle : undefined;
   const isActionMenuOpen = activeActionMenuPath === node.fullPath;
   const areActionsVisible = isActionMenuOpen;
   const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, "-")}`;

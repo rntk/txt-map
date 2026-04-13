@@ -25,6 +25,45 @@ const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
 const EMPTY_ARRAY = [];
 
+function rangesOverlap(start, end, ranges) {
+  return Array.isArray(ranges)
+    ? ranges.some((range) => start < range.end && end > range.start)
+    : false;
+}
+
+function buildSentenceCharacterRanges(rawText, sentences) {
+  if (
+    typeof rawText !== "string" ||
+    !rawText ||
+    !Array.isArray(sentences) ||
+    sentences.length === 0
+  ) {
+    return [];
+  }
+
+  const sentenceRanges = [];
+  let cursor = 0;
+
+  sentences.forEach((sentence) => {
+    if (typeof sentence !== "string" || !sentence) {
+      sentenceRanges.push(null);
+      return;
+    }
+
+    const sentenceStart = rawText.indexOf(sentence, cursor);
+    if (sentenceStart === -1) {
+      sentenceRanges.push(null);
+      return;
+    }
+
+    const sentenceEnd = sentenceStart + sentence.length;
+    sentenceRanges.push({ start: sentenceStart, end: sentenceEnd });
+    cursor = sentenceEnd;
+  });
+
+  return sentenceRanges;
+}
+
 /**
  * @typedef {Object} TextDisplayProps
  * @property {string[]} sentences
@@ -36,6 +75,7 @@ const EMPTY_ARRAY = [];
  * @property {Object|null} [paragraphMap]
  * @property {Object} [topicSummaries]
  * @property {(topic: Object, summary: string) => void} [onShowTopicSummary]
+ * @property {string} [rawText]
  * @property {string|null} [rawHtml]
  * @property {(topic: Object) => void} [onToggleRead]
  * @property {(topic: Object) => void} [onToggleTopic]
@@ -73,6 +113,7 @@ function TextDisplay({
   paragraphMap,
   topicSummaries,
   onShowTopicSummary,
+  rawText = "",
   rawHtml,
   onToggleRead,
   onToggleTopic,
@@ -206,6 +247,40 @@ function TextDisplay({
             )
         : [],
     [dimmedHighlightRanges],
+  );
+  const activeSummaryHighlightRanges = useMemo(() => {
+    const highlightedTopicNames = new Set(
+      safeSelectedTopics
+        .map((topic) => (typeof topic?.name === "string" ? topic.name : ""))
+        .filter(Boolean),
+    );
+    if (hoveredTopic?.name) {
+      highlightedTopicNames.add(hoveredTopic.name);
+    }
+
+    const ranges = [];
+    safeArticleTopics.forEach((topic) => {
+      if (!highlightedTopicNames.has(topic.name)) {
+        return;
+      }
+
+      (Array.isArray(topic.summaryHighlightRanges)
+        ? topic.summaryHighlightRanges
+        : []
+      ).forEach((range) => {
+        const start = Number(range?.start);
+        const end = Number(range?.end);
+        if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+          ranges.push({ start, end });
+        }
+      });
+    });
+
+    return ranges;
+  }, [hoveredTopic, safeArticleTopics, safeSelectedTopics]);
+  const sentenceCharacterRanges = useMemo(
+    () => buildSentenceCharacterRanges(rawText, safeSentences),
+    [rawText, safeSentences],
   );
 
   // Get highlight words from prop or context
@@ -406,6 +481,7 @@ function TextDisplay({
         articleIndex,
         effectiveHighlightRanges,
         fadeRanges,
+        activeSummaryHighlightRanges,
         coloredRanges,
         safeInteractiveHighlightRanges,
         interactiveHighlightClassName,
@@ -419,6 +495,7 @@ function TextDisplay({
       articleIndex,
       effectiveHighlightRanges,
       fadeRanges,
+      activeSummaryHighlightRanges,
       coloredRanges,
       safeInteractiveHighlightRanges,
       interactiveHighlightClassName,
@@ -951,7 +1028,9 @@ function TextDisplay({
         interactiveSentenceIndexSet={interactiveSentenceIndexSet}
         onShowTopicSummary={onShowTopicSummary}
         paragraphs={paragraphs}
+        activeSummaryHighlightRanges={activeSummaryHighlightRanges}
         safeSentences={safeSentences}
+        sentenceCharacterRanges={sentenceCharacterRanges}
         sentenceAccentMap={sentenceAccentMap}
         sentenceColorMap={sentenceColorMap}
         sentenceToTopicsEnding={sentenceToTopicsEnding}
@@ -982,7 +1061,9 @@ function TextDisplay({
  * @property {Set<number>} interactiveSentenceIndexSet
  * @property {((topic: Object, summary: string) => void) | null | undefined} onShowTopicSummary
  * @property {Array<Array<{ text: string, index: number }>> | null} paragraphs
+ * @property {Array<{start: number, end: number}>} activeSummaryHighlightRanges
  * @property {string[]} safeSentences
+ * @property {Array<{start: number, end: number} | null>} sentenceCharacterRanges
  * @property {Map<number, string> | null} sentenceAccentMap
  * @property {Map<number, string> | null} sentenceColorMap
  * @property {Map<number, Array<Object>>} sentenceToTopicsEnding
@@ -996,6 +1077,7 @@ function TextDisplay({
 const TextDisplayBody = React.memo(function TextDisplayBody({
   activeInsightSentenceIndexSet,
   articleIndex,
+  activeSummaryHighlightRanges,
   coloredHighlightMode,
   effectiveHighlightWords,
   fadedIndices,
@@ -1010,6 +1092,7 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
   onShowTopicSummary,
   paragraphs,
   safeSentences,
+  sentenceCharacterRanges,
   sentenceAccentMap,
   sentenceColorMap,
   sentenceToTopicsEnding,
@@ -1018,23 +1101,44 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
   topicStyleSheet,
   topicSummaries,
 }) {
-  const renderInteractiveSentenceContent = useCallback(
+  const renderSentenceContent = useCallback(
     (text, sentenceIndex) => {
-      const classNames = [];
+      const sentenceRange = sentenceCharacterRanges[sentenceIndex];
+      const sentenceBaseClasses = [];
+
       if (
         interactiveHighlightClassName &&
         interactiveSentenceIndexSet.has(sentenceIndex)
       ) {
-        classNames.push(interactiveHighlightClassName);
+        sentenceBaseClasses.push(interactiveHighlightClassName);
       }
       if (
         dimmedHighlightClassName &&
         dimmedSentenceIndexSet.has(sentenceIndex)
       ) {
-        classNames.push(dimmedHighlightClassName);
+        sentenceBaseClasses.push(dimmedHighlightClassName);
       }
 
-      if (classNames.length === 0) {
+      const hasSummaryHighlights =
+        sentenceRange &&
+        rangesOverlap(
+          sentenceRange.start,
+          sentenceRange.end,
+          activeSummaryHighlightRanges,
+        );
+      const shouldTokenize =
+        sentenceBaseClasses.length > 0 ||
+        hasSummaryHighlights ||
+        (Array.isArray(effectiveHighlightWords) &&
+          effectiveHighlightWords.length > 0);
+
+      if (!shouldTokenize || !sentenceRange) {
+        if (effectiveHighlightWords) {
+          return (
+            <HighlightedText text={text} words={effectiveHighlightWords} />
+          );
+        }
+
         return (
           <span
             dangerouslySetInnerHTML={{
@@ -1044,19 +1148,59 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
         );
       }
 
+      const lowerCaseHighlightWords = Array.isArray(effectiveHighlightWords)
+        ? effectiveHighlightWords.map((word) => word.toLowerCase())
+        : [];
+
+      let localOffset = 0;
       return (
         <>
           {`${text} `.split(/(\s+)/).map((segment, segmentIndex) => {
             if (!segment) {
               return null;
             }
+
+            const segmentStart = sentenceRange.start + localOffset;
+            localOffset += segment.length;
+
             if (/^\s+$/.test(segment)) {
               return segment;
             }
+
+            const segmentEnd = segmentStart + segment.length;
+            const classNames = ["word-token", ...sentenceBaseClasses];
+            const normalizedSegment = segment
+              .replace(/[^a-zA-ZÀ-ÿ0-9]/g, "")
+              .toLowerCase();
+
+            if (
+              normalizedSegment &&
+              lowerCaseHighlightWords.includes(normalizedSegment)
+            ) {
+              classNames.push("word-highlight");
+            }
+
+            if (
+              rangesOverlap(
+                segmentStart,
+                segmentEnd,
+                activeSummaryHighlightRanges,
+              )
+            ) {
+              classNames.push("reading-article__summary-word-highlight");
+            }
+
+            if (classNames.length === 1) {
+              return segment;
+            }
+
             return (
               <span
-                key={`${sentenceIndex}-${segmentIndex}-${segment}`}
-                className={`word-token ${classNames.join(" ")}`}
+                key={`${sentenceIndex}-${segmentIndex}-${segmentStart}`}
+                className={classNames.join(" ")}
+                data-article-index={articleIndex}
+                data-char-start={segmentStart}
+                data-char-end={segmentEnd}
                 data-sentence-index={sentenceIndex}
               >
                 {segment}
@@ -1067,10 +1211,14 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
       );
     },
     [
+      activeSummaryHighlightRanges,
+      articleIndex,
       dimmedHighlightClassName,
       dimmedSentenceIndexSet,
+      effectiveHighlightWords,
       interactiveHighlightClassName,
       interactiveSentenceIndexSet,
+      sentenceCharacterRanges,
     ],
   );
 
@@ -1109,7 +1257,7 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
                   className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
                   style={getSentenceRuntimeStyle(index)}
                 >
-                  {renderInteractiveSentenceContent(text, index)}
+                  {renderSentenceContent(text, index)}
                 </span>
                 {sentenceToTopicsEnding.has(index) &&
                   topicSummaries &&
@@ -1150,14 +1298,7 @@ const TextDisplayBody = React.memo(function TextDisplayBody({
               className={`sentence-token reading-article__sentence${!coloredHighlightMode && highlightedIndices.has(index) ? " highlighted" : fadedIndices.has(index) ? " faded" : ""}${coloredHighlightMode && sentenceColorMap?.has(index) ? " reading-article__sentence--colored" : ""}${showTopicRangeAccents && sentenceAccentMap?.has(index) ? " reading-article__sentence--with-topic-accent" : ""}${activeInsightSentenceIndexSet.has(index) ? " reading-article__sentence--insight-active" : ""}`}
               style={getSentenceRuntimeStyle(index)}
             >
-              {effectiveHighlightWords ? (
-                <HighlightedText
-                  text={sentence}
-                  words={effectiveHighlightWords}
-                />
-              ) : (
-                renderInteractiveSentenceContent(sentence, index)
-              )}
+              {renderSentenceContent(sentence, index)}
             </span>
             {sentenceToTopicsEnding.has(index) &&
               topicSummaries &&

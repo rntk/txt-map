@@ -51,6 +51,7 @@ const RECALCULATE_ACTIONS = [
       "summarization",
       "mindmap",
       "insights_generation",
+      "topic_marker_summary_generation",
     ],
     message: "Topic-related tasks queued.",
   },
@@ -74,6 +75,11 @@ const RECALCULATE_ACTIONS = [
     label: "Markup",
     tasks: ["markup_generation"],
     message: "Markup generation queued.",
+  },
+  {
+    label: "Marker Summary",
+    tasks: ["topic_marker_summary_generation"],
+    message: "Marker summary generation queued.",
   },
   {
     label: "Clustering",

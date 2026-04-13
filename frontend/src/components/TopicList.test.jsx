@@ -4,10 +4,11 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import TopicList from "./TopicList";
 
 // A minimal flat topic
-const makeTopic = (name, totalSentences = 1, ranges = []) => ({
+const makeTopic = (name, totalSentences = 1, ranges = [], extra = {}) => ({
   name,
   totalSentences,
   ranges,
+  ...extra,
 });
 const makeInsight = (
   id,

@@ -29,6 +29,11 @@ const TASK_TYPES = [
   "summarization",
   "mindmap",
   "prefix_tree",
+  "insights_generation",
+  "markup_generation",
+  "topic_marker_summary_generation",
+  "clustering_generation",
+  "topic_modeling_generation",
 ];
 
 function TaskControlPage() {

@@ -1142,6 +1142,7 @@ function TextPageContent() {
                             articleIndex={index}
                             topicSummaries={article.topic_summaries}
                             paragraphMap={article.paragraph_map}
+                            rawText={rawText}
                             rawHtml={article.raw_html}
                             markerWordIndices={article.marker_word_indices}
                             highlightWords={highlightWords}

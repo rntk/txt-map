@@ -411,13 +411,6 @@
   margin-top: 6px;
 }
 
-.topic-tree-node__summary {
-  margin-top: 6px;
-  color: #666;
-  font-size: 1.05rem;
-  font-style: italic;
-}
-
 .topic-tree-node__children {
   list-style: none;
   margin: 0;
