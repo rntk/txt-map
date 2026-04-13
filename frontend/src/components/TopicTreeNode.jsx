@@ -198,8 +198,8 @@ function TopicTreeNode({
 
               <span className="topic-tree-node__stats">
                 {node.isLeaf && topic
-                  ? `(${topic.totalSentences} sent.)`
-                  : `(${totalTopics} topics, ${totalSentences} sent.)`}
+                  ? `(${topic.totalSentences})`
+                  : `(${totalTopics}, ${totalSentences})`}
               </span>
             </div>
 
