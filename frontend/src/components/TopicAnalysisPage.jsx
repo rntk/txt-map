@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { WordCloudDisplay } from "./TopicsTagCloud";
+import BigramHeatmapSection from "./BigramHeatmapSection";
 import "./TopicAnalysisPage.css";
+
+/**
+ * @typedef {import("./BigramHeatmapSection").BigramHeatmapState} TopicHeatmapState
+ */
 
 function statusChip(label, status) {
   return (
@@ -141,6 +146,13 @@ export default function TopicAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTopicIndex, setSelectedTopicIndex] = useState(0);
+  const [showAllHeatmapWords, setShowAllHeatmapWords] = useState(false);
+  /** @type {[TopicHeatmapState, React.Dispatch<React.SetStateAction<TopicHeatmapState>>]} */
+  const [heatmapState, setHeatmapState] = useState({
+    data: null,
+    loading: false,
+    error: null,
+  });
 
   useEffect(() => {
     if (data && data.topics) {
@@ -177,16 +189,13 @@ export default function TopicAnalysisPage() {
       });
   }, [submissionId]);
 
-  if (loading) {
-    return <div className="topic-analysis-page">Loading…</div>;
-  }
-  if (error) {
-    return <div className="topic-analysis-page">Error: {error}</div>;
-  }
-
-  const { topics, clusters, sentences, topic_model, task_status, source_url } =
-    data;
-  const selectedTopic = (topics || [])[selectedTopicIndex] || null;
+  const topics = data?.topics || [];
+  const clusters = data?.clusters || [];
+  const sentences = data?.sentences || [];
+  const topic_model = data?.topic_model || null;
+  const task_status = data?.task_status || null;
+  const source_url = data?.source_url || "";
+  const selectedTopic = topics[selectedTopicIndex] || null;
   const topicSentenceIndices = selectedTopic
     ? selectedTopic.sentences || []
     : [];
@@ -210,6 +219,65 @@ export default function TopicAnalysisPage() {
           (m) => m.topic_name === selectedTopic.name,
         ) || null
       : null;
+
+  useEffect(() => {
+    setShowAllHeatmapWords(false);
+
+    if (!submissionId || !selectedTopic?.name) {
+      setHeatmapState({
+        data: null,
+        loading: false,
+        error: null,
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    setHeatmapState({
+      data: null,
+      loading: true,
+      error: null,
+    });
+
+    fetch(
+      `/api/submission/${submissionId}/topic-analysis/heatmap?topic_name=${encodeURIComponent(selectedTopic.name)}`,
+      { signal: controller.signal },
+    )
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((json) => {
+        setHeatmapState({
+          data: json,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") {
+          return;
+        }
+        setHeatmapState({
+          data: null,
+          loading: false,
+          error: err.message,
+        });
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [submissionId, selectedTopic]);
+
+  if (loading) {
+    return <div className="topic-analysis-page">Loading…</div>;
+  }
+  if (error) {
+    return <div className="topic-analysis-page">Error: {error}</div>;
+  }
 
   return (
     <div className="topic-analysis-page">
@@ -248,6 +316,20 @@ export default function TopicAnalysisPage() {
             <TagCloudSection
               sentences={sentences}
               sentenceIndices={topicSentenceIndices}
+            />
+          </div>
+
+          <div className="topic-analysis-section">
+            <h2>{selectedTopic.name} — Bigram Heatmap</h2>
+            <BigramHeatmapSection
+              submissionId={submissionId}
+              heatmapState={heatmapState}
+              showAllWords={showAllHeatmapWords}
+              onToggleWordCount={() =>
+                setShowAllHeatmapWords((currentValue) => !currentValue)
+              }
+              rankedByLabel="topic specificity and co-occurrence"
+              emptyMessage="No heatmap data available for this topic."
             />
           </div>
 

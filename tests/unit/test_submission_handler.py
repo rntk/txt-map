@@ -312,6 +312,179 @@ def test_get_submission_read_progress(client, mock_storage, sample_submission):
     assert response.json()["total_count"] == 3
 
 
+def test_get_topic_analysis_heatmap(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["results"]["sentences"] = [
+        "Running with cats and dogs.",
+        "Dogs keep running fast.",
+        "Outside the topic.",
+    ]
+    sample_submission["results"]["topics"] = [
+        {"name": "Topic A", "sentences": [1, 2]},
+        {"name": "Topic B", "sentences": [3]},
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    with patch("handlers.submission_handler.compute_bigram_heatmap") as mock_heatmap:
+        mock_heatmap.return_value = {
+            "window_size": 3,
+            "words": [
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.25,
+                    "outside_topic_frequency": 0,
+                }
+            ],
+            "col_words": [
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.25,
+                    "outside_topic_frequency": 0,
+                }
+            ],
+            "matrix": [[2]],
+            "max_value": 2,
+            "default_visible_word_count": 40,
+            "total_word_count": 1,
+        }
+
+        response = client.get(
+            f"/api/submission/{submission_id}/topic-analysis/heatmap",
+            params={"topic_name": "Topic A"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "submission_id": submission_id,
+        "scope": "topic",
+        "topic_name": "Topic A",
+        "window_size": 3,
+        "normalization": "lemma",
+        "words": [
+            {
+                "word": "run",
+                "frequency": 2,
+                "specificity_score": 1.25,
+                "outside_topic_frequency": 0,
+            }
+        ],
+        "col_words": [
+            {
+                "word": "run",
+                "frequency": 2,
+                "specificity_score": 1.25,
+                "outside_topic_frequency": 0,
+            }
+        ],
+        "matrix": [[2]],
+        "max_value": 2,
+        "default_visible_word_count": 40,
+        "total_word_count": 1,
+    }
+    mock_heatmap.assert_called_once_with(
+        ["Running with cats and dogs.", "Dogs keep running fast."],
+        ["Outside the topic."],
+        window_size=3,
+        default_visible_word_count=40,
+    )
+
+
+def test_get_article_analysis_heatmap(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["results"]["sentences"] = [
+        "Running with cats and dogs.",
+        "Dogs keep running fast.",
+        "Outside the topic.",
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    with patch("handlers.submission_handler.compute_bigram_heatmap") as mock_heatmap:
+        mock_heatmap.return_value = {
+            "window_size": 3,
+            "words": [
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.25,
+                    "outside_topic_frequency": 0,
+                }
+            ],
+            "col_words": [
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.25,
+                    "outside_topic_frequency": 0,
+                }
+            ],
+            "matrix": [[0]],
+            "max_value": 0,
+            "default_visible_word_count": 40,
+            "total_word_count": 1,
+        }
+
+        response = client.get(
+            f"/api/submission/{submission_id}/topic-analysis/heatmap",
+            params={"scope": "article"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "submission_id": submission_id,
+        "scope": "article",
+        "topic_name": None,
+        "window_size": 3,
+        "normalization": "lemma",
+        "words": [
+            {
+                "word": "run",
+                "frequency": 2,
+                "specificity_score": 1.25,
+                "outside_topic_frequency": 0,
+            }
+        ],
+        "col_words": [
+            {
+                "word": "run",
+                "frequency": 2,
+                "specificity_score": 1.25,
+                "outside_topic_frequency": 0,
+            }
+        ],
+        "matrix": [[0]],
+        "max_value": 0,
+        "default_visible_word_count": 40,
+        "total_word_count": 1,
+    }
+    mock_heatmap.assert_called_once_with(
+        [
+            "Running with cats and dogs.",
+            "Dogs keep running fast.",
+            "Outside the topic.",
+        ],
+        [],
+        window_size=3,
+        default_visible_word_count=40,
+    )
+
+
+def test_get_topic_analysis_heatmap_returns_404_for_unknown_topic(
+    client, mock_storage, sample_submission
+):
+    submission_id = sample_submission["submission_id"]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    response = client.get(
+        f"/api/submission/{submission_id}/topic-analysis/heatmap",
+        params={"topic_name": "Missing Topic"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Topic not found"
+
+
 # ── /api/fetch-url tests ──────────────────────────────────────────────────────
 
 

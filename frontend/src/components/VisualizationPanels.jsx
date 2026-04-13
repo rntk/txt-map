@@ -15,10 +15,11 @@ import ArticleStructureChart from "./ArticleStructureChart";
 import TreemapChart from "./TreemapChart";
 import TopicsVennChart from "./TopicsVennChart";
 import TopicHierarchyFlowChart from "./TopicHierarchyFlowChart";
+import ArticleBigramHeatmapView from "./ArticleBigramHeatmapView";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -81,6 +82,13 @@ function VisualizationPanels({
             </div>
           </div>
         </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === "article_bigram_heatmap" && (
+        <ArticleBigramHeatmapView
+          submissionId={submissionId == null ? null : String(submissionId)}
+          onClose={onClose}
+        />
       )}
 
       {fullscreenGraph === "topics_river" && (

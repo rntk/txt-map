@@ -40,6 +40,7 @@ const FULLSCREEN_TABS = [
   { key: "topic_index", label: "Index" },
   { key: "topic_summary_timeline", label: "Topic Summaries" },
   { key: "insights", label: "Insights" },
+  { key: "article_bigram_heatmap", label: "Bigram Heatmap" },
   { key: "topics", label: "Topics" },
   { key: "topics_river", label: "Topics River" },
   { key: "gantt_chart", label: "Gantt Chart" },
@@ -206,9 +207,12 @@ function TextPageContent() {
     [clearActiveInsight, setSelectedTopics, setHoveredTopic],
   );
 
-  const handleHoverTopic = useCallback((topic) => {
-    setHoveredTopic(topic);
-  }, []);
+  const handleHoverTopic = useCallback(
+    (topic) => {
+      setHoveredTopic(topic);
+    },
+    [setHoveredTopic],
+  );
 
   const toggleReadAll = useCallback(() => {
     if (!submission) return;
@@ -296,7 +300,7 @@ function TextPageContent() {
           : [...prev, matchedTopic],
       );
     },
-    [safeTopics, closeFullscreenGraph, fullscreenGraph],
+    [safeTopics, closeFullscreenGraph, fullscreenGraph, setSelectedTopics],
   );
 
   useEffect(() => {
@@ -329,7 +333,7 @@ function TextPageContent() {
     const nextSearch = searchParams.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
     window.history.replaceState({}, "", nextUrl);
-  }, [safeTopics]);
+  }, [safeTopics, setSelectedTopics]);
 
   useEffect(() => {
     if (!fullscreenGraph && pendingShowTopicRef.current) {
@@ -797,7 +801,11 @@ function TextPageContent() {
 
   const handleMinimapSentenceClick = useCallback(
     (sentenceIndex) => {
-      if (activeTab === "article" && !fullscreenGraph && !groupedByTopics) {
+      if (
+        (activeTab === "article" || activeTab === "markup") &&
+        !fullscreenGraph &&
+        !groupedByTopics
+      ) {
         scrollToArticleSentence(sentenceIndex);
         return;
       }
@@ -866,7 +874,7 @@ function TextPageContent() {
   useEffect(() => {
     if (
       !activeInsight ||
-      activeTab !== "article" ||
+      (activeTab !== "article" && activeTab !== "markup") ||
       groupedByTopics ||
       fullscreenGraph
     ) {
@@ -906,7 +914,7 @@ function TextPageContent() {
 
   useEffect(() => {
     if (
-      activeTab !== "article" ||
+      (activeTab !== "article" && activeTab !== "markup") ||
       groupedByTopics ||
       fullscreenGraph ||
       pendingMinimapSentenceRef.current === null
@@ -1061,6 +1069,7 @@ function TextPageContent() {
                         safeTopics={safeTopics}
                         markup={submission?.results?.markup}
                         selectedTopics={selectedTopics}
+                        hoveredTopic={hoveredTopic}
                         readTopics={readTopics}
                         onToggleRead={toggleRead}
                         onToggleTopic={toggleTopic}
@@ -1074,6 +1083,11 @@ function TextPageContent() {
                         coloredTopicNames={coloredTopicNames}
                         topicIndexScrollTarget={topicIndexScrollTarget}
                         onBackToTopicIndex={handleBackToTopicIndex}
+                        activeInsightSentenceIndices={
+                          activeInsightSentenceIndices
+                        }
+                        activeInsightRanges={activeInsightRanges}
+                        submissionId={submissionId}
                       />
                     ) : groupedByTopics ? (
                       <GroupedByTopicsView

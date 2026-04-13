@@ -5,6 +5,7 @@ import re
 import requests as http_requests
 
 from lib.constants import TASK_PRIORITIES
+from lib.nlp import compute_bigram_heatmap
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
 from handlers.dependencies import (
@@ -45,6 +46,44 @@ def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -
         task_queue_storage.create(
             make_task_document(submission_id, task_type, priority)
         )
+
+
+def _topic_sentence_texts(
+    submission: Dict[str, Any], topic_name: str
+) -> Tuple[Dict[str, Any], List[str], List[str]]:
+    """Resolve a topic by name and return topic and non-topic sentence texts."""
+    results = submission.get("results") or {}
+    topics = results.get("topics") or []
+    sentences = results.get("sentences") or []
+
+    topic = next((item for item in topics if item.get("name") == topic_name), None)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    sentence_indices: List[int] = topic.get("sentences") or []
+    topic_sentence_index_set: Set[int] = {
+        index
+        for index in sentence_indices
+        if isinstance(index, int) and 1 <= index <= len(sentences)
+    }
+    topic_sentences: List[str] = [
+        sentences[index - 1] for index in sorted(topic_sentence_index_set)
+    ]
+    background_sentences: List[str] = [
+        sentence
+        for index, sentence in enumerate(sentences, start=1)
+        if index not in topic_sentence_index_set
+    ]
+    return topic, topic_sentences, background_sentences
+
+
+def _article_sentence_texts(submission: Dict[str, Any]) -> List[str]:
+    """Return all non-empty sentence texts for a submission."""
+    results = submission.get("results") or {}
+    sentences = results.get("sentences") or []
+    return [
+        sentence for sentence in sentences if isinstance(sentence, str) and sentence
+    ]
 
 
 @router.post("/submit")
@@ -641,6 +680,47 @@ def get_topic_analysis(
                 "status"
             ),
         },
+    }
+
+
+@router.get("/submission/{submission_id}/topic-analysis/heatmap")
+def get_topic_analysis_heatmap(
+    topic_name: Optional[str] = Query(default=None, min_length=1),
+    scope: str = Query(default="topic", pattern="^(topic|article)$"),
+    submission: dict = Depends(require_submission),
+) -> Dict[str, Any]:
+    """Return a normalized co-occurrence heatmap for a topic or whole article."""
+    resolved_topic_name: Optional[str] = None
+
+    if scope == "article":
+        topic_sentences = _article_sentence_texts(submission)
+        background_sentences = []
+    else:
+        if not topic_name:
+            raise HTTPException(status_code=422, detail="topic_name is required")
+        topic, topic_sentences, background_sentences = _topic_sentence_texts(
+            submission, topic_name
+        )
+        resolved_topic_name = topic.get("name", topic_name)
+
+    heatmap_data = compute_bigram_heatmap(
+        topic_sentences,
+        background_sentences,
+        window_size=3,
+        default_visible_word_count=40,
+    )
+    return {
+        "submission_id": submission["submission_id"],
+        "scope": scope,
+        "topic_name": resolved_topic_name,
+        "window_size": heatmap_data["window_size"],
+        "normalization": "lemma",
+        "words": heatmap_data["words"],
+        "col_words": heatmap_data["col_words"],
+        "matrix": heatmap_data["matrix"],
+        "max_value": heatmap_data["max_value"],
+        "default_visible_word_count": heatmap_data["default_visible_word_count"],
+        "total_word_count": heatmap_data["total_word_count"],
     }
 
 

@@ -127,6 +127,61 @@ describe("TextPage raw text navigation", () => {
       ],
     },
   };
+  const articleHeatmapPayload = {
+    submission_id: "test-submission-id",
+    scope: "article",
+    topic_name: null,
+    window_size: 3,
+    normalization: "lemma",
+    words: [
+      {
+        word: "alpha",
+        frequency: 2,
+        specificity_score: 2,
+        outside_topic_frequency: 0,
+      },
+      {
+        word: "beta",
+        frequency: 2,
+        specificity_score: 1.5,
+        outside_topic_frequency: 0,
+      },
+      {
+        word: "gamma",
+        frequency: 1,
+        specificity_score: 1,
+        outside_topic_frequency: 0,
+      },
+    ],
+    col_words: [
+      {
+        word: "beta",
+        frequency: 2,
+        specificity_score: 1.5,
+        outside_topic_frequency: 0,
+      },
+      {
+        word: "alpha",
+        frequency: 2,
+        specificity_score: 2,
+        outside_topic_frequency: 0,
+      },
+      {
+        word: "gamma",
+        frequency: 1,
+        specificity_score: 1,
+        outside_topic_frequency: 0,
+      },
+    ],
+    matrix: [
+      [0, 2, 1],
+      [2, 0, 1],
+      [1, 1, 0],
+    ],
+    max_value: 2,
+    default_visible_word_count: 2,
+    total_word_count: 3,
+  };
 
   const originalFetch = global.fetch;
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
@@ -146,10 +201,23 @@ describe("TextPage raw text navigation", () => {
     document.body.appendChild(portalTarget);
 
     global.fetch = vi.fn(async (url) => {
-      if (String(url).includes("/api/submission/test-submission-id/status")) {
+      const normalizedUrl = String(url);
+
+      if (normalizedUrl.includes("/api/submission/test-submission-id/status")) {
         return {
           ok: true,
           json: async () => ({ overall_status: "completed", tasks: {} }),
+        };
+      }
+
+      if (
+        normalizedUrl.includes(
+          "/api/submission/test-submission-id/topic-analysis/heatmap?scope=article",
+        )
+      ) {
+        return {
+          ok: true,
+          json: async () => articleHeatmapPayload,
         };
       }
 
@@ -530,6 +598,36 @@ describe("TextPage raw text navigation", () => {
     expect(
       screen.getByTestId("topic-hierarchy-flow-chart"),
     ).toBeInTheDocument();
+  });
+
+  it("opens the article bigram heatmap from the View menu", async () => {
+    render(<TextPage />);
+
+    await screen.findByText("Source:");
+
+    fireEvent.click(await screen.findByRole("button", { name: /View/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Bigram Heatmap/ }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/submission/test-submission-id/topic-analysis/heatmap?scope=article",
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      );
+    });
+
+    const alphaLinks = await screen.findAllByRole("link", { name: "alpha" });
+    expect(alphaLinks).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: /Show all 3 words/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Show all 3 words/i }));
+
+    const gammaLinks = await screen.findAllByRole("link", { name: "gamma" });
+    expect(gammaLinks).toHaveLength(2);
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
   });
 
   it("renders the sidebar insights tab and highlights insight sentences when clicked", async () => {

@@ -6,7 +6,9 @@ Tests all functions in lib/nlp.py:
 - _lemmatizer_instance
 - _stop_words_set
 - _wordnet_pos
+- normalize_text_tokens
 - compute_word_frequencies
+- compute_bigram_heatmap
 
 Tests all constants:
 - WN_ADJ, WN_VERB, WN_ADV, WN_NOUN
@@ -23,7 +25,9 @@ from lib.nlp import (
     _lemmatizer_instance,
     _stop_words_set,
     _wordnet_pos,
+    normalize_text_tokens,
     compute_word_frequencies,
+    compute_bigram_heatmap,
     WN_ADJ,
     WN_VERB,
     WN_ADV,
@@ -558,6 +562,201 @@ class TestComputeWordFrequencies:
             words = [r["word"] for r in result]
             assert "test" in words
             assert "token" in words
+
+
+class TestNormalizeTextTokens:
+    """Tests for the normalize_text_tokens function."""
+
+    def test_filters_stopwords_and_lemmatizes_tokens(self):
+        """Normalizes tokens with shared stopword and lemmatizer logic."""
+        with (
+            patch("lib.nlp.word_tokenize") as mock_tokenize,
+            patch("lib.nlp.nltk.pos_tag") as mock_pos_tag,
+            patch("lib.nlp.stopwords.words") as mock_stopwords,
+            patch("lib.nlp.WordNetLemmatizer") as mock_lemmatizer,
+        ):
+            mock_tokenize.return_value = ["running", "the", "cats", "fast"]
+            mock_pos_tag.return_value = [
+                ("running", "VBG"),
+                ("the", "DT"),
+                ("cats", "NNS"),
+                ("fast", "RB"),
+            ]
+            mock_stopwords.return_value = ["the"]
+            mock_lemma_instance = MagicMock()
+            mock_lemma_instance.lemmatize.side_effect = lambda word, pos: {
+                "running": "run",
+                "cats": "cat",
+                "fast": "fast",
+            }.get(word, word)
+            mock_lemmatizer.return_value = mock_lemma_instance
+
+            result = normalize_text_tokens("running the cats fast")
+
+            assert result == ["run", "cat", "fast"]
+
+    def test_removes_html_entity_artifacts_and_nonbreaking_spaces(self):
+        """Skips nbsp artifacts after HTML entity cleanup."""
+        with (
+            patch("lib.nlp.word_tokenize") as mock_tokenize,
+            patch("lib.nlp.nltk.pos_tag") as mock_pos_tag,
+            patch("lib.nlp.stopwords.words") as mock_stopwords,
+            patch("lib.nlp.WordNetLemmatizer") as mock_lemmatizer,
+        ):
+            mock_tokenize.return_value = ["alpha", "nbsp", "beta"]
+            mock_pos_tag.return_value = [
+                ("alpha", "NN"),
+                ("nbsp", "NN"),
+                ("beta", "NN"),
+            ]
+            mock_stopwords.return_value = []
+            mock_lemma_instance = MagicMock()
+            mock_lemma_instance.lemmatize.side_effect = lambda word, pos: word
+            mock_lemmatizer.return_value = mock_lemma_instance
+
+            result = normalize_text_tokens("Alpha&nbsp;Beta nbsp;")
+
+            assert result == ["alpha", "beta"]
+
+
+class TestComputeBigramHeatmap:
+    """Tests for the compute_bigram_heatmap function."""
+
+    def test_returns_empty_structure_for_empty_input(self):
+        """Empty texts return an empty heatmap payload."""
+        result = compute_bigram_heatmap([], [])
+
+        assert result == {
+            "window_size": 3,
+            "words": [],
+            "col_words": [],
+            "matrix": [],
+            "max_value": 0,
+            "default_visible_word_count": 40,
+            "total_word_count": 0,
+        }
+
+    def test_builds_asymmetric_matrix_with_independent_axis_ordering(self):
+        """Rows and columns use independent orderings; same-word cells are zero."""
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.side_effect = [
+                ["run", "dog", "cat"],
+                ["dog", "run"],
+                ["dog", "dog", "run"],
+            ]
+
+            result = compute_bigram_heatmap(
+                ["first", "second"], ["background"], window_size=3
+            )
+
+            # Rows: specificity×cooccurrence — run(3.0) > cat(2.81) > dog(2.0)
+            assert result["words"] == [
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.0,
+                    "outside_topic_frequency": 1,
+                },
+                {
+                    "word": "cat",
+                    "frequency": 1,
+                    "specificity_score": 1.405465,
+                    "outside_topic_frequency": 0,
+                },
+                {
+                    "word": "dog",
+                    "frequency": 2,
+                    "specificity_score": 0.666667,
+                    "outside_topic_frequency": 2,
+                },
+            ]
+            # Columns: cooccurrence_strength only — dog/run(3) tie broken alpha, cat(2)
+            assert result["col_words"] == [
+                {
+                    "word": "dog",
+                    "frequency": 2,
+                    "specificity_score": 0.666667,
+                    "outside_topic_frequency": 2,
+                },
+                {
+                    "word": "run",
+                    "frequency": 2,
+                    "specificity_score": 1.0,
+                    "outside_topic_frequency": 1,
+                },
+                {
+                    "word": "cat",
+                    "frequency": 1,
+                    "specificity_score": 1.405465,
+                    "outside_topic_frequency": 0,
+                },
+            ]
+            # Matrix rows=[run,cat,dog] × cols=[dog,run,cat]
+            # Pairs: (dog,run)=2, (cat,run)=1, (cat,dog)=1
+            # run×dog=2, run×run=0(same), run×cat=1
+            # cat×dog=1, cat×run=1,        cat×cat=0(same)
+            # dog×dog=0(same), dog×run=2,  dog×cat=1
+            assert result["matrix"] == [
+                [2, 0, 1],
+                [1, 1, 0],
+                [0, 2, 1],
+            ]
+            assert result["max_value"] == 2
+
+    def test_limits_cooccurrence_to_each_text_boundary(self):
+        """Does not count pairs across sentence boundaries.
+
+        Words appearing in isolation (no co-occurrence partners) are excluded
+        from the heatmap entirely, so the result is empty rather than a matrix
+        of zeros.
+        """
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.side_effect = [
+                ["alpha"],
+                ["beta"],
+                [],
+            ]
+
+            result = compute_bigram_heatmap(["first", "second"], [], window_size=3)
+
+            assert result["words"] == []
+            assert result["matrix"] == []
+            assert result["max_value"] == 0
+
+    def test_excludes_words_with_zero_cooccurrence(self):
+        """Words that never co-occur with any other word are excluded."""
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.side_effect = [
+                ["connected", "word"],  # these two co-occur
+                ["isolated"],  # appears alone, no co-occurrence partner
+                [],
+            ]
+
+            result = compute_bigram_heatmap(["first", "second"], [], window_size=3)
+
+            words = [entry["word"] for entry in result["words"]]
+            assert "isolated" not in words
+            assert "connected" in words
+            assert "word" in words
+
+    def test_ranks_topic_specific_words_ahead_of_generic_words(self):
+        """Ranks words using the topic-vs-rest specificity score."""
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.side_effect = [
+                ["topic", "topic", "shared"],
+                ["shared", "shared", "shared", "generic"],
+            ]
+
+            result = compute_bigram_heatmap(["topic text"], ["other text"])
+
+            assert [entry["word"] for entry in result["words"]] == [
+                "topic",
+                "shared",
+            ]
+            assert (
+                result["words"][0]["specificity_score"]
+                > result["words"][1]["specificity_score"]
+            )
 
     def test_converts_to_lowercase(self):
         """Converts to lowercase."""
