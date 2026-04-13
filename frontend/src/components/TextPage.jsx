@@ -1176,6 +1176,9 @@ function TextPageContent() {
                           ? selectedTopics[0].name
                           : null
                       }
+                      topicMarkerSummaries={
+                        submission?.results?.topic_marker_summaries || null
+                      }
                     />
                   )}
                   {minimapVisible && (

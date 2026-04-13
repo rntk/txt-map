@@ -19,6 +19,22 @@ function normalizeWordForMatch(word) {
 }
 
 /**
+ * Split a marker span text into normalized words for token-based matching.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function extractNormalizedWords(text) {
+  if (!text || typeof text !== "string") {
+    return [];
+  }
+
+  return text
+    .split(/\s+/)
+    .map((word) => normalizeWordForMatch(word))
+    .filter(Boolean);
+}
+
+/**
  * Build topic-specific marker word data for highlighting
  * Each entry contains the topic's ranges and its marker words
  * @param {Array} articleTopics - Topics with marker_spans and ranges
@@ -26,7 +42,11 @@ function normalizeWordForMatch(word) {
  * @param {{ name: string }|null} hoveredTopic - Hovered topic
  * @returns {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} - Topic-specific marker data
  */
-export function buildTopicMarkerData(articleTopics, selectedTopics, hoveredTopic) {
+export function buildTopicMarkerData(
+  articleTopics,
+  selectedTopics,
+  hoveredTopic,
+) {
   const topicMarkerData = [];
 
   if (!Array.isArray(articleTopics) || articleTopics.length === 0) {
@@ -64,10 +84,9 @@ export function buildTopicMarkerData(articleTopics, selectedTopics, hoveredTopic
     const markerWords = new Set();
     markerSpans.forEach((span) => {
       if (span?.text) {
-        const normalized = normalizeWordForMatch(span.text);
-        if (normalized.length > 0) {
-          markerWords.add(normalized);
-        }
+        extractNormalizedWords(span.text).forEach((word) => {
+          markerWords.add(word);
+        });
       }
     });
 
@@ -150,7 +169,10 @@ export function wrapWord(
   }
 
   // Fallback: also check using character ranges for backward compatibility
-  if (!isSummaryWord && isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)) {
+  if (
+    !isSummaryWord &&
+    isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)
+  ) {
     isSummaryWord = true;
   }
 
@@ -230,7 +252,9 @@ export function buildHighlightedRawHtml(
   const safeHighlightWords = Array.isArray(highlightWords)
     ? highlightWords
     : [];
-  const safeTopicMarkerData = Array.isArray(topicMarkerData) ? topicMarkerData : null;
+  const safeTopicMarkerData = Array.isArray(topicMarkerData)
+    ? topicMarkerData
+    : null;
 
   const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
   const allTopicRanges = [];

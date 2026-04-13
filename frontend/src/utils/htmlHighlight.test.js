@@ -30,7 +30,11 @@ describe("htmlHighlight", () => {
         },
       ];
 
-      const result = buildTopicMarkerData(articleTopics, [{ name: "Topic1" }], null);
+      const result = buildTopicMarkerData(
+        articleTopics,
+        [{ name: "Topic1" }],
+        null,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].ranges).toEqual([{ start: 0, end: 10 }]);
@@ -48,7 +52,9 @@ describe("htmlHighlight", () => {
         },
       ];
 
-      const result = buildTopicMarkerData(articleTopics, [], { name: "Topic1" });
+      const result = buildTopicMarkerData(articleTopics, [], {
+        name: "Topic1",
+      });
 
       expect(result).toHaveLength(1);
       expect(result[0].markerWords.has("word1")).toBe(true);
@@ -59,15 +65,44 @@ describe("htmlHighlight", () => {
         {
           name: "Topic1",
           ranges: [{ start: 0, end: 10 }],
-          marker_spans: [{ text: 'AGI».' }, { text: "word!" }, { text: "test" }],
+          marker_spans: [
+            { text: "AGI»." },
+            { text: "word!" },
+            { text: "test" },
+          ],
         },
       ];
 
-      const result = buildTopicMarkerData(articleTopics, [{ name: "Topic1" }], null);
+      const result = buildTopicMarkerData(
+        articleTopics,
+        [{ name: "Topic1" }],
+        null,
+      );
 
       expect(result[0].markerWords.has("agi")).toBe(true);
       expect(result[0].markerWords.has("word")).toBe(true);
       expect(result[0].markerWords.has("test")).toBe(true);
+    });
+
+    it("splits multi-word marker spans into individual normalized words", () => {
+      const articleTopics = [
+        {
+          name: "Topic1",
+          ranges: [{ start: 0, end: 20 }],
+          marker_spans: [{ text: "Alpha beta" }, { text: "gamma." }],
+        },
+      ];
+
+      const result = buildTopicMarkerData(
+        articleTopics,
+        [{ name: "Topic1" }],
+        null,
+      );
+
+      expect(result[0].markerWords.has("alpha")).toBe(true);
+      expect(result[0].markerWords.has("beta")).toBe(true);
+      expect(result[0].markerWords.has("gamma")).toBe(true);
+      expect(result[0].markerWords.has("alpha beta")).toBe(false);
     });
 
     it("returns data for multiple selected topics", () => {
@@ -104,7 +139,11 @@ describe("htmlHighlight", () => {
         },
       ];
 
-      const result = buildTopicMarkerData(articleTopics, [{ name: "Topic1" }], null);
+      const result = buildTopicMarkerData(
+        articleTopics,
+        [{ name: "Topic1" }],
+        null,
+      );
       expect(result).toEqual([]);
     });
   });
