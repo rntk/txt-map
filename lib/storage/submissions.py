@@ -128,7 +128,6 @@ class SubmissionsStorage:
                 "annotations": {},
                 "markup": {},
                 "topic_marker_summaries": {},
-                "table_blocks": {},
                 "clusters": [],
                 "topic_model": {},
             },

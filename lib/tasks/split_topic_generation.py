@@ -3,9 +3,7 @@ Combined text splitting and topic generation task.
 """
 
 import logging
-import re
 import time
-from dataclasses import dataclass
 from typing import Any
 
 from lib.article_splitter import split_article_with_markers
@@ -13,16 +11,6 @@ from lib.storage.submissions import SubmissionsStorage
 from txt_splitt import Tracer
 
 logger = logging.getLogger(__name__)
-
-_TABLE_RE = re.compile(r"<table\b[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
-
-
-@dataclass(frozen=True)
-class TableReplacement:
-    original_start: int
-    original_end: int
-    modified_start: int
-    modified_end: int
 
 
 def _truncate_for_log(value: Any, limit: int = 500) -> str:
@@ -50,111 +38,6 @@ def _span_attributes_by_name(spans: list[Any], name: str) -> dict[str, Any]:
             if isinstance(attributes, dict):
                 last_match = attributes
     return last_match
-
-
-def _extract_table_blocks(
-    html: str,
-) -> tuple[str, dict[str, str], list[TableReplacement]]:
-    """Extract <table> blocks from HTML and replace with placeholders.
-
-    Returns (modified_html, {placeholder: original_table_html}, replacements).
-    Tables are replaced with \n[TABLE_N]\n to be processed as single sentences.
-    """
-    table_blocks: dict[str, str] = {}
-    replacements: list[TableReplacement] = []
-    counter = 1
-    original_cursor = 0
-    modified_cursor = 0
-
-    def replace_table(match: re.Match[str]) -> str:
-        nonlocal original_cursor
-        nonlocal modified_cursor
-        nonlocal counter
-        table_html = match.group(0)
-        placeholder = f"[TABLE_{counter}]"
-        replacement = f"\n{placeholder}\n"
-        modified_start = modified_cursor + (match.start() - original_cursor)
-        table_blocks[placeholder] = table_html
-        replacements.append(
-            TableReplacement(
-                original_start=match.start(),
-                original_end=match.end(),
-                modified_start=modified_start,
-                modified_end=modified_start + len(replacement),
-            )
-        )
-        original_cursor = match.end()
-        modified_cursor = replacements[-1].modified_end
-        counter += 1
-        return replacement
-
-    modified_html = _TABLE_RE.sub(replace_table, html)
-    return modified_html, table_blocks, replacements
-
-
-def _restore_offset(
-    offset: int | None,
-    replacements: list[TableReplacement],
-    *,
-    is_end: bool,
-) -> int | None:
-    if not isinstance(offset, int):
-        return offset
-
-    shift = 0
-    for replacement in replacements:
-        if offset < replacement.modified_start:
-            break
-        if offset <= replacement.modified_end:
-            return replacement.original_end if is_end else replacement.original_start
-        shift += (replacement.original_end - replacement.original_start) - (
-            replacement.modified_end - replacement.modified_start
-        )
-
-    return offset + shift
-
-
-def _restore_topic_offsets(
-    topics: list[dict[str, Any]],
-    replacements: list[TableReplacement],
-) -> list[dict[str, Any]]:
-    if not replacements:
-        return topics
-
-    restored_topics: list[dict[str, Any]] = []
-    for topic in topics:
-        restored_topic = dict(topic)
-        restored_topic["ranges"] = [
-            {
-                **range_item,
-                "start": _restore_offset(
-                    range_item.get("start"), replacements, is_end=False
-                ),
-                "end": _restore_offset(
-                    range_item.get("end"), replacements, is_end=True
-                ),
-            }
-            for range_item in (
-                topic.get("ranges") if isinstance(topic.get("ranges"), list) else []
-            )
-            if isinstance(range_item, dict)
-        ]
-        restored_topic["sentence_spans"] = [
-            {
-                **span,
-                "start": _restore_offset(span.get("start"), replacements, is_end=False),
-                "end": _restore_offset(span.get("end"), replacements, is_end=True),
-            }
-            for span in (
-                topic.get("sentence_spans")
-                if isinstance(topic.get("sentence_spans"), list)
-                else []
-            )
-            if isinstance(span, dict)
-        ]
-        restored_topics.append(restored_topic)
-
-    return restored_topics
 
 
 def _log_failure_diagnostics(
@@ -234,9 +117,6 @@ def process_split_topic_generation(
     if not source:
         raise ValueError("No text content to process")
 
-    # Extract table blocks before processing to preserve them through sentence splitting.
-    source, table_blocks, table_replacements = _extract_table_blocks(source)
-
     logger.info(f"Processing split_topic_generation for submission {submission_id}")
     logger.info(
         f"Source length: {len(source)} chars (html_content: {bool(html_content)}, text_content: {bool(text_content)})"
@@ -294,20 +174,17 @@ def process_split_topic_generation(
         raise last_error
 
     submissions_storage = SubmissionsStorage(db)
-    topics = _restore_topic_offsets(result.topics, table_replacements)
-
     submissions_storage.update_results(
         submission_id,
         {
             "sentences": result.sentences,
-            "topics": topics,
-            "table_blocks": table_blocks,
+            "topics": result.topics,
         },
     )
 
     print(
         f"Split/topic generation completed for submission {submission_id}: "
-        f"{len(result.sentences)} sentences, {len(topics)} topics"
+        f"{len(result.sentences)} sentences, {len(result.topics)} topics"
     )
     trace_output = final_tracer.format() if final_tracer is not None else ""
     if trace_output:
