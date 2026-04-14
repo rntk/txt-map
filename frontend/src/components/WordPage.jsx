@@ -103,11 +103,85 @@ function WordPageContent({ word }) {
   const [sentenceTabMap, setSentenceTabMap] = useState({});
   const [similarWords, setSimilarWords] = useState([]);
 
+  // Word-context highlights state
+  const [wordContextStatus, setWordContextStatus] = useState(null);
+  // null = not started; {status, total, completed, highlights}
+  const [wordContextHighlightsEnabled, setWordContextHighlightsEnabled] =
+    useState(false);
+  const wordContextPollingRef = useRef(null);
+
   useEffect(() => {
     if (word) {
       getSimilarWords(word).then(setSimilarWords);
     }
   }, [word, getSimilarWords]);
+
+  // Cleanup polling on unmount or word change
+  useEffect(() => {
+    return () => {
+      if (wordContextPollingRef.current) {
+        clearTimeout(wordContextPollingRef.current);
+        wordContextPollingRef.current = null;
+      }
+    };
+  }, [word]);
+
+  const pollWordContextStatus = useCallback(() => {
+    fetch(
+      `/api/submission/${submissionId}/word-context-highlights?word=${encodeURIComponent(word)}`,
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        setWordContextStatus((prev) => {
+          if (prev?.status === "pending" && data.status === "completed") {
+            setWordContextHighlightsEnabled(true);
+          }
+          return {
+            ...prev,
+            status: data.status,
+            total: data.total,
+            completed: data.completed,
+            highlights: data.highlights || {},
+          };
+        });
+        if (data.status === "pending") {
+          wordContextPollingRef.current = setTimeout(pollWordContextStatus, 1500);
+        }
+      })
+      .catch(() => {
+        wordContextPollingRef.current = setTimeout(pollWordContextStatus, 3000);
+      });
+  }, [submissionId, word]);
+
+  const startWordContextAnalysis = useCallback(() => {
+    if (wordContextPollingRef.current) {
+      clearTimeout(wordContextPollingRef.current);
+    }
+    setWordContextStatus({ status: "pending", total: 0, completed: 0, highlights: {} });
+    fetch(`/api/submission/${submissionId}/word-context-highlights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ word }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setWordContextStatus({
+          status: data.status,
+          total: data.total,
+          completed: data.completed,
+          highlights: data.highlights || {},
+        });
+        if (data.status === "completed") {
+          setWordContextHighlightsEnabled(true);
+        } else if (data.status === "pending") {
+          wordContextPollingRef.current = setTimeout(pollWordContextStatus, 1500);
+        }
+      })
+      .catch(() => {
+        setWordContextStatus(null);
+      });
+  }, [submissionId, word, pollWordContextStatus]);
+
   // Derive subsets
   const matchingData = useMemo(() => {
     if (!submission?.results) {
@@ -390,6 +464,64 @@ function WordPageContent({ word }) {
     });
   }, [getWordCharacterRanges, sentencesInfo, submission, topics]);
 
+  // Compute per-sentence highlight ranges from word-context highlights (same logic as generic ones)
+  const wordContextSentenceRanges = useMemo(() => {
+    const highlightsMap = wordContextStatus?.highlights;
+    if (!highlightsMap || !wordContextHighlightsEnabled) {
+      return {};
+    }
+
+    /** @type {Record<number, Array<{start: number, end: number}>>} */
+    const result = {};
+
+    sentencesInfo.forEach(({ index, text }) => {
+      const sentenceNum = index + 1;
+      const sentenceWordRanges = getWordCharacterRanges(text);
+      /** @type {Array<{start: number, end: number}>} */
+      const charRanges = [];
+
+      Object.values(highlightsMap).forEach((topicHighlight) => {
+        const ranges = Array.isArray(topicHighlight?.ranges) ? topicHighlight.ranges : [];
+        ranges.forEach((range) => {
+          const sentenceStart = Number(range?.sentence_start);
+          const sentenceEnd = Number(range?.sentence_end ?? range?.sentence_start);
+          if (
+            !Number.isInteger(sentenceStart) ||
+            !Number.isInteger(sentenceEnd) ||
+            sentenceStart > sentenceNum ||
+            sentenceEnd < sentenceNum
+          ) {
+            return;
+          }
+          const markerSpans = Array.isArray(range?.marker_spans) ? range.marker_spans : [];
+          markerSpans.forEach((span) => {
+            const startWord = Number(span?.start_word);
+            const endWord = Number(span?.end_word);
+            if (
+              !Number.isInteger(startWord) ||
+              !Number.isInteger(endWord) ||
+              startWord < 1 ||
+              endWord < startWord ||
+              endWord > sentenceWordRanges.length
+            ) {
+              return;
+            }
+            charRanges.push({
+              start: sentenceWordRanges[startWord - 1].start,
+              end: sentenceWordRanges[endWord - 1].end,
+            });
+          });
+        });
+      });
+
+      if (charRanges.length > 0) {
+        result[index] = charRanges;
+      }
+    });
+
+    return result;
+  }, [wordContextStatus, wordContextHighlightsEnabled, sentencesInfo, getWordCharacterRanges]);
+
   const markup = submission?.results?.markup;
 
   const sentenceMarkupData = useMemo(() => {
@@ -524,6 +656,46 @@ function WordPageContent({ word }) {
                 />
                 Highlight summary keywords
               </label>
+              <div className="word-page-context-analysis">
+                {!wordContextStatus ? (
+                  <button
+                    type="button"
+                    className="action-btn word-page-context-btn"
+                    onClick={startWordContextAnalysis}
+                  >
+                    Analyze word context
+                  </button>
+                ) : wordContextStatus.status === "pending" ? (
+                  <div className="word-page-context-progress">
+                    <span className="word-page-context-progress-label">
+                      Analyzing topics…{" "}
+                      {wordContextStatus.completed}/{wordContextStatus.total || "?"}
+                    </span>
+                    <div className="word-page-progress-bar">
+                      <div
+                        className="word-page-progress-fill"
+                        style={{
+                          width:
+                            wordContextStatus.total > 0
+                              ? `${Math.round((wordContextStatus.completed / wordContextStatus.total) * 100)}%`
+                              : "0%",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <label className="grouped-topics-toggle word-page-toggle">
+                    <input
+                      type="checkbox"
+                      checked={wordContextHighlightsEnabled}
+                      onChange={() =>
+                        setWordContextHighlightsEnabled((prev) => !prev)
+                      }
+                    />
+                    Word-context highlights
+                  </label>
+                )}
+              </div>
             </div>
           )}
           <div className="tab-bar word-page-tab-bar">
@@ -636,9 +808,12 @@ function WordPageContent({ word }) {
                               highlightWords={[word]}
                               rawText={text}
                               summaryHighlightRanges={
-                                summaryKeywordHighlightEnabled
-                                  ? summaryHighlightRanges
-                                  : []
+                                wordContextHighlightsEnabled &&
+                                wordContextSentenceRanges[index]
+                                  ? wordContextSentenceRanges[index]
+                                  : summaryKeywordHighlightEnabled
+                                    ? summaryHighlightRanges
+                                    : []
                               }
                             />
                           )}

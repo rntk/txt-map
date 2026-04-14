@@ -8,9 +8,16 @@ from lib.constants import TASK_PRIORITIES
 from lib.nlp import compute_bigram_heatmap, normalize_text_tokens
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
+from lib.storage.llm_cache import MongoLLMCacheStore
+from lib.llm_queue.store import LLMQueueStore
+from lib.llm_queue.client import QueuedLLMClient
+from lib.llm import create_llm_client
+from lib.tasks.word_context_highlights import submit_topic_requests, process_pending_requests
 from handlers.dependencies import (
     get_submissions_storage,
     get_task_queue_storage,
+    get_llm_queue_store,
+    get_cache_store,
     require_submission,
 )
 
@@ -49,6 +56,15 @@ class TagFrequencyResponse(BaseModel):
     scope_path: List[str]
     sentence_count: int
     rows: List[TagFrequencyRow]
+
+
+class WordContextHighlightsRequest(BaseModel):
+    word: str
+
+
+def _word_storage_key(word: str) -> str:
+    """Sanitize word for use as a MongoDB field name (no dots or dollar signs)."""
+    return re.sub(r"[.\$]", "_", word.lower())
 
 
 router = APIRouter()
@@ -650,6 +666,184 @@ def get_similar_words(
                 similar_words.append(w)
 
     return {"similar_words": list(dict.fromkeys(similar_words))[:10]}
+
+
+@router.post("/submission/{submission_id}/word-context-highlights")
+def start_word_context_highlights(
+    body: WordContextHighlightsRequest,
+    submission: Dict[str, Any] = Depends(require_submission),
+    storage: SubmissionsStorage = Depends(get_submissions_storage),
+    llm_queue_store: LLMQueueStore = Depends(get_llm_queue_store),
+    cache_store: MongoLLMCacheStore = Depends(get_cache_store),
+) -> Dict[str, Any]:
+    """Submit word-context highlight requests (one LLM call per topic) to the queue.
+
+    Returns immediately with current progress. Poll GET to track completion.
+    """
+    word = body.word.strip()
+    if not word:
+        raise HTTPException(status_code=422, detail="word must not be empty")
+
+    submission_id: str = submission["submission_id"]
+    results: Dict[str, Any] = submission.get("results") or {}
+    all_sentences: List[str] = results.get("sentences") or []
+    all_topics: List[Dict[str, Any]] = results.get("topics") or []
+
+    if not all_sentences or not all_topics:
+        return {"status": "completed", "word": word, "total": 0, "completed": 0, "highlights": {}}
+
+    # Find topics that contain at least one sentence matching the word
+    pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    matching_topics = [
+        t
+        for t in all_topics
+        if any(
+            pattern.search(all_sentences[i - 1])
+            for i in (t.get("sentences") or [])
+            if 1 <= i <= len(all_sentences)
+        )
+    ]
+
+    if not matching_topics:
+        return {"status": "completed", "word": word, "total": 0, "completed": 0, "highlights": {}}
+
+    word_key = _word_storage_key(word)
+    existing_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(word_key) or {}
+    existing_pending: Dict[str, str] = existing_job.get("pending") or {}
+    existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
+
+    # Build LLM client to get model metadata (respects runtime config overrides), then wrap in QueuedLLMClient
+    llm_meta = create_llm_client(db=storage._db)
+    from lib.tasks.word_context_highlights import _cache_namespace
+    namespace = _cache_namespace(llm_meta, word)
+    queued_llm = QueuedLLMClient(
+        store=llm_queue_store,
+        model_id=llm_meta.model_id,
+        max_context_tokens=llm_meta.max_context_tokens,
+        cache_store=cache_store,
+        namespace=namespace,
+        prompt_version="word_context_highlight_v1",
+    )
+
+    # Only submit topics that don't already have results or pending requests
+    topics_to_submit = [
+        t for t in matching_topics
+        if t.get("name") not in existing_highlights and t.get("name") not in existing_pending
+    ]
+
+    new_pending: Dict[str, str] = {}
+    if topics_to_submit:
+        new_pending = submit_topic_requests(word, topics_to_submit, all_sentences, queued_llm)
+
+    # Merge new pending with existing pending
+    merged_pending = {**existing_pending, **new_pending}
+
+    # Immediately resolve any pre-resolved (cache-hit) entries
+    resolved_highlights: Dict[str, Any] = {}
+    still_pending: Dict[str, str] = {}
+    for topic_name, entry in merged_pending.items():
+        if entry.startswith("__resolved__:"):
+            # Already resolved by QueuedLLMClient cache check
+            topic = next((t for t in all_topics if t.get("name") == topic_name), None)
+            if topic is not None:
+                from lib.tasks.word_context_highlights import _parse_response_to_ranges
+                response = entry[len("__resolved__:"):]
+                result = _parse_response_to_ranges(response, topic, all_sentences)
+                if result is not None:
+                    resolved_highlights[topic_name] = result
+        else:
+            still_pending[topic_name] = entry
+
+    merged_highlights = {**existing_highlights, **resolved_highlights}
+
+    # Persist updated job state
+    storage.update_results(
+        submission_id,
+        {
+            f"word_context_highlights.{word_key}": {
+                "pending": still_pending,
+                "highlights": merged_highlights,
+            }
+        },
+    )
+
+    total = len(matching_topics)
+    completed_count = len(merged_highlights)
+    status = "completed" if len(still_pending) == 0 else "pending"
+
+    return {
+        "status": status,
+        "word": word,
+        "total": total,
+        "completed": completed_count,
+        "highlights": merged_highlights,
+    }
+
+
+@router.get("/submission/{submission_id}/word-context-highlights")
+def get_word_context_highlights(
+    word: str = Query(...),
+    submission: Dict[str, Any] = Depends(require_submission),
+    storage: SubmissionsStorage = Depends(get_submissions_storage),
+    llm_queue_store: LLMQueueStore = Depends(get_llm_queue_store),
+) -> Dict[str, Any]:
+    """Poll word-context highlight progress and return available results."""
+    word = word.strip()
+    if not word:
+        raise HTTPException(status_code=422, detail="word must not be empty")
+
+    submission_id: str = submission["submission_id"]
+    results: Dict[str, Any] = submission.get("results") or {}
+    all_sentences: List[str] = results.get("sentences") or []
+    all_topics: List[Dict[str, Any]] = results.get("topics") or []
+
+    word_key = _word_storage_key(word)
+    job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(word_key) or {}
+
+    if not job:
+        return {"status": "not_found", "total": 0, "completed": 0, "highlights": {}}
+
+    pending: Dict[str, str] = job.get("pending") or {}
+    highlights: Dict[str, Any] = job.get("highlights") or {}
+
+    if pending:
+        topics_by_name = {t.get("name", ""): t for t in all_topics}
+        still_pending, newly_completed = process_pending_requests(
+            pending, topics_by_name, all_sentences, llm_queue_store
+        )
+
+        if newly_completed:
+            merged_highlights = {**highlights, **newly_completed}
+            storage.update_results(
+                submission_id,
+                {
+                    f"word_context_highlights.{word_key}": {
+                        "pending": still_pending,
+                        "highlights": merged_highlights,
+                    }
+                },
+            )
+            highlights = merged_highlights
+            pending = still_pending
+
+    pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+    total = sum(
+        1
+        for t in all_topics
+        if any(
+            pattern.search(all_sentences[i - 1])
+            for i in (t.get("sentences") or [])
+            if 1 <= i <= len(all_sentences)
+        )
+    )
+
+    status = "completed" if len(pending) == 0 else "pending"
+    return {
+        "status": status,
+        "total": total,
+        "completed": len(highlights),
+        "highlights": highlights,
+    }
 
 
 @router.get("/global-topics")

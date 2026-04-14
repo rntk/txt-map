@@ -203,6 +203,46 @@
   gap: 0.5rem;
 }
 
+.word-page-context-analysis {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.word-page-context-btn {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.word-page-context-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 140px;
+}
+
+.word-page-context-progress-label {
+  font-size: 0.78rem;
+  color: var(--shell-muted-strong, #555);
+  white-space: nowrap;
+}
+
+.word-page-progress-bar {
+  height: 5px;
+  background: var(--shell-border, #ddd);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.word-page-progress-fill {
+  height: 100%;
+  background: var(--shell-accent, #1a6bb5);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 4px;
+}
+
 @media (max-width: 640px) {
   .word-page-controls {
     margin-left: 0;
