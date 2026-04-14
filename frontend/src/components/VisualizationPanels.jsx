@@ -6,6 +6,7 @@ import MarimekkoChartTab from "./MarimekkoChartTab";
 import MindmapResults from "./MindmapResults";
 import PrefixTreeResults from "./PrefixTreeResults";
 import TopicsTagCloud from "./TopicsTagCloud";
+import TagFrequencyChart from "./TagFrequencyChart";
 import CircularPackingChart from "./CircularPackingChart";
 import GanttChart from "./GanttChart";
 import GridView from "./GridView";
@@ -19,7 +20,7 @@ import ArticleBigramHeatmapView from "./ArticleBigramHeatmapView";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'tag_frequency' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -205,6 +206,12 @@ function VisualizationPanels({
             markup={markup}
             onShowInArticle={onShowInArticle}
           />
+        </FullScreenGraph>
+      )}
+
+      {fullscreenGraph === "tag_frequency" && (
+        <FullScreenGraph title="Tag Frequency" onClose={onClose}>
+          <TagFrequencyChart submissionId={submissionId} />
         </FullScreenGraph>
       )}
 

@@ -5,7 +5,7 @@ import re
 import requests as http_requests
 
 from lib.constants import TASK_PRIORITIES
-from lib.nlp import compute_bigram_heatmap
+from lib.nlp import compute_bigram_heatmap, normalize_text_tokens
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
 from handlers.dependencies import (
@@ -31,6 +31,24 @@ class RefreshRequest(BaseModel):
 
 class ReadTopicsRequest(BaseModel):
     read_topics: List[str]
+
+
+class TagFrequencyTopicLink(BaseModel):
+    label: str
+    full_path: str
+    frequency: int
+
+
+class TagFrequencyRow(BaseModel):
+    word: str
+    frequency: int
+    topics: List[TagFrequencyTopicLink]
+
+
+class TagFrequencyResponse(BaseModel):
+    scope_path: List[str]
+    sentence_count: int
+    rows: List[TagFrequencyRow]
 
 
 router = APIRouter()
@@ -84,6 +102,116 @@ def _article_sentence_texts(submission: Dict[str, Any]) -> List[str]:
     return [
         sentence for sentence in sentences if isinstance(sentence, str) and sentence
     ]
+
+
+def _topic_name_parts(topic_name: str) -> List[str]:
+    """Split a hierarchical topic name into trimmed path segments."""
+    return [part.strip() for part in str(topic_name or "").split(">") if part.strip()]
+
+
+def _is_within_scope(topic_parts: List[str], scope_path: List[str]) -> bool:
+    """Return True when the topic path lies inside the requested scope."""
+    if len(scope_path) == 0:
+        return True
+    if len(topic_parts) < len(scope_path):
+        return False
+    return topic_parts[: len(scope_path)] == scope_path
+
+
+def _build_tag_frequency_rows(
+    submission: Dict[str, Any], scope_path: List[str], limit: Optional[int]
+) -> TagFrequencyResponse:
+    """Aggregate lemmatized word frequencies and scoped topic associations."""
+    results: Dict[str, Any] = submission.get("results") or {}
+    topics: List[Dict[str, Any]] = results.get("topics") or []
+    sentences: List[str] = results.get("sentences") or []
+
+    scoped_sentence_indices: Set[int] = set()
+    child_topic_sentence_sets: Dict[str, Set[int]] = {}
+
+    for topic in topics:
+        topic_name = topic.get("name")
+        if not isinstance(topic_name, str) or not topic_name.strip():
+            continue
+
+        topic_parts = _topic_name_parts(topic_name)
+        if not _is_within_scope(topic_parts, scope_path):
+            continue
+
+        sentence_indices = {
+            sentence_index
+            for sentence_index in (topic.get("sentences") or [])
+            if isinstance(sentence_index, int) and 1 <= sentence_index <= len(sentences)
+        }
+        if not sentence_indices:
+            continue
+
+        scoped_sentence_indices.update(sentence_indices)
+
+        if len(topic_parts) > len(scope_path):
+            child_parts = topic_parts[: len(scope_path) + 1]
+            child_full_path = ">".join(child_parts)
+            child_topic_sentence_sets.setdefault(child_full_path, set()).update(
+                sentence_indices
+            )
+
+    if len(scope_path) == 0:
+        selected_sentence_indices: List[int] = list(range(1, len(sentences) + 1))
+    else:
+        selected_sentence_indices = sorted(scoped_sentence_indices)
+
+    sentence_word_counts: Dict[int, Dict[str, int]] = {}
+    total_counts: Dict[str, int] = {}
+
+    for sentence_index in selected_sentence_indices:
+        sentence_text = sentences[sentence_index - 1]
+        if not isinstance(sentence_text, str) or not sentence_text:
+            continue
+
+        normalized_tokens = normalize_text_tokens(sentence_text)
+        token_counts: Dict[str, int] = {}
+        for token in normalized_tokens:
+            token_counts[token] = token_counts.get(token, 0) + 1
+            total_counts[token] = total_counts.get(token, 0) + 1
+
+        if token_counts:
+            sentence_word_counts[sentence_index] = token_counts
+
+    rows: List[TagFrequencyRow] = []
+    sorted_words = sorted(total_counts.items(), key=lambda item: (-item[1], item[0]))
+    limited_words = sorted_words if limit is None else sorted_words[:limit]
+    for word, frequency in limited_words:
+        topic_links: List[TagFrequencyTopicLink] = []
+        for (
+            child_full_path,
+            child_sentence_indices,
+        ) in child_topic_sentence_sets.items():
+            child_frequency = 0
+            for sentence_index in child_sentence_indices:
+                if sentence_index not in sentence_word_counts:
+                    continue
+                child_frequency += sentence_word_counts[sentence_index].get(word, 0)
+
+            if child_frequency <= 0:
+                continue
+
+            child_parts = _topic_name_parts(child_full_path)
+            topic_links.append(
+                TagFrequencyTopicLink(
+                    label=child_parts[-1] if child_parts else child_full_path,
+                    full_path=child_full_path,
+                    frequency=child_frequency,
+                )
+            )
+
+        topic_links.sort(key=lambda item: (-item.frequency, item.label.lower()))
+        rows.append(TagFrequencyRow(word=word, frequency=frequency, topics=topic_links))
+
+    return TagFrequencyResponse(
+        scope_path=scope_path,
+        sentence_count=len(selected_sentence_indices),
+        rows=rows,
+    )
 
 
 @router.post("/submit")
@@ -424,6 +552,17 @@ def post_refresh(
         )
 
     return {"message": "Tasks queued for recalculation", "tasks_queued": task_names}
+
+
+@router.get("/submission/{submission_id}/tag-frequency")
+def get_tag_frequency(
+    path: List[str] = Query(default=[]),
+    limit: Optional[int] = Query(default=None, ge=1, le=5000),
+    submission: Dict[str, Any] = Depends(require_submission),
+) -> Dict[str, Any]:
+    """Return lemmatized word frequencies for the article or a scoped topic branch."""
+    response = _build_tag_frequency_rows(submission, path, limit)
+    return response.model_dump()
 
 
 @router.get("/submission/{submission_id}/similar-words")

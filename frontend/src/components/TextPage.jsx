@@ -48,6 +48,7 @@ const FULLSCREEN_TABS = [
   { key: "mindmap", label: "Mindmap" },
   { key: "prefix_tree", label: "Prefix Tree" },
   { key: "tags_cloud", label: "Tags Cloud" },
+  { key: "tag_frequency", label: "Tag Frequency" },
   { key: "circular_packing", label: "Circles" },
   { key: "venn_chart", label: "Venn Diagram" },
   { key: "radar_chart", label: "Radar Chart" },

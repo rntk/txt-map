@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, patch
 import uuid
+import re
 from handlers.submission_handler import _extract_content_from_upload
 
 
@@ -218,12 +219,95 @@ def test_post_refresh(client, mock_storage, mock_task_queue, sample_submission):
     mock_task_queue.create.assert_called_once()
 
 
-# ... existing code ...
+def test_get_tag_frequency_returns_lemmatized_rows_and_topics(
+    client, mock_storage, sample_submission, mock_nltk_dependencies
+):
+    submission_id = sample_submission["submission_id"]
+    mock_nltk_dependencies["tokenize"].side_effect = lambda text: re.findall(
+        r"[A-Za-z]+", text
+    )
+    mock_nltk_dependencies["pos_tag"].side_effect = lambda tokens: [
+        (token, "NNS" if token.lower() in {"cats", "mice"} else "NN")
+        for token in tokens
+    ]
+    lemmatizer = mock_nltk_dependencies["lemmatizer"].return_value
+    lemmatizer.lemmatize.side_effect = lambda word, pos: {
+        "cats": "cat",
+        "mice": "mouse",
+        "chased": "chase",
+    }.get(word, word)
+    sample_submission["results"]["sentences"] = [
+        "Cats chase mice swiftly.",
+        "The cat chased another mouse.",
+        "Dogs bark loudly.",
+    ]
+    sample_submission["results"]["topics"] = [
+        {"name": "Animals>Cats", "sentences": [1, 2]},
+        {"name": "Animals>Dogs", "sentences": [3]},
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    response = client.get(f"/api/submission/{submission_id}/tag-frequency")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scope_path"] == []
+    assert payload["sentence_count"] == 3
+    assert payload["rows"][0]["word"] == "cat"
+    assert payload["rows"][0]["frequency"] == 2
+    assert payload["rows"][0]["topics"] == [
+        {"label": "Animals", "full_path": "Animals", "frequency": 2}
+    ]
 
 
-@pytest.mark.skip(reason="word-cloud endpoint is no longer implemented")
-def test_get_word_cloud(client, mock_storage, sample_submission):
-    pass
+def test_get_tag_frequency_applies_scope_and_orders_topic_links(
+    client, mock_storage, sample_submission, mock_nltk_dependencies
+):
+    submission_id = sample_submission["submission_id"]
+    mock_nltk_dependencies["tokenize"].side_effect = lambda text: re.findall(
+        r"[A-Za-z]+", text
+    )
+    mock_nltk_dependencies["pos_tag"].side_effect = lambda tokens: [
+        (token, "NNS" if token.lower() in {"cats", "mice"} else "NN")
+        for token in tokens
+    ]
+    lemmatizer = mock_nltk_dependencies["lemmatizer"].return_value
+    lemmatizer.lemmatize.side_effect = lambda word, pos: {
+        "cats": "cat",
+        "mice": "mouse",
+        "chased": "chase",
+        "models": "model",
+    }.get(word, word)
+    sample_submission["results"]["sentences"] = [
+        "Cats chase mice swiftly.",
+        "The cat chased another mouse.",
+        "Dogs bark loudly.",
+        "Quantum models model reality.",
+    ]
+    sample_submission["results"]["topics"] = [
+        {"name": "Animals>Cats>Indoor", "sentences": [1]},
+        {"name": "Animals>Cats>Outdoor", "sentences": [2]},
+        {"name": "Animals>Dogs", "sentences": [3]},
+        {"name": "Science>Physics", "sentences": [4]},
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    response = client.get(
+        f"/api/submission/{submission_id}/tag-frequency",
+        params=[("path", "Animals"), ("path", "Cats")],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scope_path"] == ["Animals", "Cats"]
+    assert payload["sentence_count"] == 2
+    assert payload["rows"][0]["word"] == "cat"
+    assert payload["rows"][0]["frequency"] == 2
+    assert payload["rows"][0]["topics"] == [
+        {"label": "Indoor", "full_path": "Animals>Cats>Indoor", "frequency": 1},
+        {"label": "Outdoor", "full_path": "Animals>Cats>Outdoor", "frequency": 1},
+    ]
+    assert all(row["word"] != "dog" for row in payload["rows"])
 
 
 def test_list_submissions(client, mock_storage, sample_submission):
