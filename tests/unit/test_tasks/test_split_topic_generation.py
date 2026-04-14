@@ -10,7 +10,10 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # Import module under test
-from lib.tasks.split_topic_generation import process_split_topic_generation
+from lib.tasks.split_topic_generation import (
+    _extract_table_blocks,
+    process_split_topic_generation,
+)
 
 
 # =============================================================================
@@ -244,6 +247,62 @@ class TestProcessSplitTopicGenerationBasic:
         assert update_call[0][0] == "test-submission-123"
         assert update_call[0][1]["sentences"] == mock_split_result.sentences
         assert update_call[0][1]["topics"] == mock_split_result.topics
+
+    def test_restores_topic_offsets_after_table_placeholder_rewrite(
+        self,
+        mock_db,
+        mock_llm,
+        mock_split_article_with_markers,
+        mock_submissions_storage,
+        mock_tracer,
+    ):
+        """Stored topic offsets are mapped back onto the original HTML."""
+        submission = {
+            "submission_id": "test-submission-123",
+            "html_content": "<p>Alpha</p><table><tr><td>beta</td></tr></table><p>Gamma</p>",
+            "text_content": "",
+            "results": {},
+        }
+        modified_html, _, _ = _extract_table_blocks(submission["html_content"])
+        gamma_start = modified_html.index("Gamma")
+        split_result = MagicMock()
+        split_result.sentences = ["Gamma"]
+        split_result.topics = [
+            {
+                "name": "Topic A",
+                "sentences": [1],
+                "ranges": [
+                    {
+                        "sentence_start": 1,
+                        "sentence_end": 1,
+                        "start": gamma_start,
+                        "end": gamma_start + len("Gamma"),
+                    }
+                ],
+                "sentence_spans": [
+                    {
+                        "sentence": 1,
+                        "start": gamma_start,
+                        "end": gamma_start + len("Gamma"),
+                    }
+                ],
+            }
+        ]
+        mock_split_article_with_markers.return_value = split_result
+        mock_storage_instance = MagicMock()
+        mock_submissions_storage.return_value = mock_storage_instance
+
+        process_split_topic_generation(submission, mock_db, mock_llm)
+
+        update_call = mock_storage_instance.update_results.call_args
+        restored_topic = update_call[0][1]["topics"][0]
+        actual_gamma_start = submission["html_content"].index("Gamma")
+        assert restored_topic["ranges"][0]["start"] == actual_gamma_start
+        assert restored_topic["ranges"][0]["end"] == actual_gamma_start + len("Gamma")
+        assert restored_topic["sentence_spans"][0]["start"] == actual_gamma_start
+        assert restored_topic["sentence_spans"][0]["end"] == actual_gamma_start + len(
+            "Gamma"
+        )
 
     def test_creates_tracer_instance(
         self,
