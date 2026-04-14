@@ -8,6 +8,7 @@ import {
 import { useTooltip } from "../hooks/useTooltip";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
+import TooltipTopicName from "./shared/TooltipTopicName";
 import "../styles/text-reading.css";
 
 const TOOLTIP_WIDTH = 260;
@@ -326,7 +327,9 @@ function MarkupTopicBlock({
 
             return (
               <div key={topic.name} className="text-topic-tooltip-topic">
-                <div className="text-topic-tooltip-name">{topic.name}</div>
+                <div className="text-topic-tooltip-name">
+                  <TooltipTopicName name={topic.name} />
+                </div>
                 {rangeCount > 1 && (
                   <div className="text-topic-tooltip-warning">
                     This topic has {rangeCount} separate ranges. Some may not be

@@ -20,6 +20,7 @@ import { isTopicRead } from "../utils/topicReadUtils";
 import { useTooltip } from "../hooks/useTooltip";
 import { HighlightContext } from "./shared/HighlightContext";
 import HighlightedText from "./shared/HighlightedText";
+import TooltipTopicName from "./shared/TooltipTopicName";
 import "../styles/text-reading.css";
 
 // Tooltip positioning constants
@@ -886,7 +887,9 @@ function TextDisplay({
                   key={topic.name}
                   className={`text-topic-tooltip-topic${i < tooltip.topics.length - 1 ? " text-topic-tooltip-topic--spaced" : ""}`}
                 >
-                  <div className="text-topic-tooltip-name">{topic.name}</div>
+                  <div className="text-topic-tooltip-name">
+                    <TooltipTopicName name={topic.name} />
+                  </div>
                   {rangeCount > 1 && (
                     <div className="text-topic-tooltip-warning">
                       This topic has {rangeCount} separate ranges. Some may not
