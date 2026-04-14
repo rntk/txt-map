@@ -58,6 +58,19 @@ function formatCount(value) {
 }
 
 /**
+ * @param {string[] | null} left
+ * @param {string[]} right
+ * @returns {boolean}
+ */
+function hasSharedCanonicalTopic(left, right) {
+  if (!left || left.length === 0 || right.length === 0) {
+    return false;
+  }
+
+  return left.some((value) => right.includes(value));
+}
+
+/**
  * @param {{
  *   fullPath: string,
  *   label: string,
@@ -93,7 +106,8 @@ function TopicHierarchyFlowChart({
   markup,
 }) {
   const [modalTopic, setModalTopic] = useState(null);
-  const [activeId, setActiveId] = useState(null);
+  const [hoveredTopicNames, setHoveredTopicNames] = useState(null);
+  const [selectedTopicNames, setSelectedTopicNames] = useState(null);
 
   const flowData = useMemo(() => buildTopicHierarchyFlowData(topics), [topics]);
 
@@ -238,6 +252,58 @@ function TopicHierarchyFlowChart({
     };
   }, [flowData.columns, flowData.links, flowData.nodes.length]);
 
+  const activeTopicNames = hoveredTopicNames || selectedTopicNames;
+
+  const activeFlow = useMemo(() => {
+    const nodeIds = new Set();
+    const linkIds = new Set();
+
+    if (!activeTopicNames || activeTopicNames.length === 0) {
+      return { nodeIds, linkIds, hasActiveFlow: false };
+    }
+
+    layout.nodes.forEach((node) => {
+      if (hasSharedCanonicalTopic(activeTopicNames, node.canonicalTopicNames)) {
+        nodeIds.add(node.id);
+      }
+    });
+
+    layout.links.forEach((link) => {
+      if (hasSharedCanonicalTopic(activeTopicNames, link.canonicalTopicNames)) {
+        linkIds.add(link.id);
+      }
+    });
+
+    return {
+      nodeIds,
+      linkIds,
+      hasActiveFlow: nodeIds.size > 0 || linkIds.size > 0,
+    };
+  }, [activeTopicNames, layout.links, layout.nodes]);
+
+  /**
+   * @param {string[]} canonicalTopicNames
+   * @returns {void}
+   */
+  function handleFlowEnter(canonicalTopicNames) {
+    setHoveredTopicNames(canonicalTopicNames);
+  }
+
+  /**
+   * @returns {void}
+   */
+  function handleFlowLeave() {
+    setHoveredTopicNames(null);
+  }
+
+  /**
+   * @param {string[]} canonicalTopicNames
+   * @returns {void}
+   */
+  function selectFlow(canonicalTopicNames) {
+    setSelectedTopicNames(canonicalTopicNames);
+  }
+
   if (!topics || topics.length === 0) {
     return (
       <div className="topic-hierarchy-flow-chart chart-empty-state chart-empty-state--panel">
@@ -290,20 +356,24 @@ function TopicHierarchyFlowChart({
             })}
 
             {layout.links.map((link) => {
-              const isActive = activeId === link.id;
+              const isActive = activeFlow.linkIds.has(link.id);
+              const isMuted = activeFlow.hasActiveFlow && !isActive;
               return (
                 <path
                   key={link.id}
-                  className={`topic-hierarchy-flow-chart__link${isActive ? " topic-hierarchy-flow-chart__link--active" : ""}`}
+                  className={`topic-hierarchy-flow-chart__link${isActive ? " topic-hierarchy-flow-chart__link--active" : ""}${isMuted ? " topic-hierarchy-flow-chart__link--muted" : ""}`}
                   d={link.path}
                   fill={colorScale(link.colorKey)}
-                  fillOpacity={isActive ? 0.64 : 0.32}
+                  fillOpacity={isActive ? 0.64 : isMuted ? 0.08 : 0.32}
                   stroke={colorScale(link.colorKey)}
-                  strokeOpacity={isActive ? 0.7 : 0.18}
+                  strokeOpacity={isActive ? 0.7 : isMuted ? 0.08 : 0.18}
                   strokeWidth="1"
-                  onMouseEnter={() => setActiveId(link.id)}
-                  onMouseLeave={() => setActiveId(null)}
-                  onClick={() =>
+                  onPointerEnter={() =>
+                    handleFlowEnter(link.canonicalTopicNames)
+                  }
+                  onPointerLeave={handleFlowLeave}
+                  onClick={() => {
+                    selectFlow(link.canonicalTopicNames);
                     setModalTopic(
                       buildSelection({
                         fullPath: `${link.sourceNode.label} → ${link.targetNode.label}`,
@@ -312,8 +382,8 @@ function TopicHierarchyFlowChart({
                         canonicalTopicNames: link.canonicalTopicNames,
                         ranges: link.ranges,
                       }),
-                    )
-                  }
+                    );
+                  }}
                 >
                   <title>
                     {`${link.sourceNode.label} → ${link.targetNode.label}\n${formatCount(link.sentenceIndices.length || link.weight)}`}
@@ -325,14 +395,18 @@ function TopicHierarchyFlowChart({
             {layout.nodes.map((node) => {
               const fill = colorScale(node.colorKey);
               const isLeaf = node.type === "leaf";
-              const isActive = activeId === node.id;
+              const isActive = activeFlow.nodeIds.has(node.id);
+              const isMuted = activeFlow.hasActiveFlow && !isActive;
               return (
                 <g
                   key={node.id}
                   className="topic-hierarchy-flow-chart__node"
-                  onMouseEnter={() => setActiveId(node.id)}
-                  onMouseLeave={() => setActiveId(null)}
-                  onClick={() =>
+                  onPointerEnter={() =>
+                    handleFlowEnter(node.canonicalTopicNames)
+                  }
+                  onPointerLeave={handleFlowLeave}
+                  onClick={() => {
+                    selectFlow(node.canonicalTopicNames);
                     setModalTopic(
                       buildSelection({
                         fullPath: node.fullPath,
@@ -341,24 +415,34 @@ function TopicHierarchyFlowChart({
                         canonicalTopicNames: node.canonicalTopicNames,
                         ranges: node.ranges,
                       }),
-                    )
-                  }
+                    );
+                  }}
                 >
                   <rect
-                    className={`topic-hierarchy-flow-chart__node-rect${isActive ? " topic-hierarchy-flow-chart__node-rect--active" : ""}`}
+                    className={`topic-hierarchy-flow-chart__node-rect${isActive ? " topic-hierarchy-flow-chart__node-rect--active" : ""}${isMuted ? " topic-hierarchy-flow-chart__node-rect--muted" : ""}`}
                     x={node.x}
                     y={node.y}
                     width={node.width}
                     height={node.height}
                     rx="6"
                     fill={fill}
-                    fillOpacity={isLeaf ? 0.88 : 0.76}
+                    fillOpacity={
+                      isActive
+                        ? isLeaf
+                          ? 0.94
+                          : 0.84
+                        : isMuted
+                          ? 0.18
+                          : isLeaf
+                            ? 0.88
+                            : 0.76
+                    }
                     stroke={fill}
-                    strokeOpacity={0.92}
+                    strokeOpacity={isMuted ? 0.28 : 0.92}
                     strokeWidth={isActive ? 2 : 1}
                   />
                   <text
-                    className={`topic-hierarchy-flow-chart__label${isLeaf ? " topic-hierarchy-flow-chart__label--leaf" : ""}`}
+                    className={`topic-hierarchy-flow-chart__label${isLeaf ? " topic-hierarchy-flow-chart__label--leaf" : ""}${isMuted ? " topic-hierarchy-flow-chart__label--muted" : ""}`}
                     x={isLeaf ? node.x - 12 : node.x + node.width + 12}
                     y={node.y + node.height / 2}
                     textAnchor={isLeaf ? "end" : "start"}
