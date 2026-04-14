@@ -30,8 +30,15 @@
   color: var(--shell-accent);
 }
 
-.word-page-tooltip-toggle {
+.word-page-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-left: auto;
+}
+
+.word-page-toggle {
+  margin-left: 0;
 }
 
 .word-page-tab-bar {
@@ -154,7 +161,7 @@
 }
 
 @media (max-width: 640px) {
-  .word-page-tooltip-toggle {
+  .word-page-controls {
     margin-left: 0;
   }
 

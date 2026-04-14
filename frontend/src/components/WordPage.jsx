@@ -32,6 +32,10 @@ import "./WordPage.css";
  * @property {number[]} [sentences]
  */
 
+/**
+ * @typedef {{ start: number, end: number }} CharacterRange
+ */
+
 /** @type {readonly WordPageTab[]} */
 const VIS_TABS = [
   { key: "sentences", label: "Sentences" },
@@ -71,6 +75,7 @@ function WordPageContent({ word }) {
     toggleRead,
     summaryTimelineItems: allTimelineItems,
     getSimilarWords,
+    allTopics: enrichedTopics,
   } = useArticle();
 
   /**
@@ -86,6 +91,8 @@ function WordPageContent({ word }) {
   const [hoveredTopic] = useState(null);
   const [summaryModalTopic, setSummaryModalTopic] = useState(null);
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const [summaryKeywordHighlightEnabled, setSummaryKeywordHighlightEnabled] =
+    useState(false);
   const compareGroupRefs = useRef({});
 
   const [similarWords, setSimilarWords] = useState([]);
@@ -110,7 +117,7 @@ function WordPageContent({ word }) {
     }
 
     const allSentences = submission.results.sentences || [];
-    const allTopics = submission.results.topics || [];
+    const allTopics = Array.isArray(enrichedTopics) ? enrichedTopics : [];
     const treeEntries = buildWordTreeEntries(allSentences, word);
     const matchedSentencesInfo = [];
     const matchedSentence1BasedIndices = new Set();
@@ -186,7 +193,7 @@ function WordPageContent({ word }) {
       allTopics: allTopics,
       treeEntries,
     };
-  }, [submission, word, allTimelineItems]);
+  }, [submission, word, allTimelineItems, enrichedTopics]);
 
   /**
    * @param {string} key
@@ -247,6 +254,126 @@ function WordPageContent({ word }) {
     });
     return indices;
   }, [allTopics, readTopics]);
+
+  /**
+   * @param {string} text
+   * @returns {CharacterRange[]}
+   */
+  const getWordCharacterRanges = useCallback((text) => {
+    if (typeof text !== "string" || !text) {
+      return [];
+    }
+
+    /** @type {CharacterRange[]} */
+    const ranges = [];
+    let wordStart = -1;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (/\s/.test(char)) {
+        if (wordStart !== -1) {
+          ranges.push({ start: wordStart, end: index });
+          wordStart = -1;
+        }
+      } else if (wordStart === -1) {
+        wordStart = index;
+      }
+    }
+
+    if (wordStart !== -1) {
+      ranges.push({ start: wordStart, end: text.length });
+    }
+
+    return ranges;
+  }, []);
+
+  const sentenceCardData = useMemo(() => {
+    const topicMarkerSummaries =
+      submission?.results?.topic_marker_summaries || {};
+
+    return sentencesInfo.map(({ index, text }) => {
+      const sentenceWordRanges = getWordCharacterRanges(text);
+      const sentenceTopics = topics
+        .filter(
+          (topic) =>
+            Array.isArray(topic.sentences) &&
+            topic.sentences.includes(index + 1),
+        )
+        .map((topic) => {
+          const markerSummary = topicMarkerSummaries[topic.name];
+          const matchingRanges = Array.isArray(markerSummary?.ranges)
+            ? markerSummary.ranges.filter((range) => {
+                const sentenceStart = Number(range?.sentence_start);
+                const sentenceEnd = Number(
+                  range?.sentence_end ?? range?.sentence_start,
+                );
+                return (
+                  Number.isInteger(sentenceStart) &&
+                  Number.isInteger(sentenceEnd) &&
+                  sentenceStart <= index + 1 &&
+                  sentenceEnd >= index + 1
+                );
+              })
+            : [];
+
+          /** @type {CharacterRange[]} */
+          const localSummaryHighlightRanges = [];
+          const localMarkerSpans = [];
+
+          matchingRanges.forEach((range) => {
+            const markerSpans = Array.isArray(range?.marker_spans)
+              ? range.marker_spans
+              : [];
+            markerSpans.forEach((markerSpan) => {
+              const startWord = Number(markerSpan?.start_word);
+              const endWord = Number(markerSpan?.end_word);
+              if (
+                !Number.isInteger(startWord) ||
+                !Number.isInteger(endWord) ||
+                startWord < 1 ||
+                endWord < startWord ||
+                endWord > sentenceWordRanges.length
+              ) {
+                return;
+              }
+
+              localSummaryHighlightRanges.push({
+                start: sentenceWordRanges[startWord - 1].start,
+                end: sentenceWordRanges[endWord - 1].end,
+              });
+              localMarkerSpans.push({
+                ...markerSpan,
+                text: text
+                  .slice(
+                    sentenceWordRanges[startWord - 1].start,
+                    sentenceWordRanges[endWord - 1].end,
+                  )
+                  .trim(),
+              });
+            });
+          });
+
+          return {
+            ...topic,
+            sentences: [1],
+            ranges: [{ start: 0, end: text.length }],
+            summaryHighlightRanges: localSummaryHighlightRanges,
+            marker_spans: localMarkerSpans,
+          };
+        });
+
+      return {
+        index,
+        text,
+        sentenceTopics,
+        summaryHighlightRanges: sentenceTopics.flatMap((topic) =>
+          Array.isArray(topic.summaryHighlightRanges)
+            ? topic.summaryHighlightRanges
+            : [],
+        ),
+      };
+    });
+  }, [getWordCharacterRanges, sentencesInfo, submission, topics]);
 
   const treeEntriesWithReadState = useMemo(() => {
     return treeEntries.map((entry) => ({
@@ -327,14 +454,26 @@ function WordPageContent({ word }) {
             <span className="word-page-word-highlight">"{word}"</span>
           </h2>
           {activeTab === "sentences" && (
-            <label className="grouped-topics-toggle word-page-tooltip-toggle">
-              <input
-                type="checkbox"
-                checked={tooltipEnabled}
-                onChange={() => setTooltipEnabled((prev) => !prev)}
-              />
-              Show tooltips
-            </label>
+            <div className="word-page-controls">
+              <label className="grouped-topics-toggle word-page-toggle">
+                <input
+                  type="checkbox"
+                  checked={tooltipEnabled}
+                  onChange={() => setTooltipEnabled((prev) => !prev)}
+                />
+                Show tooltips
+              </label>
+              <label className="grouped-topics-toggle word-page-toggle">
+                <input
+                  type="checkbox"
+                  checked={summaryKeywordHighlightEnabled}
+                  onChange={() =>
+                    setSummaryKeywordHighlightEnabled((prev) => !prev)
+                  }
+                />
+                Highlight summary keywords
+              </label>
+            </div>
           )}
           <div className="tab-bar word-page-tab-bar">
             <div className="tabs">
@@ -383,28 +522,39 @@ function WordPageContent({ word }) {
                 </div>
               ) : (
                 <div className="word-page-sentences-list">
-                  {sentencesInfo.map(({ index, text }) => (
-                    <div key={index} className="word-page-sentence-card">
-                      <div className="word-page-sentence-header">
-                        <span>Sentence #{index + 1}</span>
+                  {sentenceCardData.map(
+                    ({
+                      index,
+                      text,
+                      sentenceTopics,
+                      summaryHighlightRanges,
+                    }) => (
+                      <div key={index} className="word-page-sentence-card">
+                        <div className="word-page-sentence-header">
+                          <span>Sentence #{index + 1}</span>
+                        </div>
+                        <TextDisplay
+                          sentences={[text]}
+                          selectedTopics={selectedTopics}
+                          hoveredTopic={hoveredTopic}
+                          readTopics={readTopics}
+                          articleTopics={sentenceTopics}
+                          articleIndex={0}
+                          onToggleRead={toggleRead}
+                          onToggleTopic={toggleTopic}
+                          tooltipEnabled={tooltipEnabled}
+                          submissionId={submissionId}
+                          highlightWords={[word]}
+                          rawText={text}
+                          summaryHighlightRanges={
+                            summaryKeywordHighlightEnabled
+                              ? summaryHighlightRanges
+                              : []
+                          }
+                        />
                       </div>
-                      <TextDisplay
-                        sentences={[text]}
-                        selectedTopics={selectedTopics}
-                        hoveredTopic={hoveredTopic}
-                        readTopics={readTopics}
-                        articleTopics={topics
-                          .filter((t) => t.sentences.includes(index + 1))
-                          .map((t) => ({ ...t, sentences: [1] }))}
-                        articleIndex={0}
-                        onToggleRead={toggleRead}
-                        onToggleTopic={toggleTopic}
-                        tooltipEnabled={tooltipEnabled}
-                        submissionId={submissionId}
-                        highlightWords={[word]}
-                      />
-                    </div>
-                  ))}
+                    ),
+                  )}
                   {similarWords.length > 0 && (
                     <div className="word-page-similar-words">
                       <h3>Other related words:</h3>

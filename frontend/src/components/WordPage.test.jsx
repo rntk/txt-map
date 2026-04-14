@@ -86,7 +86,7 @@ describe("WordPage header layout", () => {
     mockTreemapChart.mockClear();
     mockWordTree.mockClear();
     mockGetSimilarWords.mockReset();
-    mockGetSimilarWords.mockResolvedValue([]);
+    mockGetSimilarWords.mockImplementation(() => new Promise(() => {}));
     mockUseSubmission.mockReturnValue({
       submission: {
         status: {
@@ -101,8 +101,31 @@ describe("WordPage header layout", () => {
             {
               name: "Topic 1",
               sentences: [1],
+              ranges: [
+                {
+                  start: 0,
+                  end: 16,
+                  sentence_start: 1,
+                  sentence_end: 1,
+                },
+              ],
             },
           ],
+          topic_marker_summaries: {
+            "Topic 1": {
+              ranges: [
+                {
+                  range_index: 1,
+                  sentence_start: 1,
+                  sentence_end: 1,
+                  marker_spans: [
+                    { start_word: 1, end_word: 2, text: "Alpha beta" },
+                  ],
+                  summary_text: "Alpha beta",
+                },
+              ],
+            },
+          },
           markup: {
             "Topic 1": {
               positions: [
@@ -200,6 +223,36 @@ describe("WordPage header layout", () => {
     const latestProps = mockTextDisplay.mock.calls.at(-1)[0];
     expect(latestProps.tooltipEnabled).toBe(false);
     expect(latestProps.submissionId).toBe("sub-123");
+  });
+
+  it("renders a summary keyword toggle on the sentences tab", () => {
+    render(<WordPage />);
+
+    const toggle = screen.getByLabelText("Highlight summary keywords");
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).not.toBeChecked();
+  });
+
+  it("passes summaryHighlightRanges to TextDisplay when summary keywords are enabled", () => {
+    render(<WordPage />);
+
+    const initialProps = mockTextDisplay.mock.calls[0][0];
+    expect(initialProps.summaryHighlightRanges).toEqual([]);
+    expect(initialProps.rawText).toBe("Alpha beta gamma");
+
+    fireEvent.click(screen.getByLabelText("Highlight summary keywords"));
+
+    const matchingCall = mockTextDisplay.mock.calls.find(([props]) =>
+      props.summaryHighlightRanges?.some(
+        (range) => range.start === 0 && range.end === 10,
+      ),
+    );
+
+    expect(matchingCall).toBeDefined();
+    expect(matchingCall[0].articleTopics[0]).toMatchObject({
+      marker_spans: [{ start_word: 1, end_word: 2, text: "Alpha beta" }],
+      summaryHighlightRanges: [{ start: 0, end: 10 }],
+    });
   });
 
   it("forwards markup to modal-capable chart tabs", () => {

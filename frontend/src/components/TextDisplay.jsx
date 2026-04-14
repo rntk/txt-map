@@ -100,6 +100,7 @@ function buildSentenceCharacterRanges(rawText, sentences) {
  * @property {Array<number>} [dimmedSentenceIndices]
  * @property {Array<{start: number, end: number}>} [dimmedHighlightRanges]
  * @property {string} [dimmedHighlightClassName]
+ * @property {Array<{start: number, end: number}>} [summaryHighlightRanges]
  * @property {string|null} [topicIndexScrollTarget] - Topic name to show "Back to Index" for
  * @property {(topicName: string) => void} [onBackToTopicIndex] - Navigate back to topic index
  */
@@ -138,6 +139,7 @@ function TextDisplay({
   dimmedSentenceIndices = EMPTY_ARRAY,
   dimmedHighlightRanges = EMPTY_ARRAY,
   dimmedHighlightClassName = "",
+  summaryHighlightRanges = EMPTY_ARRAY,
   topicIndexScrollTarget = null,
   onBackToTopicIndex,
 }) {
@@ -253,6 +255,20 @@ function TextDisplay({
     [dimmedHighlightRanges],
   );
   const activeSummaryHighlightRanges = useMemo(() => {
+    const ranges = Array.isArray(summaryHighlightRanges)
+      ? summaryHighlightRanges
+          .map((range) => ({
+            start: Number(range?.start),
+            end: Number(range?.end),
+          }))
+          .filter(
+            (range) =>
+              Number.isFinite(range.start) &&
+              Number.isFinite(range.end) &&
+              range.end > range.start,
+          )
+      : [];
+
     const highlightedTopicNames = new Set(
       safeSelectedTopics
         .map((topic) => (typeof topic?.name === "string" ? topic.name : ""))
@@ -262,7 +278,6 @@ function TextDisplay({
       highlightedTopicNames.add(hoveredTopic.name);
     }
 
-    const ranges = [];
     safeArticleTopics.forEach((topic) => {
       if (!highlightedTopicNames.has(topic.name)) {
         return;
@@ -281,7 +296,12 @@ function TextDisplay({
     });
 
     return ranges;
-  }, [hoveredTopic, safeArticleTopics, safeSelectedTopics]);
+  }, [
+    hoveredTopic,
+    safeArticleTopics,
+    safeSelectedTopics,
+    summaryHighlightRanges,
+  ]);
   const sentenceCharacterRanges = useMemo(
     () => buildSentenceCharacterRanges(rawText, safeSentences),
     [rawText, safeSentences],

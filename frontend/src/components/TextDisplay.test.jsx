@@ -183,6 +183,26 @@ describe("TextDisplay", () => {
         summaryHighlight.closest(".reading-article__sentence"),
       ).toHaveClass("highlighted");
     });
+
+    it("highlights summary keywords from explicit ranges without selecting a topic", () => {
+      const props = {
+        ...defaultProps,
+        rawText: "Alpha Beta Gamma",
+        sentences: ["Alpha Beta Gamma"],
+        summaryHighlightRanges: [{ start: 6, end: 10 }],
+      };
+
+      render(<TextDisplay {...props} />);
+
+      const summaryHighlight = document.querySelector(
+        ".reading-article__summary-word-highlight",
+      );
+      const sentence = document.getElementById("sentence-0-0");
+
+      expect(summaryHighlight).toBeInTheDocument();
+      expect(summaryHighlight).toHaveTextContent("Beta");
+      expect(sentence).not.toHaveClass("highlighted");
+    });
   });
 
   describe("Highlighted vs faded precedence", () => {
