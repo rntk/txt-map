@@ -280,8 +280,6 @@ export function buildHighlightedRawHtml(
 
   let result = "";
   let inTag = false;
-  let inQuote = false;
-  let quoteChar = "";
   let wordBuffer = "";
   let wordStart = -1;
 
@@ -289,12 +287,7 @@ export function buildHighlightedRawHtml(
     const ch = rawHtml[i];
 
     if (inTag) {
-      if (inQuote) {
-        if (ch === quoteChar) inQuote = false;
-      } else if (ch === '"' || ch === "'") {
-        inQuote = true;
-        quoteChar = ch;
-      } else if (ch === ">") {
+      if (ch === ">") {
         inTag = false;
       }
       result += ch;

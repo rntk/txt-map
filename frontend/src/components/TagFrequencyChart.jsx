@@ -262,7 +262,11 @@ function TagFrequencyChart({ submissionId }) {
                 <div className="tag-frequency-chart__bar-shell">
                   <div
                     className={`tag-frequency-chart__bar-fill tag-frequency-chart__bar-fill--w-${widthBucket} ${paletteClassName}${isExpanded ? " tag-frequency-chart__bar-fill--expanded" : ""}`}
-                    title={shouldShowHint ? row.word : `${row.word} (${row.frequency})`}
+                    title={
+                      shouldShowHint
+                        ? row.word
+                        : `${row.word} (${row.frequency})`
+                    }
                     onMouseEnter={() => {
                       if (shouldShowHint) {
                         setHoveredWord(row.word);

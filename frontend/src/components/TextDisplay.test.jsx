@@ -969,6 +969,30 @@ describe("TextDisplay", () => {
         document.querySelector(".text-topic-tooltip"),
       ).not.toBeInTheDocument();
     });
+
+    it("continues tokenizing after malformed attributes in raw-html tags", () => {
+      render(
+        <TextDisplay
+          {...defaultProps}
+          rawHtml={
+            '<p><a href="https://example.com" "="">Broken Link</a> After text</p>'
+          }
+          articleTopics={[
+            {
+              name: "Topic1",
+              sentences: [],
+              ranges: [{ start: 0, end: 200 }],
+            },
+          ]}
+        />,
+      );
+
+      const tokenTexts = Array.from(
+        document.querySelectorAll(".word-token"),
+      ).map((token) => token.textContent);
+      expect(tokenTexts).toContain("After");
+      expect(tokenTexts).toContain("text");
+    });
   });
 
   describe("edge cases and defensive programming", () => {
