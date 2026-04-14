@@ -14,6 +14,11 @@ import SummaryTimeline from "./SummaryTimeline";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import WordTree, { buildWordTreeEntries } from "./WordTree";
 import GlobalTopicsCompareView from "./GlobalTopicsCompareView";
+import MarkupRenderer from "./markup/MarkupRenderer";
+import {
+  resolveTopicMarkup,
+  getTopicMarkupRanges,
+} from "./markup/topicMarkupUtils";
 import {
   buildModalSelectionFromSummarySource,
   buildTopicModalSelection,
@@ -95,6 +100,7 @@ function WordPageContent({ word }) {
     useState(false);
   const compareGroupRefs = useRef({});
 
+  const [sentenceTabMap, setSentenceTabMap] = useState({});
   const [similarWords, setSimilarWords] = useState([]);
 
   useEffect(() => {
@@ -212,6 +218,15 @@ function WordPageContent({ word }) {
         ? prev.filter((t) => t.name !== topic.name)
         : [...prev, topic];
     });
+  }, []);
+
+  /**
+   * @param {number} sentenceIndex
+   * @param {string} tabKey
+   * @returns {void}
+   */
+  const handleSentenceTabChange = useCallback((sentenceIndex, tabKey) => {
+    setSentenceTabMap((prev) => ({ ...prev, [sentenceIndex]: tabKey }));
   }, []);
 
   const {
@@ -375,6 +390,42 @@ function WordPageContent({ word }) {
     });
   }, [getWordCharacterRanges, sentencesInfo, submission, topics]);
 
+  const markup = submission?.results?.markup;
+
+  const sentenceMarkupData = useMemo(() => {
+    if (!markup || topics.length === 0) {
+      return {};
+    }
+
+    const result = {};
+    sentencesInfo.forEach(({ index }) => {
+      const sentenceNum = index + 1;
+      const rangesForSentence = [];
+
+      topics.forEach((topic) => {
+        const topicMarkup = resolveTopicMarkup(markup, topic);
+        if (!topicMarkup) {
+          return;
+        }
+        const allRanges = getTopicMarkupRanges(topicMarkup);
+        allRanges.forEach((range) => {
+          if (
+            range.sentence_start <= sentenceNum &&
+            range.sentence_end >= sentenceNum
+          ) {
+            rangesForSentence.push(range);
+          }
+        });
+      });
+
+      if (rangesForSentence.length > 0) {
+        result[index] = rangesForSentence;
+      }
+    });
+
+    return result;
+  }, [markup, sentencesInfo, topics]);
+
   const treeEntriesWithReadState = useMemo(() => {
     return treeEntries.map((entry) => ({
       ...entry,
@@ -528,32 +579,72 @@ function WordPageContent({ word }) {
                       text,
                       sentenceTopics,
                       summaryHighlightRanges,
-                    }) => (
-                      <div key={index} className="word-page-sentence-card">
-                        <div className="word-page-sentence-header">
-                          <span>Sentence #{index + 1}</span>
+                    }) => {
+                      const hasMarkup = Array.isArray(
+                        sentenceMarkupData[index],
+                      );
+                      const activeSentenceTab =
+                        sentenceTabMap[index] || "sentences";
+                      return (
+                        <div key={index} className="word-page-sentence-card">
+                          <div className="word-page-sentence-header">
+                            <span>Sentence #{index + 1}</span>
+                            <div className="word-page-sentence-tabs">
+                              <button
+                                type="button"
+                                className={`word-page-sentence-tab${activeSentenceTab === "sentences" ? " word-page-sentence-tab--active" : ""}`}
+                                onClick={() =>
+                                  handleSentenceTabChange(index, "sentences")
+                                }
+                              >
+                                Sentences
+                              </button>
+                              <button
+                                type="button"
+                                className={`word-page-sentence-tab${activeSentenceTab === "markup" ? " word-page-sentence-tab--active" : ""}${!hasMarkup ? " word-page-sentence-tab--disabled" : ""}`}
+                                onClick={() =>
+                                  hasMarkup &&
+                                  handleSentenceTabChange(index, "markup")
+                                }
+                                disabled={!hasMarkup}
+                              >
+                                Markup
+                              </button>
+                            </div>
+                          </div>
+                          {activeSentenceTab === "markup" && hasMarkup ? (
+                            <div className="word-page-sentence-markup">
+                              {sentenceMarkupData[index].map((range) => (
+                                <MarkupRenderer
+                                  key={`range-${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
+                                  html={range.html}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <TextDisplay
+                              sentences={[text]}
+                              selectedTopics={selectedTopics}
+                              hoveredTopic={hoveredTopic}
+                              readTopics={readTopics}
+                              articleTopics={sentenceTopics}
+                              articleIndex={0}
+                              onToggleRead={toggleRead}
+                              onToggleTopic={toggleTopic}
+                              tooltipEnabled={tooltipEnabled}
+                              submissionId={submissionId}
+                              highlightWords={[word]}
+                              rawText={text}
+                              summaryHighlightRanges={
+                                summaryKeywordHighlightEnabled
+                                  ? summaryHighlightRanges
+                                  : []
+                              }
+                            />
+                          )}
                         </div>
-                        <TextDisplay
-                          sentences={[text]}
-                          selectedTopics={selectedTopics}
-                          hoveredTopic={hoveredTopic}
-                          readTopics={readTopics}
-                          articleTopics={sentenceTopics}
-                          articleIndex={0}
-                          onToggleRead={toggleRead}
-                          onToggleTopic={toggleTopic}
-                          tooltipEnabled={tooltipEnabled}
-                          submissionId={submissionId}
-                          highlightWords={[word]}
-                          rawText={text}
-                          summaryHighlightRanges={
-                            summaryKeywordHighlightEnabled
-                              ? summaryHighlightRanges
-                              : []
-                          }
-                        />
-                      </div>
-                    ),
+                      );
+                    },
                   )}
                   {similarWords.length > 0 && (
                     <div className="word-page-similar-words">
