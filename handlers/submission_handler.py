@@ -13,8 +13,10 @@ from lib.llm_queue.store import LLMQueueStore
 from lib.llm_queue.client import QueuedLLMClient
 from lib.llm import create_llm_client
 from lib.tasks.word_context_highlights import (
+    WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION,
     _cache_namespace,
     _parse_response_to_ranges,
+    build_word_context_job_signature,
     submit_topic_requests,
     process_pending_requests,
 )
@@ -66,6 +68,7 @@ class TagFrequencyResponse(BaseModel):
 
 class WordContextHighlightsRequest(BaseModel):
     word: str
+    refresh: bool = False
 
 
 def _word_storage_key(word: str) -> str:
@@ -750,16 +753,20 @@ def start_word_context_highlights(
             "highlights": {},
         }
 
-    word_key = _word_storage_key(word)
-    existing_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
-        word_key
-    ) or {}
-    existing_pending: Dict[str, str] = existing_job.get("pending") or {}
-    existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
-
     # Build LLM client to get model metadata (respects runtime config overrides), then wrap in QueuedLLMClient
     llm_meta = create_llm_client(db=db)
     namespace = _cache_namespace(llm_meta, word)
+    job_signature = build_word_context_job_signature(llm_meta, word)
+    word_key = _word_storage_key(word)
+    stored_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
+        word_key
+    ) or {}
+    existing_job: Dict[str, Any] = {}
+    if not body.refresh and stored_job.get("signature") == job_signature:
+        existing_job = stored_job
+    existing_pending: Dict[str, str] = existing_job.get("pending") or {}
+    existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
+
     queued_llm = QueuedLLMClient(
         store=llm_queue_store,
         model_id=llm_meta.model_id,
@@ -769,7 +776,7 @@ def start_word_context_highlights(
         model_name=llm_meta.model_name,
         cache_store=cache_store,
         namespace=namespace,
-        prompt_version="word_context_highlight_v1",
+        prompt_version=WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION,
     )
 
     # Only submit topics that don't already have results or pending requests
@@ -807,6 +814,10 @@ def start_word_context_highlights(
         submission_id,
         {
             f"word_context_highlights.{word_key}": {
+                "signature": job_signature,
+                "prompt_version": WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION,
+                "model_id": llm_meta.model_id,
+                "namespace": namespace,
                 "pending": still_pending,
                 "highlights": merged_highlights,
             }
@@ -866,6 +877,10 @@ def get_word_context_highlights(
                 submission_id,
                 {
                     f"word_context_highlights.{word_key}": {
+                        "signature": job.get("signature"),
+                        "prompt_version": job.get("prompt_version"),
+                        "model_id": job.get("model_id"),
+                        "namespace": job.get("namespace"),
                         "pending": still_pending,
                         "highlights": merged_highlights,
                     }

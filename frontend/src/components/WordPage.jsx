@@ -185,7 +185,7 @@ function WordPageContent({ word }) {
     fetch(`/api/submission/${submissionId}/word-context-highlights`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word }),
+      body: JSON.stringify({ word, refresh: true }),
     })
       .then((r) => {
         if (!r.ok) throw new Error(`Unexpected status ${r.status}`);

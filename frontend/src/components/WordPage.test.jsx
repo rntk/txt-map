@@ -1,6 +1,12 @@
 import React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import WordPage from "./WordPage";
 
 const mockUseSubmission = vi.fn();
@@ -80,6 +86,10 @@ vi.mock("../utils/summaryTimeline", () => ({
 }));
 
 describe("WordPage header layout", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     mockTextDisplay.mockClear();
     mockCircularPackingChart.mockClear();
@@ -168,18 +178,21 @@ describe("WordPage header layout", () => {
       screen.getByRole("button", { name: /Back to Article/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Sentences matching:")).toBeInTheDocument();
+    const headerTabs = within(document.querySelector(".word-page-tab-bar"));
     expect(
-      screen.getByRole("button", { name: "Sentences" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tree" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Topics (Circles)" }),
+      headerTabs.getByRole("button", { name: "Sentences" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Summaries" }),
+      headerTabs.getByRole("button", { name: "Tree" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Tags Cloud" }),
+      headerTabs.getByRole("button", { name: "Topics (Circles)" }),
+    ).toBeInTheDocument();
+    expect(
+      headerTabs.getByRole("button", { name: "Summaries" }),
+    ).toBeInTheDocument();
+    expect(
+      headerTabs.getByRole("button", { name: "Tags Cloud" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Show tooltips")).toBeInTheDocument();
     expect(
@@ -231,6 +244,36 @@ describe("WordPage header layout", () => {
     const toggle = screen.getByLabelText("Highlight summary keywords");
     expect(toggle).toBeInTheDocument();
     expect(toggle).not.toBeChecked();
+  });
+
+  it("requests a refreshed word-context analysis when Analyze is clicked", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "pending",
+          total: 1,
+          completed: 0,
+          highlights: {},
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WordPage />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Analyze word context" }),
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/submission/sub-123/word-context-highlights",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ word: "beta", refresh: true }),
+        }),
+      );
+    });
   });
 
   it("passes summaryHighlightRanges to TextDisplay when summary keywords are enabled", () => {

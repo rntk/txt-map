@@ -239,6 +239,13 @@ class LLMQueueStore:
         result = self._col.delete_one({"request_id": request_id})
         return result.deleted_count > 0
 
+    def delete_by_ids(self, request_ids: Sequence[str]) -> int:
+        """Delete multiple queue entries by request_id. Returns count deleted."""
+        if not request_ids:
+            return 0
+        result = self._col.delete_many({"request_id": {"$in": request_ids}})
+        return result.deleted_count
+
     def reclaim_stale_processing(
         self,
         stale_after_minutes: int = 10,

@@ -65,11 +65,14 @@ class LLMFuture:
                 )
             status = doc["status"]
             if status == "completed":
-                return doc["response"]
+                response = doc["response"]
+                self._cached_response = response
+                self._store.delete_by_id(self._request_id)
+                return response
             if status == "failed":
-                raise LLMRequestError(
-                    f"LLM request {self._request_id} failed: {doc.get('error', 'unknown error')}"
-                )
+                error = doc.get("error", "unknown error")
+                self._store.delete_by_id(self._request_id)
+                raise LLMRequestError(f"LLM request {self._request_id} failed: {error}")
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"LLM request {self._request_id} timed out after {timeout}s"
