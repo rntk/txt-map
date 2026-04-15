@@ -39,6 +39,28 @@ const PADDING_BOTTOM = 40;
 const PADDING_SIDE = 24;
 
 /**
+ * @typedef {Object} RadialFlowTopicInput
+ * @property {string} [name]
+ * @property {number[]} [sentences]
+ * @property {number} [totalChars]
+ * @property {Array<unknown>} [ranges]
+ */
+
+/**
+ * @typedef {Object} RadialFlowEntry
+ * @property {string} entryId
+ * @property {string} fullPath
+ * @property {string} groupPath
+ * @property {string} displayName
+ * @property {number} totalChars
+ * @property {number} sentenceCount
+ * @property {number[]} sentenceIndices
+ * @property {Array<unknown>} ranges
+ * @property {string[]} canonicalTopicNames
+ * @property {number} firstSentence
+ */
+
+/**
  * @param {string} topicName
  * @param {string} groupPath
  * @param {number} firstSentence
@@ -50,6 +72,37 @@ function getRadialFlowEntryId(topicName, groupPath, firstSentence, index) {
 }
 
 /**
+ * @param {RadialFlowTopicInput[]} topics
+ * @param {string[]} scopePath
+ * @param {number} selectedLevel
+ * @returns {Map<string, Set<string>>}
+ */
+function buildNextLevelLabelsByGroupPath(topics, scopePath, selectedLevel) {
+  /** @type {Map<string, Set<string>>} */
+  const labelsByGroupPath = new Map();
+  const absoluteDepth = scopePath.length + selectedLevel + 1;
+
+  topics.forEach((topic) => {
+    const parts = getTopicParts(topic);
+    if (!isWithinScope(parts, scopePath) || parts.length <= absoluteDepth) {
+      return;
+    }
+
+    const groupPath = parts.slice(0, absoluteDepth).join(">");
+    const nextLevelLabel = parts[absoluteDepth];
+    if (!nextLevelLabel) return;
+
+    if (!labelsByGroupPath.has(groupPath)) {
+      labelsByGroupPath.set(groupPath, new Set());
+    }
+
+    labelsByGroupPath.get(groupPath).add(nextLevelLabel);
+  });
+
+  return labelsByGroupPath;
+}
+
+/**
  * Like buildScopedChartData but WITHOUT aggregating same-name topics.
  * Each topic object becomes its own entry, so "Technology > AI" and
  * "Technology > Mobile" appear as two separate "Technology" circles,
@@ -58,12 +111,28 @@ function getRadialFlowEntryId(topicName, groupPath, firstSentence, index) {
  * entryId = unique render row identifier
  * fullPath = actual topic.name (article selection path)
  * groupPath = display-level path (used for color grouping and subtopic lookup)
+ *
+ * @param {RadialFlowTopicInput[]} topics
+ * @param {string[]} sentences
+ * @param {string[]} scopePath
+ * @param {number} selectedLevel
+ * @returns {RadialFlowEntry[]}
  */
-function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
+export function buildOrderedTopicEntries(
+  topics,
+  sentences,
+  scopePath,
+  selectedLevel,
+) {
   if (!Array.isArray(topics) || topics.length === 0) return [];
 
   const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
   const absoluteDepth = scopePath.length + selectedLevel + 1;
+  const nextLabelsByGroupPath = buildNextLevelLabelsByGroupPath(
+    topics,
+    scopePath,
+    selectedLevel,
+  );
   const entries = [];
 
   topics.forEach((topic, index) => {
@@ -73,7 +142,13 @@ function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
 
     const groupParts = parts.slice(0, absoluteDepth);
     const groupPath = groupParts.join(">");
-    const displayName = groupParts[groupParts.length - 1] || groupPath;
+    const baseDisplayName = groupParts[groupParts.length - 1] || groupPath;
+    const nextLevelLabel = parts[absoluteDepth];
+    const siblingNextLevelLabels = nextLabelsByGroupPath.get(groupPath);
+    const displayName =
+      nextLevelLabel && siblingNextLevelLabels?.size > 1
+        ? `${baseDisplayName} > ${nextLevelLabel}`
+        : baseDisplayName;
 
     const rawIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
     const sentenceIndices = rawIndices
@@ -396,11 +471,12 @@ function RadialFlowChart({
               const labelX = item.side === "right" ? -10 : 10;
               const labelAnchor = item.side === "right" ? "end" : "start";
 
-              const labelPath = item.groupPath || item.fullPath;
+              const labelPath = item.displayName || item.groupPath;
               const labelParts = getTopicParts(labelPath);
               const labelLeaf =
                 labelParts[labelParts.length - 1] || item.displayName;
               const labelAncestors = labelParts.slice(0, -1);
+              const fullPathLabel = getTopicParts(item.fullPath).join(" > ");
               const shouldRenderLeafFirst = labelAnchor === "start";
               const isLabelLink = Boolean(onShowInArticle);
 
@@ -527,7 +603,7 @@ function RadialFlowChart({
                       tabIndex={isLabelLink ? 0 : undefined}
                       aria-label={
                         isLabelLink
-                          ? `Show ${labelParts.join(" > ")} in article`
+                          ? `Show ${fullPathLabel} in article`
                           : undefined
                       }
                       onClick={
