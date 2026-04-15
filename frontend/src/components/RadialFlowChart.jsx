@@ -300,15 +300,9 @@ function RadialFlowChart({
               const labelX = item.side === "right" ? -10 : 10;
               const labelAnchor = item.side === "right" ? "end" : "start";
 
-              // Clip label to fit available width
-              const maxLabelChars = Math.max(
-                4,
-                Math.floor((centerX - PADDING_SIDE - 10) / 7),
-              );
-              const labelText =
-                item.displayName.length > maxLabelChars
-                  ? item.displayName.slice(0, maxLabelChars - 1) + "…"
-                  : item.displayName;
+              const labelParts = getTopicParts(item.fullPath);
+              const labelLeaf = labelParts[labelParts.length - 1] || item.displayName;
+              const labelAncestors = labelParts.slice(0, -1);
 
               return (
                 <g key={item.fullPath}>
@@ -330,11 +324,28 @@ function RadialFlowChart({
                       d={makeSemiArcPath(item.r, item.side)}
                       fill={baseColor}
                       opacity={isHoveredParent ? 0.35 : 0.18}
-                      className={`radial-flow-chart__arc-bg${item.isDrillable ? " radial-flow-chart__arc-bg--drillable" : ""}`}
+                      className={`radial-flow-chart__arc-bg${item.isDrillable ? " radial-flow-chart__arc-bg--drillable" : " radial-flow-chart__arc-bg--leaf"}`}
                       onClick={() => {
-                        if (!item.isDrillable) return;
-                        drillInto(item.fullPath);
-                        setSelectedLevel(0);
+                        if (item.isDrillable) {
+                          drillInto(item.fullPath);
+                          setSelectedLevel(0);
+                        } else {
+                          setModalTopic(
+                            buildModalSelectionFromTopic({
+                              name: item.fullPath,
+                              displayName: item.displayName,
+                              fullPath: item.fullPath,
+                              sentenceIndices: item.sentenceIndices || [],
+                              ranges: Array.isArray(item.ranges)
+                                ? item.ranges
+                                : [],
+                              canonicalTopicNames:
+                                item.canonicalTopicNames || [],
+                              primaryTopicName:
+                                item.canonicalTopicNames?.[0] || item.fullPath,
+                            }),
+                          );
+                        }
                       }}
                       onMouseEnter={(e) => {
                         setHoveredTopic(item.fullPath);
@@ -425,9 +436,24 @@ function RadialFlowChart({
                       textAnchor={labelAnchor}
                       dominantBaseline="middle"
                       className="radial-flow-chart__label"
-                      fill={baseColor}
                     >
-                      {labelText}
+                      {labelAncestors.map((part, i) => (
+                        <React.Fragment key={i}>
+                          <tspan className="radial-flow-chart__label-ancestor">
+                            {part}
+                          </tspan>
+                          <tspan className="radial-flow-chart__label-sep">
+                            {" ›"}
+                          </tspan>
+                        </React.Fragment>
+                      ))}
+                      <tspan
+                        className="radial-flow-chart__label-leaf"
+                        fill={baseColor}
+                      >
+                        {labelAncestors.length > 0 ? " " : ""}
+                        {labelLeaf}
+                      </tspan>
                     </text>
 
                     {/* Char count annotation */}

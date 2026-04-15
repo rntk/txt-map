@@ -61,6 +61,10 @@
   cursor: pointer;
 }
 
+.radial-flow-chart__arc-bg--leaf {
+  cursor: pointer;
+}
+
 .radial-flow-chart__arc-bg--drillable:hover {
   filter: brightness(1.06);
 }
@@ -80,6 +84,23 @@
   font-size: 18px;
   font-weight: 700;
   pointer-events: none;
+}
+
+.radial-flow-chart__label-ancestor {
+  fill: #aaa;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.radial-flow-chart__label-sep {
+  fill: #ccc;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.radial-flow-chart__label-leaf {
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .radial-flow-chart__count {
