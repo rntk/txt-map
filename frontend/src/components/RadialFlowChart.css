@@ -86,6 +86,16 @@
   pointer-events: none;
 }
 
+.radial-flow-chart__label--link {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.radial-flow-chart__label--link:hover .radial-flow-chart__label-leaf,
+.radial-flow-chart__label--link:focus .radial-flow-chart__label-leaf {
+  text-decoration: underline;
+}
+
 .radial-flow-chart__label-ancestor {
   fill: #aaa;
   font-size: 13px;

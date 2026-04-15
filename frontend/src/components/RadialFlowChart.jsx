@@ -1,4 +1,10 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import * as d3 from "d3";
 import "../styles/App.css";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
@@ -181,6 +187,38 @@ function RadialFlowChart({
     );
   }, [tooltip]);
 
+  const buildTopicSelection = useCallback(
+    (topic) =>
+      buildModalSelectionFromTopic({
+        name: topic.fullPath,
+        displayName: topic.displayName,
+        fullPath: topic.fullPath,
+        sentenceIndices: topic.sentenceIndices || [],
+        ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
+        canonicalTopicNames: topic.canonicalTopicNames || [],
+        primaryTopicName: topic.canonicalTopicNames?.[0] || topic.fullPath,
+      }),
+    [],
+  );
+
+  const handleShowTopicInArticle = useCallback(
+    (topic) => {
+      if (!onShowInArticle) return;
+      onShowInArticle(buildTopicSelection(topic));
+    },
+    [buildTopicSelection, onShowInArticle],
+  );
+
+  const handleTopicLabelKeyDown = useCallback(
+    (event, topic) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+
+      event.preventDefault();
+      handleShowTopicInArticle(topic);
+    },
+    [handleShowTopicInArticle],
+  );
+
   const safeReadTopics = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
     [readTopics],
@@ -323,6 +361,7 @@ function RadialFlowChart({
                 labelParts[labelParts.length - 1] || item.displayName;
               const labelAncestors = labelParts.slice(0, -1);
               const shouldRenderLeafFirst = labelAnchor === "start";
+              const isLabelLink = Boolean(onShowInArticle);
 
               return (
                 <g key={item.fullPath}>
@@ -350,21 +389,7 @@ function RadialFlowChart({
                           drillInto(item.fullPath);
                           setSelectedLevel(0);
                         } else {
-                          setModalTopic(
-                            buildModalSelectionFromTopic({
-                              name: item.fullPath,
-                              displayName: item.displayName,
-                              fullPath: item.fullPath,
-                              sentenceIndices: item.sentenceIndices || [],
-                              ranges: Array.isArray(item.ranges)
-                                ? item.ranges
-                                : [],
-                              canonicalTopicNames:
-                                item.canonicalTopicNames || [],
-                              primaryTopicName:
-                                item.canonicalTopicNames?.[0] || item.fullPath,
-                            }),
-                          );
+                          setModalTopic(buildTopicSelection(item));
                         }
                       }}
                       onMouseEnter={(e) => {
@@ -456,7 +481,24 @@ function RadialFlowChart({
                       y={0}
                       textAnchor={labelAnchor}
                       dominantBaseline="middle"
-                      className="radial-flow-chart__label"
+                      className={`radial-flow-chart__label${isLabelLink ? " radial-flow-chart__label--link" : ""}`}
+                      role={isLabelLink ? "link" : undefined}
+                      tabIndex={isLabelLink ? 0 : undefined}
+                      aria-label={
+                        isLabelLink
+                          ? `Show ${item.displayName} in article`
+                          : undefined
+                      }
+                      onClick={
+                        isLabelLink
+                          ? () => handleShowTopicInArticle(item)
+                          : undefined
+                      }
+                      onKeyDown={
+                        isLabelLink
+                          ? (event) => handleTopicLabelKeyDown(event, item)
+                          : undefined
+                      }
                     >
                       {shouldRenderLeafFirst ? (
                         <>
