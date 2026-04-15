@@ -596,21 +596,26 @@ function RadialFlowChart({
                           className="radial-flow-chart__arc-sub"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setModalTopic(
-                              buildModalSelectionFromTopic({
-                                name: st.fullPath,
-                                displayName: st.displayName,
-                                fullPath: st.fullPath,
-                                sentenceIndices: st.sentenceIndices || [],
-                                ranges: Array.isArray(st.ranges)
-                                  ? st.ranges
-                                  : [],
-                                canonicalTopicNames:
-                                  st.canonicalTopicNames || [],
-                                primaryTopicName:
-                                  st.canonicalTopicNames?.[0] || st.fullPath,
-                              }),
-                            );
+                            if (hasDeeperChildren(topics, st.fullPath)) {
+                              drillInto(item.fullPath);
+                              setSelectedLevel(0);
+                            } else {
+                              setModalTopic(
+                                buildModalSelectionFromTopic({
+                                  name: st.fullPath,
+                                  displayName: st.displayName,
+                                  fullPath: st.fullPath,
+                                  sentenceIndices: st.sentenceIndices || [],
+                                  ranges: Array.isArray(st.ranges)
+                                    ? st.ranges
+                                    : [],
+                                  canonicalTopicNames:
+                                    st.canonicalTopicNames || [],
+                                  primaryTopicName:
+                                    st.canonicalTopicNames?.[0] || st.fullPath,
+                                }),
+                              );
+                            }
                           }}
                           onMouseEnter={(e) => {
                             setHoveredTopic(st.fullPath);
