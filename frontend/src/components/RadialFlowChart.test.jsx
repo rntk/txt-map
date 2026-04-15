@@ -68,7 +68,7 @@ describe("RadialFlowChart layout", () => {
 });
 
 describe("RadialFlowChart entries", () => {
-  it("adds the next-level topic to duplicate parent titles when there are multiple subtopics", () => {
+  it("collapses adjacent sibling subtopics into one parent entry", () => {
     const entries = buildOrderedTopicEntries(
       [
         { name: "Technology>Web", sentences: [1] },
@@ -79,26 +79,41 @@ describe("RadialFlowChart entries", () => {
       0,
     );
 
-    expect(entries.map((entry) => entry.displayName)).toEqual([
-      "Technology > Web",
-      "Technology > AI",
-    ]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      fullPath: "Technology",
+      groupPath: "Technology",
+      displayName: "Technology",
+      sentenceCount: 2,
+      sentenceIndices: [1, 2],
+      canonicalTopicNames: ["Technology>Web", "Technology>AI"],
+    });
+    expect(entries[0].totalChars).toBe(
+      "Web sentence.".length + "AI sentence.".length,
+    );
   });
 
-  it("keeps the parent title when it has only one subtopic", () => {
+  it("keeps same-parent subtopics separate when another topic sits between them", () => {
     const entries = buildOrderedTopicEntries(
       [
-        { name: "Technology>Web>React", sentences: [1] },
-        { name: "Technology>Web>CSS", sentences: [2] },
+        { name: "Technology>Web", sentences: [1] },
+        { name: "Business>Markets", sentences: [2] },
+        { name: "Technology>AI", sentences: [3] },
       ],
-      ["React sentence.", "CSS sentence."],
+      ["Web sentence.", "Markets sentence.", "AI sentence."],
       [],
       0,
     );
 
     expect(entries.map((entry) => entry.displayName)).toEqual([
       "Technology",
+      "Business",
       "Technology",
+    ]);
+    expect(entries.map((entry) => entry.canonicalTopicNames)).toEqual([
+      ["Technology>Web"],
+      ["Business>Markets"],
+      ["Technology>AI"],
     ]);
   });
 });

@@ -61,6 +61,30 @@ const PADDING_SIDE = 24;
  */
 
 /**
+ * @typedef {Object} RadialFlowEntryDraft
+ * @property {string} groupPath
+ * @property {string} displayName
+ * @property {number} totalChars
+ * @property {Set<number>} sentenceIndices
+ * @property {Array<unknown>} ranges
+ * @property {Set<string>} canonicalTopicNames
+ * @property {number} firstSentence
+ * @property {number} startIndex
+ */
+
+/**
+ * @typedef {Object} RadialFlowTopicRow
+ * @property {string} topicName
+ * @property {string} groupPath
+ * @property {string} displayName
+ * @property {number} totalChars
+ * @property {number[]} sentenceIndices
+ * @property {Array<unknown>} ranges
+ * @property {number} firstSentence
+ * @property {number} sourceIndex
+ */
+
+/**
  * @param {string} topicName
  * @param {string} groupPath
  * @param {number} firstSentence
@@ -72,44 +96,12 @@ function getRadialFlowEntryId(topicName, groupPath, firstSentence, index) {
 }
 
 /**
- * @param {RadialFlowTopicInput[]} topics
- * @param {string[]} scopePath
- * @param {number} selectedLevel
- * @returns {Map<string, Set<string>>}
- */
-function buildNextLevelLabelsByGroupPath(topics, scopePath, selectedLevel) {
-  /** @type {Map<string, Set<string>>} */
-  const labelsByGroupPath = new Map();
-  const absoluteDepth = scopePath.length + selectedLevel + 1;
-
-  topics.forEach((topic) => {
-    const parts = getTopicParts(topic);
-    if (!isWithinScope(parts, scopePath) || parts.length <= absoluteDepth) {
-      return;
-    }
-
-    const groupPath = parts.slice(0, absoluteDepth).join(">");
-    const nextLevelLabel = parts[absoluteDepth];
-    if (!nextLevelLabel) return;
-
-    if (!labelsByGroupPath.has(groupPath)) {
-      labelsByGroupPath.set(groupPath, new Set());
-    }
-
-    labelsByGroupPath.get(groupPath).add(nextLevelLabel);
-  });
-
-  return labelsByGroupPath;
-}
-
-/**
- * Like buildScopedChartData but WITHOUT aggregating same-name topics.
- * Each topic object becomes its own entry, so "Technology > AI" and
- * "Technology > Mobile" appear as two separate "Technology" circles,
- * each at its own position in the article.
+ * Like buildScopedChartData, but preserves article-order runs. Consecutive
+ * topics with the same visible group collapse into one entry, while separated
+ * runs of the same group remain separate chart rows.
  *
  * entryId = unique render row identifier
- * fullPath = actual topic.name (article selection path)
+ * fullPath = display-level path used for drilldown
  * groupPath = display-level path (used for color grouping and subtopic lookup)
  *
  * @param {RadialFlowTopicInput[]} topics
@@ -128,12 +120,12 @@ export function buildOrderedTopicEntries(
 
   const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
   const absoluteDepth = scopePath.length + selectedLevel + 1;
-  const nextLabelsByGroupPath = buildNextLevelLabelsByGroupPath(
-    topics,
-    scopePath,
-    selectedLevel,
-  );
-  const entries = [];
+  /** @type {RadialFlowTopicRow[]} */
+  const rows = [];
+  /** @type {RadialFlowEntryDraft[]} */
+  const runs = [];
+  /** @type {RadialFlowEntryDraft | null} */
+  let currentRun = null;
 
   topics.forEach((topic, index) => {
     const parts = getTopicParts(topic);
@@ -142,13 +134,7 @@ export function buildOrderedTopicEntries(
 
     const groupParts = parts.slice(0, absoluteDepth);
     const groupPath = groupParts.join(">");
-    const baseDisplayName = groupParts[groupParts.length - 1] || groupPath;
-    const nextLevelLabel = parts[absoluteDepth];
-    const siblingNextLevelLabels = nextLabelsByGroupPath.get(groupPath);
-    const displayName =
-      nextLevelLabel && siblingNextLevelLabels?.size > 1
-        ? `${baseDisplayName} > ${nextLevelLabel}`
-        : baseDisplayName;
+    const displayName = groupParts[groupParts.length - 1] || groupPath;
 
     const rawIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
     const sentenceIndices = rawIndices
@@ -174,21 +160,75 @@ export function buildOrderedTopicEntries(
         ? topic.name.trim()
         : groupPath;
 
-    entries.push({
-      entryId: getRadialFlowEntryId(topicName, groupPath, firstSentence, index),
-      fullPath: topicName,
+    rows.push({
+      topicName,
       groupPath,
       displayName,
       totalChars,
-      sentenceCount: sentenceIndices.length,
       sentenceIndices,
       ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
-      canonicalTopicNames: [topicName],
       firstSentence,
+      sourceIndex: index,
     });
   });
 
-  return entries.sort((a, b) => a.firstSentence - b.firstSentence);
+  rows
+    .sort(
+      (left, right) =>
+        left.firstSentence - right.firstSentence ||
+        left.sourceIndex - right.sourceIndex,
+    )
+    .forEach((row) => {
+      if (!currentRun || currentRun.groupPath !== row.groupPath) {
+        currentRun = {
+          groupPath: row.groupPath,
+          displayName: row.displayName,
+          totalChars: 0,
+          sentenceIndices: new Set(),
+          ranges: [],
+          canonicalTopicNames: new Set(),
+          firstSentence: row.firstSentence,
+          startIndex: row.sourceIndex,
+        };
+        runs.push(currentRun);
+      }
+
+      currentRun.totalChars += row.totalChars;
+      currentRun.firstSentence = Math.min(
+        currentRun.firstSentence,
+        row.firstSentence,
+      );
+      row.sentenceIndices.forEach((sentenceIndex) => {
+        currentRun.sentenceIndices.add(sentenceIndex);
+      });
+      currentRun.ranges.push(...row.ranges);
+      currentRun.canonicalTopicNames.add(row.topicName);
+    });
+
+  return runs.map((run) => {
+    const sentenceIndices = Array.from(run.sentenceIndices).sort(
+      (left, right) => left - right,
+    );
+    const canonicalTopicNames = Array.from(run.canonicalTopicNames);
+
+    return {
+      entryId: getRadialFlowEntryId(
+        run.groupPath,
+        run.groupPath,
+        run.firstSentence,
+        run.startIndex,
+      ),
+      fullPath: run.groupPath,
+      groupPath: run.groupPath,
+      displayName: run.displayName,
+      totalChars: run.totalChars,
+      sentenceCount: sentenceIndices.length,
+      sentenceIndices,
+      ranges: run.ranges,
+      canonicalTopicNames,
+      firstSentence: run.firstSentence,
+    };
+  });
 }
 
 /**
@@ -357,7 +397,18 @@ function RadialFlowChart({
     const map = new Map();
     topLevelData.forEach((item) => {
       const pathParts = getTopicParts(item.fullPath);
-      const children = buildScopedChartData(topics, sentences, pathParts, 0);
+      const canonicalNames = new Set(item.canonicalTopicNames || []);
+      const scopedTopics = topics.filter((topic) => {
+        const topicName =
+          typeof topic?.name === "string" ? topic.name.trim() : "";
+        return canonicalNames.has(topicName);
+      });
+      const children = buildScopedChartData(
+        scopedTopics.length > 0 ? scopedTopics : topics,
+        sentences,
+        pathParts,
+        0,
+      );
       map.set(item.entryId, children);
     });
     return map;
