@@ -17,10 +17,11 @@ import TreemapChart from "./TreemapChart";
 import TopicsVennChart from "./TopicsVennChart";
 import TopicHierarchyFlowChart from "./TopicHierarchyFlowChart";
 import ArticleBigramHeatmapView from "./ArticleBigramHeatmapView";
+import RadialFlowChart from "./RadialFlowChart";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'tag_frequency' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'tag_frequency' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | 'radial_flow' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -296,6 +297,22 @@ function VisualizationPanels({
           <div className="chart-surface__panel">
             <div className="chart-surface__panel-body chart-surface__panel-body--padded">
               <TopicHierarchyFlowChart
+                topics={safeTopics}
+                sentences={safeSentences}
+                onShowInArticle={onShowInArticle}
+                readTopics={readTopics}
+                onToggleRead={onToggleRead}
+                markup={markup}
+              />
+            </div>
+          </div>
+        </FullScreenGraph>
+      )}
+      {fullscreenGraph === "radial_flow" && (
+        <FullScreenGraph title="Radial Flow" onClose={onClose}>
+          <div className="chart-surface__panel">
+            <div className="chart-surface__panel-body chart-surface__panel-body--padded">
+              <RadialFlowChart
                 topics={safeTopics}
                 sentences={safeSentences}
                 onShowInArticle={onShowInArticle}

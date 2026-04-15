@@ -1,0 +1,127 @@
+.radial-flow-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.radial-flow-chart__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.radial-flow-chart__subtitle {
+  margin: 0;
+  color: #666;
+  font-size: 1.28rem;
+  line-height: 1.45;
+}
+
+.radial-flow-chart__canvas {
+  overflow: auto;
+  border: 1px solid #e5dfd5;
+  border-radius: 12px;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(210, 138, 59, 0.08),
+      transparent 40%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 247, 0.97),
+      rgba(248, 247, 243, 0.99)
+    );
+}
+
+.radial-flow-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.radial-flow-chart__spine {
+  stroke: rgba(180, 170, 155, 0.4);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.radial-flow-chart__connector {
+  stroke: rgba(180, 170, 155, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.radial-flow-chart__arc-bg {
+  cursor: default;
+  transition: opacity 160ms ease;
+}
+
+.radial-flow-chart__arc-bg--drillable {
+  cursor: pointer;
+}
+
+.radial-flow-chart__arc-bg--drillable:hover {
+  filter: brightness(1.06);
+}
+
+.radial-flow-chart__arc-sub {
+  cursor: pointer;
+  transition:
+    opacity 160ms ease,
+    filter 160ms ease;
+}
+
+.radial-flow-chart__arc-sub:hover {
+  filter: brightness(1.1) saturate(1.1);
+}
+
+.radial-flow-chart__label {
+  font-size: 18px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.radial-flow-chart__count {
+  fill: #999;
+  font-size: 15px;
+  font-weight: 400;
+  pointer-events: none;
+}
+
+.radial-flow-chart__legend {
+  flex-wrap: wrap;
+}
+
+.radial-flow-chart__legend-item {
+  cursor: default;
+}
+
+.radial-flow-chart__legend-value {
+  color: #999;
+  font-size: 1.19em;
+  margin-left: 2px;
+}
+
+.radial-flow-chart__tooltip {
+  position: fixed;
+  z-index: 1000;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  font-size: 1.23rem;
+  pointer-events: none;
+  max-width: 280px;
+}
+
+.radial-flow-chart__tooltip-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.radial-flow-chart__tooltip-stats {
+  color: #777;
+  font-size: 1.15rem;
+  margin-top: 2px;
+}
