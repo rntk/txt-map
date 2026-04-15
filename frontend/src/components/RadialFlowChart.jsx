@@ -39,12 +39,24 @@ const PADDING_BOTTOM = 40;
 const PADDING_SIDE = 24;
 
 /**
+ * @param {string} topicName
+ * @param {string} groupPath
+ * @param {number} firstSentence
+ * @param {number} index
+ * @returns {string}
+ */
+function getRadialFlowEntryId(topicName, groupPath, firstSentence, index) {
+  return `${topicName || groupPath || "topic"}::${firstSentence}::${index}`;
+}
+
+/**
  * Like buildScopedChartData but WITHOUT aggregating same-name topics.
  * Each topic object becomes its own entry, so "Technology > AI" and
  * "Technology > Mobile" appear as two separate "Technology" circles,
  * each at its own position in the article.
  *
- * fullPath = actual topic.name (unique identifier)
+ * entryId = unique render row identifier
+ * fullPath = actual topic.name (article selection path)
  * groupPath = display-level path (used for color grouping and subtopic lookup)
  */
 function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
@@ -54,7 +66,7 @@ function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
   const absoluteDepth = scopePath.length + selectedLevel + 1;
   const entries = [];
 
-  topics.forEach((topic) => {
+  topics.forEach((topic, index) => {
     const parts = getTopicParts(topic);
     if (!isWithinScope(parts, scopePath) || parts.length < absoluteDepth)
       return;
@@ -88,6 +100,7 @@ function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
         : groupPath;
 
     entries.push({
+      entryId: getRadialFlowEntryId(topicName, groupPath, firstSentence, index),
       fullPath: topicName,
       groupPath,
       displayName,
@@ -102,6 +115,40 @@ function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
 
   return entries.sort((a, b) => a.firstSentence - b.firstSentence);
 }
+
+/**
+ * @param {Array<{ entryId?: string, fullPath: string, groupPath: string, totalChars: number }>} topLevelData
+ * @param {number} containerWidth
+ * @param {Array<unknown>} topics
+ * @returns {Array<{ entryId?: string, fullPath: string, groupPath: string, totalChars: number, r: number, yCenter: number, side: string, isDrillable: boolean, index: number }>}
+ */
+function buildRadialFlowLayoutItems(topLevelData, containerWidth, topics) {
+  if (!topLevelData.length) return [];
+
+  const maxChars = Math.max(...topLevelData.map((d) => d.totalChars), 1);
+  const halfWidth = containerWidth / 2 - PADDING_SIDE;
+  const clampedMax = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, halfWidth));
+
+  let previousItem = null;
+
+  return topLevelData.map((topic, index) => {
+    const r = Math.max(
+      MIN_RADIUS,
+      clampedMax * Math.sqrt(topic.totalChars / maxChars),
+    );
+    const yCenter =
+      previousItem === null
+        ? PADDING_TOP + r
+        : previousItem.yCenter + previousItem.r + r + GAP;
+    const side = index % 2 === 0 ? "right" : "left";
+    const isDrillable = hasDeeperChildren(topics, topic.fullPath);
+    const item = { ...topic, r, yCenter, side, isDrillable, index };
+    previousItem = item;
+    return item;
+  });
+}
+
+export { buildRadialFlowLayoutItems };
 
 /**
  * @typedef {Object} RadialFlowChartProps
@@ -236,7 +283,7 @@ function RadialFlowChart({
     topLevelData.forEach((item) => {
       const pathParts = getTopicParts(item.fullPath);
       const children = buildScopedChartData(topics, sentences, pathParts, 0);
-      map.set(item.fullPath, children);
+      map.set(item.entryId, children);
     });
     return map;
   }, [topLevelData, topics, sentences]);
@@ -252,7 +299,7 @@ function RadialFlowChart({
           BASE_COLORS[colorIdx % BASE_COLORS.length];
         colorIdx++;
       }
-      colors[item.fullPath] = groupColorMap[item.groupPath];
+      colors[item.entryId] = groupColorMap[item.groupPath];
     });
     return colors;
   }, [topLevelData]);
@@ -262,24 +309,17 @@ function RadialFlowChart({
     if (!topLevelData.length)
       return { items: [], totalHeight: PADDING_TOP + PADDING_BOTTOM };
 
-    const maxChars = Math.max(...topLevelData.map((d) => d.totalChars), 1);
-    const halfWidth = containerWidth / 2 - PADDING_SIDE;
-    const clampedMax = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, halfWidth));
+    const items = buildRadialFlowLayoutItems(
+      topLevelData,
+      containerWidth,
+      topics,
+    );
+    const lastItem = items[items.length - 1];
+    const totalHeight = lastItem
+      ? lastItem.yCenter + lastItem.r + PADDING_BOTTOM
+      : PADDING_TOP + PADDING_BOTTOM;
 
-    let cumulativeY = PADDING_TOP;
-    const items = topLevelData.map((topic, i) => {
-      const r = Math.max(
-        MIN_RADIUS,
-        clampedMax * Math.sqrt(topic.totalChars / maxChars),
-      );
-      const yCenter = cumulativeY + r;
-      cumulativeY = yCenter + r + GAP;
-      const side = i % 2 === 0 ? "right" : "left";
-      const isDrillable = hasDeeperChildren(topics, topic.fullPath);
-      return { ...topic, r, yCenter, side, isDrillable, index: i };
-    });
-
-    return { items, totalHeight: cumulativeY - GAP + PADDING_BOTTOM };
+    return { items, totalHeight };
   }, [topLevelData, containerWidth, topics]);
 
   const scopeLabel = getScopeLabel(scopePath);
@@ -336,14 +376,14 @@ function RadialFlowChart({
             />
 
             {layout.items.map((item, idx) => {
-              const subtopics = subtopicMap.get(item.fullPath) || [];
+              const subtopics = subtopicMap.get(item.entryId) || [];
               // Sort by size descending so largest is drawn first (background layer)
               const sortedSubs = [...subtopics].sort(
                 (a, b) => b.totalChars - a.totalChars,
               );
-              const baseColor = colorScale[item.fullPath];
+              const baseColor = colorScale[item.entryId];
               const isRead = isTopicSelectionRead(item, safeReadTopics);
-              const isHoveredParent = hoveredTopic === item.fullPath;
+              const isHoveredParent = hoveredTopic === item.entryId;
 
               // Connecting dashed line from bottom of this circle to top of next
               const nextItem = layout.items[idx + 1];
@@ -365,7 +405,7 @@ function RadialFlowChart({
               const isLabelLink = Boolean(onShowInArticle);
 
               return (
-                <g key={item.fullPath}>
+                <g key={item.entryId}>
                   {/* Dashed connector to next item */}
                   {connectorY2 !== null && (
                     <line
@@ -394,7 +434,7 @@ function RadialFlowChart({
                         }
                       }}
                       onMouseEnter={(e) => {
-                        setHoveredTopic(item.fullPath);
+                        setHoveredTopic(item.entryId);
                         setTooltip({ x: e.clientX, y: e.clientY, data: item });
                       }}
                       onMouseMove={(e) =>
@@ -589,7 +629,7 @@ function RadialFlowChart({
       {topLevelData.length > 0 && (
         <div className="radial-flow-chart__legend chart-legend">
           {topLevelData.map((item) => {
-            const colorIndex = BASE_COLORS.indexOf(colorScale[item.fullPath]);
+            const colorIndex = BASE_COLORS.indexOf(colorScale[item.entryId]);
             const swatchClassName =
               colorIndex >= 0
                 ? ` radial-flow-chart__legend-swatch--color-${colorIndex}`
@@ -597,9 +637,9 @@ function RadialFlowChart({
 
             return (
               <div
-                key={item.fullPath}
-                className={`radial-flow-chart__legend-item chart-legend-item${hoveredTopic === item.fullPath ? " hovered" : ""}`}
-                onMouseEnter={() => setHoveredTopic(item.fullPath)}
+                key={item.entryId}
+                className={`radial-flow-chart__legend-item chart-legend-item${hoveredTopic === item.entryId ? " hovered" : ""}`}
+                onMouseEnter={() => setHoveredTopic(item.entryId)}
                 onMouseLeave={() => setHoveredTopic(null)}
               >
                 <div
