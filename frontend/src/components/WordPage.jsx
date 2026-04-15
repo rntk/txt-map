@@ -116,7 +116,7 @@ function WordPageContent({ word }) {
     }
   }, [word, getSimilarWords]);
 
-  // Cleanup polling on unmount or word change
+  // Cleanup polling on unmount, word change, or submissionId change
   useEffect(() => {
     return () => {
       if (wordContextPollingRef.current) {
@@ -124,14 +124,21 @@ function WordPageContent({ word }) {
         wordContextPollingRef.current = null;
       }
     };
-  }, [word]);
+  }, [word, submissionId]);
+
+  const wordContextPollRetries = useRef(0);
+  const MAX_POLL_RETRIES = 10;
 
   const pollWordContextStatus = useCallback(() => {
     fetch(
       `/api/submission/${submissionId}/word-context-highlights?word=${encodeURIComponent(word)}`,
     )
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Unexpected status ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
+        wordContextPollRetries.current = 0;
         setWordContextStatus((prev) => {
           if (prev?.status === "pending" && data.status === "completed") {
             setWordContextHighlightsEnabled(true);
@@ -145,11 +152,23 @@ function WordPageContent({ word }) {
           };
         });
         if (data.status === "pending") {
-          wordContextPollingRef.current = setTimeout(pollWordContextStatus, 1500);
+          wordContextPollingRef.current = setTimeout(
+            pollWordContextStatus,
+            1500,
+          );
         }
       })
       .catch(() => {
-        wordContextPollingRef.current = setTimeout(pollWordContextStatus, 3000);
+        wordContextPollRetries.current += 1;
+        if (wordContextPollRetries.current < MAX_POLL_RETRIES) {
+          const delay = Math.min(3000 * wordContextPollRetries.current, 30000);
+          wordContextPollingRef.current = setTimeout(
+            pollWordContextStatus,
+            delay,
+          );
+        } else {
+          setWordContextStatus((prev) => ({ ...prev, status: "error" }));
+        }
       });
   }, [submissionId, word]);
 
@@ -157,13 +176,21 @@ function WordPageContent({ word }) {
     if (wordContextPollingRef.current) {
       clearTimeout(wordContextPollingRef.current);
     }
-    setWordContextStatus({ status: "pending", total: 0, completed: 0, highlights: {} });
+    setWordContextStatus({
+      status: "pending",
+      total: 0,
+      completed: 0,
+      highlights: {},
+    });
     fetch(`/api/submission/${submissionId}/word-context-highlights`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ word }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Unexpected status ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         setWordContextStatus({
           status: data.status,
@@ -174,7 +201,11 @@ function WordPageContent({ word }) {
         if (data.status === "completed") {
           setWordContextHighlightsEnabled(true);
         } else if (data.status === "pending") {
-          wordContextPollingRef.current = setTimeout(pollWordContextStatus, 1500);
+          wordContextPollRetries.current = 0;
+          wordContextPollingRef.current = setTimeout(
+            pollWordContextStatus,
+            1500,
+          );
         }
       })
       .catch(() => {
@@ -481,10 +512,14 @@ function WordPageContent({ word }) {
       const charRanges = [];
 
       Object.values(highlightsMap).forEach((topicHighlight) => {
-        const ranges = Array.isArray(topicHighlight?.ranges) ? topicHighlight.ranges : [];
+        const ranges = Array.isArray(topicHighlight?.ranges)
+          ? topicHighlight.ranges
+          : [];
         ranges.forEach((range) => {
           const sentenceStart = Number(range?.sentence_start);
-          const sentenceEnd = Number(range?.sentence_end ?? range?.sentence_start);
+          const sentenceEnd = Number(
+            range?.sentence_end ?? range?.sentence_start,
+          );
           if (
             !Number.isInteger(sentenceStart) ||
             !Number.isInteger(sentenceEnd) ||
@@ -493,7 +528,9 @@ function WordPageContent({ word }) {
           ) {
             return;
           }
-          const markerSpans = Array.isArray(range?.marker_spans) ? range.marker_spans : [];
+          const markerSpans = Array.isArray(range?.marker_spans)
+            ? range.marker_spans
+            : [];
           markerSpans.forEach((span) => {
             const startWord = Number(span?.start_word);
             const endWord = Number(span?.end_word);
@@ -520,7 +557,12 @@ function WordPageContent({ word }) {
     });
 
     return result;
-  }, [wordContextStatus, wordContextHighlightsEnabled, sentencesInfo, getWordCharacterRanges]);
+  }, [
+    wordContextStatus,
+    wordContextHighlightsEnabled,
+    sentencesInfo,
+    getWordCharacterRanges,
+  ]);
 
   const markup = submission?.results?.markup;
 
@@ -668,8 +710,8 @@ function WordPageContent({ word }) {
                 ) : wordContextStatus.status === "pending" ? (
                   <div className="word-page-context-progress">
                     <span className="word-page-context-progress-label">
-                      Analyzing topics…{" "}
-                      {wordContextStatus.completed}/{wordContextStatus.total || "?"}
+                      Analyzing topics… {wordContextStatus.completed}/
+                      {wordContextStatus.total || "?"}
                     </span>
                     <div className="word-page-progress-bar">
                       <div

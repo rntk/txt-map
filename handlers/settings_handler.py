@@ -38,9 +38,15 @@ def update_llm_settings(
 ) -> Dict[str, Any]:
     active = get_active_llm_settings(db=storage.db)
 
-    # Quick lookup for provider info
+    # Custom providers are identified by their key ("custom:..."),
+    # while built-in providers are identified by display name.
+    # Try matching by key first (for custom providers), then by name.
     provider = next(
-        (p for p in active["available_providers"] if p["name"] == payload.provider),
+        (
+            p
+            for p in active["available_providers"]
+            if p.get("key") == payload.provider or p["name"] == payload.provider
+        ),
         None,
     )
 
@@ -53,5 +59,10 @@ def update_llm_settings(
             status_code=400, detail="Selected model is not allowed for this provider"
         )
 
-    storage.set_llm_runtime_config(provider=payload.provider, model=payload.model)
+    # For custom providers, store the key (custom:id) as the provider identifier
+    provider_identifier = payload.provider
+    if provider.get("is_custom") and payload.provider == provider["name"]:
+        provider_identifier = provider["key"]
+
+    storage.set_llm_runtime_config(provider=provider_identifier, model=payload.model)
     return _serialize_settings(storage)

@@ -1,8 +1,12 @@
 """Unit tests for llm_workers startup cleanup behavior."""
 
+import json
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from lib.llm_queue.store import LLMQueueStore
 from llm_workers import COMPLETED_TASK_RETENTION_HOURS, main
@@ -145,3 +149,142 @@ class TestLLMWorkersMain:
             thread.join.assert_called_once_with()
         assert mock_signal.call_count == 2
         mock_client.close.assert_called_once_with()
+
+    @patch.dict(
+        os.environ,
+        {
+            "LLM_WORKER_BACKEND": "remote",
+            "LLM_WORKER_API_URL": "https://api.example",
+            "LLM_WORKER_TOKEN": "worker-token",
+        },
+        clear=False,
+    )
+    @patch("llm_workers.signal.signal")
+    @patch("llm_workers.LLMWorker")
+    @patch("llm_workers.RemoteQueueBackend")
+    @patch("llm_workers.MongoClient")
+    def test_main_remote_loads_provider_config_and_uses_supported_models(
+        self,
+        mock_mongo_client: MagicMock,
+        mock_remote_backend_cls: MagicMock,
+        mock_worker_cls: MagicMock,
+        mock_signal: MagicMock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Remote startup derives claimable model IDs from its provider config."""
+        config_path = tmp_path / "llm-providers.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "providers": [
+                        {
+                            "id": "custom:abc123",
+                            "name": "Remote Llama",
+                            "type": "openai_comp",
+                            "model": "llama-3.3",
+                            "token": "secret",
+                            "url": "https://llm.example/v1",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("LLM_WORKER_PROVIDER_CONFIG", str(config_path))
+
+        main()
+
+        mock_mongo_client.assert_not_called()
+        mock_remote_backend_cls.assert_called_once_with(
+            "https://api.example",
+            "worker-token",
+            supported_model_ids=["custom:abc123:llama-3.3"],
+        )
+        assert mock_worker_cls.call_args.kwargs["remote_provider_config"] is not None
+        mock_worker_cls.return_value.run.assert_called_once_with()
+        assert mock_signal.call_count == 2
+
+
+class TestLLMQueueStoreLeases:
+    """Tests for lease-aware queue updates."""
+
+    def test_claim_assigns_lease_metadata(self) -> None:
+        mock_db = MagicMock()
+        store = LLMQueueStore(mock_db)
+
+        claimed = {"request_id": "req-1", "lease_id": "lease-1"}
+        mock_db[LLMQueueStore.COLLECTION].find_one_and_update.return_value = claimed
+
+        result = store.claim(
+            "worker-1",
+            worker_kind="remote",
+            lease_seconds=90,
+            supported_model_ids=["openai:gpt-5.4"],
+        )
+
+        assert result == claimed
+        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
+        update = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[1]
+        assert query["status"] == "pending"
+        assert query["$or"][0]["requested_model_id"]["$in"] == ["openai:gpt-5.4"]
+        assert update["$set"]["worker_id"] == "worker-1"
+        assert update["$set"]["worker_kind"] == "remote"
+        assert "lease_id" in update["$set"]
+        assert "lease_expires_at" in update["$set"]
+
+    def test_claim_can_exclude_legacy_model_id_matches(self) -> None:
+        mock_db = MagicMock()
+        store = LLMQueueStore(mock_db)
+
+        store.claim(
+            "worker-1",
+            worker_kind="remote",
+            supported_model_ids=["custom:abc123:llama-3.3"],
+            include_legacy_model_ids=False,
+        )
+
+        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
+        assert "$or" not in query
+        assert query["requested_model_id"]["$in"] == ["custom:abc123:llama-3.3"]
+
+    def test_complete_requires_matching_worker_and_lease(self) -> None:
+        mock_db = MagicMock()
+        store = LLMQueueStore(mock_db)
+        mock_db[LLMQueueStore.COLLECTION].update_one.return_value.modified_count = 1
+
+        completed = store.complete(
+            "req-1",
+            "hello",
+            worker_id="worker-1",
+            lease_id="lease-1",
+            executed_provider="OpenAI",
+            executed_model="gpt-5.4",
+            executed_model_id="openai:gpt-5.4",
+        )
+
+        assert completed is True
+        query = mock_db[LLMQueueStore.COLLECTION].update_one.call_args.args[0]
+        update = mock_db[LLMQueueStore.COLLECTION].update_one.call_args.args[1]
+        assert query == {
+            "request_id": "req-1",
+            "status": "processing",
+            "worker_id": "worker-1",
+            "lease_id": "lease-1",
+        }
+        assert update["$set"]["status"] == "completed"
+        assert update["$set"]["executed_model_id"] == "openai:gpt-5.4"
+
+    def test_heartbeat_extends_processing_lease(self) -> None:
+        mock_db = MagicMock()
+        store = LLMQueueStore(mock_db)
+        updated_doc = {"request_id": "req-1", "lease_expires_at": datetime.now(UTC)}
+        mock_db[LLMQueueStore.COLLECTION].find_one_and_update.return_value = updated_doc
+
+        result = store.heartbeat("req-1", "worker-1", "lease-1", lease_seconds=75)
+
+        assert result == updated_doc
+        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
+        assert query["request_id"] == "req-1"
+        assert query["worker_id"] == "worker-1"
+        assert query["lease_id"] == "lease-1"

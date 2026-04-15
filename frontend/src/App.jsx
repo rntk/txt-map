@@ -11,6 +11,7 @@ import TextPage from "./components/TextPage";
 import TokensPage from "./components/TokensPage";
 import WordPage from "./components/WordPage";
 import TopicAnalysisPage from "./components/TopicAnalysisPage";
+import LlmProvidersPage from "./components/LlmProvidersPage";
 
 /**
  * @typedef {Object} NavigationItem
@@ -133,6 +134,7 @@ const PAGE_COMPONENTS = {
   topics: GlobalTopicsPage,
   word: WordPage,
   "topic-analysis": TopicAnalysisPage,
+  "llm-providers": LlmProvidersPage,
 };
 
 /**
@@ -262,8 +264,14 @@ function AppShell({
   // Build navigation items based on auth state
   const navItems = [...navigationItems];
 
-  // Add Tokens page for superuser
+  // Add superuser-only pages
   if (isSuperuser) {
+    navItems.push({
+      title: "LLM Providers",
+      link: "/page/llm-providers",
+      badge: "LP",
+      description: "Manage custom LLM endpoints",
+    });
     navItems.push({
       title: "Tokens",
       link: "/page/tokens",

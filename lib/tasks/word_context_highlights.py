@@ -110,7 +110,9 @@ def _cache_namespace(llm_client: Any, word: str) -> str:
     return f"word_context_highlights:{model_id}:{safe_word}"
 
 
-def _build_prompt(word: str, topic_name: str, clean_text: str, anchored_text: str) -> str:
+def _build_prompt(
+    word: str, topic_name: str, clean_text: str, anchored_text: str
+) -> str:
     return WORD_CONTEXT_HIGHLIGHT_PROMPT_TEMPLATE.format(
         word=word,
         topic_name=topic_name,
@@ -167,16 +169,18 @@ def submit_topic_requests(
     topics: List[Dict[str, Any]],
     all_sentences: List[str],
     queued_llm: QueuedLLMClient,
-) -> Dict[str, str]:
+) -> Tuple[Dict[str, str], Dict[str, str]]:
     """Submit one LLM request per topic (non-blocking).
 
-    Returns a dict mapping topic_name → request_id for topics enqueued.
+    Returns ``(pending_ids, pre_resolved_responses)`` where:
+    - ``pending_ids``: topic_name → request_id for topics queued for async processing.
+    - ``pre_resolved_responses``: topic_name → raw LLM response for cache hits that
+      resolved synchronously without entering the queue.
+
     Topics with no extractable text ranges are skipped.
-    Cache hits are resolved immediately by QueuedLLMClient.submit() and
-    their futures are pre-resolved; they are tracked as "__cached__:{response}".
-    We return them with a special sentinel so the caller can process them right away.
     """
-    pending: Dict[str, str] = {}
+    pending_ids: Dict[str, str] = {}
+    pre_resolved: Dict[str, str] = {}
 
     for topic in topics:
         topic_name = topic.get("name", "")
@@ -195,16 +199,19 @@ def submit_topic_requests(
         future = queued_llm.submit(prompt, temperature=0.0)
 
         if future.done():
-            # Cache hit — store the response directly with a sentinel
+            # Cache hit — available immediately, no queue entry was created.
             try:
-                response = future.result()
-                pending[topic_name] = f"__resolved__:{response}"
+                pre_resolved[topic_name] = future.result()
             except Exception as exc:
-                logger.warning("Cache-hit future failed for topic '%s': %s", topic_name, exc)
+                logger.warning(
+                    "Cache-hit future failed for topic '%s': %s", topic_name, exc
+                )
         else:
-            pending[topic_name] = future._request_id  # type: ignore[attr-defined]
+            request_id = future.request_id
+            if request_id is not None:
+                pending_ids[topic_name] = request_id
 
-    return pending
+    return pending_ids, pre_resolved
 
 
 def process_pending_requests(
@@ -222,40 +229,25 @@ def process_pending_requests(
     still_pending: Dict[str, str] = {}
     completed: Dict[str, Any] = {}
 
-    # Separate pre-resolved (cache hits) from queue-backed entries
-    resolved_entries: Dict[str, str] = {}
-    queue_ids: List[str] = []
-    queue_topics: Dict[str, str] = {}  # request_id → topic_name
+    queue_ids: List[str] = list(pending.values())
+    queue_topics: Dict[str, str] = {
+        request_id: topic_name for topic_name, request_id in pending.items()
+    }
 
-    for topic_name, entry in pending.items():
-        if entry.startswith("__resolved__:"):
-            resolved_entries[topic_name] = entry[len("__resolved__:"):]
-        else:
-            queue_ids.append(entry)
-            queue_topics[entry] = topic_name
-
-    # Process pre-resolved cache hits
-    for topic_name, response in resolved_entries.items():
-        topic = topics_by_name.get(topic_name)
-        if topic is None:
-            continue
-        result = _parse_response_to_ranges(response, topic, all_sentences)
-        if result is not None:
-            completed[topic_name] = result
-
-    # Batch-poll queue
     if queue_ids:
         docs = llm_queue_store.get_results(queue_ids)
-        docs_by_id = {
-            d["request_id"]: d for d in docs if d is not None
-        }
+        docs_by_id = {d["request_id"]: d for d in docs if d is not None}
 
         for request_id in queue_ids:
             topic_name = queue_topics[request_id]
             doc = docs_by_id.get(request_id)
 
             if doc is None:
-                logger.warning("LLM queue entry %s disappeared for topic '%s'", request_id, topic_name)
+                logger.warning(
+                    "LLM queue entry %s disappeared for topic '%s'",
+                    request_id,
+                    topic_name,
+                )
                 continue
 
             status = doc.get("status")

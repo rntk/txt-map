@@ -233,6 +233,29 @@ submissions_storage.queue_task(submission_id, "your_task")
 ### Environment Variables
 
 - `MONGODB_URL`: MongoDB connection string (default: `mongodb://localhost:8765/`)
+- `LLM_WORKER_BACKEND`: `local` for direct MongoDB queue access or `remote` for authenticated API access.
+- `LLM_WORKER_API_URL`: Base API URL for remote LLM workers.
+- `LLM_WORKER_TOKEN`: API bearer token for remote LLM workers.
+- `LLM_WORKER_PROVIDER_CONFIG`: Worker-local JSON provider config path for remote LLM workers.
+
+Remote LLM workers are independent from DB-backed LLM provider storage. Their provider API tokens live only in `LLM_WORKER_PROVIDER_CONFIG`, and the worker derives claimable model IDs from that file before polling the API.
+
+Example remote provider config:
+
+```json
+{
+  "providers": [
+    {
+      "id": "custom:<provider-id>",
+      "name": "Remote Llama",
+      "type": "openai_comp",
+      "model": "llama-3.3",
+      "token": "secret",
+      "url": "https://llm.example/v1"
+    }
+  ]
+}
+```
 
 ### Polling Interval
 

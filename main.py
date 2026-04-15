@@ -12,9 +12,10 @@ from handlers import (
     settings_handler,
     extension_handler,
     llm_queue_handler,
+    llm_worker_handler,
 )
 from handlers.auth_handler import require_auth
-from handlers import auth_handler, tokens_handler
+from handlers import auth_handler, tokens_handler, llm_providers_handler
 from lifespan import lifespan
 
 app = FastAPI(
@@ -55,6 +56,13 @@ app.include_router(
     dependencies=[Depends(require_auth)],
 )
 
+# LLM providers management routes (superuser only)
+app.include_router(
+    llm_providers_handler.router,
+    prefix="/api",
+    dependencies=[Depends(require_auth)],
+)
+
 # Protected API routes
 app.include_router(
     submission_handler.router,
@@ -68,6 +76,11 @@ app.include_router(
 )
 app.include_router(
     llm_queue_handler.router,
+    prefix="/api",
+    dependencies=[Depends(require_auth)],
+)
+app.include_router(
+    llm_worker_handler.router,
     prefix="/api",
     dependencies=[Depends(require_auth)],
 )
@@ -109,6 +122,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/topic-analysis/{submission_id}")
 @app.get("/page/login")
 @app.get("/page/tokens")
+@app.get("/page/llm-providers")
 def serve_frontend_page():
     return FileResponse(FRONTEND_INDEX)
 

@@ -7,7 +7,12 @@ from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.task_queue import TaskQueueStorage
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.tokens import TokenStorage
+from lib.storage.llm_providers import LlmProvidersStorage
 from lib.llm_queue.store import LLMQueueStore
+
+
+def get_db(request: Request):
+    return request.app.state.db
 
 
 def get_submissions_storage(request: Request) -> SubmissionsStorage:
@@ -84,6 +89,10 @@ def get_token_storage(request: Request) -> TokenStorage:
             "Ensure lifespan sets up token_storage or disable auth by not setting SUPER_TOKEN."
         )
     return storage
+
+
+def get_llm_providers_storage(request: Request) -> LlmProvidersStorage:
+    return request.app.state.llm_providers_storage
 
 
 def require_submission(

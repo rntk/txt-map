@@ -12,6 +12,8 @@ class AnthropicClient(LLMClient):
         max_context_tokens: int = 200000,
         max_retries: int = 3,
         retry_delay: float = 1.0,
+        provider_name: str = "Anthropic",
+        provider_key: str = "anthropic",
     ) -> None:
         super().__init__(
             max_context_tokens=max_context_tokens,
@@ -22,14 +24,16 @@ class AnthropicClient(LLMClient):
 
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
+        self._provider_name = provider_name
+        self._provider_key = provider_key
 
     @property
     def provider_name(self) -> str:
-        return "Anthropic"
+        return self._provider_name
 
     @property
     def provider_key(self) -> str:
-        return "anthropic"
+        return self._provider_key
 
     @property
     def model_name(self) -> str:

@@ -31,6 +31,8 @@ class LLamaCPP(LLMClient):
         dry_base: float = 1.75,
         dry_allowed_length: int = 2,
         stop: Optional[List[str]] = None,
+        provider_name: str = "LlamaCPP",
+        provider_key: str = "llamacpp",
     ) -> None:
         super().__init__(
             max_context_tokens=max_context_tokens,
@@ -51,14 +53,16 @@ class LLamaCPP(LLMClient):
         self.__dry_base = dry_base
         self.__dry_allowed_length = dry_allowed_length
         self.__stop = stop or ["User:", "\n\n"]
+        self.__provider_name = provider_name
+        self.__provider_key = provider_key
 
     @property
     def provider_name(self) -> str:
-        return "LlamaCPP"
+        return self.__provider_name
 
     @property
     def provider_key(self) -> str:
-        return "llamacpp"
+        return self.__provider_key
 
     @property
     def model_name(self) -> str:

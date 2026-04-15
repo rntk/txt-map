@@ -12,3 +12,4 @@ nltk
 git+https://github.com/rntk/txt-splitt.git@v0.0.19
 openai
 anthropic
+cryptography

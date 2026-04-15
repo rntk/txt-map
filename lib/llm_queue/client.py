@@ -35,6 +35,10 @@ class LLMFuture:
         self._cached_response = cached_response
         self._poll_interval = poll_interval
 
+    @property
+    def request_id(self) -> Optional[str]:
+        return self._request_id
+
     def done(self) -> bool:
         """Non-blocking check — True if result is available."""
         if self._cached_response is not None:
@@ -95,6 +99,9 @@ class QueuedLLMClient:
         store: LLMQueueStore,
         model_id: str,
         max_context_tokens: int,
+        provider_key: Optional[str] = None,
+        provider_name: Optional[str] = None,
+        model_name: Optional[str] = None,
         cache_store: Optional[Any] = None,
         namespace: Optional[str] = None,
         prompt_version: Optional[str] = None,
@@ -103,6 +110,9 @@ class QueuedLLMClient:
         self._store = store
         self._model_id = model_id
         self._max_context_tokens = max_context_tokens
+        self._provider_key = provider_key
+        self._provider_name = provider_name
+        self._model_name = model_name
         self._cache_store = cache_store
         self._namespace = namespace
         self._prompt_version = prompt_version
@@ -159,6 +169,9 @@ class QueuedLLMClient:
             prompt=prompt,
             temperature=temperature,
             model_id=self._model_id,
+            requested_provider=self._provider_key or self._provider_name,
+            requested_model=self._model_name,
+            requested_model_id=self._model_id,
             cache_key=cache_key,
             cache_namespace=self._namespace,
             prompt_version=self._prompt_version,
@@ -190,6 +203,9 @@ class QueuedLLMClient:
             store=self._store,
             model_id=self._model_id,
             max_context_tokens=self._max_context_tokens,
+            provider_key=self._provider_key,
+            provider_name=self._provider_name,
+            model_name=self._model_name,
             cache_store=self._cache_store,
             namespace=namespace,
             prompt_version=prompt_version,

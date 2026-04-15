@@ -45,6 +45,7 @@ const inlineStyleAllowlist = [
   'src/components/TopicsBarChart.jsx',
   'src/components/TopicsRiverChart.jsx',
   'src/components/TopicsVennChart.jsx',
+  'src/components/WordPage.jsx',
   'src/components/WordSelectionPopup.jsx',
 ];
 

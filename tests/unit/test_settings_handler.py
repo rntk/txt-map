@@ -107,6 +107,52 @@ def test_put_settings_updates_runtime_config(client, mock_settings_storage):
     assert response.json()["llm_model"] == "gpt-5-mini"
 
 
+def test_put_settings_stores_custom_provider_key(client, mock_settings_storage):
+    with patch(
+        "handlers.settings_handler.get_active_llm_settings",
+        side_effect=[
+            {
+                "provider_key": "custom:abc123",
+                "provider": "Remote Llama",
+                "model": "llama-3.3",
+                "available_providers": [
+                    {
+                        "key": "custom:abc123",
+                        "name": "Remote Llama",
+                        "models": ["llama-3.3"],
+                        "default_model": "llama-3.3",
+                        "is_custom": True,
+                    }
+                ],
+            },
+            {
+                "provider_key": "custom:abc123",
+                "provider": "Remote Llama",
+                "model": "llama-3.3",
+                "available_providers": [
+                    {
+                        "key": "custom:abc123",
+                        "name": "Remote Llama",
+                        "models": ["llama-3.3"],
+                        "default_model": "llama-3.3",
+                        "is_custom": True,
+                    }
+                ],
+            },
+        ],
+    ):
+        response = client.put(
+            "/api/settings/llm",
+            json={"provider": "Remote Llama", "model": "llama-3.3"},
+        )
+
+    assert response.status_code == 200
+    mock_settings_storage.set_llm_runtime_config.assert_called_once_with(
+        provider="custom:abc123",
+        model="llama-3.3",
+    )
+
+
 def test_put_settings_rejects_unavailable_provider(client):
     with patch(
         "handlers.settings_handler.get_active_llm_settings",

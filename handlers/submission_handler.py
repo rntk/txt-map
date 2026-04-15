@@ -12,8 +12,14 @@ from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.llm_queue.store import LLMQueueStore
 from lib.llm_queue.client import QueuedLLMClient
 from lib.llm import create_llm_client
-from lib.tasks.word_context_highlights import submit_topic_requests, process_pending_requests
+from lib.tasks.word_context_highlights import (
+    _cache_namespace,
+    _parse_response_to_ranges,
+    submit_topic_requests,
+    process_pending_requests,
+)
 from handlers.dependencies import (
+    get_db,
     get_submissions_storage,
     get_task_queue_storage,
     get_llm_queue_store,
@@ -63,8 +69,32 @@ class WordContextHighlightsRequest(BaseModel):
 
 
 def _word_storage_key(word: str) -> str:
-    """Sanitize word for use as a MongoDB field name (no dots or dollar signs)."""
-    return re.sub(r"[.\$]", "_", word.lower())
+    """Return a stable MongoDB field-name key for a word.
+
+    Uses a SHA-1 hex digest so that characters illegal in MongoDB field names
+    (dots, dollar signs) and collisions from normalisation (e.g. "a.b" vs "a_b")
+    are never an issue.
+    """
+    import hashlib
+
+    return hashlib.sha1(word.lower().encode()).hexdigest()[:20]
+
+
+def _count_matching_topics(
+    all_topics: List[Dict[str, Any]],
+    all_sentences: List[str],
+    pattern: re.Pattern,
+) -> int:
+    """Count topics that contain at least one sentence matching the word pattern."""
+    return sum(
+        1
+        for t in all_topics
+        if any(
+            pattern.search(all_sentences[i - 1])
+            for i in (t.get("sentences") or [])
+            if 1 <= i <= len(all_sentences)
+        )
+    )
 
 
 router = APIRouter()
@@ -673,6 +703,7 @@ def start_word_context_highlights(
     body: WordContextHighlightsRequest,
     submission: Dict[str, Any] = Depends(require_submission),
     storage: SubmissionsStorage = Depends(get_submissions_storage),
+    db: Any = Depends(get_db),
     llm_queue_store: LLMQueueStore = Depends(get_llm_queue_store),
     cache_store: MongoLLMCacheStore = Depends(get_cache_store),
 ) -> Dict[str, Any]:
@@ -690,7 +721,13 @@ def start_word_context_highlights(
     all_topics: List[Dict[str, Any]] = results.get("topics") or []
 
     if not all_sentences or not all_topics:
-        return {"status": "completed", "word": word, "total": 0, "completed": 0, "highlights": {}}
+        return {
+            "status": "completed",
+            "word": word,
+            "total": 0,
+            "completed": 0,
+            "highlights": {},
+        }
 
     # Find topics that contain at least one sentence matching the word
     pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
@@ -705,21 +742,31 @@ def start_word_context_highlights(
     ]
 
     if not matching_topics:
-        return {"status": "completed", "word": word, "total": 0, "completed": 0, "highlights": {}}
+        return {
+            "status": "completed",
+            "word": word,
+            "total": 0,
+            "completed": 0,
+            "highlights": {},
+        }
 
     word_key = _word_storage_key(word)
-    existing_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(word_key) or {}
+    existing_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
+        word_key
+    ) or {}
     existing_pending: Dict[str, str] = existing_job.get("pending") or {}
     existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
 
     # Build LLM client to get model metadata (respects runtime config overrides), then wrap in QueuedLLMClient
-    llm_meta = create_llm_client(db=storage._db)
-    from lib.tasks.word_context_highlights import _cache_namespace
+    llm_meta = create_llm_client(db=db)
     namespace = _cache_namespace(llm_meta, word)
     queued_llm = QueuedLLMClient(
         store=llm_queue_store,
         model_id=llm_meta.model_id,
         max_context_tokens=llm_meta.max_context_tokens,
+        provider_key=llm_meta.provider_key,
+        provider_name=llm_meta.provider_name,
+        model_name=llm_meta.model_name,
         cache_store=cache_store,
         namespace=namespace,
         prompt_version="word_context_highlight_v1",
@@ -727,32 +774,31 @@ def start_word_context_highlights(
 
     # Only submit topics that don't already have results or pending requests
     topics_to_submit = [
-        t for t in matching_topics
-        if t.get("name") not in existing_highlights and t.get("name") not in existing_pending
+        t
+        for t in matching_topics
+        if t.get("name") not in existing_highlights
+        and t.get("name") not in existing_pending
     ]
 
     new_pending: Dict[str, str] = {}
+    new_resolved_responses: Dict[str, str] = {}
     if topics_to_submit:
-        new_pending = submit_topic_requests(word, topics_to_submit, all_sentences, queued_llm)
+        new_pending, new_resolved_responses = submit_topic_requests(
+            word, topics_to_submit, all_sentences, queued_llm
+        )
 
-    # Merge new pending with existing pending
-    merged_pending = {**existing_pending, **new_pending}
+    # Merge queue entries with any pre-existing pending
+    still_pending: Dict[str, str] = {**existing_pending, **new_pending}
 
-    # Immediately resolve any pre-resolved (cache-hit) entries
+    # Parse and collect cache-hit responses that were resolved synchronously
     resolved_highlights: Dict[str, Any] = {}
-    still_pending: Dict[str, str] = {}
-    for topic_name, entry in merged_pending.items():
-        if entry.startswith("__resolved__:"):
-            # Already resolved by QueuedLLMClient cache check
-            topic = next((t for t in all_topics if t.get("name") == topic_name), None)
-            if topic is not None:
-                from lib.tasks.word_context_highlights import _parse_response_to_ranges
-                response = entry[len("__resolved__:"):]
-                result = _parse_response_to_ranges(response, topic, all_sentences)
-                if result is not None:
-                    resolved_highlights[topic_name] = result
-        else:
-            still_pending[topic_name] = entry
+    topics_by_name = {t.get("name", ""): t for t in all_topics}
+    for topic_name, response in new_resolved_responses.items():
+        topic = topics_by_name.get(topic_name)
+        if topic is not None:
+            result = _parse_response_to_ranges(response, topic, all_sentences)
+            if result is not None:
+                resolved_highlights[topic_name] = result
 
     merged_highlights = {**existing_highlights, **resolved_highlights}
 
@@ -798,7 +844,9 @@ def get_word_context_highlights(
     all_topics: List[Dict[str, Any]] = results.get("topics") or []
 
     word_key = _word_storage_key(word)
-    job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(word_key) or {}
+    job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
+        word_key
+    ) or {}
 
     if not job:
         return {"status": "not_found", "total": 0, "completed": 0, "highlights": {}}
@@ -827,15 +875,7 @@ def get_word_context_highlights(
             pending = still_pending
 
     pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
-    total = sum(
-        1
-        for t in all_topics
-        if any(
-            pattern.search(all_sentences[i - 1])
-            for i in (t.get("sentences") or [])
-            if 1 <= i <= len(all_sentences)
-        )
-    )
+    total = _count_matching_topics(all_topics, all_sentences, pattern)
 
     status = "completed" if len(pending) == 0 else "pending"
     return {

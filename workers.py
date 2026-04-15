@@ -224,6 +224,9 @@ class Worker:
                     store=self.queue_store,
                     model_id=llm_meta.model_id,
                     max_context_tokens=llm_meta.max_context_tokens,
+                    provider_key=llm_meta.provider_key,
+                    provider_name=llm_meta.provider_name,
+                    model_name=llm_meta.model_name,
                     cache_store=self.cache_store,
                 )
             else:

@@ -38,6 +38,26 @@ The factory takes a `db` argument to fetch **runtime configuration**. This enabl
 ### Refresh Policy
 Background workers (`workers.py`) call `create_llm_client(db=db)` at the start of **each task**. This ensures that if a user changes the LLM provider midway, the next queued task will automatically use the new configuration.
 
+### Remote LLM Workers
+Remote LLM workers do not read MongoDB provider records or encrypted DB tokens. When `LLM_WORKER_BACKEND=remote`, `llm_workers.py` requires `LLM_WORKER_PROVIDER_CONFIG` to point to a worker-local JSON file:
+
+```json
+{
+  "providers": [
+    {
+      "id": "custom:<provider-id>",
+      "name": "Remote Provider",
+      "type": "openai|anthropic|openai_comp",
+      "model": "model-name",
+      "token": "provider-token",
+      "url": "https://openai-compatible.example/v1"
+    }
+  ]
+}
+```
+
+The `id` and `model` form the worker's supported model ID (`<id>:<model>`). Remote workers send those IDs when claiming tasks, so the API only assigns work the worker can execute. `url` is required for `openai_comp` providers and ignored for official OpenAI/Anthropic providers.
+
 ## 4. LLM Caching Mechanism
 
 To optimize performance, reduce latency, and lower API costs, all LLM calls are wrapped in a caching layer.
