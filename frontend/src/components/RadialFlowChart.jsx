@@ -356,7 +356,8 @@ function RadialFlowChart({
               const labelX = item.side === "right" ? -10 : 10;
               const labelAnchor = item.side === "right" ? "end" : "start";
 
-              const labelParts = getTopicParts(item.fullPath);
+              const labelPath = item.groupPath || item.fullPath;
+              const labelParts = getTopicParts(labelPath);
               const labelLeaf =
                 labelParts[labelParts.length - 1] || item.displayName;
               const labelAncestors = labelParts.slice(0, -1);
@@ -486,7 +487,7 @@ function RadialFlowChart({
                       tabIndex={isLabelLink ? 0 : undefined}
                       aria-label={
                         isLabelLink
-                          ? `Show ${item.displayName} in article`
+                          ? `Show ${labelParts.join(" > ")} in article`
                           : undefined
                       }
                       onClick={
