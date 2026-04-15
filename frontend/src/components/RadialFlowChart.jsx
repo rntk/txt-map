@@ -10,6 +10,7 @@ import {
   getScopedMaxLevel,
   hasDeeperChildren,
   getTopicParts,
+  isWithinScope,
 } from "../utils/topicHierarchy";
 import { BASE_COLORS } from "../utils/chartConstants";
 import Breadcrumbs from "./shared/Breadcrumbs";
@@ -19,6 +20,7 @@ import { useContainerSize } from "../hooks/useContainerSize";
 import { isTopicSelectionRead } from "../utils/topicReadUtils";
 import { buildModalSelectionFromTopic } from "../utils/topicModalSelection";
 import { useArticle } from "../contexts/ArticleContext";
+import TooltipTopicName from "./shared/TooltipTopicName";
 import "./RadialFlowChart.css";
 
 export { buildScopedChartData, getScopedMaxLevel };
@@ -29,6 +31,70 @@ const GAP = 20;
 const PADDING_TOP = 40;
 const PADDING_BOTTOM = 40;
 const PADDING_SIDE = 24;
+
+/**
+ * Like buildScopedChartData but WITHOUT aggregating same-name topics.
+ * Each topic object becomes its own entry, so "Technology > AI" and
+ * "Technology > Mobile" appear as two separate "Technology" circles,
+ * each at its own position in the article.
+ *
+ * fullPath = actual topic.name (unique identifier)
+ * groupPath = display-level path (used for color grouping and subtopic lookup)
+ */
+function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
+  if (!Array.isArray(topics) || topics.length === 0) return [];
+
+  const hasSentenceText = Array.isArray(sentences) && sentences.length > 0;
+  const absoluteDepth = scopePath.length + selectedLevel + 1;
+  const entries = [];
+
+  topics.forEach((topic) => {
+    const parts = getTopicParts(topic);
+    if (!isWithinScope(parts, scopePath) || parts.length < absoluteDepth) return;
+
+    const groupParts = parts.slice(0, absoluteDepth);
+    const groupPath = groupParts.join(">");
+    const displayName = groupParts[groupParts.length - 1] || groupPath;
+
+    const rawIndices = Array.isArray(topic.sentences) ? topic.sentences : [];
+    const sentenceIndices = rawIndices
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0);
+
+    let totalChars = 0;
+    if (hasSentenceText) {
+      sentenceIndices.forEach((n) => {
+        const s = sentences[n - 1];
+        if (typeof s === "string") totalChars += s.length;
+      });
+    } else {
+      totalChars = Number.isFinite(topic.totalChars) ? topic.totalChars : 0;
+    }
+
+    if (totalChars === 0 && sentenceIndices.length === 0) return;
+
+    const firstSentence =
+      sentenceIndices.length > 0 ? Math.min(...sentenceIndices) : Infinity;
+    const topicName =
+      typeof topic.name === "string" && topic.name.trim()
+        ? topic.name.trim()
+        : groupPath;
+
+    entries.push({
+      fullPath: topicName,
+      groupPath,
+      displayName,
+      totalChars,
+      sentenceCount: sentenceIndices.length,
+      sentenceIndices,
+      ranges: Array.isArray(topic.ranges) ? topic.ranges : [],
+      canonicalTopicNames: [topicName],
+      firstSentence,
+    });
+  });
+
+  return entries.sort((a, b) => a.firstSentence - b.firstSentence);
+}
 
 /**
  * @typedef {Object} RadialFlowChartProps
@@ -105,28 +171,35 @@ function RadialFlowChart({
     [readTopics],
   );
 
-  // Top-level chart data (article-ordered)
+  // One entry per topic in article order — no aggregation by name
   const topLevelData = useMemo(
-    () => buildScopedChartData(topics, sentences, scopePath, selectedLevel),
+    () => buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel),
     [topics, sentences, scopePath, selectedLevel],
   );
 
-  // Subtopics per top-level entry
+  // Subtopics per entry: children of this topic's full path
   const subtopicMap = useMemo(() => {
     const map = new Map();
-    topLevelData.forEach((topic) => {
-      const pathParts = getTopicParts(topic.fullPath);
+    topLevelData.forEach((item) => {
+      const pathParts = getTopicParts(item.fullPath);
       const children = buildScopedChartData(topics, sentences, pathParts, 0);
-      map.set(topic.fullPath, children);
+      map.set(item.fullPath, children);
     });
     return map;
   }, [topLevelData, topics, sentences]);
 
-  // Color per top-level topic
+  // Topics that share the same groupPath (e.g. both "Technology") get the same color
   const colorScale = useMemo(() => {
     const colors = {};
-    topLevelData.forEach((item, i) => {
-      colors[item.fullPath] = BASE_COLORS[i % BASE_COLORS.length];
+    const groupColorMap = {};
+    let colorIdx = 0;
+    topLevelData.forEach((item) => {
+      if (!(item.groupPath in groupColorMap)) {
+        groupColorMap[item.groupPath] =
+          BASE_COLORS[colorIdx % BASE_COLORS.length];
+        colorIdx++;
+      }
+      colors[item.fullPath] = groupColorMap[item.groupPath];
     });
     return colors;
   }, [topLevelData]);
@@ -425,7 +498,7 @@ function RadialFlowChart({
           style={{ left: tooltip.x + 14, top: tooltip.y - 10 }}
         >
           <div className="radial-flow-chart__tooltip-name">
-            {tooltip.data.fullPath}
+            <TooltipTopicName name={tooltip.data.fullPath} />
           </div>
           <div className="radial-flow-chart__tooltip-stats">
             {tooltip.data.totalChars.toLocaleString()} chars &bull;{" "}
