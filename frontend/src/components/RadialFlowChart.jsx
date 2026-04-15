@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import * as d3 from "d3";
 import "../styles/App.css";
 import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
@@ -50,7 +50,8 @@ function buildOrderedTopicEntries(topics, sentences, scopePath, selectedLevel) {
 
   topics.forEach((topic) => {
     const parts = getTopicParts(topic);
-    if (!isWithinScope(parts, scopePath) || parts.length < absoluteDepth) return;
+    if (!isWithinScope(parts, scopePath) || parts.length < absoluteDepth)
+      return;
 
     const groupParts = parts.slice(0, absoluteDepth);
     const groupPath = groupParts.join(">");
@@ -158,6 +159,7 @@ function RadialFlowChart({
   );
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [tooltip, setTooltip] = useState(null);
+  const tooltipRef = useRef(null);
   const { containerRef, containerWidth } = useContainerSize(700, 400);
   const [modalTopic, setModalTopic] = useState(null);
 
@@ -165,6 +167,19 @@ function RadialFlowChart({
     setHoveredTopic(null);
     setTooltip(null);
   }, [scopePath, selectedLevel]);
+
+  useEffect(() => {
+    if (!tooltip || !tooltipRef.current) return;
+
+    tooltipRef.current.style.setProperty(
+      "--radial-flow-tooltip-left",
+      `${tooltip.x + 14}px`,
+    );
+    tooltipRef.current.style.setProperty(
+      "--radial-flow-tooltip-top",
+      `${tooltip.y - 10}px`,
+    );
+  }, [tooltip]);
 
   const safeReadTopics = useMemo(
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
@@ -206,7 +221,8 @@ function RadialFlowChart({
 
   // Layout: place each topic as a half-circle, alternating sides, stacked vertically
   const layout = useMemo(() => {
-    if (!topLevelData.length) return { items: [], totalHeight: PADDING_TOP + PADDING_BOTTOM };
+    if (!topLevelData.length)
+      return { items: [], totalHeight: PADDING_TOP + PADDING_BOTTOM };
 
     const maxChars = Math.max(...topLevelData.map((d) => d.totalChars), 1);
     const halfWidth = containerWidth / 2 - PADDING_SIDE;
@@ -294,15 +310,19 @@ function RadialFlowChart({
               // Connecting dashed line from bottom of this circle to top of next
               const nextItem = layout.items[idx + 1];
               const connectorY1 = item.yCenter + item.r;
-              const connectorY2 = nextItem ? nextItem.yCenter - nextItem.r : null;
+              const connectorY2 = nextItem
+                ? nextItem.yCenter - nextItem.r
+                : null;
 
               // Label placement
               const labelX = item.side === "right" ? -10 : 10;
               const labelAnchor = item.side === "right" ? "end" : "start";
 
               const labelParts = getTopicParts(item.fullPath);
-              const labelLeaf = labelParts[labelParts.length - 1] || item.displayName;
+              const labelLeaf =
+                labelParts[labelParts.length - 1] || item.displayName;
               const labelAncestors = labelParts.slice(0, -1);
+              const shouldRenderLeafFirst = labelAnchor === "start";
 
               return (
                 <g key={item.fullPath}>
@@ -364,9 +384,10 @@ function RadialFlowChart({
 
                     {/* Subtopic concentric half-circles (largest → smallest) */}
                     {sortedSubs.map((st, j) => {
-                      const stFraction = item.totalChars > 0
-                        ? st.totalChars / item.totalChars
-                        : 0;
+                      const stFraction =
+                        item.totalChars > 0
+                          ? st.totalChars / item.totalChars
+                          : 0;
                       const stR = item.r * Math.sqrt(Math.min(stFraction, 1));
                       if (stR < 2) return null;
 
@@ -437,23 +458,49 @@ function RadialFlowChart({
                       dominantBaseline="middle"
                       className="radial-flow-chart__label"
                     >
-                      {labelAncestors.map((part, i) => (
-                        <React.Fragment key={i}>
-                          <tspan className="radial-flow-chart__label-ancestor">
-                            {part}
+                      {shouldRenderLeafFirst ? (
+                        <>
+                          <tspan
+                            className="radial-flow-chart__label-leaf"
+                            fill={baseColor}
+                          >
+                            {labelLeaf}
                           </tspan>
-                          <tspan className="radial-flow-chart__label-sep">
-                            {" ›"}
+                          {labelAncestors
+                            .slice()
+                            .reverse()
+                            .map((part, i) => (
+                              <React.Fragment key={i}>
+                                <tspan className="radial-flow-chart__label-sep">
+                                  {" ‹ "}
+                                </tspan>
+                                <tspan className="radial-flow-chart__label-ancestor">
+                                  {part}
+                                </tspan>
+                              </React.Fragment>
+                            ))}
+                        </>
+                      ) : (
+                        <>
+                          {labelAncestors.map((part, i) => (
+                            <React.Fragment key={i}>
+                              <tspan className="radial-flow-chart__label-ancestor">
+                                {part}
+                              </tspan>
+                              <tspan className="radial-flow-chart__label-sep">
+                                {" ›"}
+                              </tspan>
+                            </React.Fragment>
+                          ))}
+                          <tspan
+                            className="radial-flow-chart__label-leaf"
+                            fill={baseColor}
+                          >
+                            {labelAncestors.length > 0 ? " " : ""}
+                            {labelLeaf}
                           </tspan>
-                        </React.Fragment>
-                      ))}
-                      <tspan
-                        className="radial-flow-chart__label-leaf"
-                        fill={baseColor}
-                      >
-                        {labelAncestors.length > 0 ? " " : ""}
-                        {labelLeaf}
-                      </tspan>
+                        </>
+                      )}
                     </text>
 
                     {/* Char count annotation */}
@@ -498,31 +545,35 @@ function RadialFlowChart({
 
       {topLevelData.length > 0 && (
         <div className="radial-flow-chart__legend chart-legend">
-          {topLevelData.map((item) => (
-            <div
-              key={item.fullPath}
-              className={`radial-flow-chart__legend-item chart-legend-item${hoveredTopic === item.fullPath ? " hovered" : ""}`}
-              onMouseEnter={() => setHoveredTopic(item.fullPath)}
-              onMouseLeave={() => setHoveredTopic(null)}
-            >
+          {topLevelData.map((item) => {
+            const colorIndex = BASE_COLORS.indexOf(colorScale[item.fullPath]);
+            const swatchClassName =
+              colorIndex >= 0
+                ? ` radial-flow-chart__legend-swatch--color-${colorIndex}`
+                : "";
+
+            return (
               <div
-                className="chart-legend-swatch chart-legend-swatch--square"
-                style={{ "--chart-legend-swatch": colorScale[item.fullPath] }}
-              />
-              <span>{item.displayName}</span>
-              <span className="radial-flow-chart__legend-value">
-                ({item.totalChars.toLocaleString()} chars)
-              </span>
-            </div>
-          ))}
+                key={item.fullPath}
+                className={`radial-flow-chart__legend-item chart-legend-item${hoveredTopic === item.fullPath ? " hovered" : ""}`}
+                onMouseEnter={() => setHoveredTopic(item.fullPath)}
+                onMouseLeave={() => setHoveredTopic(null)}
+              >
+                <div
+                  className={`chart-legend-swatch chart-legend-swatch--square${swatchClassName}`}
+                />
+                <span>{item.displayName}</span>
+                <span className="radial-flow-chart__legend-value">
+                  ({item.totalChars.toLocaleString()} chars)
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {tooltip && (
-        <div
-          className="radial-flow-chart__tooltip"
-          style={{ left: tooltip.x + 14, top: tooltip.y - 10 }}
-        >
+        <div ref={tooltipRef} className="radial-flow-chart__tooltip">
           <div className="radial-flow-chart__tooltip-name">
             <TooltipTopicName name={tooltip.data.fullPath} />
           </div>

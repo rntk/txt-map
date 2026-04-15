@@ -124,8 +124,58 @@
   margin-left: 2px;
 }
 
+.radial-flow-chart__legend-swatch--color-0 {
+  --chart-legend-swatch: #7ba3cc;
+}
+
+.radial-flow-chart__legend-swatch--color-1 {
+  --chart-legend-swatch: #e8a87c;
+}
+
+.radial-flow-chart__legend-swatch--color-2 {
+  --chart-legend-swatch: #85bb65;
+}
+
+.radial-flow-chart__legend-swatch--color-3 {
+  --chart-legend-swatch: #c9a0dc;
+}
+
+.radial-flow-chart__legend-swatch--color-4 {
+  --chart-legend-swatch: #d4a5a5;
+}
+
+.radial-flow-chart__legend-swatch--color-5 {
+  --chart-legend-swatch: #a0c4a9;
+}
+
+.radial-flow-chart__legend-swatch--color-6 {
+  --chart-legend-swatch: #cfb997;
+}
+
+.radial-flow-chart__legend-swatch--color-7 {
+  --chart-legend-swatch: #9db4c0;
+}
+
+.radial-flow-chart__legend-swatch--color-8 {
+  --chart-legend-swatch: #c2b280;
+}
+
+.radial-flow-chart__legend-swatch--color-9 {
+  --chart-legend-swatch: #b5c7d3;
+}
+
+.radial-flow-chart__legend-swatch--color-10 {
+  --chart-legend-swatch: #d4a76a;
+}
+
+.radial-flow-chart__legend-swatch--color-11 {
+  --chart-legend-swatch: #a5b8d0;
+}
+
 .radial-flow-chart__tooltip {
   position: fixed;
+  left: var(--radial-flow-tooltip-left, 0);
+  top: var(--radial-flow-tooltip-top, 0);
   z-index: 1000;
   padding: 6px 10px;
   border-radius: 8px;
