@@ -32,9 +32,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-COMPLETED_TASK_RETENTION_HOURS: int = 48
 DEFAULT_LEASE_SECONDS: int = 60
 DEFAULT_HEARTBEAT_INTERVAL_SECONDS: int = 20
+DEFAULT_MAINTENANCE_INTERVAL_SECONDS: int = 60
 
 
 class WorkerBackend(Protocol):
@@ -498,6 +498,7 @@ def main() -> None:
     workers: list[LLMWorker]
     client: MongoClient | None = None
     db: Database | None = None
+    maintenance_stop_event = threading.Event()
 
     if backend_name == "local":
         mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
@@ -508,16 +509,23 @@ def main() -> None:
         AppSettingsStorage(db).prepare()
         queue_store = LLMQueueStore(db)
         queue_store.prepare()
-        deleted_count = queue_store.cleanup_old(
-            max_age_hours=COMPLETED_TASK_RETENTION_HOURS,
-            statuses=["completed"],
-        )
-        if deleted_count:
-            logger.info(
-                "Removed %s completed LLM queue requests older than %s hours",
-                deleted_count,
-                COMPLETED_TASK_RETENTION_HOURS,
-            )
+
+        def run_maintenance_loop() -> None:
+            logger.info("LLM maintenance loop started")
+            while not maintenance_stop_event.wait(DEFAULT_MAINTENANCE_INTERVAL_SECONDS):
+                try:
+                    reclaimed = queue_store.reclaim_stale_processing(
+                        lease_seconds=lease_seconds
+                    )
+                    if reclaimed:
+                        logger.info(
+                            "Reclaimed %s stale 'processing' LLM queue requests",
+                            reclaimed,
+                        )
+                except Exception:
+                    logger.exception("Unexpected error in LLM maintenance loop")
+            logger.info("LLM maintenance loop stopped")
+
         reclaimed_count = queue_store.reclaim_stale_processing(
             lease_seconds=lease_seconds
         )
@@ -526,6 +534,12 @@ def main() -> None:
                 "Reclaimed %s stale 'processing' LLM queue requests back to 'pending'",
                 reclaimed_count,
             )
+
+        maintenance_thread = threading.Thread(
+            target=run_maintenance_loop, name="llm-maintenance", daemon=True
+        )
+        maintenance_thread.start()
+
         cache_store = MongoLLMCacheStore(db)
         cache_store.prepare()
 
@@ -587,6 +601,7 @@ def main() -> None:
         logger.info(
             "Received signal %s, stopping %s LLM worker(s)", signum, len(workers)
         )
+        maintenance_stop_event.set()
         for worker in workers:
             worker.stop()
 
@@ -608,6 +623,7 @@ def main() -> None:
                 thread.join()
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, shutting down")
+        maintenance_stop_event.set()
         for worker in workers:
             worker.stop()
     finally:

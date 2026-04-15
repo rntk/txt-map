@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from lib.llm_queue.store import LLMQueueStore
-from llm_workers import COMPLETED_TASK_RETENTION_HOURS, main
+from llm_workers import main
 
 
 class TestLLMQueueStoreCleanupOld:
@@ -52,6 +52,7 @@ class TestLLMQueueStoreCleanupOld:
 class TestLLMWorkersMain:
     """Tests for llm_workers.main."""
 
+    @patch("llm_workers.threading.Thread")
     @patch("llm_workers.logger")
     @patch("llm_workers.LLMWorker")
     @patch("llm_workers.create_llm_client")
@@ -59,7 +60,7 @@ class TestLLMWorkersMain:
     @patch("llm_workers.LLMQueueStore")
     @patch("llm_workers.AppSettingsStorage")
     @patch("llm_workers.MongoClient")
-    def test_main_cleans_up_old_completed_requests_on_start(
+    def test_main_reclaims_stale_processing_on_start(
         self,
         mock_mongo_client: MagicMock,
         mock_app_settings_storage: MagicMock,
@@ -68,15 +69,16 @@ class TestLLMWorkersMain:
         mock_create_llm_client: MagicMock,
         mock_worker_cls: MagicMock,
         mock_logger: MagicMock,
+        mock_thread_cls: MagicMock,
     ) -> None:
-        """Startup removes completed requests older than the retention window."""
+        """Startup reclaims stale processing requests and does not clean up completed."""
         mock_client = MagicMock()
         mock_db = MagicMock()
         mock_client.__getitem__.return_value = mock_db
         mock_mongo_client.return_value = mock_client
 
         mock_queue_store = MagicMock()
-        mock_queue_store.cleanup_old.return_value = 2
+        mock_queue_store.reclaim_stale_processing.return_value = 3
         mock_queue_store_cls.return_value = mock_queue_store
 
         mock_llm = MagicMock()
@@ -86,17 +88,12 @@ class TestLLMWorkersMain:
 
         main()
 
-        mock_queue_store.cleanup_old.assert_called_once_with(
-            max_age_hours=COMPLETED_TASK_RETENTION_HOURS,
-            statuses=["completed"],
-        )
-        mock_logger.info.assert_any_call(
-            "Removed %s completed LLM queue requests older than %s hours",
-            2,
-            COMPLETED_TASK_RETENTION_HOURS,
-        )
+        mock_queue_store.reclaim_stale_processing.assert_called_once()
+        mock_queue_store.cleanup_old.assert_not_called()
         mock_worker_cls.return_value.run.assert_called_once_with()
         mock_client.close.assert_called_once_with()
+        assert mock_thread_cls.call_count == 1
+        assert mock_thread_cls.call_args.kwargs["name"] == "llm-maintenance"
 
     @patch.dict(os.environ, {"LLM_WORKER_CONCURRENCY": "3"}, clear=False)
     @patch("llm_workers.threading.Thread")
@@ -127,7 +124,7 @@ class TestLLMWorkersMain:
         mock_mongo_client.return_value = mock_client
 
         mock_queue_store = MagicMock()
-        mock_queue_store.cleanup_old.return_value = 0
+        mock_queue_store.reclaim_stale_processing.return_value = 0
         mock_queue_store_cls.return_value = mock_queue_store
 
         mock_llm = MagicMock()
@@ -135,7 +132,7 @@ class TestLLMWorkersMain:
         mock_llm.model_name = "gpt-test"
         mock_create_llm_client.return_value = mock_llm
 
-        thread_instances = [MagicMock(), MagicMock(), MagicMock()]
+        thread_instances = [MagicMock(), MagicMock(), MagicMock(), MagicMock()]
         mock_thread_cls.side_effect = thread_instances
 
         main()
@@ -143,9 +140,17 @@ class TestLLMWorkersMain:
         assert mock_worker_cls.call_count == 3
         for call_args in mock_worker_cls.call_args_list:
             assert call_args.kwargs["register_signal_handlers"] is False
-        assert mock_thread_cls.call_count == 3
+        assert mock_thread_cls.call_count == 4
+        # maintenance thread (daemon=True) + 3 worker threads
+        mock_thread_cls.assert_any_call(
+            target=mock_thread_cls.call_args_list[0].kwargs["target"],
+            name="llm-maintenance",
+            daemon=True,
+        )
         for thread in thread_instances:
             thread.start.assert_called_once_with()
+        # join is only called for worker threads
+        for thread in thread_instances[1:]:
             thread.join.assert_called_once_with()
         assert mock_signal.call_count == 2
         mock_client.close.assert_called_once_with()
