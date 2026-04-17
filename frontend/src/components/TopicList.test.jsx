@@ -48,8 +48,9 @@ const getRowForText = (text) =>
 describe("TopicList subtreeStateMap – hasSelected", () => {
   it("leaf checkbox is unchecked when topic is not selected", () => {
     render(<TopicList topics={[makeTopic("Science")]} selectedTopics={[]} />);
-    const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes[0].checked).toBe(false);
+    const row = getRowForText("Science");
+    const checkbox = within(row).getByRole("checkbox");
+    expect(checkbox.checked).toBe(false);
   });
 
   it("leaf checkbox is checked when topic is selected", () => {
@@ -59,8 +60,9 @@ describe("TopicList subtreeStateMap – hasSelected", () => {
         selectedTopics={[{ name: "Science" }]}
       />,
     );
-    const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes[0].checked).toBe(true);
+    const row = getRowForText("Science");
+    const checkbox = within(row).getByRole("checkbox");
+    expect(checkbox.checked).toBe(true);
   });
 
   it("parent checkbox is checked when all leaves in subtree are selected", () => {

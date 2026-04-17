@@ -69,9 +69,8 @@ function TopicTreeNode({
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
-  const isExpanded = searchQuery.trim()
-    ? true
-    : expandedNodes.has(node.fullPath);
+  const nodeKey = node.uid || node.fullPath;
+  const isExpanded = searchQuery.trim() ? true : expandedNodes.has(nodeKey);
   const { totalTopics, totalSentences } = getSubtreeStats(treeNode);
   const isNodeSelected = isSubtreeSelected(treeNode);
   const isNodeRead = isSubtreeRead(treeNode);
@@ -124,13 +123,13 @@ function TopicTreeNode({
     .join(" ");
 
   const titleStyle = highlightAllTopics ? topicHighlightStyle : undefined;
-  const isActionMenuOpen = activeActionMenuPath === node.fullPath;
+  const isActionMenuOpen = activeActionMenuPath === nodeKey;
   const areActionsVisible = isActionMenuOpen;
-  const actionsId = `topic-tree-node-actions-${node.fullPath.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const actionsId = `topic-tree-node-actions-${nodeKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   const handleAction = (callback) => {
     callback();
-    onCloseActionMenu(node.fullPath);
+    onCloseActionMenu(nodeKey);
   };
 
   return (
@@ -144,7 +143,7 @@ function TopicTreeNode({
           <button
             type="button"
             className="topic-tree-node__expand"
-            onClick={() => toggleNode(node.fullPath)}
+            onClick={() => toggleNode(nodeKey)}
             aria-label={
               isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`
             }
@@ -168,7 +167,7 @@ function TopicTreeNode({
                   />
                   <span
                     className={titleClassName}
-                    onClick={() => toggleNode(node.fullPath)}
+                    onClick={() => toggleNode(nodeKey)}
                   >
                     {node.name}
                   </span>
@@ -209,7 +208,7 @@ function TopicTreeNode({
               aria-label={`Show actions for ${node.name}`}
               aria-controls={actionsId}
               aria-expanded={isActionMenuOpen}
-              onClick={() => onToggleActionMenu(node.fullPath)}
+              onClick={() => onToggleActionMenu(nodeKey)}
             >
               <span aria-hidden="true">...</span>
             </button>
@@ -362,16 +361,14 @@ function TopicTreeNode({
 
       {hasChildren && isExpanded && (
         <ul className="topic-tree-node__children">
-          {Array.from(children.values())
-            .sort((a, b) => a.node.name.localeCompare(b.node.name))
-            .map((childNode) => (
-              <TopicTreeNode
-                key={childNode.node.fullPath}
-                treeNode={childNode}
-                depth={depth + 1}
-                {...childProps}
-              />
-            ))}
+          {Array.from(children.values()).map((childNode) => (
+            <TopicTreeNode
+              key={childNode.node.uid || childNode.node.fullPath}
+              treeNode={childNode}
+              depth={depth + 1}
+              {...childProps}
+            />
+          ))}
         </ul>
       )}
     </li>

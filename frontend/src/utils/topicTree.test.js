@@ -1,4 +1,8 @@
-import { buildTopicTree, getSubtreeStats } from "./topicTree";
+import {
+  buildTopicTree,
+  buildAdjacentTopicTree,
+  getSubtreeStats,
+} from "./topicTree";
 
 const flatTopics = [
   { name: "Animals", sentences: [1, 2] },
@@ -63,6 +67,116 @@ describe("buildTopicTree", () => {
     const tree = buildTopicTree(topics);
     expect(tree).toHaveLength(2);
     expect(tree[0].node.isLeaf).toBe(true);
+  });
+});
+
+describe("buildAdjacentTopicTree", () => {
+  test("returns empty array for empty input", () => {
+    expect(buildAdjacentTopicTree([])).toEqual([]);
+    expect(buildAdjacentTopicTree(null)).toEqual([]);
+  });
+
+  test("collapses adjacent siblings under same parent into one group", () => {
+    const topics = [
+      { name: "A>X", sentences: [1] },
+      { name: "A>Y", sentences: [2] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].node.name).toBe("A");
+    expect(tree[0].node.fullPath).toBe("A");
+    expect(tree[0].children.size).toBe(2);
+    const childNames = Array.from(tree[0].children.values()).map(
+      (c) => c.node.name,
+    );
+    expect(childNames).toEqual(["X", "Y"]);
+  });
+
+  test("non-adjacent siblings render as two separate groups in article order", () => {
+    const topics = [
+      { name: "A>X", sentences: [1] },
+      { name: "B>P", sentences: [2] },
+      { name: "A>Y", sentences: [3] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    expect(tree.map((r) => r.node.name)).toEqual(["A", "B", "A"]);
+    const firstA = tree[0];
+    const secondA = tree[2];
+    expect(firstA.node.uid).not.toBe(secondA.node.uid);
+    expect(Array.from(firstA.children.values())[0].node.name).toBe("X");
+    expect(Array.from(secondA.children.values())[0].node.name).toBe("Y");
+  });
+
+  test("orders by minimum sentence index", () => {
+    const topics = [
+      { name: "Z>A", sentences: [10] },
+      { name: "Y>B", sentences: [1] },
+      { name: "X>C", sentences: [5] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    expect(tree.map((r) => r.node.name)).toEqual(["Y", "X", "Z"]);
+  });
+
+  test("topics with no sentences fall to the end preserving input order", () => {
+    const topics = [
+      { name: "First", sentences: [] },
+      { name: "Second", sentences: [] },
+      { name: "Real", sentences: [1] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    expect(tree.map((r) => r.node.name)).toEqual(["Real", "First", "Second"]);
+  });
+
+  test("respects startLevel for deeper roots", () => {
+    const topics = [
+      { name: "Root>A>X", sentences: [1] },
+      { name: "Root>A>Y", sentences: [2] },
+      { name: "Root>B>Z", sentences: [3] },
+    ];
+    const tree = buildAdjacentTopicTree(topics, 1);
+    expect(tree.map((r) => r.node.name)).toEqual(["A", "B"]);
+    expect(tree[0].node.depth).toBe(1);
+    expect(tree[0].children.size).toBe(2);
+  });
+
+  test("topic shorter than startLevel emits as root leaf", () => {
+    const topics = [
+      { name: "Root", sentences: [1] },
+      { name: "Root>Child", sentences: [2] },
+    ];
+    const tree = buildAdjacentTopicTree(topics, 1);
+    expect(tree).toHaveLength(2);
+    expect(tree[0].node.isLeaf).toBe(true);
+    expect(tree[0].node.topic.name).toBe("Root");
+    expect(tree[1].node.name).toBe("Child");
+  });
+
+  test("each created node has a unique uid", () => {
+    const topics = [
+      { name: "A>X", sentences: [1] },
+      { name: "B>Y", sentences: [2] },
+      { name: "A>Z", sentences: [3] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    const uids = new Set();
+    const collect = (n) => {
+      uids.add(n.node.uid);
+      n.children.forEach(collect);
+    };
+    tree.forEach(collect);
+    expect(uids.size).toBe(6);
+  });
+
+  test("handles single-segment topic names", () => {
+    const topics = [
+      { name: "Solo", sentences: [1] },
+      { name: "Other", sentences: [2] },
+    ];
+    const tree = buildAdjacentTopicTree(topics);
+    expect(tree).toHaveLength(2);
+    expect(tree[0].node.isLeaf).toBe(true);
+    expect(tree[0].node.name).toBe("Solo");
+    expect(tree[1].node.name).toBe("Other");
   });
 });
 

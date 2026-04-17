@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import {
   buildTopicTree,
+  buildAdjacentTopicTree,
   getSubtreeStats as getSubtreeStatsUtil,
 } from "../utils/topicTree";
 import TopicTreeNode from "./TopicTreeNode";
@@ -95,6 +96,7 @@ function TopicList({
   const [searchQuery, setSearchQuery] = useState("");
   const [insightSearchQuery, setInsightSearchQuery] = useState("");
   const [activeActionMenuPath, setActiveActionMenuPath] = useState(null);
+  const [groupingEnabled, setGroupingEnabled] = useState(true);
 
   const safeSelectedTopics = useMemo(
     () => (Array.isArray(selectedTopics) ? selectedTopics : []),
@@ -112,8 +114,11 @@ function TopicList({
   const currentSidebarTab = hasInsights ? sidebarTab : "topics";
 
   const topicTree = useMemo(
-    () => buildTopicTree(topics, selectedLevel),
-    [topics, selectedLevel],
+    () =>
+      groupingEnabled
+        ? buildTopicTree(topics, selectedLevel)
+        : buildAdjacentTopicTree(topics, selectedLevel),
+    [topics, selectedLevel, groupingEnabled],
   );
   const getSubtreeStats = useCallback(
     (treeNode) => getSubtreeStatsUtil(treeNode),
@@ -129,12 +134,13 @@ function TopicList({
     const map = new Map();
 
     const compute = (node) => {
+      const key = node.node.uid || node.node.fullPath;
       if (node.node.isLeaf && node.node.topic) {
         const name = node.node.topic.name;
         const hasSelected = selectedNamesSet.has(name);
         const allRead = isTopicRead(name, safeReadTopics);
         const entry = { hasSelected, allRead, hasLeaves: true };
-        map.set(node.node.fullPath, entry);
+        map.set(key, entry);
         return entry;
       }
 
@@ -150,7 +156,7 @@ function TopicList({
       });
 
       const entry = { hasSelected, allRead: hasLeaves && allRead, hasLeaves };
-      map.set(node.node.fullPath, entry);
+      map.set(key, entry);
       return entry;
     };
 
@@ -160,13 +166,16 @@ function TopicList({
 
   const isSubtreeSelected = useCallback(
     (treeNode) =>
-      subtreeStateMap.get(treeNode.node.fullPath)?.hasSelected ?? false,
+      subtreeStateMap.get(treeNode.node.uid || treeNode.node.fullPath)
+        ?.hasSelected ?? false,
     [subtreeStateMap],
   );
 
   const isSubtreeRead = useCallback(
     (treeNode) => {
-      const entry = subtreeStateMap.get(treeNode.node.fullPath);
+      const entry = subtreeStateMap.get(
+        treeNode.node.uid || treeNode.node.fullPath,
+      );
       return entry ? entry.hasLeaves && entry.allRead : false;
     },
     [subtreeStateMap],
@@ -286,7 +295,7 @@ function TopicList({
     const paths = new Set();
     const traverse = (treeNode) => {
       if (treeNode.children.size > 0) {
-        paths.add(treeNode.node.fullPath);
+        paths.add(treeNode.node.uid || treeNode.node.fullPath);
         treeNode.children.forEach((child) => traverse(child));
       }
     };
@@ -305,9 +314,14 @@ function TopicList({
           : null;
       }
       const filteredChildren = new Map();
-      treeNode.children.forEach((child, key) => {
+      treeNode.children.forEach((child) => {
         const filtered = filterNode(child);
-        if (filtered) filteredChildren.set(key, filtered);
+        if (filtered) {
+          filteredChildren.set(
+            filtered.node.uid || filtered.node.fullPath,
+            filtered,
+          );
+        }
       });
       if (filteredChildren.size === 0) return null;
       return { ...treeNode, children: filteredChildren };
@@ -481,6 +495,14 @@ function TopicList({
               >
                 {highlightAllTopics ? "Clear Colors" : "Color Topics"}
               </button>
+              <label className="topic-nav-button topic-nav-button--checkbox">
+                <input
+                  type="checkbox"
+                  checked={groupingEnabled}
+                  onChange={(e) => setGroupingEnabled(e.target.checked)}
+                />
+                Grouping
+              </label>
             </div>
             <input
               type="text"
@@ -531,7 +553,7 @@ function TopicList({
             <ul className="topic-nav-list">
               {filteredTree.map((treeNode) => (
                 <TopicTreeNode
-                  key={treeNode.node.fullPath}
+                  key={treeNode.node.uid || treeNode.node.fullPath}
                   treeNode={treeNode}
                   depth={0}
                   {...nodeProps}
