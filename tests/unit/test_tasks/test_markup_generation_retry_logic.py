@@ -15,7 +15,10 @@ class TestMarkupGenerationRetryLogic(unittest.TestCase):
         mock_llm.call.side_effect = ["garbage", "1-5: p"]
 
         topic_range = TopicRange(
-            range_index=1, sentence_start=1, sentence_end=1, text="Hello world."
+            range_index=1,
+            sentence_start=1,
+            sentence_end=1,
+            text="Hello world.",
         )
 
         # We need to mock _call_llm_cached because it might hit cache
@@ -58,7 +61,10 @@ class TestMarkupGenerationRetryLogic(unittest.TestCase):
         mock_llm.call.return_value = "1-5: p"
 
         topic_range = TopicRange(
-            range_index=1, sentence_start=1, sentence_end=1, text="Hello world."
+            range_index=1,
+            sentence_start=1,
+            sentence_end=1,
+            text="Hello world.",
         )
 
         _generate_html_for_range_from_response(

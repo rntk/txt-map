@@ -7,7 +7,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from txt_splitt.cache import CacheEntry, _build_cache_key
 
@@ -229,6 +229,15 @@ class TopicRange:
     text: str
 
 
+@dataclass(frozen=True)
+class PromptChunk:
+    chunk_index: int
+    clean_text: str
+    words: Tuple[str, ...]
+    prompt: str
+    start_word_offset: int
+
+
 def _cache_namespace(llm_client: Any) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
     return f"markup_generation:{model_id}"
@@ -319,6 +328,146 @@ def _build_anchor_markup_prompt(clean_text: str, anchored_text: str) -> str:
         clean_text=clean_text,
         anchored_text=anchored_text,
     )
+
+
+def _build_content_units_for_chunking(
+    cleaned_text: str,
+    max_unit_words: int = 120,
+) -> List[str]:
+    units: List[str] = []
+    for line in cleaned_text.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line:
+            units.append("")
+            continue
+
+        words = stripped_line.split()
+        if len(words) <= max_unit_words:
+            units.append(stripped_line)
+            continue
+
+        for start in range(0, len(words), max_unit_words):
+            units.append(" ".join(words[start : start + max_unit_words]))
+
+    return units
+
+
+def _estimate_prompt_budget(
+    llm: Any,
+    max_output_tokens_buffer: int,
+) -> int:
+    context_size = getattr(llm, "max_context_tokens", 64000)
+    reserved_tokens = max(
+        max_output_tokens_buffer,
+        min(12000, max(1000, int(context_size) // 8)),
+    )
+    return max(1, min(int(context_size * 0.75), int(context_size) - reserved_tokens))
+
+
+def _estimate_tokens(llm: Any, text: str) -> int:
+    estimator = getattr(llm, "estimate_tokens", None)
+    if callable(estimator):
+        estimated = estimator(text)
+        if isinstance(estimated, int):
+            return estimated
+    return len(text) // 4
+
+
+def _estimate_prompt_tokens(
+    llm: Any,
+    prompt: str,
+    word_count: int,
+) -> int:
+    return max(
+        _estimate_tokens(llm, prompt),
+        len(prompt) // 3,
+        word_count * 10,
+    )
+
+
+def _finalize_prompt_chunk(
+    chunk_index: int,
+    start_word_offset: int,
+    raw_text: str,
+    prompt_builder: Callable[[str, str], str],
+) -> PromptChunk:
+    clean_text = _cleanup_text_for_llm(raw_text)
+    anchored_text, words = _insert_anchors(clean_text)
+    return PromptChunk(
+        chunk_index=chunk_index,
+        clean_text=clean_text,
+        words=tuple(words),
+        prompt=prompt_builder(clean_text, anchored_text),
+        start_word_offset=start_word_offset,
+    )
+
+
+def _build_prompt_aware_chunks(
+    topic_range: TopicRange,
+    llm: Any,
+    prompt_builder: Callable[[str, str], str],
+    max_output_tokens_buffer: int = 1200,
+) -> List[PromptChunk]:
+    cleaned_source_text = _cleanup_text_for_llm(topic_range.text)
+    content_units = _build_content_units_for_chunking(cleaned_source_text)
+
+    if not content_units:
+        return [_finalize_prompt_chunk(1, 1, cleaned_source_text, prompt_builder)]
+
+    prompt_budget = _estimate_prompt_budget(llm, max_output_tokens_buffer)
+    # Template overhead: cost of the prompt envelope with empty content. Estimated
+    # once so per-unit additions are O(1) rather than rebuilding the full prompt.
+    template_overhead = _estimate_prompt_tokens(llm, prompt_builder("", ""), 0)
+
+    chunks: List[PromptChunk] = []
+    current_units: List[str] = []
+    current_content_tokens = 0
+    current_start_word_offset = 1
+    completed_word_count = 0
+
+    for unit in content_units:
+        unit_word_count = len(unit.split())
+        # Anchors roughly triple per-word token cost; match the floor used by
+        # `_estimate_prompt_tokens` so commit-time estimates stay consistent.
+        unit_tokens = max(
+            _estimate_tokens(llm, unit),
+            len(unit) // 3,
+            unit_word_count * 10,
+        )
+
+        if (
+            current_units
+            and template_overhead + current_content_tokens + unit_tokens > prompt_budget
+        ):
+            chunk = _finalize_prompt_chunk(
+                len(chunks) + 1,
+                current_start_word_offset,
+                "\n".join(current_units),
+                prompt_builder,
+            )
+            chunks.append(chunk)
+            completed_word_count += len(chunk.words)
+            current_start_word_offset = completed_word_count + 1
+            current_units = []
+            current_content_tokens = 0
+
+        current_units.append(unit)
+        current_content_tokens += unit_tokens
+
+    if current_units:
+        chunks.append(
+            _finalize_prompt_chunk(
+                len(chunks) + 1,
+                current_start_word_offset,
+                "\n".join(current_units),
+                prompt_builder,
+            )
+        )
+
+    if not chunks:
+        return [_finalize_prompt_chunk(1, 1, cleaned_source_text, prompt_builder)]
+
+    return chunks
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -608,28 +757,32 @@ def _extract_topic_ranges(
     return ranges
 
 
-def _generate_html_for_range(
+def _join_html_chunks(html_chunks: List[str]) -> str:
+    rendered_chunks = [chunk for chunk in html_chunks if chunk]
+    return "\n".join(rendered_chunks)
+
+
+def _render_markup_prompt_chunk(
     topic_name: str,
     topic_range: TopicRange,
+    prompt_chunk: PromptChunk,
     llm: Any,
     cache_store: Any,
     namespace: str,
     max_retries: int,
 ) -> str:
-    cleaned_text = _cleanup_text_for_llm(topic_range.text)
-    anchored_text, words = _insert_anchors(cleaned_text)
-
+    words = list(prompt_chunk.words)
     if not words:
-        return _build_plain_html(cleaned_text)
+        return _build_plain_html(prompt_chunk.clean_text)
 
-    prompt = _build_anchor_markup_prompt(cleaned_text, anchored_text)
+    response = ""
     skip_cache = False
 
     for attempt in range(max_retries):
         try:
             if attempt == 0:
                 response = _call_llm_cached(
-                    prompt=prompt,
+                    prompt=prompt_chunk.prompt,
                     llm=llm,
                     cache_store=cache_store,
                     namespace=namespace,
@@ -638,7 +791,7 @@ def _generate_html_for_range(
                 )
             else:
                 full_correction_prompt = (
-                    f"{prompt}\n\n"
+                    f"{prompt_chunk.prompt}\n\n"
                     f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
                     f"{MARKUP_ANCHOR_CORRECTION_TEMPLATE}"
                 )
@@ -647,31 +800,34 @@ def _generate_html_for_range(
             tags = _parse_tag_output(response)
             if tags is not None:
                 if not tags:
-                    return _build_plain_html(cleaned_text)
+                    return _build_plain_html(prompt_chunk.clean_text)
                 validated = _validate_tag_map(tags, len(words))
                 candidate = _reconstruct_html(words, validated)
-                if _is_grounded(cleaned_text, candidate):
+                if _is_grounded(prompt_chunk.clean_text, candidate):
                     return candidate
                 logger.warning(
-                    "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
+                    "Markup HTML not grounded for topic '%s' range %d chunk %d (%d/%d), retrying",
                     topic_name,
                     topic_range.range_index,
+                    prompt_chunk.chunk_index,
                     attempt + 1,
                     max_retries,
                 )
             else:
                 logger.warning(
-                    "Markup tag parsing yielded no results for topic '%s' range %d (%d/%d)",
+                    "Markup tag parsing yielded no results for topic '%s' range %d chunk %d (%d/%d)",
                     topic_name,
                     topic_range.range_index,
+                    prompt_chunk.chunk_index,
                     attempt + 1,
                     max_retries,
                 )
         except Exception as exc:
             logger.warning(
-                "Markup generation failed for topic '%s' range %d (%d/%d): %s",
+                "Markup generation failed for topic '%s' range %d chunk %d (%d/%d): %s",
                 topic_name,
                 topic_range.range_index,
+                prompt_chunk.chunk_index,
                 attempt + 1,
                 max_retries,
                 exc,
@@ -682,55 +838,55 @@ def _generate_html_for_range(
             time.sleep(float(attempt + 1))
 
     logger.warning(
-        "Markup falling back to plain HTML for topic '%s' range %d",
+        "Markup falling back to plain HTML for topic '%s' range %d chunk %d",
         topic_name,
         topic_range.range_index,
+        prompt_chunk.chunk_index,
     )
-    return _build_plain_html(cleaned_text)
+    return _build_plain_html(prompt_chunk.clean_text)
 
 
-def _generate_html_for_range_from_response(
+def _render_markup_prompt_chunk_from_response(
     topic_name: str,
     topic_range: TopicRange,
+    prompt_chunk: PromptChunk,
     llm: Any,
     max_retries: int,
     initial_response: str,
 ) -> str:
-    cleaned_text = _cleanup_text_for_llm(topic_range.text)
-    anchored_text, words = _insert_anchors(cleaned_text)
-
+    words = list(prompt_chunk.words)
     if not words:
-        return _build_plain_html(cleaned_text)
+        return _build_plain_html(prompt_chunk.clean_text)
 
-    prompt = _build_anchor_markup_prompt(cleaned_text, anchored_text)
     response = initial_response
-
     tags = _parse_tag_output(response)
     if tags is not None:
         if not tags:
-            return _build_plain_html(cleaned_text)
+            return _build_plain_html(prompt_chunk.clean_text)
         validated = _validate_tag_map(tags, len(words))
         candidate = _reconstruct_html(words, validated)
-        if _is_grounded(cleaned_text, candidate):
+        if _is_grounded(prompt_chunk.clean_text, candidate):
             return candidate
         logger.warning(
-            "Markup HTML not grounded for topic '%s' range %d (1/%d), retrying",
+            "Markup HTML not grounded for topic '%s' range %d chunk %d (1/%d), retrying",
             topic_name,
             topic_range.range_index,
+            prompt_chunk.chunk_index,
             max_retries,
         )
     else:
         logger.warning(
-            "Markup tag parsing yielded no results for topic '%s' range %d (1/%d)",
+            "Markup tag parsing yielded no results for topic '%s' range %d chunk %d (1/%d)",
             topic_name,
             topic_range.range_index,
+            prompt_chunk.chunk_index,
             max_retries,
         )
 
     for attempt in range(1, max_retries):
         try:
             full_correction_prompt = (
-                f"{prompt}\n\n"
+                f"{prompt_chunk.prompt}\n\n"
                 f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
                 f"{MARKUP_ANCHOR_CORRECTION_TEMPLATE}"
             )
@@ -738,31 +894,34 @@ def _generate_html_for_range_from_response(
             tags = _parse_tag_output(response)
             if tags is not None:
                 if not tags:
-                    return _build_plain_html(cleaned_text)
+                    return _build_plain_html(prompt_chunk.clean_text)
                 validated = _validate_tag_map(tags, len(words))
                 candidate = _reconstruct_html(words, validated)
-                if _is_grounded(cleaned_text, candidate):
+                if _is_grounded(prompt_chunk.clean_text, candidate):
                     return candidate
                 logger.warning(
-                    "Markup HTML not grounded for topic '%s' range %d (%d/%d), retrying",
+                    "Markup HTML not grounded for topic '%s' range %d chunk %d (%d/%d), retrying",
                     topic_name,
                     topic_range.range_index,
+                    prompt_chunk.chunk_index,
                     attempt + 1,
                     max_retries,
                 )
             else:
                 logger.warning(
-                    "Markup tag parsing yielded no results for topic '%s' range %d (%d/%d)",
+                    "Markup tag parsing yielded no results for topic '%s' range %d chunk %d (%d/%d)",
                     topic_name,
                     topic_range.range_index,
+                    prompt_chunk.chunk_index,
                     attempt + 1,
                     max_retries,
                 )
         except Exception as exc:
             logger.warning(
-                "Markup generation failed for topic '%s' range %d (%d/%d): %s",
+                "Markup generation failed for topic '%s' range %d chunk %d (%d/%d): %s",
                 topic_name,
                 topic_range.range_index,
+                prompt_chunk.chunk_index,
                 attempt + 1,
                 max_retries,
                 exc,
@@ -772,28 +931,91 @@ def _generate_html_for_range_from_response(
             time.sleep(float(attempt))
 
     logger.warning(
-        "Markup falling back to plain HTML for topic '%s' range %d",
+        "Markup falling back to plain HTML for topic '%s' range %d chunk %d",
         topic_name,
         topic_range.range_index,
+        prompt_chunk.chunk_index,
     )
-    return _build_plain_html(cleaned_text)
+    return _build_plain_html(prompt_chunk.clean_text)
+
+
+def _generate_html_for_range(
+    topic_name: str,
+    topic_range: TopicRange,
+    llm: Any,
+    cache_store: Any,
+    namespace: str,
+    max_retries: int,
+) -> str:
+    prompt_chunks = _build_prompt_aware_chunks(
+        topic_range=topic_range,
+        llm=llm,
+        prompt_builder=_build_anchor_markup_prompt,
+        max_output_tokens_buffer=1500,
+    )
+    rendered_chunks = [
+        _render_markup_prompt_chunk(
+            topic_name=topic_name,
+            topic_range=topic_range,
+            prompt_chunk=prompt_chunk,
+            llm=llm,
+            cache_store=cache_store,
+            namespace=namespace,
+            max_retries=max_retries,
+        )
+        for prompt_chunk in prompt_chunks
+    ]
+    return _join_html_chunks(rendered_chunks)
+
+
+def _generate_html_for_range_from_response(
+    topic_name: str,
+    topic_range: TopicRange,
+    llm: Any,
+    max_retries: int,
+    initial_response: str,
+) -> str:
+    prompt_chunks = _build_prompt_aware_chunks(
+        topic_range=topic_range,
+        llm=llm,
+        prompt_builder=_build_anchor_markup_prompt,
+        max_output_tokens_buffer=1500,
+    )
+    if len(prompt_chunks) != 1:
+        raise ValueError(
+            "Initial range response can only be reused for single-chunk ranges"
+        )
+
+    return _render_markup_prompt_chunk_from_response(
+        topic_name=topic_name,
+        topic_range=topic_range,
+        prompt_chunk=prompt_chunks[0],
+        llm=llm,
+        max_retries=max_retries,
+        initial_response=initial_response,
+    )
 
 
 def _submit_markup_range_request(
     topic_range: TopicRange,
     llm: Any,
-) -> Optional[Any]:
-    cleaned_text = _cleanup_text_for_llm(topic_range.text)
-    anchored_text, words = _insert_anchors(cleaned_text)
-
-    if not words:
-        return None
-
-    prompt = _build_anchor_markup_prompt(cleaned_text, anchored_text)
+) -> List[Tuple[PromptChunk, Any]]:
+    prompt_chunks = _build_prompt_aware_chunks(
+        topic_range=topic_range,
+        llm=llm,
+        prompt_builder=_build_anchor_markup_prompt,
+        max_output_tokens_buffer=1500,
+    )
     submit = getattr(llm, "submit", None)
     if not callable(submit):
-        return None
-    return submit(prompt, 0.0)
+        return []
+
+    submitted_chunks: List[Tuple[PromptChunk, Any]] = []
+    for prompt_chunk in prompt_chunks:
+        if not prompt_chunk.words:
+            continue
+        submitted_chunks.append((prompt_chunk, submit(prompt_chunk.prompt, 0.0)))
+    return submitted_chunks
 
 
 def _process_topic(
@@ -838,32 +1060,34 @@ def _process_all_topics_parallel(
     max_retries: int,
 ) -> Dict[str, Any]:
     topic_ranges_map: Dict[str, List[TopicRange]] = {}
-    pending_ranges: List[tuple[str, TopicRange, Any]] = []
+    pending_ranges: List[Tuple[str, TopicRange, PromptChunk, Any]] = []
 
     for index, topic in enumerate(topics):
         topic_name = topic.get("name", f"topic_{index}")
         ranges = _extract_topic_ranges(topic, all_sentences)
         topic_ranges_map[topic_name] = ranges
         for topic_range in ranges:
-            future = _submit_markup_range_request(topic_range, llm)
-            if future is not None:
-                pending_ranges.append((topic_name, topic_range, future))
+            for prompt_chunk, future in _submit_markup_range_request(topic_range, llm):
+                pending_ranges.append((topic_name, topic_range, prompt_chunk, future))
 
     if pending_ranges:
         logger.info(
-            "markup_generation: submitted %d ranges in parallel across %d topics",
+            "markup_generation: submitted %d prompt chunks in parallel across %d topics",
             len(pending_ranges),
             len(topic_ranges_map),
         )
 
-    resolved_html: Dict[str, Dict[int, str]] = {}
-    for topic_name, topic_range, future in pending_ranges:
+    resolved_html: Dict[str, Dict[int, Dict[int, str]]] = {}
+    for topic_name, topic_range, prompt_chunk, future in pending_ranges:
         response = future.result()
-        topic_resolved = resolved_html.setdefault(topic_name, {})
-        topic_resolved[topic_range.range_index] = (
-            _generate_html_for_range_from_response(
+        topic_resolved = resolved_html.setdefault(topic_name, {}).setdefault(
+            topic_range.range_index, {}
+        )
+        topic_resolved[prompt_chunk.chunk_index] = (
+            _render_markup_prompt_chunk_from_response(
                 topic_name=topic_name,
                 topic_range=topic_range,
+                prompt_chunk=prompt_chunk,
                 llm=llm,
                 max_retries=max_retries,
                 initial_response=response,
@@ -876,8 +1100,12 @@ def _process_all_topics_parallel(
         ranges = topic_ranges_map.get(topic_name, [])
         rendered_ranges: List[Dict[str, Any]] = []
         for topic_range in ranges:
-            html = resolved_html.get(topic_name, {}).get(topic_range.range_index)
-            if html is None:
+            chunk_map = resolved_html.get(topic_name, {}).get(
+                topic_range.range_index, {}
+            )
+            if chunk_map:
+                html = _join_html_chunks([chunk_map[idx] for idx in sorted(chunk_map)])
+            else:
                 html = _build_plain_html(_cleanup_text_for_llm(topic_range.text))
             rendered_ranges.append(
                 {

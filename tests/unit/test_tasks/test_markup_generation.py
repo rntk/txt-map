@@ -5,6 +5,7 @@ from lib.llm_queue.client import QueuedLLMClient
 from lib.tasks.markup_generation import (
     _build_anchor_markup_prompt,
     _build_plain_html,
+    _build_prompt_aware_chunks,
     _cleanup_text_for_llm,
     _ensure_list_containers,
     _extract_topic_ranges,
@@ -492,6 +493,68 @@ def test_extract_topic_ranges_groups_consecutive_sentences() -> None:
         (4, 4),
         (6, 7),
     ]
+
+
+def test_build_prompt_aware_chunks_splits_by_sentence_budget() -> None:
+    class TinyLLM:
+        max_context_tokens = 420
+
+        @staticmethod
+        def estimate_tokens(text: str) -> int:
+            return len(text) // 4
+
+    topic = {
+        "name": "Topic",
+        "ranges": [{"sentence_start": 1, "sentence_end": 3}],
+    }
+    ranges = _extract_topic_ranges(
+        topic,
+        [
+            "Alpha " * 50,
+            "Beta " * 50,
+            "Gamma " * 50,
+        ],
+    )
+
+    chunks = _build_prompt_aware_chunks(
+        topic_range=ranges[0],
+        llm=TinyLLM(),
+        prompt_builder=_build_anchor_markup_prompt,
+        max_output_tokens_buffer=120,
+    )
+
+    assert len(chunks) > 1
+    assert [chunk.start_word_offset for chunk in chunks] == [1, 51, 101]
+    assert [chunk.chunk_index for chunk in chunks] == [1, 2, 3]
+
+
+def test_build_prompt_aware_chunks_splits_single_oversized_sentence() -> None:
+    class TinyLLM:
+        max_context_tokens = 420
+
+        @staticmethod
+        def estimate_tokens(text: str) -> int:
+            return len(text) // 4
+
+    topic = {
+        "name": "Topic",
+        "ranges": [{"sentence_start": 1, "sentence_end": 1}],
+    }
+    ranges = _extract_topic_ranges(
+        topic,
+        ["Alpha " * 240],
+    )
+
+    chunks = _build_prompt_aware_chunks(
+        topic_range=ranges[0],
+        llm=TinyLLM(),
+        prompt_builder=_build_anchor_markup_prompt,
+        max_output_tokens_buffer=120,
+    )
+
+    assert len(chunks) > 1
+    assert chunks[0].start_word_offset == 1
+    assert chunks[1].start_word_offset > chunks[0].start_word_offset
 
 
 # ---------------------------------------------------------------------------
