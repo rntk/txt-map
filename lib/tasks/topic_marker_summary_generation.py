@@ -14,7 +14,9 @@ from lib.llm_queue.client import QueuedLLMClient
 from lib.nlp import normalize_text_tokens
 from lib.storage.submissions import SubmissionsStorage
 from lib.tasks.markup_generation import (
+    PromptChunk,
     TopicRange,
+    _build_prompt_aware_chunks,
     _cleanup_text_for_llm,
     _extract_topic_ranges,
     _insert_anchors,
@@ -251,6 +253,49 @@ def _build_summary_text(marker_spans: List[Dict[str, Any]]) -> str:
     ).strip()
 
 
+def _offset_spans(
+    spans: List[Tuple[int, int]],
+    start_word_offset: int,
+) -> List[Tuple[int, int]]:
+    offset = start_word_offset - 1
+    return [(start + offset, end + offset) for start, end in spans]
+
+
+def _select_merged_marker_spans(
+    spans: List[Tuple[int, int]],
+    words: List[str],
+    clean_text: str,
+    max_spans: int = 6,
+) -> List[Tuple[int, int]]:
+    normalized_spans = _normalize_marker_spans(spans, len(words), max_spans=len(spans))
+    if len(normalized_spans) <= max_spans:
+        return normalized_spans
+
+    token_counts = collections.Counter(normalize_text_tokens(clean_text))
+    scored_spans: List[Tuple[float, int, int, int, int]] = []
+    for start, end in normalized_spans:
+        span_text = " ".join(words[start - 1 : end]).strip()
+        span_tokens = normalize_text_tokens(span_text)
+        score = float(sum(token_counts[token] for token in span_tokens))
+        scored_spans.append((score, start, end - start, start, end))
+
+    selected: List[Tuple[int, int]] = []
+    for _, _, _, start, end in sorted(
+        scored_spans,
+        key=lambda item: (-item[0], item[1], item[2]),
+    ):
+        if any(
+            not (end < existing_start or start > existing_end)
+            for existing_start, existing_end in selected
+        ):
+            continue
+        selected.append((start, end))
+        if len(selected) >= max_spans:
+            break
+
+    return sorted(selected, key=lambda span: (span[0], span[1]))
+
+
 def _build_fallback_marker_spans(
     words: List[str], clean_text: str
 ) -> List[Tuple[int, int]]:
@@ -285,6 +330,107 @@ def _build_fallback_marker_spans(
     return _normalize_marker_spans(selected_spans, len(words), max_spans=6)
 
 
+def _generate_marker_spans_for_chunk(
+    topic_name: str,
+    topic_range: TopicRange,
+    prompt_chunk: PromptChunk,
+    llm: Any,
+    cache_store: Any,
+    namespace: str,
+    max_retries: int,
+) -> List[Tuple[int, int]]:
+    words = list(prompt_chunk.words)
+    if not words:
+        return []
+
+    response = ""
+    skip_cache = False
+
+    for attempt in range(max_retries):
+        try:
+            if attempt == 0:
+                response = _call_llm_cached(
+                    prompt=prompt_chunk.prompt,
+                    llm=llm,
+                    cache_store=cache_store,
+                    namespace=namespace,
+                    temperature=0.0,
+                    skip_cache_read=skip_cache,
+                )
+            else:
+                correction_prompt = (
+                    f"{prompt_chunk.prompt}\n\n"
+                    f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
+                    f"{TOPIC_MARKER_SUMMARY_CORRECTION_TEMPLATE}"
+                )
+                response = llm.call([correction_prompt], temperature=0.0)
+
+            parsed_spans = _parse_marker_output(response)
+            if parsed_spans is None:
+                raise ValueError("Unparseable marker output")
+
+            return _normalize_marker_spans(parsed_spans, len(words), max_spans=6)
+        except Exception as exc:
+            logger.warning(
+                "Marker summary generation failed for topic '%s' range %d chunk %d (%d/%d): %s",
+                topic_name,
+                topic_range.range_index,
+                prompt_chunk.chunk_index,
+                attempt + 1,
+                max_retries,
+                exc,
+            )
+            skip_cache = True
+            if attempt < max_retries - 1:
+                time.sleep(float(attempt + 1))
+
+    return _build_fallback_marker_spans(words, prompt_chunk.clean_text)
+
+
+def _generate_marker_spans_for_chunk_from_response(
+    topic_name: str,
+    topic_range: TopicRange,
+    prompt_chunk: PromptChunk,
+    llm: Any,
+    initial_response: str,
+    max_retries: int,
+) -> List[Tuple[int, int]]:
+    words = list(prompt_chunk.words)
+    if not words:
+        return []
+
+    response = initial_response
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                correction_prompt = (
+                    f"{prompt_chunk.prompt}\n\n"
+                    f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
+                    f"{TOPIC_MARKER_SUMMARY_CORRECTION_TEMPLATE}"
+                )
+                response = llm.call([correction_prompt], temperature=0.0)
+
+            parsed_spans = _parse_marker_output(response)
+            if parsed_spans is None:
+                raise ValueError("Unparseable marker output")
+
+            return _normalize_marker_spans(parsed_spans, len(words), max_spans=6)
+        except Exception as exc:
+            logger.warning(
+                "Marker summary generation failed for topic '%s' range %d chunk %d (%d/%d): %s",
+                topic_name,
+                topic_range.range_index,
+                prompt_chunk.chunk_index,
+                attempt + 1,
+                max_retries,
+                exc,
+            )
+            if attempt < max_retries - 1:
+                time.sleep(float(attempt + 1))
+
+    return _build_fallback_marker_spans(words, prompt_chunk.clean_text)
+
+
 def _generate_marker_summary_for_range(
     topic_name: str,
     topic_range: TopicRange,
@@ -294,62 +440,48 @@ def _generate_marker_summary_for_range(
     max_retries: int,
 ) -> Dict[str, Any]:
     cleaned_text = _cleanup_text_for_llm(topic_range.text)
-    anchored_text, words = _insert_anchors(cleaned_text)
+    _, words = _insert_anchors(cleaned_text)
 
     if not words:
         return {"marker_spans": [], "summary_text": ""}
 
-    prompt = _build_topic_marker_summary_prompt(topic_name, cleaned_text, anchored_text)
-    response = ""
-    skip_cache = False
-
-    for attempt in range(max_retries):
-        try:
-            if attempt == 0:
-                response = _call_llm_cached(
-                    prompt=prompt,
-                    llm=llm,
-                    cache_store=cache_store,
-                    namespace=namespace,
-                    temperature=0.0,
-                    skip_cache_read=skip_cache,
-                )
-            else:
-                correction_prompt = (
-                    f"{prompt}\n\n"
-                    f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
-                    f"{TOPIC_MARKER_SUMMARY_CORRECTION_TEMPLATE}"
-                )
-                response = llm.call([correction_prompt], temperature=0.0)
-
-            parsed_spans = _parse_marker_output(response)
-            if parsed_spans is None:
-                raise ValueError("Unparseable marker output")
-
-            normalized_spans = _normalize_marker_spans(parsed_spans, len(words))
-            marker_spans = _build_marker_span_payload(words, normalized_spans)
-            return {
-                "marker_spans": marker_spans,
-                "summary_text": _build_summary_text(marker_spans),
-            }
-        except Exception as exc:
-            logger.warning(
-                "Marker summary generation failed for topic '%s' range %d (%d/%d): %s",
-                topic_name,
-                topic_range.range_index,
-                attempt + 1,
-                max_retries,
-                exc,
+    prompt_chunks = _build_prompt_aware_chunks(
+        topic_range=topic_range,
+        llm=llm,
+        prompt_builder=lambda chunk_clean_text, chunk_anchored_text: (
+            _build_topic_marker_summary_prompt(
+                topic_name, chunk_clean_text, chunk_anchored_text
             )
-            skip_cache = True
-            if attempt < max_retries - 1:
-                time.sleep(float(attempt + 1))
+        ),
+        max_output_tokens_buffer=900,
+    )
 
-    fallback_spans = _build_fallback_marker_spans(words, cleaned_text)
-    fallback_marker_spans = _build_marker_span_payload(words, fallback_spans)
+    merged_spans: List[Tuple[int, int]] = []
+    for prompt_chunk in prompt_chunks:
+        chunk_spans = _generate_marker_spans_for_chunk(
+            topic_name=topic_name,
+            topic_range=topic_range,
+            prompt_chunk=prompt_chunk,
+            llm=llm,
+            cache_store=cache_store,
+            namespace=namespace,
+            max_retries=max_retries,
+        )
+        merged_spans.extend(_offset_spans(chunk_spans, prompt_chunk.start_word_offset))
+
+    selected_spans = _select_merged_marker_spans(merged_spans, words, cleaned_text)
+    if not selected_spans:
+        fallback_spans = _build_fallback_marker_spans(words, cleaned_text)
+        fallback_marker_spans = _build_marker_span_payload(words, fallback_spans)
+        return {
+            "marker_spans": fallback_marker_spans,
+            "summary_text": _build_summary_text(fallback_marker_spans),
+        }
+
+    marker_spans = _build_marker_span_payload(words, selected_spans)
     return {
-        "marker_spans": fallback_marker_spans,
-        "summary_text": _build_summary_text(fallback_marker_spans),
+        "marker_spans": marker_spans,
+        "summary_text": _build_summary_text(marker_spans),
     }
 
 
@@ -357,18 +489,31 @@ def _submit_marker_summary_request(
     topic_name: str,
     topic_range: TopicRange,
     llm: Any,
-) -> Optional[Tuple[List[str], str, Any]]:
+) -> Tuple[List[str], str, List[Tuple[PromptChunk, Any]]]:
     cleaned_text = _cleanup_text_for_llm(topic_range.text)
-    anchored_text, words = _insert_anchors(cleaned_text)
-    if not words:
-        return None
+    _, words = _insert_anchors(cleaned_text)
 
     submit = getattr(llm, "submit", None)
     if not callable(submit):
-        return None
+        return (words, cleaned_text, [])
 
-    prompt = _build_topic_marker_summary_prompt(topic_name, cleaned_text, anchored_text)
-    return (words, cleaned_text, submit(prompt, 0.0))
+    prompt_chunks = _build_prompt_aware_chunks(
+        topic_range=topic_range,
+        llm=llm,
+        prompt_builder=lambda chunk_clean_text, chunk_anchored_text: (
+            _build_topic_marker_summary_prompt(
+                topic_name, chunk_clean_text, chunk_anchored_text
+            )
+        ),
+        max_output_tokens_buffer=900,
+    )
+
+    submitted_chunks: List[Tuple[PromptChunk, Any]] = []
+    for prompt_chunk in prompt_chunks:
+        if not prompt_chunk.words:
+            continue
+        submitted_chunks.append((prompt_chunk, submit(prompt_chunk.prompt, 0.0)))
+    return (words, cleaned_text, submitted_chunks)
 
 
 def _generate_marker_summary_from_response(
@@ -377,53 +522,34 @@ def _generate_marker_summary_from_response(
     llm: Any,
     words: List[str],
     cleaned_text: str,
-    initial_response: str,
+    prompt_chunk_results: List[Tuple[PromptChunk, str]],
     max_retries: int,
 ) -> Dict[str, Any]:
-    prompt = _build_topic_marker_summary_prompt(
-        topic_name,
-        cleaned_text,
-        _insert_anchors(cleaned_text)[0],
-    )
-    response = initial_response
+    merged_spans: List[Tuple[int, int]] = []
+    for prompt_chunk, initial_response in prompt_chunk_results:
+        chunk_spans = _generate_marker_spans_for_chunk_from_response(
+            topic_name=topic_name,
+            topic_range=topic_range,
+            prompt_chunk=prompt_chunk,
+            llm=llm,
+            initial_response=initial_response,
+            max_retries=max_retries,
+        )
+        merged_spans.extend(_offset_spans(chunk_spans, prompt_chunk.start_word_offset))
 
-    for attempt in range(max_retries):
-        try:
-            if attempt > 0:
-                correction_prompt = (
-                    f"{prompt}\n\n"
-                    f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
-                    f"{TOPIC_MARKER_SUMMARY_CORRECTION_TEMPLATE}"
-                )
-                response = llm.call([correction_prompt], temperature=0.0)
+    selected_spans = _select_merged_marker_spans(merged_spans, words, cleaned_text)
+    if not selected_spans:
+        fallback_spans = _build_fallback_marker_spans(words, cleaned_text)
+        fallback_marker_spans = _build_marker_span_payload(words, fallback_spans)
+        return {
+            "marker_spans": fallback_marker_spans,
+            "summary_text": _build_summary_text(fallback_marker_spans),
+        }
 
-            parsed_spans = _parse_marker_output(response)
-            if parsed_spans is None:
-                raise ValueError("Unparseable marker output")
-
-            normalized_spans = _normalize_marker_spans(parsed_spans, len(words))
-            marker_spans = _build_marker_span_payload(words, normalized_spans)
-            return {
-                "marker_spans": marker_spans,
-                "summary_text": _build_summary_text(marker_spans),
-            }
-        except Exception as exc:
-            logger.warning(
-                "Marker summary generation failed for topic '%s' range %d (%d/%d): %s",
-                topic_name,
-                topic_range.range_index,
-                attempt + 1,
-                max_retries,
-                exc,
-            )
-            if attempt < max_retries - 1:
-                time.sleep(float(attempt + 1))
-
-    fallback_spans = _build_fallback_marker_spans(words, cleaned_text)
-    fallback_marker_spans = _build_marker_span_payload(words, fallback_spans)
+    marker_spans = _build_marker_span_payload(words, selected_spans)
     return {
-        "marker_spans": fallback_marker_spans,
-        "summary_text": _build_summary_text(fallback_marker_spans),
+        "marker_spans": marker_spans,
+        "summary_text": _build_summary_text(marker_spans),
     }
 
 
@@ -470,36 +596,59 @@ def _process_all_topics_parallel(
     max_retries: int,
 ) -> Dict[str, Any]:
     topic_ranges_map: Dict[str, List[TopicRange]] = {}
-    pending_ranges: List[tuple[str, TopicRange, List[str], str, Any]] = []
+    range_words: Dict[str, Dict[int, List[str]]] = {}
+    range_clean_text: Dict[str, Dict[int, str]] = {}
+    pending_ranges: List[Tuple[str, TopicRange, PromptChunk, Any]] = []
 
     for index, topic in enumerate(topics):
         topic_name = topic.get("name", f"topic_{index}")
         ranges = _extract_topic_ranges(topic, all_sentences)
         topic_ranges_map[topic_name] = ranges
         for topic_range in ranges:
-            submitted = _submit_marker_summary_request(topic_name, topic_range, llm)
-            if submitted is None:
-                continue
-            words, cleaned_text, future = submitted
-            pending_ranges.append(
-                (topic_name, topic_range, words, cleaned_text, future)
+            words, cleaned_text, submitted_chunks = _submit_marker_summary_request(
+                topic_name, topic_range, llm
             )
+            range_words.setdefault(topic_name, {})[topic_range.range_index] = words
+            range_clean_text.setdefault(topic_name, {})[topic_range.range_index] = (
+                cleaned_text
+            )
+            for prompt_chunk, future in submitted_chunks:
+                pending_ranges.append((topic_name, topic_range, prompt_chunk, future))
+
+    chunk_responses: Dict[str, Dict[int, List[Tuple[PromptChunk, str]]]] = {}
+    for topic_name, topic_range, prompt_chunk, future in pending_ranges:
+        response = future.result()
+        chunk_responses.setdefault(topic_name, {}).setdefault(
+            topic_range.range_index, []
+        ).append((prompt_chunk, response))
 
     resolved_data: Dict[str, Dict[int, Dict[str, Any]]] = {}
-    for topic_name, topic_range, words, cleaned_text, future in pending_ranges:
-        response = future.result()
-        topic_resolved = resolved_data.setdefault(topic_name, {})
-        topic_resolved[topic_range.range_index] = (
-            _generate_marker_summary_from_response(
-                topic_name=topic_name,
-                topic_range=topic_range,
-                llm=llm,
-                words=words,
-                cleaned_text=cleaned_text,
-                initial_response=response,
-                max_retries=max_retries,
+    for topic_name, topic_range_map in topic_ranges_map.items():
+        for topic_range in topic_range_map:
+            words = range_words.get(topic_name, {}).get(topic_range.range_index, [])
+            cleaned_text = range_clean_text.get(topic_name, {}).get(
+                topic_range.range_index, ""
             )
-        )
+            if not words:
+                summary_data = {"marker_spans": [], "summary_text": ""}
+            else:
+                summary_data = _generate_marker_summary_from_response(
+                    topic_name=topic_name,
+                    topic_range=topic_range,
+                    llm=llm,
+                    words=words,
+                    cleaned_text=cleaned_text,
+                    prompt_chunk_results=sorted(
+                        chunk_responses.get(topic_name, {}).get(
+                            topic_range.range_index, []
+                        ),
+                        key=lambda item: item[0].chunk_index,
+                    ),
+                    max_retries=max_retries,
+                )
+            resolved_data.setdefault(topic_name, {})[topic_range.range_index] = (
+                summary_data
+            )
 
     marker_summaries: Dict[str, Any] = {}
     for index, topic in enumerate(topics):

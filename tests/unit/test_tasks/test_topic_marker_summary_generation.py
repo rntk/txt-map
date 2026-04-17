@@ -140,3 +140,62 @@ def test_process_topic_marker_summary_generation_parallel_path_stores_results() 
         {"start_word": 2, "end_word": 3, "text": "beta gamma"}
     ]
     assert stored_range["summary_text"] == "beta gamma"
+
+
+def test_process_topic_marker_summary_generation_chunks_large_prompt() -> None:
+    class ChunkingLLM:
+        model_id = "chunking-model"
+        max_context_tokens = 420
+
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        @staticmethod
+        def estimate_tokens(text: str) -> int:
+            return len(text) // 4
+
+        def call(self, prompts, temperature=0.0):
+            del temperature
+            prompt = prompts[0]
+            self.prompts.append(prompt)
+            if "Alpha" in prompt:
+                return "1"
+            if "Beta" in prompt:
+                return "1"
+            return "1"
+
+    submission = {
+        "submission_id": "sub-3",
+        "results": {
+            "sentences": [
+                "Alpha " * 50,
+                "Beta " * 50,
+            ],
+            "topics": [
+                {
+                    "name": "Topic A",
+                    "ranges": [{"sentence_start": 1, "sentence_end": 2}],
+                }
+            ],
+        },
+    }
+
+    llm = ChunkingLLM()
+
+    with patch(
+        "lib.tasks.topic_marker_summary_generation.SubmissionsStorage.update_results"
+    ) as mock_update_results:
+        process_topic_marker_summary_generation(
+            submission=submission,
+            db=object(),
+            llm=llm,
+        )
+
+    stored_payload = mock_update_results.call_args.args[1]["topic_marker_summaries"]
+    stored_range = stored_payload["Topic A"]["ranges"][0]
+    assert len(llm.prompts) == 2
+    assert stored_range["marker_spans"] == [
+        {"start_word": 1, "end_word": 1, "text": "Alpha"},
+        {"start_word": 51, "end_word": 51, "text": "Beta"},
+    ]
+    assert stored_range["summary_text"] == "Alpha Beta"
