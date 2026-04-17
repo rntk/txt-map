@@ -1,8 +1,12 @@
 """Generate word-context keyword highlights for topic ranges.
 
-For a given search word, sends one LLM request per topic (via the LLM queue for
-parallel processing) asking the model to highlight keywords that explain the
-context and significance of that word within each topic's text.
+For a given search word, sends one or more LLM requests per topic (via the LLM
+queue for parallel processing) asking the model to highlight keywords that
+explain the context and significance of that word within each topic's text.
+
+Large topic ranges are split into prompt-aware chunks so they fit within the
+model's context window; chunk spans are re-aligned to the range's word
+coordinates and merged when the job finishes.
 
 Results are stored in the submission document and cached in the LLM cache so
 repeat requests for the same word are served instantly.
@@ -18,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from lib.llm_queue.client import QueuedLLMClient
 from lib.llm_queue.store import LLMQueueStore
 from lib.tasks.markup_generation import (
+    _build_prompt_aware_chunks,
     _cleanup_text_for_llm,
     _extract_topic_ranges,
     _insert_anchors,
@@ -25,7 +30,9 @@ from lib.tasks.markup_generation import (
 from lib.tasks.topic_marker_summary_generation import (
     _build_marker_span_payload,
     _normalize_marker_spans,
+    _offset_spans,
     _parse_marker_output,
+    _select_merged_marker_spans,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +109,12 @@ Focus word: "{word}"
 
 WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION = "word_context_highlight_v1"
 
+# Bumped whenever the persisted pending-job schema changes. Including it in
+# the signature invalidates stored jobs that were written in the old shape.
+_STORAGE_FORMAT_VERSION = "v3"
+
+_MAX_SPANS = 4
+
 
 def _cache_namespace(llm_client: Any, word: str) -> str:
     model_id = getattr(llm_client, "model_id", "unknown")
@@ -116,6 +129,7 @@ def build_word_context_job_signature(llm_client: Any, word: str) -> str:
     signature_input = "\n".join(
         [
             WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION,
+            _STORAGE_FORMAT_VERSION,
             model_id,
             namespace,
             WORD_CONTEXT_HIGHLIGHT_PROMPT_TEMPLATE,
@@ -135,46 +149,88 @@ def _build_prompt(
     )
 
 
-def _parse_response_to_ranges(
-    response: str, topic: Dict[str, Any], all_sentences: List[str]
-) -> Optional[Dict[str, Any]]:
-    """Parse an LLM response (built from the primary range) into range marker span data.
+def _parse_chunk_response(
+    response: str,
+    start_word_offset: int,
+    word_count: int,
+) -> Optional[List[Tuple[int, int]]]:
+    """Parse a chunk's LLM response into spans aligned to the full range."""
+    parsed = _parse_marker_output(response)
+    if parsed is None:
+        return None
+    normalized = _normalize_marker_spans(parsed, word_count, max_spans=_MAX_SPANS)
+    return _offset_spans(normalized, start_word_offset)
 
-    One LLM call is made per topic using the first (primary) range's text.
-    The parsed spans are applied to that same range's word list.
-    """
+
+def _finalize_topic_highlights(
+    topic: Dict[str, Any],
+    all_sentences: List[str],
+    spans_by_range: Dict[int, List[Tuple[int, int]]],
+) -> Optional[Dict[str, Any]]:
+    """Select top spans per range and build the ranges payload."""
     ranges = _extract_topic_ranges(topic, all_sentences)
     if not ranges:
         return None
 
-    parsed_spans = _parse_marker_output(response)
-    if parsed_spans is None:
-        logger.warning(
-            "Unparseable word-context highlight response for topic '%s': %r",
-            topic.get("name"),
-            response[:200],
+    rendered_ranges: List[Dict[str, Any]] = []
+    for topic_range in ranges:
+        cleaned_text = _cleanup_text_for_llm(topic_range.text)
+        _, words = _insert_anchors(cleaned_text)
+        if not words:
+            continue
+        merged_spans = spans_by_range.get(topic_range.range_index, [])
+        selected = _select_merged_marker_spans(
+            merged_spans, words, cleaned_text, max_spans=_MAX_SPANS
         )
-        return None
-
-    # Apply the spans to the primary range (the one used to build the prompt)
-    primary_range = ranges[0]
-    cleaned_text = _cleanup_text_for_llm(primary_range.text)
-    _, words = _insert_anchors(cleaned_text)
-    if not words:
-        return None
-
-    normalized = _normalize_marker_spans(parsed_spans, len(words))
-    marker_spans = _build_marker_span_payload(words, normalized)
-
-    return {
-        "ranges": [
+        marker_spans = _build_marker_span_payload(words, selected)
+        rendered_ranges.append(
             {
-                "range_index": primary_range.range_index,
-                "sentence_start": primary_range.sentence_start,
-                "sentence_end": primary_range.sentence_end,
+                "range_index": topic_range.range_index,
+                "sentence_start": topic_range.sentence_start,
+                "sentence_end": topic_range.sentence_end,
                 "marker_spans": marker_spans,
             }
-        ]
+        )
+
+    if not rendered_ranges:
+        return None
+    return {"ranges": rendered_ranges}
+
+
+def _coerce_partial_spans(
+    raw: Any,
+) -> Dict[int, List[Tuple[int, int]]]:
+    """Decode persisted ``partial_spans`` into ``{range_index: [(s, e), ...]}``."""
+    result: Dict[int, List[Tuple[int, int]]] = {}
+    if not isinstance(raw, dict):
+        return result
+    for key, spans in raw.items():
+        try:
+            range_index = int(key)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(spans, list):
+            continue
+        decoded: List[Tuple[int, int]] = []
+        for span in spans:
+            if isinstance(span, (list, tuple)) and len(span) == 2:
+                try:
+                    decoded.append((int(span[0]), int(span[1])))
+                except (TypeError, ValueError):
+                    continue
+        if decoded:
+            result[range_index] = decoded
+    return result
+
+
+def _encode_partial_spans(
+    spans_by_range: Dict[int, List[Tuple[int, int]]],
+) -> Dict[str, List[List[int]]]:
+    """Encode in-memory spans for Mongo (string keys, list values)."""
+    return {
+        str(range_index): [list(span) for span in spans]
+        for range_index, spans in spans_by_range.items()
+        if spans
     }
 
 
@@ -183,18 +239,20 @@ def submit_topic_requests(
     topics: List[Dict[str, Any]],
     all_sentences: List[str],
     queued_llm: QueuedLLMClient,
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """Submit one LLM request per topic (non-blocking).
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """Submit chunked LLM requests per topic (non-blocking).
 
-    Returns ``(pending_ids, pre_resolved_responses)`` where:
-    - ``pending_ids``: topic_name → request_id for topics queued for async processing.
-    - ``pre_resolved_responses``: topic_name → raw LLM response for cache hits that
-      resolved synchronously without entering the queue.
+    Returns ``(pending_jobs, resolved_highlights)`` where:
+    - ``pending_jobs``: topic_name → job dict with keys ``chunks`` (pending chunk
+      metadata) and ``partial_spans`` (range-aligned spans from chunks that
+      already resolved via cache).
+    - ``resolved_highlights``: topic_name → final highlights payload for topics
+      whose chunks all resolved synchronously from cache.
 
-    Topics with no extractable text ranges are skipped.
+    Topics with no extractable text are skipped.
     """
-    pending_ids: Dict[str, str] = {}
-    pre_resolved: Dict[str, str] = {}
+    pending_jobs: Dict[str, Dict[str, Any]] = {}
+    resolved_highlights: Dict[str, Any] = {}
 
     for topic in topics:
         topic_name = topic.get("name", "")
@@ -202,91 +260,177 @@ def submit_topic_requests(
         if not ranges:
             continue
 
-        # Use the first (primary) range for the prompt text.
-        primary_range = ranges[0]
-        cleaned_text = _cleanup_text_for_llm(primary_range.text)
-        anchored_text, words = _insert_anchors(cleaned_text)
-        if not words:
-            continue
+        pending_chunks: List[Dict[str, Any]] = []
+        partial_spans: Dict[int, List[Tuple[int, int]]] = {}
 
-        prompt = _build_prompt(word, topic_name, cleaned_text, anchored_text)
-        future = queued_llm.submit(prompt, temperature=0.0)
+        for topic_range in ranges:
+            prompt_chunks = _build_prompt_aware_chunks(
+                topic_range=topic_range,
+                llm=queued_llm,
+                prompt_builder=lambda clean_text, anchored_text: _build_prompt(
+                    word, topic_name, clean_text, anchored_text
+                ),
+                max_output_tokens_buffer=900,
+            )
 
-        if future.done():
-            # Cache hit — available immediately, no queue entry was created.
-            try:
-                pre_resolved[topic_name] = future.result()
-            except Exception as exc:
-                logger.warning(
-                    "Cache-hit future failed for topic '%s': %s", topic_name, exc
-                )
+            for prompt_chunk in prompt_chunks:
+                if not prompt_chunk.words:
+                    continue
+                future = queued_llm.submit(prompt_chunk.prompt, temperature=0.0)
+                word_count = len(prompt_chunk.words)
+                if future.done():
+                    try:
+                        response = future.result()
+                    except Exception as exc:
+                        logger.warning(
+                            "Cache-hit future failed for topic '%s' range %d chunk %d: %s",
+                            topic_name,
+                            topic_range.range_index,
+                            prompt_chunk.chunk_index,
+                            exc,
+                        )
+                        continue
+                    chunk_spans = _parse_chunk_response(
+                        response, prompt_chunk.start_word_offset, word_count
+                    )
+                    if chunk_spans is None:
+                        logger.warning(
+                            "Unparseable cached response for topic '%s' range %d chunk %d: %r",
+                            topic_name,
+                            topic_range.range_index,
+                            prompt_chunk.chunk_index,
+                            response[:200],
+                        )
+                        continue
+                    partial_spans.setdefault(topic_range.range_index, []).extend(
+                        chunk_spans
+                    )
+                else:
+                    request_id = future.request_id
+                    if request_id is None:
+                        continue
+                    pending_chunks.append(
+                        {
+                            "request_id": request_id,
+                            "chunk_index": prompt_chunk.chunk_index,
+                            "range_index": topic_range.range_index,
+                            "start_word_offset": prompt_chunk.start_word_offset,
+                            "word_count": word_count,
+                        }
+                    )
+
+        if pending_chunks:
+            pending_jobs[topic_name] = {
+                "chunks": pending_chunks,
+                "partial_spans": _encode_partial_spans(partial_spans),
+            }
         else:
-            request_id = future.request_id
-            if request_id is not None:
-                pending_ids[topic_name] = request_id
+            finalized = _finalize_topic_highlights(topic, all_sentences, partial_spans)
+            if finalized is not None:
+                resolved_highlights[topic_name] = finalized
 
-    return pending_ids, pre_resolved
+    return pending_jobs, resolved_highlights
 
 
 def process_pending_requests(
-    pending: Dict[str, str],
+    pending: Dict[str, Dict[str, Any]],
     topics_by_name: Dict[str, Dict[str, Any]],
     all_sentences: List[str],
     llm_queue_store: LLMQueueStore,
-) -> Tuple[Dict[str, str], Dict[str, Any]]:
-    """Poll the LLM queue for completed requests and parse results.
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """Poll the LLM queue and finalize topics whose chunks are all done.
 
     Returns (still_pending, newly_completed_highlights).
-    still_pending: topic_name → request_id for topics not yet done.
-    newly_completed_highlights: topic_name → {ranges: [...]} for finished topics.
+    still_pending follows the same shape as the input ``pending``.
     """
-    still_pending: Dict[str, str] = {}
+    still_pending: Dict[str, Dict[str, Any]] = {}
     completed: Dict[str, Any] = {}
     consumed_ids: List[str] = []
 
-    queue_ids: List[str] = list(pending.values())
-    queue_topics: Dict[str, str] = {
-        request_id: topic_name for topic_name, request_id in pending.items()
-    }
+    request_to_topic: Dict[str, str] = {}
+    for topic_name, job in pending.items():
+        if not isinstance(job, dict):
+            continue
+        for chunk in job.get("chunks") or []:
+            if not isinstance(chunk, dict):
+                continue
+            rid = chunk.get("request_id")
+            if rid:
+                request_to_topic[rid] = topic_name
 
-    if queue_ids:
-        docs = llm_queue_store.get_results(queue_ids)
+    docs_by_id: Dict[str, Any] = {}
+    if request_to_topic:
+        docs = llm_queue_store.get_results(list(request_to_topic.keys()))
         docs_by_id = {d["request_id"]: d for d in docs if d is not None}
 
-        for request_id in queue_ids:
-            topic_name = queue_topics[request_id]
-            doc = docs_by_id.get(request_id)
+    for topic_name, job in pending.items():
+        if not isinstance(job, dict):
+            continue
+        chunks = job.get("chunks") or []
+        partial_spans = _coerce_partial_spans(job.get("partial_spans"))
+        remaining_chunks: List[Dict[str, Any]] = []
 
+        for chunk in chunks:
+            if not isinstance(chunk, dict):
+                continue
+            rid = chunk.get("request_id")
+            if not rid:
+                continue
+            doc = docs_by_id.get(rid)
             if doc is None:
                 logger.warning(
-                    "LLM queue entry %s disappeared for topic '%s'",
-                    request_id,
+                    "LLM queue entry %s disappeared for topic '%s' chunk %s",
+                    rid,
                     topic_name,
+                    chunk.get("chunk_index"),
                 )
                 continue
 
             status = doc.get("status")
             if status == "completed":
-                topic = topics_by_name.get(topic_name)
-                if topic is None:
-                    continue
                 response = doc.get("response", "")
-                result = _parse_response_to_ranges(response, topic, all_sentences)
-                if result is not None:
-                    completed[topic_name] = result
-                consumed_ids.append(request_id)
+                word_count = int(chunk.get("word_count") or 0)
+                start_offset = int(chunk.get("start_word_offset") or 1)
+                range_index = int(chunk.get("range_index") or 0)
+                chunk_spans = _parse_chunk_response(response, start_offset, word_count)
+                if chunk_spans is None:
+                    logger.warning(
+                        "Unparseable word-context response for topic '%s' range %d chunk %s: %r",
+                        topic_name,
+                        range_index,
+                        chunk.get("chunk_index"),
+                        response[:200],
+                    )
+                else:
+                    partial_spans.setdefault(range_index, []).extend(chunk_spans)
+                consumed_ids.append(rid)
             elif status == "failed":
                 logger.warning(
-                    "LLM request %s failed for topic '%s': %s",
-                    request_id,
+                    "LLM request %s failed for topic '%s' chunk %s: %s",
+                    rid,
                     topic_name,
+                    chunk.get("chunk_index"),
                     doc.get("error"),
                 )
-                consumed_ids.append(request_id)
+                consumed_ids.append(rid)
             else:
-                still_pending[topic_name] = request_id
+                remaining_chunks.append(chunk)
 
-        if consumed_ids:
-            llm_queue_store.delete_by_ids(consumed_ids)
+        if remaining_chunks:
+            still_pending[topic_name] = {
+                "chunks": remaining_chunks,
+                "partial_spans": _encode_partial_spans(partial_spans),
+            }
+        else:
+            topic = topics_by_name.get(topic_name)
+            if topic is not None:
+                finalized = _finalize_topic_highlights(
+                    topic, all_sentences, partial_spans
+                )
+                if finalized is not None:
+                    completed[topic_name] = finalized
+
+    if consumed_ids:
+        llm_queue_store.delete_by_ids(consumed_ids)
 
     return still_pending, completed

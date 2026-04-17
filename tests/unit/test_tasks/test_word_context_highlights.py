@@ -48,7 +48,15 @@ def test_start_word_context_highlights_ignores_stale_persisted_job() -> None:
         patch("handlers.submission_handler.create_llm_client", return_value=DummyLLM()),
         patch(
             "handlers.submission_handler.submit_topic_requests",
-            return_value=({"AI": "new-request"}, {}),
+            return_value=(
+                {
+                    "AI": {
+                        "chunks": [{"request_id": "new-request"}],
+                        "partial_spans": [],
+                    }
+                },
+                {},
+            ),
         ) as submit_topic_requests,
     ):
         response = start_word_context_highlights(
@@ -68,7 +76,9 @@ def test_start_word_context_highlights_ignores_stale_persisted_job() -> None:
     assert response["status"] == "pending"
     assert [topic["name"] for topic in submitted_topics] == ["AI"]
     assert updated_job["signature"] != stale_signature
-    assert updated_job["pending"] == {"AI": "new-request"}
+    assert updated_job["pending"] == {
+        "AI": {"chunks": [{"request_id": "new-request"}], "partial_spans": []}
+    }
     assert updated_job["highlights"] == {}
 
 
@@ -94,7 +104,15 @@ def test_start_word_context_highlights_refresh_ignores_matching_persisted_job() 
         patch("handlers.submission_handler.create_llm_client", return_value=DummyLLM()),
         patch(
             "handlers.submission_handler.submit_topic_requests",
-            return_value=({"AI": "new-request"}, {}),
+            return_value=(
+                {
+                    "AI": {
+                        "chunks": [{"request_id": "new-request"}],
+                        "partial_spans": [],
+                    }
+                },
+                {},
+            ),
         ) as submit_topic_requests,
     ):
         response = start_word_context_highlights(
@@ -112,5 +130,69 @@ def test_start_word_context_highlights_refresh_ignores_matching_persisted_job() 
 
     assert response["status"] == "pending"
     assert submit_topic_requests.call_count == 1
-    assert updated_job["pending"] == {"AI": "new-request"}
+    assert updated_job["pending"] == {
+        "AI": {"chunks": [{"request_id": "new-request"}], "partial_spans": []}
+    }
     assert updated_job["highlights"] == {}
+
+
+def test_start_word_context_highlights_resolves_cache_hit_none() -> None:
+    submission: dict[str, Any] = {
+        "submission_id": "submission-1",
+        "results": {
+            "sentences": ["Codex shipped context analysis."],
+            "topics": [{"name": "AI", "sentences": [1]}],
+        },
+    }
+    storage = MagicMock()
+
+    with (
+        patch("handlers.submission_handler.create_llm_client", return_value=DummyLLM()),
+        patch(
+            "handlers.submission_handler.submit_topic_requests",
+            return_value=(
+                {},
+                {
+                    "AI": {
+                        "ranges": [
+                            {
+                                "range_index": 0,
+                                "sentence_start": 1,
+                                "sentence_end": 1,
+                                "marker_spans": [],
+                            }
+                        ]
+                    }
+                },
+            ),
+        ),
+    ):
+        response = start_word_context_highlights(
+            WordContextHighlightsRequest(word="Codex"),
+            submission=submission,
+            storage=storage,
+            db=MagicMock(),
+            llm_queue_store=MagicMock(),
+            cache_store=MagicMock(),
+        )
+
+    updated_job = storage.update_results.call_args.args[1][
+        "word_context_highlights.d688ae4face9f51ed484"
+    ]
+
+    assert response["status"] == "completed"
+    assert response["completed"] == 1
+    assert response["highlights"] == {
+        "AI": {
+            "ranges": [
+                {
+                    "range_index": 0,
+                    "sentence_start": 1,
+                    "sentence_end": 1,
+                    "marker_spans": [],
+                }
+            ]
+        }
+    }
+    assert updated_job["pending"] == {}
+    assert updated_job["highlights"] == response["highlights"]

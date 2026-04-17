@@ -15,7 +15,6 @@ from lib.llm import create_llm_client
 from lib.tasks.word_context_highlights import (
     WORD_CONTEXT_HIGHLIGHT_PROMPT_VERSION,
     _cache_namespace,
-    _parse_response_to_ranges,
     build_word_context_job_signature,
     submit_topic_requests,
     process_pending_requests,
@@ -764,7 +763,7 @@ def start_word_context_highlights(
     existing_job: Dict[str, Any] = {}
     if not body.refresh and stored_job.get("signature") == job_signature:
         existing_job = stored_job
-    existing_pending: Dict[str, str] = existing_job.get("pending") or {}
+    existing_pending: Dict[str, Any] = existing_job.get("pending") or {}
     existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
 
     queued_llm = QueuedLLMClient(
@@ -787,27 +786,17 @@ def start_word_context_highlights(
         and t.get("name") not in existing_pending
     ]
 
-    new_pending: Dict[str, str] = {}
-    new_resolved_responses: Dict[str, str] = {}
+    new_pending: Dict[str, Any] = {}
+    new_resolved_highlights: Dict[str, Any] = {}
     if topics_to_submit:
-        new_pending, new_resolved_responses = submit_topic_requests(
+        new_pending, new_resolved_highlights = submit_topic_requests(
             word, topics_to_submit, all_sentences, queued_llm
         )
 
     # Merge queue entries with any pre-existing pending
-    still_pending: Dict[str, str] = {**existing_pending, **new_pending}
+    still_pending: Dict[str, Any] = {**existing_pending, **new_pending}
 
-    # Parse and collect cache-hit responses that were resolved synchronously
-    resolved_highlights: Dict[str, Any] = {}
-    topics_by_name = {t.get("name", ""): t for t in all_topics}
-    for topic_name, response in new_resolved_responses.items():
-        topic = topics_by_name.get(topic_name)
-        if topic is not None:
-            result = _parse_response_to_ranges(response, topic, all_sentences)
-            if result is not None:
-                resolved_highlights[topic_name] = result
-
-    merged_highlights = {**existing_highlights, **resolved_highlights}
+    merged_highlights = {**existing_highlights, **new_resolved_highlights}
 
     # Persist updated job state
     storage.update_results(
@@ -862,7 +851,7 @@ def get_word_context_highlights(
     if not job:
         return {"status": "not_found", "total": 0, "completed": 0, "highlights": {}}
 
-    pending: Dict[str, str] = job.get("pending") or {}
+    pending: Dict[str, Any] = job.get("pending") or {}
     highlights: Dict[str, Any] = job.get("highlights") or {}
 
     if pending:
