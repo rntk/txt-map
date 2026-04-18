@@ -9,7 +9,7 @@ markdown
 python-multipart
 PyMuPDF>=1.27.0
 nltk
-git+https://github.com/rntk/txt-splitt.git@v0.0.19
+git+https://github.com/rntk/txt-splitt.git@v0.0.20
 openai
 anthropic
 cryptography
