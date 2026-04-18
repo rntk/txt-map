@@ -832,6 +832,7 @@ function WordPageContent({ word }) {
                                 <MarkupRenderer
                                   key={`range-${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
                                   html={range.html}
+                                  highlightWords={[word]}
                                 />
                               ))}
                             </div>

@@ -36,4 +36,63 @@ describe("MarkupRenderer", () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("leaves markup untouched when highlightWords is undefined", () => {
+    const { container } = render(
+      <MarkupRenderer html="<p>The quick brown fox.</p>" />,
+    );
+
+    expect(container.querySelector(".word-highlight")).toBeNull();
+  });
+
+  it("leaves markup untouched when highlightWords is an empty array", () => {
+    const { container } = render(
+      <MarkupRenderer
+        html="<p>The quick brown fox.</p>"
+        highlightWords={[]}
+      />,
+    );
+
+    expect(container.querySelector(".word-highlight")).toBeNull();
+  });
+
+  it("wraps matching words with .word-highlight class", () => {
+    const { container } = render(
+      <MarkupRenderer
+        html="<p>The quick brown fox.</p>"
+        highlightWords={["quick"]}
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".word-highlight");
+    expect(highlighted.length).toBe(1);
+    expect(highlighted[0].textContent).toBe("quick");
+  });
+
+  it("matches words case-insensitively and with surrounding punctuation", () => {
+    const { container } = render(
+      <MarkupRenderer
+        html="<p>Quick! The QUICK, quick fox.</p>"
+        highlightWords={["quick"]}
+      />,
+    );
+
+    const highlighted = container.querySelectorAll(".word-highlight");
+    expect(highlighted.length).toBe(3);
+  });
+
+  it("supports multiple highlight words", () => {
+    const { container } = render(
+      <MarkupRenderer
+        html="<p>The quick brown fox jumps.</p>"
+        highlightWords={["quick", "fox"]}
+      />,
+    );
+
+    const highlighted = Array.from(
+      container.querySelectorAll(".word-highlight"),
+    ).map((el) => el.textContent);
+    expect(highlighted).toEqual(expect.arrayContaining(["quick", "fox"]));
+    expect(highlighted.length).toBe(2);
+  });
 });
