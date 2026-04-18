@@ -104,4 +104,36 @@ describe("WordTree component", () => {
       screen.getByText("No occurrences of this word were found."),
     ).toBeInTheDocument();
   });
+
+  it("caps extremely deep branches without overflowing the stack", () => {
+    /** @type {{ text: string, normalized: string }[]} */
+    const deepRightTokens = Array.from({ length: 20000 }, (_, index) => ({
+      text: `token${index}`,
+      normalized: `token${index}`,
+    }));
+
+    expect(() =>
+      render(
+        <WordTree
+          entries={[
+            {
+              id: "deep-1",
+              sentenceIndex: 0,
+              sentenceNumber: 1,
+              sentenceText: "beta",
+              matchText: "beta",
+              leftTokens: [],
+              rightTokens: deepRightTokens,
+              isRead: false,
+            },
+          ]}
+          pivotLabel="beta"
+        />,
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByText("token0")).toBeInTheDocument();
+    expect(screen.getByText("token11")).toBeInTheDocument();
+    expect(screen.queryByText("token12")).not.toBeInTheDocument();
+  });
 });

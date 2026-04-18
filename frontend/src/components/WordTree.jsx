@@ -160,6 +160,7 @@ export function buildWordTreeEntries(
  * @property {string} name
  * @property {Map<string, TrieNode>} children
  * @property {number} count
+ * @property {Set<number>} sentenceIndices
  */
 
 /**
@@ -178,8 +179,9 @@ function buildTrie(entries, side) {
   entries.forEach((entry) => {
     root.sentenceIndices.add(entry.sentenceIndex);
     let current = root;
-    const tokens =
+    const rawTokens =
       side === "left" ? [...entry.leftTokens].reverse() : entry.rightTokens;
+    const tokens = rawTokens.slice(0, MAX_DEPTH);
 
     tokens.forEach((token) => {
       const key = token.normalized;
@@ -201,16 +203,50 @@ function buildTrie(entries, side) {
 }
 
 /**
+ * @typedef {Object} HierarchyNode
+ * @property {string} name
+ * @property {number} count
+ * @property {number[]} sentenceIndices
+ * @property {HierarchyNode[]} children
+ *
  * @param {TrieNode} node
- * @returns {Object}
+ * @returns {HierarchyNode}
  */
 function trieToHierarchy(node) {
-  return {
+  const root = {
     name: node.name,
     count: node.count,
     sentenceIndices: Array.from(node.sentenceIndices || []),
-    children: Array.from(node.children.values()).map(trieToHierarchy),
   };
+  const visited = new WeakSet([node]);
+  const stack = [{ source: node, target: root }];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    const childNodes = Array.from(current.source.children?.values() || []);
+    current.target.children = new Array(childNodes.length);
+
+    for (let index = childNodes.length - 1; index >= 0; index -= 1) {
+      const child = childNodes[index];
+      const childHierarchy = {
+        name: child.name,
+        count: child.count,
+        sentenceIndices: Array.from(child.sentenceIndices || []),
+        children: [],
+      };
+
+      current.target.children[index] = childHierarchy;
+
+      if (visited.has(child)) {
+        continue;
+      }
+
+      visited.add(child);
+      stack.push({ source: child, target: childHierarchy });
+    }
+  }
+
+  return root;
 }
 
 // ── Layout constants ───────────────────────────────────────────────────────────
@@ -260,11 +296,33 @@ function measureTextWidth(text, fontSize) {
 
 // ── Layout algorithm ───────────────────────────────────────────────────────────
 
+/**
+ * @param {HierarchyNode & Record<string, unknown>} node
+ * @returns {HierarchyNode[]}
+ */
+function getNodeChildren(node) {
+  return Array.isArray(node.children) ? node.children : [];
+}
+
 function findMaxCount(node) {
-  let max = node.count || 0;
-  (node.children || []).forEach((child) => {
-    max = Math.max(max, findMaxCount(child));
-  });
+  let max = 0;
+  const stack = [node];
+  const visited = new WeakSet();
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+    max = Math.max(max, current.count || 0);
+    const children = getNodeChildren(current);
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push(children[index]);
+    }
+  }
+
   return max;
 }
 
@@ -275,26 +333,73 @@ function computeFontSize(count, maxCount) {
 
 /** Annotate each node with fontSize, textWidth, lineHeight (mutates). */
 function annotateNode(node, maxCount, depth) {
-  node.fontSize = computeFontSize(node.count, maxCount);
-  node.textWidth = measureTextWidth(node.name, node.fontSize);
-  node.lineHeight = node.fontSize * LINE_HEIGHT_FACTOR;
-  node._depth = depth;
+  const stack = [{ node, depth }];
+  const visited = new WeakSet();
 
-  const children = depth < MAX_DEPTH ? node.children || [] : [];
-  node._visibleChildren = children;
-  children.forEach((child) => annotateNode(child, maxCount, depth + 1));
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current?.node || visited.has(current.node)) {
+      continue;
+    }
+
+    visited.add(current.node);
+    current.node.fontSize = computeFontSize(current.node.count, maxCount);
+    current.node.textWidth = measureTextWidth(
+      current.node.name,
+      current.node.fontSize,
+    );
+    current.node.lineHeight = current.node.fontSize * LINE_HEIGHT_FACTOR;
+    current.node._depth = current.depth;
+
+    const children =
+      current.depth < MAX_DEPTH ? getNodeChildren(current.node) : [];
+    current.node._visibleChildren = children;
+
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push({ node: children[index], depth: current.depth + 1 });
+    }
+  }
 }
 
 /** Bottom-up pass: compute subtreeHeight for each node. */
 function computeSubtreeHeight(node) {
-  const children = node._visibleChildren || [];
-  if (children.length === 0) {
-    node.subtreeHeight = node.lineHeight;
-    return node.subtreeHeight;
+  const stack = [{ node, visited: false }];
+  const seen = new WeakSet();
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current?.node) {
+      continue;
+    }
+
+    if (current.visited) {
+      const children = current.node._visibleChildren || [];
+      if (children.length === 0) {
+        current.node.subtreeHeight = current.node.lineHeight;
+      } else {
+        const total = children.reduce(
+          (sum, child) => sum + (child.subtreeHeight || child.lineHeight || 0),
+          0,
+        );
+        current.node.subtreeHeight = total + (children.length - 1) * V_GAP;
+      }
+      continue;
+    }
+
+    if (seen.has(current.node)) {
+      continue;
+    }
+
+    seen.add(current.node);
+    stack.push({ node: current.node, visited: true });
+
+    const children = current.node._visibleChildren || [];
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push({ node: children[index], visited: false });
+    }
   }
-  const total = children.reduce((s, c) => s + computeSubtreeHeight(c), 0);
-  node.subtreeHeight = total + (children.length - 1) * V_GAP;
-  return node.subtreeHeight;
+
+  return node.subtreeHeight || node.lineHeight;
 }
 
 /**
@@ -303,30 +408,71 @@ function computeSubtreeHeight(node) {
  * For "left":  child.x = parent.x - H_GAP - child.textWidth   (x = left edge)
  */
 function assignPositions(node, x, y, parent, direction) {
-  node.x = x;
-  node.y = y;
-  node.parent = parent;
-  node.direction = direction;
+  const stack = [{ node, x, y, parent }];
+  const visited = new WeakSet();
 
-  const children = node._visibleChildren || [];
-  if (children.length === 0) return;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current?.node || visited.has(current.node)) {
+      continue;
+    }
 
-  let yOffset = y - node.subtreeHeight / 2;
-  children.forEach((child) => {
-    const childY = yOffset + child.subtreeHeight / 2;
-    const childX =
-      direction === "right"
-        ? x + node.textWidth + H_GAP
-        : x - H_GAP - child.textWidth;
-    assignPositions(child, childX, childY, node, direction);
-    yOffset += child.subtreeHeight + V_GAP;
-  });
+    visited.add(current.node);
+    current.node.x = current.x;
+    current.node.y = current.y;
+    current.node.parent = current.parent;
+    current.node.direction = direction;
+
+    const children = current.node._visibleChildren || [];
+    if (children.length === 0) {
+      continue;
+    }
+
+    let yOffset = current.y - current.node.subtreeHeight / 2;
+    const placements = [];
+
+    for (let index = 0; index < children.length; index += 1) {
+      const child = children[index];
+      const childY = yOffset + child.subtreeHeight / 2;
+      const childX =
+        direction === "right"
+          ? current.x + current.node.textWidth + H_GAP
+          : current.x - H_GAP - child.textWidth;
+      placements.push({
+        node: child,
+        x: childX,
+        y: childY,
+        parent: current.node,
+      });
+      yOffset += child.subtreeHeight + V_GAP;
+    }
+
+    for (let index = placements.length - 1; index >= 0; index -= 1) {
+      stack.push(placements[index]);
+    }
+  }
 }
 
 /** Flatten tree into array (pre-order). */
 function flattenTree(node, result = []) {
-  result.push(node);
-  (node._visibleChildren || []).forEach((child) => flattenTree(child, result));
+  const stack = [node];
+  const visited = new WeakSet();
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+    result.push(current);
+
+    const children = current._visibleChildren || [];
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push(children[index]);
+    }
+  }
+
   return result;
 }
 

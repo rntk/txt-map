@@ -4355,7 +4355,9 @@
 }
 
 .word-page-tree-container {
-  height: 70vh;
+  height: 99%;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .word-page-timeline-container {
@@ -4380,6 +4382,9 @@
 
 .word-tree-graph-container {
   width: 100%;
+  height: 99%;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow: auto;
   background: #fff;
   border-radius: 8px;

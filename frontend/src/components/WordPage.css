@@ -94,6 +94,12 @@
   gap: 0.75rem;
 }
 
+.word-page-tree-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 99%;
+}
+
 .word-page-compare-container {
   height: 100%;
   min-height: 100%;
