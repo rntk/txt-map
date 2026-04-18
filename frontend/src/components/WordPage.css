@@ -166,6 +166,24 @@
   color: white;
 }
 
+.word-page-sentence-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.word-page-sentence-topic-label {
+  font-weight: 600;
+  color: var(--shell-accent);
+  font-size: 0.9rem;
+}
+
+.word-page-sentence-range-label {
+  color: var(--shell-muted);
+  font-size: 0.82rem;
+}
+
 .word-page-sentence-tabs {
   display: flex;
   gap: 2px;

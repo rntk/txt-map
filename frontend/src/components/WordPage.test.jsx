@@ -276,25 +276,143 @@ describe("WordPage header layout", () => {
     });
   });
 
-  it("passes summaryHighlightRanges to TextDisplay when summary keywords are enabled", () => {
+  it("passes wordHighlightRanges to TextDisplay showing matched word positions", () => {
     render(<WordPage />);
 
-    const initialProps = mockTextDisplay.mock.calls[0][0];
-    expect(initialProps.summaryHighlightRanges).toEqual([]);
-    expect(initialProps.rawText).toBe("Alpha beta gamma");
+    // With grouped sentences, word highlights are always shown
+    const firstCallProps = mockTextDisplay.mock.calls[0][0];
+    expect(firstCallProps.summaryHighlightRanges).toBeDefined();
+    // The word "beta" appears in "Alpha beta gamma" at position 6-10
+    expect(firstCallProps.summaryHighlightRanges).toContainEqual({
+      start: 6,
+      end: 10,
+    });
+    // The full range text should be displayed (for Topic 1 range 1-1, this is sentence 1)
+    expect(firstCallProps.rawText).toBe("Alpha beta gamma");
+    expect(firstCallProps.sentences).toEqual(["Alpha beta gamma"]);
+  });
 
-    fireEvent.click(screen.getByLabelText("Highlight summary keywords"));
+  it("shows all sentences in a range even if only some contain the matched word", () => {
+    // Update mock to have a range spanning multiple sentences
+    mockUseSubmission.mockReturnValue({
+      submission: {
+        status: {
+          overall: "completed",
+          tasks: {
+            summarization: { status: "completed" },
+          },
+        },
+        results: {
+          sentences: ["First sentence", "Alpha beta gamma", "Last sentence"],
+          topics: [
+            {
+              name: "Topic 1",
+              sentences: [1, 2, 3],
+              ranges: [
+                {
+                  start: 0,
+                  end: 50,
+                  sentence_start: 1,
+                  sentence_end: 3,
+                },
+              ],
+            },
+          ],
+          topic_marker_summaries: {},
+          markup: {},
+          topic_summaries: {},
+          summary: [],
+          summary_mappings: [],
+        },
+      },
+      loading: false,
+      error: null,
+      readTopics: new Set(),
+      toggleRead: vi.fn(),
+      getSimilarWords: mockGetSimilarWords,
+    });
 
-    const matchingCall = mockTextDisplay.mock.calls.find(([props]) =>
-      props.summaryHighlightRanges?.some(
-        (range) => range.start === 0 && range.end === 10,
-      ),
+    render(<WordPage />);
+
+    // Should show all 3 sentences in the range, combined
+    const callWithFullRange = mockTextDisplay.mock.calls.find(
+      ([props]) => props.rawText?.includes("First sentence"),
     );
+    expect(callWithFullRange).toBeDefined();
+    const props = callWithFullRange[0];
+    // All sentences in range 1-3 should be displayed
+    expect(props.rawText).toBe(
+      "First sentence Alpha beta gamma Last sentence",
+    );
+    expect(props.sentences).toEqual([
+      "First sentence",
+      "Alpha beta gamma",
+      "Last sentence",
+    ]);
+    // Word highlight should be at "beta" position in combined text
+    // "First sentence" = 13 chars + space = 14, "Alpha " = 5 chars + space = 6
+    // So beta starts at position 21
+    expect(props.summaryHighlightRanges).toContainEqual({
+      start: 21,
+      end: 25,
+    });
+  });
 
-    expect(matchingCall).toBeDefined();
-    expect(matchingCall[0].articleTopics[0]).toMatchObject({
-      marker_spans: [{ start_word: 1, end_word: 2, text: "Alpha beta" }],
-      summaryHighlightRanges: [{ start: 0, end: 10 }],
+  it("groups consecutive topic sentences into one range when enrichedTopics has per-sentence ranges", () => {
+    // Simulates real data: backend stored topic with multi-sentence range,
+    // but useTextPageData.safeTopics expanded sentence_spans into per-sentence
+    // ranges. The raw submission.results.topics still carries the full range
+    // info (either via topic.ranges with sentence_start/end or topic.sentences),
+    // which we must use to group sentences on the Sentences tab.
+    mockUseSubmission.mockReturnValue({
+      submission: {
+        status: {
+          overall: "completed",
+          tasks: { summarization: { status: "completed" } },
+        },
+        results: {
+          sentences: ["Intro line", "Alpha beta gamma", "Tail line"],
+          topics: [
+            {
+              name: "Topic 1",
+              sentences: [1, 2, 3],
+              sentence_spans: [
+                { sentence: 1, start: 0, end: 10 },
+                { sentence: 2, start: 11, end: 27 },
+                { sentence: 3, start: 28, end: 37 },
+              ],
+            },
+          ],
+          topic_marker_summaries: {},
+          markup: {},
+          topic_summaries: {},
+          summary: [],
+          summary_mappings: [],
+        },
+      },
+      loading: false,
+      error: null,
+      readTopics: new Set(),
+      toggleRead: vi.fn(),
+      getSimilarWords: mockGetSimilarWords,
+    });
+
+    render(<WordPage />);
+
+    const fullRangeCall = mockTextDisplay.mock.calls.find(
+      ([props]) => props.rawText === "Intro line Alpha beta gamma Tail line",
+    );
+    expect(fullRangeCall).toBeDefined();
+    const props = fullRangeCall[0];
+    expect(props.sentences).toEqual([
+      "Intro line",
+      "Alpha beta gamma",
+      "Tail line",
+    ]);
+    // "Intro line " (11) + "Alpha " (6) = 17 → "beta" at 17-21
+    expect(props.summaryHighlightRanges).toContainEqual({
+      start: 17,
+      end: 21,
     });
   });
 

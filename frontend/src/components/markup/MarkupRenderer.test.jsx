@@ -47,10 +47,7 @@ describe("MarkupRenderer", () => {
 
   it("leaves markup untouched when highlightWords is an empty array", () => {
     const { container } = render(
-      <MarkupRenderer
-        html="<p>The quick brown fox.</p>"
-        highlightWords={[]}
-      />,
+      <MarkupRenderer html="<p>The quick brown fox.</p>" highlightWords={[]} />,
     );
 
     expect(container.querySelector(".word-highlight")).toBeNull();

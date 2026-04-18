@@ -376,229 +376,176 @@ function WordPageContent({ word }) {
   }, [allTopics, readTopics]);
 
   /**
-   * @param {string} text
-   * @returns {CharacterRange[]}
+   * Groups sentences by topic ranges. For each topic range that contains a matched
+   * sentence, we display ALL sentences in that range (not just those containing
+   * the word), mirroring how the backend generates markup in
+   * lib/tasks/markup_generation.py::_extract_topic_ranges: use explicit
+   * `ranges[]` with sentence_start/sentence_end when available, otherwise group
+   * consecutive sentence numbers.
+   *
+   * We intentionally read from the raw `submission.results.topics` rather than
+   * the `enrichedTopics` exposed by ArticleContext, because the enrichment step
+   * (useTextPageData.safeTopics) rebuilds `ranges` from per-sentence
+   * `sentence_spans`, collapsing every multi-sentence topic range into
+   * single-sentence ranges. That loses the grouping we need here.
    */
-  const getWordCharacterRanges = useCallback((text) => {
-    if (typeof text !== "string" || !text) {
-      return [];
-    }
+  const sentenceGroupsByRange = useMemo(() => {
+    const markup = submission?.results?.markup;
+    const rawTopics = Array.isArray(submission?.results?.topics)
+      ? submission.results.topics
+      : [];
 
-    /** @type {CharacterRange[]} */
-    const ranges = [];
-    let wordStart = -1;
+    const matchedTopicNames = new Set(topics.map((t) => t.name));
+    const matchedSentenceNums = new Set(
+      sentencesInfo.map(({ index }) => index + 1),
+    );
 
-    for (let index = 0; index < text.length; index += 1) {
-      const char = text[index];
-      if (/\s/.test(char)) {
-        if (wordStart !== -1) {
-          ranges.push({ start: wordStart, end: index });
-          wordStart = -1;
+    /**
+     * Mirrors backend _extract_topic_ranges: prefer explicit ranges with
+     * sentence_start/sentence_end, else group consecutive topic.sentences.
+     * @param {{ ranges?: Array<{sentence_start?: number, sentence_end?: number}>, sentences?: number[] }} topic
+     * @returns {Array<{ start: number, end: number }>}
+     */
+    const extractSentenceRanges = (topic) => {
+      const rawRanges = Array.isArray(topic?.ranges) ? topic.ranges : [];
+      const explicit = [];
+      rawRanges.forEach((range) => {
+        const s = Number(range?.sentence_start);
+        const e = Number(range?.sentence_end ?? range?.sentence_start);
+        if (Number.isInteger(s) && Number.isInteger(e) && s >= 1 && e >= s) {
+          explicit.push({ start: s, end: e });
         }
-      } else if (wordStart === -1) {
-        wordStart = index;
-      }
-    }
-
-    if (wordStart !== -1) {
-      ranges.push({ start: wordStart, end: text.length });
-    }
-
-    return ranges;
-  }, []);
-
-  const sentenceCardData = useMemo(() => {
-    const topicMarkerSummaries =
-      submission?.results?.topic_marker_summaries || {};
-
-    return sentencesInfo.map(({ index, text }) => {
-      const sentenceWordRanges = getWordCharacterRanges(text);
-      const sentenceTopics = topics
-        .filter(
-          (topic) =>
-            Array.isArray(topic.sentences) &&
-            topic.sentences.includes(index + 1),
-        )
-        .map((topic) => {
-          const markerSummary = topicMarkerSummaries[topic.name];
-          const matchingRanges = Array.isArray(markerSummary?.ranges)
-            ? markerSummary.ranges.filter((range) => {
-                const sentenceStart = Number(range?.sentence_start);
-                const sentenceEnd = Number(
-                  range?.sentence_end ?? range?.sentence_start,
-                );
-                return (
-                  Number.isInteger(sentenceStart) &&
-                  Number.isInteger(sentenceEnd) &&
-                  sentenceStart <= index + 1 &&
-                  sentenceEnd >= index + 1
-                );
-              })
-            : [];
-
-          /** @type {CharacterRange[]} */
-          const localSummaryHighlightRanges = [];
-          const localMarkerSpans = [];
-
-          matchingRanges.forEach((range) => {
-            const markerSpans = Array.isArray(range?.marker_spans)
-              ? range.marker_spans
-              : [];
-            markerSpans.forEach((markerSpan) => {
-              const startWord = Number(markerSpan?.start_word);
-              const endWord = Number(markerSpan?.end_word);
-              if (
-                !Number.isInteger(startWord) ||
-                !Number.isInteger(endWord) ||
-                startWord < 1 ||
-                endWord < startWord ||
-                endWord > sentenceWordRanges.length
-              ) {
-                return;
-              }
-
-              localSummaryHighlightRanges.push({
-                start: sentenceWordRanges[startWord - 1].start,
-                end: sentenceWordRanges[endWord - 1].end,
-              });
-              localMarkerSpans.push({
-                ...markerSpan,
-                text: text
-                  .slice(
-                    sentenceWordRanges[startWord - 1].start,
-                    sentenceWordRanges[endWord - 1].end,
-                  )
-                  .trim(),
-              });
-            });
-          });
-
-          return {
-            ...topic,
-            sentences: [1],
-            ranges: [{ start: 0, end: text.length }],
-            summaryHighlightRanges: localSummaryHighlightRanges,
-            marker_spans: localMarkerSpans,
-          };
-        });
-
-      return {
-        index,
-        text,
-        sentenceTopics,
-        summaryHighlightRanges: sentenceTopics.flatMap((topic) =>
-          Array.isArray(topic.summaryHighlightRanges)
-            ? topic.summaryHighlightRanges
-            : [],
-        ),
-      };
-    });
-  }, [getWordCharacterRanges, sentencesInfo, submission, topics]);
-
-  // Compute per-sentence highlight ranges from word-context highlights (same logic as generic ones)
-  const wordContextSentenceRanges = useMemo(() => {
-    const highlightsMap = wordContextStatus?.highlights;
-    if (!highlightsMap || !wordContextHighlightsEnabled) {
-      return {};
-    }
-
-    /** @type {Record<number, Array<{start: number, end: number}>>} */
-    const result = {};
-
-    sentencesInfo.forEach(({ index, text }) => {
-      const sentenceNum = index + 1;
-      const sentenceWordRanges = getWordCharacterRanges(text);
-      /** @type {Array<{start: number, end: number}>} */
-      const charRanges = [];
-
-      Object.values(highlightsMap).forEach((topicHighlight) => {
-        const ranges = Array.isArray(topicHighlight?.ranges)
-          ? topicHighlight.ranges
-          : [];
-        ranges.forEach((range) => {
-          const sentenceStart = Number(range?.sentence_start);
-          const sentenceEnd = Number(
-            range?.sentence_end ?? range?.sentence_start,
-          );
-          if (
-            !Number.isInteger(sentenceStart) ||
-            !Number.isInteger(sentenceEnd) ||
-            sentenceStart > sentenceNum ||
-            sentenceEnd < sentenceNum
-          ) {
-            return;
-          }
-          const markerSpans = Array.isArray(range?.marker_spans)
-            ? range.marker_spans
-            : [];
-          markerSpans.forEach((span) => {
-            const startWord = Number(span?.start_word);
-            const endWord = Number(span?.end_word);
-            if (
-              !Number.isInteger(startWord) ||
-              !Number.isInteger(endWord) ||
-              startWord < 1 ||
-              endWord < startWord ||
-              endWord > sentenceWordRanges.length
-            ) {
-              return;
-            }
-            charRanges.push({
-              start: sentenceWordRanges[startWord - 1].start,
-              end: sentenceWordRanges[endWord - 1].end,
-            });
-          });
-        });
       });
+      if (explicit.length > 0) return explicit;
 
-      if (charRanges.length > 0) {
-        result[index] = charRanges;
-      }
+      const sorted = Array.isArray(topic?.sentences)
+        ? [...topic.sentences]
+            .filter((n) => Number.isInteger(n) && n >= 1)
+            .sort((a, b) => a - b)
+        : [];
+      const groups = [];
+      sorted.forEach((n) => {
+        const last = groups[groups.length - 1];
+        if (last && n === last[last.length - 1] + 1) {
+          last.push(n);
+        } else if (!last || n !== last[last.length - 1]) {
+          groups.push([n]);
+        }
+      });
+      return groups.map((g) => ({ start: g[0], end: g[g.length - 1] }));
+    };
+
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wordPattern = word ? new RegExp(`\\b${escapeRegex(word)}\\b`, "gi") : null;
+
+    /** @type {Map<string, { topicName: string, rangeStart: number, rangeEnd: number }>} */
+    const matchedRangeKeys = new Map();
+
+    rawTopics.forEach((rawTopic) => {
+      if (!rawTopic?.name || !matchedTopicNames.has(rawTopic.name)) return;
+      const ranges = extractSentenceRanges(rawTopic);
+      ranges.forEach(({ start, end }) => {
+        let hit = false;
+        for (let n = start; n <= end; n += 1) {
+          if (matchedSentenceNums.has(n)) {
+            hit = true;
+            break;
+          }
+        }
+        if (!hit) return;
+        const key = `${rawTopic.name}\u0000${start}\u0000${end}`;
+        if (!matchedRangeKeys.has(key)) {
+          matchedRangeKeys.set(key, {
+            topicName: rawTopic.name,
+            rangeStart: start,
+            rangeEnd: end,
+          });
+        }
+      });
     });
 
-    return result;
-  }, [
-    wordContextStatus,
-    wordContextHighlightsEnabled,
-    sentencesInfo,
-    getWordCharacterRanges,
-  ]);
+    /** @type {Array<{ key: string, topic: any, rangeStart: number, rangeEnd: number, sentenceIndices: number[], text: string, sentences: string[], sentenceTopics: any[], wordHighlightRanges: Array<{start: number, end: number}>, hasMarkup: boolean }>} */
+    const groups = [];
+
+    matchedRangeKeys.forEach(({ topicName, rangeStart, rangeEnd }, key) => {
+      const topic = topics.find((t) => t.name === topicName) || { name: topicName };
+
+      const sentenceIndices = [];
+      const sentences = [];
+      for (let i = rangeStart; i <= rangeEnd; i += 1) {
+        const sentIdx = i - 1;
+        if (sentIdx >= 0 && sentIdx < allSentences.length) {
+          sentenceIndices.push(sentIdx);
+          sentences.push(allSentences[sentIdx]);
+        }
+      }
+      if (sentences.length === 0) return;
+
+      const combinedText = sentences.join(" ");
+      const wordMatches = [];
+      if (wordPattern) {
+        wordPattern.lastIndex = 0;
+        let match;
+        while ((match = wordPattern.exec(combinedText)) !== null) {
+          wordMatches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+          });
+        }
+      }
+
+      groups.push({
+        key,
+        topic,
+        rangeStart,
+        rangeEnd,
+        sentenceIndices,
+        text: combinedText,
+        sentences,
+        sentenceTopics: [topic],
+        wordHighlightRanges: wordMatches,
+        hasMarkup: Boolean(markup && resolveTopicMarkup(markup, topic)),
+      });
+    });
+
+    // Fallback: matched sentences not covered by any topic range
+    sentencesInfo.forEach(({ index, text }) => {
+      const sentNum = index + 1;
+      const covered = groups.some(
+        (g) => sentNum >= g.rangeStart && sentNum <= g.rangeEnd,
+      );
+      if (covered) return;
+
+      const wordMatches = [];
+      if (wordPattern) {
+        wordPattern.lastIndex = 0;
+        let match;
+        while ((match = wordPattern.exec(text)) !== null) {
+          wordMatches.push({
+            start: match.index,
+            end: match.index + match[0].length,
+          });
+        }
+      }
+      groups.push({
+        key: `standalone\u0000${sentNum}`,
+        topic: { name: `Sentence ${sentNum}` },
+        rangeStart: sentNum,
+        rangeEnd: sentNum,
+        sentenceIndices: [index],
+        text,
+        sentences: [text],
+        sentenceTopics: [],
+        wordHighlightRanges: wordMatches,
+        hasMarkup: false,
+      });
+    });
+
+    groups.sort((a, b) => a.rangeStart - b.rangeStart);
+    return groups;
+  }, [sentencesInfo, submission, topics, word, allSentences]);
 
   const markup = submission?.results?.markup;
-
-  const sentenceMarkupData = useMemo(() => {
-    if (!markup || topics.length === 0) {
-      return {};
-    }
-
-    const result = {};
-    sentencesInfo.forEach(({ index }) => {
-      const sentenceNum = index + 1;
-      const rangesForSentence = [];
-
-      topics.forEach((topic) => {
-        const topicMarkup = resolveTopicMarkup(markup, topic);
-        if (!topicMarkup) {
-          return;
-        }
-        const allRanges = getTopicMarkupRanges(topicMarkup);
-        allRanges.forEach((range) => {
-          if (
-            range.sentence_start <= sentenceNum &&
-            range.sentence_end >= sentenceNum
-          ) {
-            rangesForSentence.push(range);
-          }
-        });
-      });
-
-      if (rangesForSentence.length > 0) {
-        result[index] = rangesForSentence;
-      }
-    });
-
-    return result;
-  }, [markup, sentencesInfo, topics]);
 
   const treeEntriesWithReadState = useMemo(() => {
     return treeEntries.map((entry) => ({
@@ -787,28 +734,48 @@ function WordPageContent({ word }) {
                 </div>
               ) : (
                 <div className="word-page-sentences-list">
-                  {sentenceCardData.map(
+                  {sentenceGroupsByRange.map(
                     ({
-                      index,
+                      key,
+                      topic,
+                      rangeStart: _rangeStart,
+                      rangeEnd: _rangeEnd,
+                      sentenceIndices,
                       text,
+                      sentences,
                       sentenceTopics,
-                      summaryHighlightRanges,
+                      wordHighlightRanges,
+                      hasMarkup,
                     }) => {
-                      const hasMarkup = Array.isArray(
-                        sentenceMarkupData[index],
-                      );
+                      const rangeMarkupRanges = hasMarkup
+                        ? getTopicMarkupRanges(
+                            resolveTopicMarkup(markup, topic),
+                          )
+                        : [];
                       const activeSentenceTab =
-                        sentenceTabMap[index] || "sentences";
+                        sentenceTabMap[key] || "sentences";
+                      const sentenceLabel =
+                        sentenceIndices.length === 1
+                          ? `Sentence #${sentenceIndices[0] + 1}`
+                          : `Sentences #${sentenceIndices[0] + 1}-${sentenceIndices[sentenceIndices.length - 1] + 1}`;
                       return (
-                        <div key={index} className="word-page-sentence-card">
+                        <div
+                          key={key}
+                          className="word-page-sentence-card word-page-sentence-card--grouped"
+                        >
                           <div className="word-page-sentence-header">
-                            <span>Sentence #{index + 1}</span>
+                            <span className="word-page-sentence-topic-label">
+                              {topic.name}
+                            </span>
+                            <span className="word-page-sentence-range-label">
+                              {sentenceLabel}
+                            </span>
                             <div className="word-page-sentence-tabs">
                               <button
                                 type="button"
                                 className={`word-page-sentence-tab${activeSentenceTab === "sentences" ? " word-page-sentence-tab--active" : ""}`}
                                 onClick={() =>
-                                  handleSentenceTabChange(index, "sentences")
+                                  handleSentenceTabChange(key, "sentences")
                                 }
                               >
                                 Sentences
@@ -818,7 +785,7 @@ function WordPageContent({ word }) {
                                 className={`word-page-sentence-tab${activeSentenceTab === "markup" ? " word-page-sentence-tab--active" : ""}${!hasMarkup ? " word-page-sentence-tab--disabled" : ""}`}
                                 onClick={() =>
                                   hasMarkup &&
-                                  handleSentenceTabChange(index, "markup")
+                                  handleSentenceTabChange(key, "markup")
                                 }
                                 disabled={!hasMarkup}
                               >
@@ -826,9 +793,11 @@ function WordPageContent({ word }) {
                               </button>
                             </div>
                           </div>
-                          {activeSentenceTab === "markup" && hasMarkup ? (
+                          {activeSentenceTab === "markup" &&
+                          hasMarkup &&
+                          rangeMarkupRanges.length > 0 ? (
                             <div className="word-page-sentence-markup">
-                              {sentenceMarkupData[index].map((range) => (
+                              {rangeMarkupRanges.map((range) => (
                                 <MarkupRenderer
                                   key={`range-${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
                                   html={range.html}
@@ -838,7 +807,7 @@ function WordPageContent({ word }) {
                             </div>
                           ) : (
                             <TextDisplay
-                              sentences={[text]}
+                              sentences={sentences}
                               selectedTopics={selectedTopics}
                               hoveredTopic={hoveredTopic}
                               readTopics={readTopics}
@@ -850,14 +819,7 @@ function WordPageContent({ word }) {
                               submissionId={submissionId}
                               highlightWords={[word]}
                               rawText={text}
-                              summaryHighlightRanges={
-                                wordContextHighlightsEnabled &&
-                                wordContextSentenceRanges[index]
-                                  ? wordContextSentenceRanges[index]
-                                  : summaryKeywordHighlightEnabled
-                                    ? summaryHighlightRanges
-                                    : []
-                              }
+                              summaryHighlightRanges={wordHighlightRanges}
                             />
                           )}
                         </div>
