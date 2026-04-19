@@ -292,3 +292,25 @@
   font-weight: 600;
   color: #1d4ed8;
 }
+
+.topic-heatmap-nonzero {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.topic-heatmap-nonzero input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.topic-heatmap-row-header .topic-heatmap-nonzero {
+  margin-top: 0;
+  margin-left: 6px;
+}

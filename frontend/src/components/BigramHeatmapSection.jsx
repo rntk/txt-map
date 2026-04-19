@@ -120,6 +120,10 @@ function BigramHeatmapSection({
   const [activeColumnIndex, setActiveColumnIndex] = useState(null);
   const [pinnedRowIndex, setPinnedRowIndex] = useState(null);
   const [pinnedColumnIndex, setPinnedColumnIndex] = useState(null);
+  const [nonZeroColumnIndices, setNonZeroColumnIndices] = useState(
+    () => new Set(),
+  );
+  const [nonZeroRowIndices, setNonZeroRowIndices] = useState(() => new Set());
   const heatmapData = heatmapState.data;
 
   useEffect(() => {
@@ -129,7 +133,33 @@ function BigramHeatmapSection({
     setActiveColumnIndex(null);
     setPinnedRowIndex(null);
     setPinnedColumnIndex(null);
+    setNonZeroColumnIndices(new Set());
+    setNonZeroRowIndices(new Set());
   }, [submissionId, heatmapData]);
+
+  const toggleNonZeroColumn = useCallback((columnIndex) => {
+    setNonZeroColumnIndices((current) => {
+      const next = new Set(current);
+      if (next.has(columnIndex)) {
+        next.delete(columnIndex);
+      } else {
+        next.add(columnIndex);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleNonZeroRow = useCallback((rowIndex) => {
+    setNonZeroRowIndices((current) => {
+      const next = new Set(current);
+      if (next.has(rowIndex)) {
+        next.delete(rowIndex);
+      } else {
+        next.add(rowIndex);
+      }
+      return next;
+    });
+  }, []);
 
   const handleHoverPosition = useCallback((rowIndex, columnIndex) => {
     setActiveRowIndex(rowIndex);
@@ -194,14 +224,30 @@ function BigramHeatmapSection({
   const normalizedRowFilterValue = rowFilterValue.trim().toLowerCase();
   const filteredRowEntries = allRowWords
     .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) =>
-      matchesWordFilter(entry.word, normalizedRowFilterValue),
-    );
+    .filter(({ entry, index }) => {
+      if (!matchesWordFilter(entry.word, normalizedRowFilterValue)) {
+        return false;
+      }
+      for (const columnIndex of nonZeroColumnIndices) {
+        if (!(matrix[index]?.[columnIndex] > 0)) {
+          return false;
+        }
+      }
+      return true;
+    });
   const filteredColumnEntries = allColWords
     .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) =>
-      matchesWordFilter(entry.word, normalizedColumnFilterValue),
-    );
+    .filter(({ entry, index }) => {
+      if (!matchesWordFilter(entry.word, normalizedColumnFilterValue)) {
+        return false;
+      }
+      for (const rowIndex of nonZeroRowIndices) {
+        if (!(matrix[rowIndex]?.[index] > 0)) {
+          return false;
+        }
+      }
+      return true;
+    });
   const visibleRowEntries = showAllWords
     ? filteredRowEntries
     : filteredRowEntries.slice(0, defaultVisibleWordCount);
@@ -304,6 +350,19 @@ function BigramHeatmapSection({
                         {entry.word}
                       </a>
                     )}
+                    <label
+                      className="topic-heatmap-nonzero"
+                      onClick={(event) => event.stopPropagation()}
+                      title="Hide rows whose value in this column is 0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={nonZeroColumnIndices.has(columnIndex)}
+                        onChange={() => toggleNonZeroColumn(columnIndex)}
+                        aria-label={`Hide rows with zero value in ${entry.word}`}
+                      />
+                      <span>≠0</span>
+                    </label>
                   </th>
                 );
               })}
@@ -360,6 +419,19 @@ function BigramHeatmapSection({
                           {rowEntry.word}
                         </a>
                       )}
+                      <label
+                        className="topic-heatmap-nonzero"
+                        onClick={(event) => event.stopPropagation()}
+                        title="Hide columns whose value in this row is 0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={nonZeroRowIndices.has(rowIndex)}
+                          onChange={() => toggleNonZeroRow(rowIndex)}
+                          aria-label={`Hide columns with zero value in ${rowEntry.word}`}
+                        />
+                        <span>≠0</span>
+                      </label>
                     </th>
                     {visibleColumnEntries.map(
                       ({ entry: columnEntry, index: columnIndex }) => {
