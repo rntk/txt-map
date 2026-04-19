@@ -124,6 +124,8 @@ function BigramHeatmapSection({
     () => new Set(),
   );
   const [nonZeroRowIndices, setNonZeroRowIndices] = useState(() => new Set());
+  const [sortByColumnIndex, setSortByColumnIndex] = useState(null);
+  const [sortByRowIndex, setSortByRowIndex] = useState(null);
   const heatmapData = heatmapState.data;
 
   useEffect(() => {
@@ -135,6 +137,8 @@ function BigramHeatmapSection({
     setPinnedColumnIndex(null);
     setNonZeroColumnIndices(new Set());
     setNonZeroRowIndices(new Set());
+    setSortByColumnIndex(null);
+    setSortByRowIndex(null);
   }, [submissionId, heatmapData]);
 
   const toggleNonZeroColumn = useCallback((columnIndex) => {
@@ -159,6 +163,16 @@ function BigramHeatmapSection({
       }
       return next;
     });
+  }, []);
+
+  const toggleSortByColumn = useCallback((columnIndex) => {
+    setSortByColumnIndex((current) =>
+      current === columnIndex ? null : columnIndex,
+    );
+  }, []);
+
+  const toggleSortByRow = useCallback((rowIndex) => {
+    setSortByRowIndex((current) => (current === rowIndex ? null : rowIndex));
   }, []);
 
   const handleHoverPosition = useCallback((rowIndex, columnIndex) => {
@@ -235,6 +249,13 @@ function BigramHeatmapSection({
       }
       return true;
     });
+  if (sortByColumnIndex !== null) {
+    filteredRowEntries.sort(
+      ({ index: a }, { index: b }) =>
+        (matrix[b]?.[sortByColumnIndex] || 0) -
+        (matrix[a]?.[sortByColumnIndex] || 0),
+    );
+  }
   const filteredColumnEntries = allColWords
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry, index }) => {
@@ -248,6 +269,13 @@ function BigramHeatmapSection({
       }
       return true;
     });
+  if (sortByRowIndex !== null) {
+    filteredColumnEntries.sort(
+      ({ index: a }, { index: b }) =>
+        (matrix[sortByRowIndex]?.[b] || 0) -
+        (matrix[sortByRowIndex]?.[a] || 0),
+    );
+  }
   const visibleRowEntries = showAllWords
     ? filteredRowEntries
     : filteredRowEntries.slice(0, defaultVisibleWordCount);
@@ -363,6 +391,19 @@ function BigramHeatmapSection({
                       />
                       <span>≠0</span>
                     </label>
+                    <label
+                      className="topic-heatmap-nonzero"
+                      onClick={(event) => event.stopPropagation()}
+                      title="Sort rows by this column in descending order"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sortByColumnIndex === columnIndex}
+                        onChange={() => toggleSortByColumn(columnIndex)}
+                        aria-label={`Sort rows by ${entry.word} descending`}
+                      />
+                      <span>sort</span>
+                    </label>
                   </th>
                 );
               })}
@@ -431,6 +472,19 @@ function BigramHeatmapSection({
                           aria-label={`Hide columns with zero value in ${rowEntry.word}`}
                         />
                         <span>≠0</span>
+                      </label>
+                      <label
+                        className="topic-heatmap-nonzero"
+                        onClick={(event) => event.stopPropagation()}
+                        title="Sort columns by this row in descending order"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={sortByRowIndex === rowIndex}
+                          onChange={() => toggleSortByRow(rowIndex)}
+                          aria-label={`Sort columns by ${rowEntry.word} descending`}
+                        />
+                        <span>sort</span>
                       </label>
                     </th>
                     {visibleColumnEntries.map(
