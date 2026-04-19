@@ -65,11 +65,20 @@
 }
 
 .topic-heatmap-corner,
-.topic-heatmap-column-header,
 .topic-heatmap-row-header {
   position: sticky;
   background: #f8fafc;
   z-index: 2;
+}
+
+.topic-heatmap-column-header {
+  position: sticky;
+  background: #f8fafc;
+  z-index: 2;
+  top: 0;
+  min-width: 120px;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .topic-heatmap-corner {
@@ -115,12 +124,10 @@
   outline-offset: 1px;
 }
 
-.topic-heatmap-column-header {
-  top: 0;
-  min-width: 120px;
-  white-space: nowrap;
-  line-height: 1.2;
+.topic-heatmap-column-part {
+  display: block;
 }
+
 
 .topic-heatmap-row-header {
   left: 0;
@@ -158,6 +165,45 @@
 
 .topic-heatmap-cell.is-diagonal {
   font-weight: 600;
+}
+
+.topic-heatmap-row-header,
+.topic-heatmap-column-header {
+  cursor: pointer;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.topic-heatmap-row-header.is-active,
+.topic-heatmap-column-header.is-active {
+  background: #dbeafe;
+  color: #0f172a;
+}
+
+.topic-heatmap-row-header.is-pinned,
+.topic-heatmap-column-header.is-pinned {
+  background: #bfdbfe;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.topic-heatmap-cell.is-active-row,
+.topic-heatmap-cell.is-active-column {
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+  outline-offset: -1px;
+}
+
+.topic-heatmap-cell.is-active-row.is-active-column,
+.topic-heatmap-cell.is-focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.topic-heatmap-cell.is-pinned-row,
+.topic-heatmap-cell.is-pinned-column {
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.55);
+}
+
+.topic-heatmap-cell.is-pinned-row.is-pinned-column {
+  box-shadow: inset 0 0 0 2px #1d4ed8;
 }
 
 .topic-heatmap-cell.heat-0 {
@@ -222,4 +268,27 @@
   height: 100%;
   min-height: 0;
   padding: 0.35rem;
+}
+
+.topic-heatmap-column-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  max-width: 12ch;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.topic-heatmap-column-part {
+  display: block;
+  font-size: 0.78rem;
+  color: #475569;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.topic-heatmap-column-part--leaf {
+  font-weight: 600;
+  color: #1d4ed8;
 }

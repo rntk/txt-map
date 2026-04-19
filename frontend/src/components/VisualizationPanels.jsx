@@ -17,11 +17,12 @@ import TreemapChart from "./TreemapChart";
 import TopicsVennChart from "./TopicsVennChart";
 import TopicHierarchyFlowChart from "./TopicHierarchyFlowChart";
 import ArticleBigramHeatmapView from "./ArticleBigramHeatmapView";
+import TopicHeatmapView from "./TopicHeatmapView";
 import RadialFlowChart from "./RadialFlowChart";
 
 /**
  * @typedef {Object} VisualizationPanelsProps
- * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'tag_frequency' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | 'radial_flow' | null} fullscreenGraph
+ * @property {'venn_chart' | 'topics' | 'topics_river' | 'gantt_chart' | 'marimekko' | 'mindmap' | 'prefix_tree' | 'tags_cloud' | 'tag_frequency' | 'circular_packing' | 'radar_chart' | 'grid_view' | 'article_structure' | 'treemap' | 'topic_hierarchy_flow' | 'article_bigram_heatmap' | 'topic_word_heatmap' | 'radial_flow' | null} fullscreenGraph
  * @property {() => void} [onClose]
  * @property {Array<unknown>} safeTopics
  * @property {string[]} safeSentences
@@ -88,6 +89,13 @@ function VisualizationPanels({
 
       {fullscreenGraph === "article_bigram_heatmap" && (
         <ArticleBigramHeatmapView
+          submissionId={submissionId == null ? null : String(submissionId)}
+          onClose={onClose}
+        />
+      )}
+
+      {fullscreenGraph === "topic_word_heatmap" && (
+        <TopicHeatmapView
           submissionId={submissionId == null ? null : String(submissionId)}
           onClose={onClose}
         />

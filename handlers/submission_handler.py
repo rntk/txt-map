@@ -1101,6 +1101,93 @@ def get_topic_analysis_heatmap(
     }
 
 
+@router.get("/submission/{submission_id}/topic-analysis/topic-word-heatmap")
+def get_topic_word_heatmap(
+    top_words: int = Query(default=80, ge=1, le=500),
+    submission: dict = Depends(require_submission),
+) -> Dict[str, Any]:
+    """Return a matrix of word frequencies per topic (rows=words, cols=topics)."""
+    import collections
+
+    results = submission.get("results") or {}
+    topics: List[Dict[str, Any]] = results.get("topics") or []
+    sentences: List[str] = results.get("sentences") or []
+
+    topic_entries: List[Tuple[str, collections.Counter]] = []
+    word_totals: collections.Counter[str] = collections.Counter()
+
+    for topic in topics:
+        topic_name = topic.get("name")
+        if not isinstance(topic_name, str) or not topic_name.strip():
+            continue
+
+        sentence_indices = [
+            index
+            for index in (topic.get("sentences") or [])
+            if isinstance(index, int) and 1 <= index <= len(sentences)
+        ]
+        if not sentence_indices:
+            continue
+
+        word_counts: collections.Counter[str] = collections.Counter()
+        for sentence_index in sentence_indices:
+            sentence_text = sentences[sentence_index - 1]
+            if isinstance(sentence_text, str) and sentence_text:
+                word_counts.update(normalize_text_tokens(sentence_text))
+
+        if not word_counts:
+            continue
+
+        topic_entries.append((topic_name, word_counts))
+        word_totals.update(word_counts)
+
+    selected_words = [word for word, _ in word_totals.most_common(top_words)]
+    word_index = {word: i for i, word in enumerate(selected_words)}
+
+    matrix: List[List[int]] = [
+        [0 for _ in range(len(topic_entries))] for _ in selected_words
+    ]
+    for col, (_topic_name, word_counts) in enumerate(topic_entries):
+        for word, count in word_counts.items():
+            row = word_index.get(word)
+            if row is not None:
+                matrix[row][col] = count
+
+    word_entries = [
+        {
+            "word": word,
+            "frequency": word_totals[word],
+            "specificity_score": 0.0,
+            "outside_topic_frequency": 0,
+        }
+        for word in selected_words
+    ]
+    col_entries = [
+        {
+            "word": topic_name,
+            "frequency": sum(word_counts.values()),
+            "specificity_score": 0.0,
+            "outside_topic_frequency": 0,
+        }
+        for topic_name, word_counts in topic_entries
+    ]
+    max_value = max((max(row, default=0) for row in matrix), default=0)
+
+    return {
+        "submission_id": submission["submission_id"],
+        "scope": "topic_word",
+        "topic_name": None,
+        "window_size": 0,
+        "normalization": "lemma",
+        "words": word_entries,
+        "col_words": col_entries,
+        "matrix": matrix,
+        "max_value": max_value,
+        "default_visible_word_count": 40,
+        "total_word_count": len(word_entries),
+    }
+
+
 @router.get("/submissions")
 def list_submissions(
     submission_id: Optional[str] = None,

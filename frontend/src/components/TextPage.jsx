@@ -41,6 +41,7 @@ const FULLSCREEN_TABS = [
   { key: "topic_summary_timeline", label: "Topic Summaries" },
   { key: "insights", label: "Insights" },
   { key: "article_bigram_heatmap", label: "Bigram Heatmap" },
+  { key: "topic_word_heatmap", label: "Topic Heatmap" },
   { key: "topics", label: "Topics" },
   { key: "topics_river", label: "Topics River" },
   { key: "gantt_chart", label: "Gantt Chart" },

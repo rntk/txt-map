@@ -541,6 +541,76 @@ def test_get_article_analysis_heatmap(client, mock_storage, sample_submission):
     )
 
 
+def test_get_topic_word_heatmap(client, mock_storage, sample_submission):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["results"]["sentences"] = [
+        "sentence one",
+        "sentence two",
+        "sentence three",
+    ]
+    sample_submission["results"]["topics"] = [
+        {"name": "Animals", "sentences": [1, 2]},
+        {"name": "Birds", "sentences": [3]},
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    token_map = {
+        "sentence one": ["dog", "cat", "run"],
+        "sentence two": ["dog", "run"],
+        "sentence three": ["bird", "sing"],
+    }
+
+    with patch(
+        "handlers.submission_handler.normalize_text_tokens",
+        side_effect=lambda text: list(token_map.get(text, [])),
+    ):
+        response = client.get(
+            f"/api/submission/{submission_id}/topic-analysis/topic-word-heatmap",
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["submission_id"] == submission_id
+    assert body["scope"] == "topic_word"
+    assert body["normalization"] == "lemma"
+    assert [entry["word"] for entry in body["col_words"]] == ["Animals", "Birds"]
+    word_index = {entry["word"]: i for i, entry in enumerate(body["words"])}
+    assert set(word_index) == {"dog", "cat", "run", "bird", "sing"}
+    # Animals column: dog=2, cat=1, run=2, bird=0, sing=0
+    assert body["matrix"][word_index["dog"]] == [2, 0]
+    assert body["matrix"][word_index["run"]] == [2, 0]
+    assert body["matrix"][word_index["cat"]] == [1, 0]
+    assert body["matrix"][word_index["bird"]] == [0, 1]
+    assert body["matrix"][word_index["sing"]] == [0, 1]
+    assert body["max_value"] == 2
+    assert body["total_word_count"] == 5
+    assert body["default_visible_word_count"] == 40
+
+
+def test_get_topic_word_heatmap_skips_topics_without_sentences(
+    client, mock_storage, sample_submission
+):
+    submission_id = sample_submission["submission_id"]
+    sample_submission["results"]["sentences"] = ["only sentence"]
+    sample_submission["results"]["topics"] = [
+        {"name": "Active", "sentences": [1]},
+        {"name": "Empty", "sentences": []},
+    ]
+    mock_storage.get_by_id.return_value = sample_submission
+
+    with patch(
+        "handlers.submission_handler.normalize_text_tokens",
+        return_value=["alpha", "beta"],
+    ):
+        response = client.get(
+            f"/api/submission/{submission_id}/topic-analysis/topic-word-heatmap",
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["word"] for entry in body["col_words"]] == ["Active"]
+
+
 def test_get_topic_analysis_heatmap_returns_404_for_unknown_topic(
     client, mock_storage, sample_submission
 ):

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./TopicHeatmap.css";
 
 /**
@@ -83,7 +83,16 @@ function matchesWordFilter(word, filterValue) {
  *   onToggleWordCount: () => void,
  *   rankedByLabel?: string,
  *   emptyMessage?: string,
- *   fillAvailableHeight?: boolean
+ *   fillAvailableHeight?: boolean,
+ *   metaPrefix?: string,
+ *   columnFilterLabel?: string,
+ *   rowFilterLabel?: string,
+ *   ariaLabel?: string,
+ *   renderColumnHeader?: (entry: BigramHeatmapWord) => React.ReactNode,
+ *   renderRowHeader?: (entry: BigramHeatmapWord) => React.ReactNode,
+ *   buildCellHref?: (submissionId: string | null, rowEntry: BigramHeatmapWord, columnEntry: BigramHeatmapWord) => string | null,
+ *   buildCellAriaLabel?: (rowEntry: BigramHeatmapWord, columnEntry: BigramHeatmapWord) => string,
+ *   diagonalEnabled?: boolean
  * }} props
  * @returns {React.JSX.Element}
  */
@@ -95,15 +104,64 @@ function BigramHeatmapSection({
   rankedByLabel = "topic specificity and co-occurrence",
   emptyMessage = "No heatmap data available.",
   fillAvailableHeight = false,
+  metaPrefix,
+  columnFilterLabel = "Filter columns",
+  rowFilterLabel = "Filter rows",
+  ariaLabel = "Bigram heatmap",
+  renderColumnHeader,
+  renderRowHeader,
+  buildCellHref,
+  buildCellAriaLabel,
+  diagonalEnabled = true,
 }) {
   const [columnFilterValue, setColumnFilterValue] = useState("");
   const [rowFilterValue, setRowFilterValue] = useState("");
+  const [activeRowIndex, setActiveRowIndex] = useState(null);
+  const [activeColumnIndex, setActiveColumnIndex] = useState(null);
+  const [pinnedRowIndex, setPinnedRowIndex] = useState(null);
+  const [pinnedColumnIndex, setPinnedColumnIndex] = useState(null);
   const heatmapData = heatmapState.data;
 
   useEffect(() => {
     setColumnFilterValue("");
     setRowFilterValue("");
+    setActiveRowIndex(null);
+    setActiveColumnIndex(null);
+    setPinnedRowIndex(null);
+    setPinnedColumnIndex(null);
   }, [submissionId, heatmapData]);
+
+  const handleHoverPosition = useCallback((rowIndex, columnIndex) => {
+    setActiveRowIndex(rowIndex);
+    setActiveColumnIndex(columnIndex);
+  }, []);
+
+  const handleClearHover = useCallback(() => {
+    setActiveRowIndex(null);
+    setActiveColumnIndex(null);
+  }, []);
+
+  const togglePinnedRow = useCallback((rowIndex) => {
+    setPinnedRowIndex((current) => (current === rowIndex ? null : rowIndex));
+  }, []);
+
+  const togglePinnedColumn = useCallback((columnIndex) => {
+    setPinnedColumnIndex((current) =>
+      current === columnIndex ? null : columnIndex,
+    );
+  }, []);
+
+  const togglePinnedCell = useCallback((rowIndex, columnIndex) => {
+    setPinnedRowIndex((current) => (current === rowIndex ? null : rowIndex));
+    setPinnedColumnIndex((current) =>
+      current === columnIndex ? null : columnIndex,
+    );
+  }, []);
+
+  const effectiveRowIndex =
+    activeRowIndex !== null ? activeRowIndex : pinnedRowIndex;
+  const effectiveColumnIndex =
+    activeColumnIndex !== null ? activeColumnIndex : pinnedColumnIndex;
 
   if (heatmapState.loading) {
     return <p className="topic-heatmap-status">Loading heatmap…</p>;
@@ -160,8 +218,9 @@ function BigramHeatmapSection({
     >
       <div className="topic-heatmap-meta">
         <span>
-          Window: {heatmapData.window_size} · Normalization:{" "}
-          {heatmapData.normalization} · Ranked by {rankedByLabel}
+          {metaPrefix
+            ? metaPrefix
+            : `Window: ${heatmapData.window_size} · Normalization: ${heatmapData.normalization} · Ranked by ${rankedByLabel}`}
         </span>
         {showWordCountToggle && (
           <button
@@ -179,7 +238,8 @@ function BigramHeatmapSection({
       <div
         className="topic-heatmap-scroll"
         role="region"
-        aria-label="Bigram heatmap"
+        aria-label={ariaLabel}
+        onPointerLeave={handleClearHover}
       >
         <table className="topic-heatmap-table">
           <thead>
@@ -194,8 +254,8 @@ function BigramHeatmapSection({
                       setColumnFilterValue(event.target.value)
                     }
                     className="topic-heatmap-filter__input"
-                    placeholder="Filter columns"
-                    aria-label="Filter columns"
+                    placeholder={columnFilterLabel}
+                    aria-label={columnFilterLabel}
                   />
                 </label>
                 <label className="topic-heatmap-filter">
@@ -205,25 +265,48 @@ function BigramHeatmapSection({
                     value={rowFilterValue}
                     onChange={(event) => setRowFilterValue(event.target.value)}
                     className="topic-heatmap-filter__input"
-                    placeholder="Filter rows"
-                    aria-label="Filter rows"
+                    placeholder={rowFilterLabel}
+                    aria-label={rowFilterLabel}
                   />
                 </label>
               </th>
-              {visibleColumnEntries.map(({ entry }) => (
-                <th
-                  key={`column-${entry.word}`}
-                  scope="col"
-                  className="topic-heatmap-column-header"
-                >
-                  <a
-                    href={`/page/word/${submissionId}/${encodeURIComponent(entry.word)}`}
-                    className="topic-heatmap-word-link"
+              {visibleColumnEntries.map(({ entry, index: columnIndex }) => {
+                const isColumnActive = effectiveColumnIndex === columnIndex;
+                const isColumnPinned = pinnedColumnIndex === columnIndex;
+                return (
+                  <th
+                    key={`column-${entry.word}`}
+                    scope="col"
+                    className={`topic-heatmap-column-header${
+                      isColumnActive ? " is-active" : ""
+                    }${isColumnPinned ? " is-pinned" : ""}`}
+                    onPointerEnter={() =>
+                      handleHoverPosition(null, columnIndex)
+                    }
+                    onClick={(event) => {
+                      const target = event.target;
+                      if (
+                        target instanceof HTMLElement &&
+                        target.closest("a")
+                      ) {
+                        return;
+                      }
+                      togglePinnedColumn(columnIndex);
+                    }}
                   >
-                    {entry.word}
-                  </a>
-                </th>
-              ))}
+                    {renderColumnHeader ? (
+                      renderColumnHeader(entry)
+                    ) : (
+                      <a
+                        href={`/page/word/${submissionId}/${encodeURIComponent(entry.word)}`}
+                        className="topic-heatmap-word-link"
+                      >
+                        {entry.word}
+                      </a>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -237,55 +320,121 @@ function BigramHeatmapSection({
                 </td>
               </tr>
             ) : (
-              visibleRowEntries.map(({ entry: rowEntry, index: rowIndex }) => (
-                <tr key={`row-${rowEntry.word}`}>
-                  <th
-                    scope="row"
-                    className="topic-heatmap-row-header"
-                    title={`${rowEntry.word} (${rowEntry.frequency})`}
+              visibleRowEntries.map(({ entry: rowEntry, index: rowIndex }) => {
+                const isRowActive = effectiveRowIndex === rowIndex;
+                const isRowPinned = pinnedRowIndex === rowIndex;
+                return (
+                  <tr
+                    key={`row-${rowEntry.word}`}
+                    className={`${isRowActive ? "is-active-row" : ""}${
+                      isRowPinned ? " is-pinned-row" : ""
+                    }`}
                   >
-                    <a
-                      href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
-                      className="topic-heatmap-word-link"
+                    <th
+                      scope="row"
+                      className={`topic-heatmap-row-header${
+                        isRowActive ? " is-active" : ""
+                      }${isRowPinned ? " is-pinned" : ""}`}
+                      title={`${rowEntry.word} (${rowEntry.frequency})`}
+                      onPointerEnter={() =>
+                        handleHoverPosition(rowIndex, null)
+                      }
+                      onClick={(event) => {
+                        const target = event.target;
+                        if (
+                          target instanceof HTMLElement &&
+                          target.closest("a")
+                        ) {
+                          return;
+                        }
+                        togglePinnedRow(rowIndex);
+                      }}
                     >
-                      {rowEntry.word}
-                    </a>
-                  </th>
-                  {visibleColumnEntries.map(
-                    ({ entry: columnEntry, index: columnIndex }) => {
-                      const cellValue = matrix[rowIndex]?.[columnIndex] || 0;
-                      const heatLevelClassName = getHeatLevelClassName(
-                        cellValue,
-                        heatmapData.max_value,
-                      );
-                      const cellHref = buildBigramHighlightHref(
-                        submissionId,
-                        rowEntry.word,
-                        columnEntry.word,
-                      );
-
-                      return (
-                        <td
-                          key={`cell-${rowEntry.word}-${columnEntry.word}`}
-                          className={`topic-heatmap-cell ${heatLevelClassName}${rowEntry.word === columnEntry.word ? " is-diagonal" : ""}`}
+                      {renderRowHeader ? (
+                        renderRowHeader(rowEntry)
+                      ) : (
+                        <a
+                          href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
+                          className="topic-heatmap-word-link"
                         >
-                          {cellHref ? (
-                            <a
-                              href={cellHref}
-                              className="topic-heatmap-cell-link"
-                              aria-label={`Highlight ${rowEntry.word} ${columnEntry.word} in article`}
-                            >
-                              {cellValue}
-                            </a>
-                          ) : (
-                            cellValue
-                          )}
-                        </td>
-                      );
-                    },
-                  )}
-                </tr>
-              ))
+                          {rowEntry.word}
+                        </a>
+                      )}
+                    </th>
+                    {visibleColumnEntries.map(
+                      ({ entry: columnEntry, index: columnIndex }) => {
+                        const cellValue = matrix[rowIndex]?.[columnIndex] || 0;
+                        const heatLevelClassName = getHeatLevelClassName(
+                          cellValue,
+                          heatmapData.max_value,
+                        );
+                        const cellHref = buildCellHref
+                          ? buildCellHref(submissionId, rowEntry, columnEntry)
+                          : buildBigramHighlightHref(
+                              submissionId,
+                              rowEntry.word,
+                              columnEntry.word,
+                            );
+                        const cellAriaLabel = buildCellAriaLabel
+                          ? buildCellAriaLabel(rowEntry, columnEntry)
+                          : `Highlight ${rowEntry.word} ${columnEntry.word} in article`;
+                        const isDiagonal =
+                          diagonalEnabled && rowEntry.word === columnEntry.word;
+                        const isColumnActive =
+                          effectiveColumnIndex === columnIndex;
+                        const isColumnPinned =
+                          pinnedColumnIndex === columnIndex;
+                        const isCellFocus =
+                          isRowActive && isColumnActive;
+                        const cellClassName = [
+                          "topic-heatmap-cell",
+                          heatLevelClassName,
+                          isDiagonal ? "is-diagonal" : "",
+                          isRowActive ? "is-active-row" : "",
+                          isColumnActive ? "is-active-column" : "",
+                          isCellFocus ? "is-focus" : "",
+                          isRowPinned ? "is-pinned-row" : "",
+                          isColumnPinned ? "is-pinned-column" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
+
+                        return (
+                          <td
+                            key={`cell-${rowEntry.word}-${columnEntry.word}`}
+                            className={cellClassName}
+                            onPointerEnter={() =>
+                              handleHoverPosition(rowIndex, columnIndex)
+                            }
+                            onClick={(event) => {
+                              const target = event.target;
+                              if (
+                                target instanceof HTMLElement &&
+                                target.closest("a")
+                              ) {
+                                return;
+                              }
+                              togglePinnedCell(rowIndex, columnIndex);
+                            }}
+                          >
+                            {cellHref ? (
+                              <a
+                                href={cellHref}
+                                className="topic-heatmap-cell-link"
+                                aria-label={cellAriaLabel}
+                              >
+                                {cellValue}
+                              </a>
+                            ) : (
+                              cellValue
+                            )}
+                          </td>
+                        );
+                      },
+                    )}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
