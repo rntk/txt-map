@@ -489,9 +489,14 @@ function TextPageContent() {
       const rawRate =
         value && typeof value === "object" ? value.rate : Number(value);
       const rate = Math.max(0, Math.min(100, Math.round(Number(rawRate))));
-      if (Number.isFinite(rate)) {
-        map.set(topicName, rate);
+      if (!Number.isFinite(rate)) {
+        return;
       }
+      const rawReasoning =
+        value && typeof value === "object" ? value.reasoning : "";
+      const reasoning =
+        typeof rawReasoning === "string" ? rawReasoning.trim() : "";
+      map.set(topicName, { rate, reasoning });
     });
     return map;
   }, [results.topic_temperatures]);
@@ -499,8 +504,8 @@ function TextPageContent() {
   const temperatureModeActive = showTemperature && temperatureAvailable;
   const temperatureTopicColorMap = useMemo(() => {
     const map = new Map();
-    topicTemperatureMap.forEach((rate, topicName) => {
-      map.set(topicName, getTemperatureColor(rate));
+    topicTemperatureMap.forEach((entry, topicName) => {
+      map.set(topicName, getTemperatureColor(entry.rate));
     });
     return map;
   }, [topicTemperatureMap]);
@@ -1114,6 +1119,8 @@ function TextPageContent() {
                 onSelectInsight={handleSelectInsight}
                 highlightInsightTopics={highlightInsightTopics}
                 onToggleHighlightInsightTopics={toggleHighlightInsightTopics}
+                topicTemperatureMap={topicTemperatureMap}
+                temperatureModeActive={temperatureModeActive}
               />
             </div>
             <div className="right-column" ref={rightColumnRef}>

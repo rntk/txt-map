@@ -50,6 +50,8 @@ import "./TopicNavigation.css";
  * @property {() => void} [onToggleHighlightInsightTopics]
  * @property {(topic: TopicListTopic) => void} [onCompareTopicRanges]
  * @property {(topic: TopicListTopic) => void} [onAnalyzeTopic]
+ * @property {Map<string, { rate: number, reasoning: string }>} [topicTemperatureMap]
+ * @property {boolean} [temperatureModeActive]
  */
 
 /**
@@ -90,6 +92,8 @@ function TopicList({
   onToggleHighlightInsightTopics = () => {},
   onCompareTopicRanges,
   onAnalyzeTopic,
+  topicTemperatureMap = new Map(),
+  temperatureModeActive = false,
 }) {
   const { selectedLevel, setSelectedLevel, maxLevel } = useTopicLevel(topics);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
@@ -430,6 +434,8 @@ function TopicList({
     onCloseActionMenu: closeActionMenu,
     onCompareTopicRanges,
     onAnalyzeTopic,
+    topicTemperatureMap,
+    temperatureModeActive,
   };
 
   return (

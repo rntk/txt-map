@@ -1,5 +1,6 @@
 import React from "react";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
+import { getTemperatureColor } from "../utils/temperatureColor";
 import "./TopicNavigation.css";
 
 /**
@@ -34,6 +35,8 @@ import "./TopicNavigation.css";
  * @property {string | null} [activeActionMenuPath]
  * @property {(path: string) => void} [onToggleActionMenu]
  * @property {(path: string) => void} [onCloseActionMenu]
+ * @property {Map<string, { rate: number, reasoning: string }>} [topicTemperatureMap]
+ * @property {boolean} [temperatureModeActive]
  */
 
 /**
@@ -66,6 +69,8 @@ function TopicTreeNode({
   activeActionMenuPath = null,
   onToggleActionMenu = () => {},
   onCloseActionMenu = () => {},
+  topicTemperatureMap = new Map(),
+  temperatureModeActive = false,
 }) {
   const { node, children } = treeNode;
   const hasChildren = children.size > 0;
@@ -106,6 +111,8 @@ function TopicTreeNode({
     activeActionMenuPath,
     onToggleActionMenu,
     onCloseActionMenu,
+    topicTemperatureMap,
+    temperatureModeActive,
   };
 
   const titleClassName = [
@@ -123,6 +130,18 @@ function TopicTreeNode({
     .join(" ");
 
   const titleStyle = highlightAllTopics ? topicHighlightStyle : undefined;
+  const temperatureEntry =
+    temperatureModeActive && node.isLeaf && topic
+      ? topicTemperatureMap.get(topic.name) || null
+      : null;
+  const showTemperatureBadge =
+    temperatureEntry && Number.isFinite(temperatureEntry.rate);
+  const showTemperatureNote = Boolean(
+    temperatureEntry && temperatureEntry.reasoning,
+  );
+  const temperatureBadgeStyle = showTemperatureBadge
+    ? { "--topic-temp-color": getTemperatureColor(temperatureEntry.rate) }
+    : undefined;
   const isActionMenuOpen = activeActionMenuPath === nodeKey;
   const areActionsVisible = isActionMenuOpen;
   const actionsId = `topic-tree-node-actions-${nodeKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -200,6 +219,18 @@ function TopicTreeNode({
                   ? `(${topic.totalSentences})`
                   : `(${totalTopics}, ${totalSentences})`}
               </span>
+              {showTemperatureBadge && (
+                <span
+                  className="topic-tree-node__temp-badge"
+                  style={temperatureBadgeStyle}
+                  title={
+                    temperatureEntry.reasoning ||
+                    `Temperature ${temperatureEntry.rate}`
+                  }
+                >
+                  {temperatureEntry.rate}
+                </span>
+              )}
             </div>
 
             <button
@@ -213,6 +244,12 @@ function TopicTreeNode({
               <span aria-hidden="true">...</span>
             </button>
           </div>
+
+          {showTemperatureNote && (
+            <div className="topic-tree-node__temp-note">
+              {temperatureEntry.reasoning}
+            </div>
+          )}
 
           <div
             id={actionsId}

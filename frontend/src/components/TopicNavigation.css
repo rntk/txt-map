@@ -359,6 +359,29 @@
   font-size: 1rem;
 }
 
+.topic-tree-node__temp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--topic-temp-color, rgba(200, 200, 200, 0.4));
+  color: #1d1e1b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.topic-tree-node__temp-note {
+  margin-top: 2px;
+  color: #6a6a6a;
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
 .topic-tree-node__menu-trigger {
   appearance: none;
   display: inline-flex;
