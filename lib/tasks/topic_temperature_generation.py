@@ -22,8 +22,13 @@ from lib.tasks.markup_generation import (
 
 logger = logging.getLogger(__name__)
 
-_PROMPT_VERSION = "topic_temperature_v2"
-_RATE_RE = re.compile(r"^\s*(-?\d{1,3})\s*$")
+_PROMPT_VERSION = "topic_temperature_v3"
+_RATE_RE = re.compile(r"(-?\d{1,4})")
+_RATE_LABEL_PREFIX_RE = re.compile(
+    r"^\s*(?:rate|score|rating|priority|result)\s*[:\-=]\s*",
+    re.IGNORECASE,
+)
+_RATE_LINE_STRIP_CHARS = " \t*`_#>"
 _OVERLAP_SENTENCE_COUNT = 2
 
 TOPIC_TEMPERATURE_PROMPT_TEMPLATE = """\
@@ -56,11 +61,36 @@ BEFORE rating, compare the current topic to the other topics listed below. Ask y
 Do NOT rate highly just because text is technical or well-written.
 Being a legitimate subtopic does not equal high reading priority.
 
-Return format:
-  First line: a single integer from 0 to 100
-  Optional second line: one short rationale
+Context rules:
+  - <prev_context> and <next_context> are neighboring sentences from OTHER topics.
+    They are provided only so you can judge how the current topic relates to the article.
+    Do NOT rate those context sentences. Rate ONLY <current_topic_text>.
+  - <all_topics> is the full list of topics in this article, with the current one
+    marked "(CURRENT)". Use it to compare how this topic ranks against the others.
 
-Do not use markdown fences. Do not output anything else.
+Return format (exact, no markdown, no fences, no extra text):
+  Line 1: a single integer from 0 to 100, nothing else on the line
+  Line 2: one short rationale sentence (required, 3–12 words)
+
+Examples (for format and calibration only):
+
+  Example A — low
+    Input topic: "Subscribe to our newsletter for occasional updates and offers."
+    Output:
+      8
+      Pure CTA boilerplate with no informational value for the article.
+
+  Example B — mid
+    Input topic: "Brief history of containerization leading up to Docker."
+    Output:
+      45
+      Useful background, but widely known and not central to the article's thesis.
+
+  Example C — high
+    Input topic: "Measured 3x throughput improvement from the new scheduler algorithm."
+    Output:
+      88
+      Central empirical finding — the article's main result and hardest-to-replace content.
 </system>
 
 <all_topics>
@@ -71,15 +101,15 @@ Do not use markdown fences. Do not output anything else.
 {topic_name}
 </current_topic>
 
-<prev_context>
+<prev_context note="neighbors from other topics, for context only — do NOT rate this">
 {prev_context}
 </prev_context>
 
-<current_topic_text>
+<current_topic_text note="rate THIS content">
 {current_text}
 </current_topic_text>
 
-<next_context>
+<next_context note="neighbors from other topics, for context only — do NOT rate this">
 {next_context}
 </next_context>
 """
@@ -88,8 +118,9 @@ TOPIC_TEMPERATURE_CORRECTION_TEMPLATE = """\
 <correction_request>
 Your previous response could not be parsed.
 Return ONLY:
-  First line: one integer from 0 to 100
-  Optional second line: one short rationale
+  Line 1: one integer from 0 to 100 on its own line, no other characters
+  Line 2: one short rationale sentence (required, 3–12 words)
+No markdown fences, no labels like "Rate:", no asterisks, no quotes.
 </correction_request>
 """
 
@@ -151,6 +182,12 @@ def _clamp_rate(rate: int) -> int:
     return max(0, min(100, rate))
 
 
+def _normalize_rate_line(line: str) -> str:
+    cleaned: str = line.strip().strip(_RATE_LINE_STRIP_CHARS)
+    cleaned = _RATE_LABEL_PREFIX_RE.sub("", cleaned)
+    return cleaned.strip(_RATE_LINE_STRIP_CHARS)
+
+
 def _parse_temperature_output(output: str) -> Dict[str, Any] | None:
     lines: List[str] = [
         line.strip() for line in (output or "").strip().splitlines() if line.strip()
@@ -158,7 +195,8 @@ def _parse_temperature_output(output: str) -> Dict[str, Any] | None:
     if not lines:
         return None
 
-    match: re.Match[str] | None = _RATE_RE.match(lines[0])
+    normalized_first: str = _normalize_rate_line(lines[0])
+    match: re.Match[str] | None = _RATE_RE.search(normalized_first)
     if not match:
         return None
 
@@ -172,19 +210,41 @@ def _join_topic_ranges(ranges: List[TopicRange]) -> str:
     )
 
 
+def _topic_boundary(topic: Dict[str, Any], before: bool) -> int | None:
+    """Return the outermost sentence index owned by the topic (1-indexed).
+
+    Prefer `ranges` (contiguous spans) over the `sentences` list, which may be
+    interleaved with other topics when the article is multi-threaded.
+    """
+    raw_ranges: Any = topic.get("ranges")
+    boundaries: List[int] = []
+    if isinstance(raw_ranges, list):
+        for raw_range in raw_ranges:
+            if not isinstance(raw_range, dict):
+                continue
+            start_val: Any = raw_range.get("sentence_start")
+            end_val: Any = raw_range.get("sentence_end", start_val)
+            if isinstance(start_val, int) and isinstance(end_val, int):
+                boundaries.append(start_val if before else end_val)
+    if not boundaries:
+        boundaries = [
+            value for value in topic.get("sentences", []) if isinstance(value, int)
+        ]
+    if not boundaries:
+        return None
+    return min(boundaries) if before else max(boundaries)
+
+
 def _context_for_topic(
     topic: Dict[str, Any],
     all_sentences: List[str],
     before: bool,
     overlap_count: int = _OVERLAP_SENTENCE_COUNT,
 ) -> str:
-    sentence_numbers: List[int] = [
-        value for value in topic.get("sentences", []) if isinstance(value, int)
-    ]
-    if not sentence_numbers:
+    anchor: int | None = _topic_boundary(topic, before=before)
+    if anchor is None:
         return ""
 
-    anchor: int = min(sentence_numbers) if before else max(sentence_numbers)
     if before:
         start: int = max(1, anchor - overlap_count)
         end: int = anchor - 1
@@ -209,7 +269,10 @@ def _build_topic_temperature_prompt(
         return None
 
     topic_names: str = "\n".join(
-        f"- {candidate.get('name', f'topic_{index}')}"
+        (
+            f"- {candidate.get('name', f'topic_{index}')}"
+            + (" (CURRENT)" if candidate.get("name") == topic_name else "")
+        )
         for index, candidate in enumerate(all_topics)
     )
     prompt: str = TOPIC_TEMPERATURE_PROMPT_TEMPLATE.format(

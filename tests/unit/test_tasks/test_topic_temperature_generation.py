@@ -86,7 +86,23 @@ def test_parse_temperature_output_clamps_rate() -> None:
 
 
 def test_parse_temperature_output_rejects_malformed_first_line() -> None:
-    assert _parse_temperature_output("Rate: 82") is None
+    assert _parse_temperature_output("absolutely no number here") is None
+    assert _parse_temperature_output("") is None
+
+
+def test_parse_temperature_output_accepts_common_llm_decorations() -> None:
+    assert _parse_temperature_output("Rate: 82\nReason.") == {
+        "rate": 82,
+        "reasoning": "Reason.",
+    }
+    assert _parse_temperature_output("**82**\nReason.") == {
+        "rate": 82,
+        "reasoning": "Reason.",
+    }
+    assert _parse_temperature_output("Score: 82/100\nReason.") == {
+        "rate": 82,
+        "reasoning": "Reason.",
+    }
 
 
 def test_generate_temperature_retries_on_malformed_response() -> None:
@@ -144,7 +160,10 @@ def test_prompt_includes_previous_and_next_context() -> None:
     assert "Intro context." in prompt_data.prompt
     assert "Closing filler." in prompt_data.prompt
     assert "Important security flaw disclosed." in prompt_data.prompt
-    assert "- Security" in prompt_data.prompt
+    assert "- Security (CURRENT)" in prompt_data.prompt
+    # Context-only clarification and banded scale must stay in the prompt.
+    assert "do NOT rate this" in prompt_data.prompt
+    assert "76–100" in prompt_data.prompt
 
 
 def test_process_topic_temperature_generation_stores_topic_temperatures() -> None:
