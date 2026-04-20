@@ -11,6 +11,7 @@ import TextPage from "./components/TextPage";
 import TokensPage from "./components/TokensPage";
 import WordPage from "./components/WordPage";
 import TopicAnalysisPage from "./components/TopicAnalysisPage";
+import TopicHierarchyPage from "./components/TopicHierarchyPage";
 import LlmProvidersPage from "./components/LlmProvidersPage";
 
 /**
@@ -134,6 +135,7 @@ const PAGE_COMPONENTS = {
   topics: GlobalTopicsPage,
   word: WordPage,
   "topic-analysis": TopicAnalysisPage,
+  "topic-hierarchy": TopicHierarchyPage,
   "llm-providers": LlmProvidersPage,
 };
 

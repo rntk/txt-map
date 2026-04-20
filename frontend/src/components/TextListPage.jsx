@@ -247,6 +247,12 @@ function TextListPage() {
                       >
                         Open
                       </a>
+                      <a
+                        className="text-list-link"
+                        href={`/page/topic-hierarchy/${submission.submission_id}`}
+                      >
+                        Hierarchy
+                      </a>
                       <RefreshButton
                         submissionId={submission.submission_id}
                         onRefresh={fetchSubmissions}

@@ -120,6 +120,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/cache")
 @app.get("/page/topics")
 @app.get("/page/topic-analysis/{submission_id}")
+@app.get("/page/topic-hierarchy/{submission_id}")
 @app.get("/page/login")
 @app.get("/page/tokens")
 @app.get("/page/llm-providers")
