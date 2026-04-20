@@ -1,50 +1,218 @@
 import React, { useMemo, useCallback } from "react";
 import { buildTopicTree } from "../utils/topicTree";
+import { getTopicParts, isWithinScope } from "../utils/topicHierarchy";
 import {
   getTopicHighlightColor,
   getTopicAccentColor,
 } from "../utils/topicColorUtils";
 import "./TopicHierarchyView.css";
 
+const DEFAULT_CHILD_LIMIT = 0;
+const DEFAULT_ROOT_LIMIT = 0;
+
 /**
- * @typedef {Object} TopicHierarchyViewProps
- * @property {Array<{ name: string, sentences?: number[] }>} topics
- * @property {string|null} [selectedPath]
- * @property {string|null} [hoveredPath]
- * @property {(path: string, topic: unknown) => void} [onSelectPath]
- * @property {(path: string|null) => void} [onHoverPath]
+ * @typedef {Object} TopicHierarchyTopic
+ * @property {string} name
+ * @property {number[]} [sentences]
  */
 
-function computeWeight(entry) {
-  if (entry.node.isLeaf) {
-    const topic = entry.node.topic;
-    const count = Array.isArray(topic?.sentences) ? topic.sentences.length : 0;
-    return Math.max(count, 1);
-  }
-  let total = 0;
-  entry.children.forEach((child) => {
-    total += computeWeight(child);
-  });
-  return total || 1;
+/**
+ * @typedef {Object} TopicTreeNode
+ * @property {string} name
+ * @property {string} fullPath
+ * @property {string} uid
+ * @property {boolean} isLeaf
+ * @property {TopicHierarchyTopic|null} topic
+ * @property {number} depth
+ */
+
+/**
+ * @typedef {Object} TopicTreeEntry
+ * @property {TopicTreeNode} node
+ * @property {Map<string, TopicTreeEntry>} children
+ * @property {string|null|TopicTreeEntry} parent
+ */
+
+/**
+ * @typedef {Object} TopicHierarchyViewProps
+ * @property {TopicHierarchyTopic[]} topics
+ * @property {string|null} [selectedPath]
+ * @property {string|null} [hoveredPath]
+ * @property {string[]} [scopePath]
+ * @property {number} [childLimit]
+ * @property {number} [rootLimit]
+ * @property {boolean} [drilldownMode]
+ * @property {(path: string, topic: TopicHierarchyTopic|null) => void} [onSelectPath]
+ * @property {(path: string|null) => void} [onHoverPath]
+ * @property {(path: string) => void} [onDrilldownPath]
+ */
+
+/**
+ * @param {TopicTreeEntry} entry
+ * @returns {number}
+ */
+/**
+ * @param {TopicTreeEntry} entry
+ * @returns {number}
+ */
+function countVisibleLeaves(entry) {
+  const children = Array.from(entry.children.values());
+  if (children.length === 0) return 1;
+
+  return children.reduce(
+    (total, child) => total + countVisibleLeaves(child),
+    0,
+  );
 }
 
+/**
+ * @param {TopicTreeEntry} entry
+ * @param {number} childLimit
+ * @param {boolean} drilldownMode
+ * @returns {number}
+ */
+function countRenderedRows(entry, childLimit, drilldownMode) {
+  const children = Array.from(entry.children.values());
+  if (children.length === 0) return 1;
+
+  const shouldLimitChildren = !drilldownMode && childLimit > 0;
+  const visibleChildren = shouldLimitChildren
+    ? children.slice(0, childLimit)
+    : children;
+  const hiddenRowCount =
+    shouldLimitChildren && children.length > childLimit ? 1 : 0;
+
+  return (
+    visibleChildren.reduce(
+      (total, child) =>
+        total + countRenderedRows(child, childLimit, drilldownMode),
+      0,
+    ) + hiddenRowCount
+  );
+}
+
+/**
+ * @param {string|null|undefined} ancestor
+ * @param {string|null|undefined} descendant
+ * @returns {boolean}
+ */
 function isAncestorPath(ancestor, descendant) {
   if (!ancestor || !descendant) return false;
   if (ancestor === descendant) return true;
   return descendant.startsWith(`${ancestor}>`);
 }
 
+/**
+ * @param {TopicHierarchyTopic[]} topics
+ * @param {string[]} scopePath
+ * @returns {TopicHierarchyTopic[]}
+ */
+function getScopedTopics(topics, scopePath) {
+  if (scopePath.length === 0) return topics;
+
+  return topics.filter((topic) => {
+    const parts = getTopicParts(topic);
+    return parts.length > scopePath.length && isWithinScope(parts, scopePath);
+  });
+}
+
+/**
+ * @param {Object} props
+ * @param {TopicTreeEntry[]} props.hiddenChildren
+ * @param {string} props.parentPath
+ * @param {(path: string) => void} [props.onDrilldownPath]
+ * @returns {React.ReactElement|null}
+ */
+function MoreChildrenIndicator({
+  hiddenChildren,
+  parentPath,
+  onDrilldownPath,
+}) {
+  const hiddenLeafCount = hiddenChildren.reduce(
+    (total, child) => total + countVisibleLeaves(child),
+    0,
+  );
+
+  const handleClick = useCallback(
+    (event) => {
+      event.stopPropagation();
+      if (onDrilldownPath) onDrilldownPath(parentPath);
+    },
+    [onDrilldownPath, parentPath],
+  );
+
+  if (hiddenLeafCount === 0) return null;
+
+  return (
+    <button
+      type="button"
+      className="th-more"
+      onClick={handleClick}
+      title="Open this topic branch"
+    >
+      <span className="th-more__dot" aria-hidden="true" />
+      <span className="th-more__label">{hiddenLeafCount} more topics</span>
+    </button>
+  );
+}
+
+/**
+ * @param {Object} props
+ * @param {number} props.hiddenCount
+ * @param {(path: string) => void} [props.onDrilldownPath]
+ * @returns {React.ReactElement|null}
+ */
+function MoreRootIndicator({ hiddenCount, onDrilldownPath }) {
+  const handleClick = useCallback(() => {
+    if (onDrilldownPath) onDrilldownPath("");
+  }, [onDrilldownPath]);
+
+  if (hiddenCount === 0) return null;
+
+  return (
+    <button
+      type="button"
+      className="th-more th-more--root"
+      onClick={handleClick}
+      title="Open a scrollable view of all topics"
+    >
+      <span className="th-more__dot" aria-hidden="true" />
+      <span className="th-more__label">{hiddenCount} more root topics</span>
+    </button>
+  );
+}
+
+/**
+ * @param {Object} props
+ * @param {TopicTreeEntry} props.entry
+ * @param {string|null} props.selectedPath
+ * @param {string|null} props.hoveredPath
+ * @param {number} props.childLimit
+ * @param {boolean} props.drilldownMode
+ * @param {(path: string, topic: TopicHierarchyTopic|null) => void} [props.onSelectPath]
+ * @param {(path: string|null) => void} [props.onHoverPath]
+ * @param {(path: string) => void} [props.onDrilldownPath]
+ * @returns {React.ReactElement}
+ */
 function HierarchyNode({
   entry,
   selectedPath,
   hoveredPath,
+  childLimit,
+  drilldownMode,
   onSelectPath,
   onHoverPath,
+  onDrilldownPath,
 }) {
   const { node } = entry;
   const children = Array.from(entry.children.values());
-  const isLeaf = node.isLeaf || children.length === 0;
-  const weight = computeWeight(entry);
+  const isLeaf = children.length === 0;
+  const shouldLimitChildren = !drilldownMode && childLimit > 0;
+  const visibleChildren = shouldLimitChildren
+    ? children.slice(0, childLimit)
+    : children;
+  const hiddenChildren = shouldLimitChildren ? children.slice(childLimit) : [];
+  const renderedRows = countRenderedRows(entry, childLimit, drilldownMode);
 
   const isHovered = isAncestorPath(node.fullPath, hoveredPath);
   const isSelected = isAncestorPath(node.fullPath, selectedPath);
@@ -62,9 +230,13 @@ function HierarchyNode({
   const handleClick = useCallback(
     (event) => {
       event.stopPropagation();
+      if (!isLeaf && onDrilldownPath) {
+        onDrilldownPath(node.fullPath);
+        return;
+      }
       if (onSelectPath) onSelectPath(node.fullPath, node.topic);
     },
-    [onSelectPath, node.fullPath, node.topic],
+    [isLeaf, onDrilldownPath, onSelectPath, node.fullPath, node.topic],
   );
 
   const stateClass = [
@@ -82,7 +254,6 @@ function HierarchyNode({
       <div
         className={`th-leaf ${stateClass}`}
         style={{
-          flexGrow: weight,
           backgroundColor: highlightColor,
           borderLeftColor: accentColor,
         }}
@@ -102,7 +273,7 @@ function HierarchyNode({
   return (
     <div
       className={`th-node ${stateClass}`}
-      style={{ flexGrow: weight }}
+      style={{ "--th-row-span": renderedRows }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -113,21 +284,38 @@ function HierarchyNode({
           borderLeftColor: accentColor,
         }}
         onClick={handleClick}
-        title={node.fullPath}
+        title={
+          isLeaf ? node.fullPath : `Open ${node.fullPath || node.name} branch`
+        }
       >
         <span className="th-node__label-text">{node.name}</span>
+        {!isLeaf && (
+          <span className="th-node__drill" aria-hidden="true">
+            &gt;
+          </span>
+        )}
       </div>
       <div className="th-node__children">
-        {children.map((child) => (
+        {visibleChildren.map((child) => (
           <HierarchyNode
             key={child.node.uid}
             entry={child}
             selectedPath={selectedPath}
             hoveredPath={hoveredPath}
+            childLimit={childLimit}
+            drilldownMode={drilldownMode}
             onSelectPath={onSelectPath}
             onHoverPath={onHoverPath}
+            onDrilldownPath={onDrilldownPath}
           />
         ))}
+        {hiddenChildren.length > 0 && (
+          <MoreChildrenIndicator
+            hiddenChildren={hiddenChildren}
+            parentPath={node.fullPath}
+            onDrilldownPath={onDrilldownPath}
+          />
+        )}
       </div>
     </div>
   );
@@ -140,27 +328,52 @@ function TopicHierarchyView({
   topics,
   selectedPath = null,
   hoveredPath = null,
+  scopePath = [],
+  childLimit = DEFAULT_CHILD_LIMIT,
+  rootLimit = DEFAULT_ROOT_LIMIT,
+  drilldownMode = false,
   onSelectPath,
   onHoverPath,
+  onDrilldownPath,
 }) {
-  const roots = useMemo(() => buildTopicTree(topics || []), [topics]);
+  const roots = useMemo(() => {
+    const safeTopics = Array.isArray(topics) ? topics : [];
+    const safeScopePath = Array.isArray(scopePath) ? scopePath : [];
+    const scopedTopics = getScopedTopics(safeTopics, safeScopePath);
+    return buildTopicTree(scopedTopics, safeScopePath.length);
+  }, [topics, scopePath]);
 
   if (!roots || roots.length === 0) {
     return <div className="th-empty">No topics available.</div>;
   }
 
+  const shouldLimitRoots = !drilldownMode && rootLimit > 0;
+  const visibleRoots = shouldLimitRoots ? roots.slice(0, rootLimit) : roots;
+  const hiddenRootCount = shouldLimitRoots
+    ? Math.max(0, roots.length - rootLimit)
+    : 0;
+
   return (
-    <div className="th-root">
-      {roots.map((root) => (
+    <div className={`th-root${drilldownMode ? " th-root--drilldown" : ""}`}>
+      {visibleRoots.map((root) => (
         <HierarchyNode
           key={root.node.uid}
           entry={root}
           selectedPath={selectedPath}
           hoveredPath={hoveredPath}
+          childLimit={childLimit}
+          drilldownMode={drilldownMode}
           onSelectPath={onSelectPath}
           onHoverPath={onHoverPath}
+          onDrilldownPath={onDrilldownPath}
         />
       ))}
+      {hiddenRootCount > 0 && (
+        <MoreRootIndicator
+          hiddenCount={hiddenRootCount}
+          onDrilldownPath={onDrilldownPath}
+        />
+      )}
     </div>
   );
 }

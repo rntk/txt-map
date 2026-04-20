@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { ArticleProvider, useArticle } from "../contexts/ArticleContext";
 import TopicHierarchyView from "./TopicHierarchyView";
 import { getTopicAccentColor } from "../utils/topicColorUtils";
@@ -17,11 +23,19 @@ function TopicHierarchyPageContent() {
 
   const [selectedPath, setSelectedPath] = useState(null);
   const [hoveredPath, setHoveredPath] = useState(null);
+  const [drilldownPath, setDrilldownPath] = useState(null);
 
-  const isCollapsed = Boolean(selectedPath);
+  const isArticleOpen = Boolean(selectedPath);
+  const isDrillingDown = drilldownPath !== null;
 
   const handleSelectPath = useCallback((path) => {
+    setDrilldownPath(null);
     setSelectedPath((prev) => (prev === path ? null : path));
+  }, []);
+
+  const handleDrilldownPath = useCallback((path) => {
+    setSelectedPath(null);
+    setDrilldownPath(path);
   }, []);
 
   const handleHoverPath = useCallback((path) => {
@@ -92,41 +106,112 @@ function TopicHierarchyPageContent() {
   }
 
   const collapsedSegments = pathSegments(selectedPath);
+  const drilldownSegments = pathSegments(drilldownPath);
+  const drilldownTitle =
+    drilldownSegments.length === 0
+      ? "All Topics"
+      : drilldownSegments[drilldownSegments.length - 1];
 
   return (
     <div className="topic-hierarchy-page">
       <div className="topic-hierarchy-page__header">
         <h2 className="topic-hierarchy-page__title">Topic Structure</h2>
         <span className="topic-hierarchy-page__hint">
-          {isCollapsed
+          {isArticleOpen
             ? "Click the collapsed bar to expand the hierarchy."
-            : "Hover to highlight a path, click a topic to open it."}
+            : isDrillingDown
+              ? "Scoped topic view. Click child branches to drill deeper."
+              : "Hover to highlight a path, click a topic to open it."}
         </span>
       </div>
       <div className="topic-hierarchy-page__body">
         <div
           className={`topic-hierarchy-page__viz${
-            isCollapsed ? " topic-hierarchy-page__viz--collapsed" : ""
-          }`}
+            isArticleOpen ? " topic-hierarchy-page__viz--collapsed" : ""
+          }${isDrillingDown ? " topic-hierarchy-page__viz--drilldown" : ""}`}
         >
-          {isCollapsed ? (
+          {isArticleOpen ? (
             <div
               className="topic-hierarchy-page__collapsed-strip"
               onClick={() => setSelectedPath(null)}
               title="Click to expand topic hierarchy"
             >
               {collapsedSegments.map((segment, idx) => {
-                const partialPath = collapsedSegments.slice(0, idx + 1).join(">");
+                const partialPath = collapsedSegments
+                  .slice(0, idx + 1)
+                  .join(">");
                 return (
                   <div
                     key={partialPath}
                     className="topic-hierarchy-page__collapsed-label"
-                    style={{ borderLeftColor: getTopicAccentColor(partialPath) }}
+                    style={{
+                      borderLeftColor: getTopicAccentColor(partialPath),
+                    }}
                   >
                     {segment}
                   </div>
                 );
               })}
+            </div>
+          ) : isDrillingDown ? (
+            <div className="topic-hierarchy-page__drilldown">
+              <div className="topic-hierarchy-page__drilldown-bar">
+                <div className="topic-hierarchy-page__breadcrumbs">
+                  <button
+                    type="button"
+                    className={`topic-hierarchy-page__breadcrumb${
+                      drilldownSegments.length === 0
+                        ? " topic-hierarchy-page__breadcrumb--current"
+                        : ""
+                    }`}
+                    onClick={() => setDrilldownPath("")}
+                  >
+                    All Topics
+                  </button>
+                  {drilldownSegments.map((segment, index) => {
+                    const partialPath = drilldownSegments
+                      .slice(0, index + 1)
+                      .join(">");
+                    const isCurrent = index === drilldownSegments.length - 1;
+                    return (
+                      <button
+                        key={partialPath}
+                        type="button"
+                        className={`topic-hierarchy-page__breadcrumb${
+                          isCurrent
+                            ? " topic-hierarchy-page__breadcrumb--current"
+                            : ""
+                        }`}
+                        onClick={() => setDrilldownPath(partialPath)}
+                      >
+                        {segment}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="topic-hierarchy-page__overview-button"
+                  onClick={() => setDrilldownPath(null)}
+                >
+                  Overview
+                </button>
+              </div>
+              <div className="topic-hierarchy-page__drilldown-title">
+                {drilldownTitle}
+              </div>
+              <TopicHierarchyView
+                topics={safeTopics}
+                selectedPath={selectedPath}
+                hoveredPath={hoveredPath}
+                scopePath={drilldownSegments}
+                drilldownMode
+                childLimit={0}
+                rootLimit={0}
+                onSelectPath={handleSelectPath}
+                onHoverPath={handleHoverPath}
+                onDrilldownPath={handleDrilldownPath}
+              />
             </div>
           ) : (
             <TopicHierarchyView
@@ -135,10 +220,11 @@ function TopicHierarchyPageContent() {
               hoveredPath={hoveredPath}
               onSelectPath={handleSelectPath}
               onHoverPath={handleHoverPath}
+              onDrilldownPath={handleDrilldownPath}
             />
           )}
         </div>
-        {isCollapsed && (
+        {isArticleOpen && (
           <div
             ref={articleRef}
             className={`topic-hierarchy-page__article${
