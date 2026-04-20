@@ -378,32 +378,34 @@ function BigramHeatmapSection({
                         {entry.word}
                       </a>
                     )}
-                    <label
-                      className="topic-heatmap-nonzero"
-                      onClick={(event) => event.stopPropagation()}
-                      title="Hide rows whose value in this column is 0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={nonZeroColumnIndices.has(columnIndex)}
-                        onChange={() => toggleNonZeroColumn(columnIndex)}
-                        aria-label={`Hide rows with zero value in ${entry.word}`}
-                      />
-                      <span>≠0</span>
-                    </label>
-                    <label
-                      className="topic-heatmap-nonzero"
-                      onClick={(event) => event.stopPropagation()}
-                      title="Sort rows by this column in descending order"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={sortByColumnIndex === columnIndex}
-                        onChange={() => toggleSortByColumn(columnIndex)}
-                        aria-label={`Sort rows by ${entry.word} descending`}
-                      />
-                      <span>sort</span>
-                    </label>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                      <label
+                        className="topic-heatmap-nonzero"
+                        onClick={(event) => event.stopPropagation()}
+                        title="Hide rows whose value in this column is 0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={nonZeroColumnIndices.has(columnIndex)}
+                          onChange={() => toggleNonZeroColumn(columnIndex)}
+                          aria-label={`Hide rows with zero value in ${entry.word}`}
+                        />
+                        <span>≠0</span>
+                      </label>
+                      <label
+                        className="topic-heatmap-nonzero"
+                        onClick={(event) => event.stopPropagation()}
+                        title="Sort rows by this column in descending order"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={sortByColumnIndex === columnIndex}
+                          onChange={() => toggleSortByColumn(columnIndex)}
+                          aria-label={`Sort rows by ${entry.word} descending`}
+                        />
+                        <span>sort</span>
+                      </label>
+                    </div>
                   </th>
                 );
               })}
