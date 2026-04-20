@@ -435,6 +435,7 @@ function BigramHeatmapSection({
                       className={`topic-heatmap-row-header${
                         isRowActive ? " is-active" : ""
                       }${isRowPinned ? " is-pinned" : ""}`}
+                      style={{ minWidth: "160px" }}
                       title={`${rowEntry.word} (${rowEntry.frequency})`}
                       onPointerEnter={() =>
                         handleHoverPosition(rowIndex, null)
@@ -450,42 +451,46 @@ function BigramHeatmapSection({
                         togglePinnedRow(rowIndex);
                       }}
                     >
-                      {renderRowHeader ? (
-                        renderRowHeader(rowEntry)
-                      ) : (
-                        <a
-                          href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
-                          className="topic-heatmap-word-link"
-                        >
-                          {rowEntry.word}
-                        </a>
-                      )}
-                      <label
-                        className="topic-heatmap-nonzero"
-                        onClick={(event) => event.stopPropagation()}
-                        title="Hide columns whose value in this row is 0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={nonZeroRowIndices.has(rowIndex)}
-                          onChange={() => toggleNonZeroRow(rowIndex)}
-                          aria-label={`Hide columns with zero value in ${rowEntry.word}`}
-                        />
-                        <span>≠0</span>
-                      </label>
-                      <label
-                        className="topic-heatmap-nonzero"
-                        onClick={(event) => event.stopPropagation()}
-                        title="Sort columns by this row in descending order"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={sortByRowIndex === rowIndex}
-                          onChange={() => toggleSortByRow(rowIndex)}
-                          aria-label={`Sort columns by ${rowEntry.word} descending`}
-                        />
-                        <span>sort</span>
-                      </label>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        {renderRowHeader ? (
+                          renderRowHeader(rowEntry)
+                        ) : (
+                          <a
+                            href={`/page/word/${submissionId}/${encodeURIComponent(rowEntry.word)}`}
+                            className="topic-heatmap-word-link"
+                          >
+                            {rowEntry.word}
+                          </a>
+                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <label
+                            className="topic-heatmap-nonzero"
+                            onClick={(event) => event.stopPropagation()}
+                            title="Hide columns whose value in this row is 0"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={nonZeroRowIndices.has(rowIndex)}
+                              onChange={() => toggleNonZeroRow(rowIndex)}
+                              aria-label={`Hide columns with zero value in ${rowEntry.word}`}
+                            />
+                            <span>≠0</span>
+                          </label>
+                          <label
+                            className="topic-heatmap-nonzero"
+                            onClick={(event) => event.stopPropagation()}
+                            title="Sort columns by this row in descending order"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={sortByRowIndex === rowIndex}
+                              onChange={() => toggleSortByRow(rowIndex)}
+                              aria-label={`Sort columns by ${rowEntry.word} descending`}
+                            />
+                            <span>sort</span>
+                          </label>
+                        </div>
+                      </div>
                     </th>
                     {visibleColumnEntries.map(
                       ({ entry: columnEntry, index: columnIndex }) => {
