@@ -33,6 +33,51 @@
   background: #eff6ff;
 }
 
+.topic-heatmap-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.78rem;
+}
+
+.topic-heatmap-pagination__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.topic-heatmap-pagination__label,
+.topic-heatmap-pagination__page {
+  font-weight: 600;
+}
+
+.topic-heatmap-page-button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #1e3a8a;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.topic-heatmap-page-button:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.topic-heatmap-page-button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .topic-heatmap-scroll {
   overflow: auto;
   border: 1px solid #e2e8f0;
@@ -128,11 +173,16 @@
   display: block;
 }
 
+.topic-heatmap-column-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
 
 .topic-heatmap-row-header {
   left: 0;
   z-index: 3;
-  min-width: 120px;
+  min-width: 160px;
   text-align: left;
   white-space: nowrap;
 }
@@ -170,7 +220,9 @@
 .topic-heatmap-row-header,
 .topic-heatmap-column-header {
   cursor: pointer;
-  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .topic-heatmap-row-header.is-active,
@@ -291,6 +343,18 @@
 .topic-heatmap-column-part--leaf {
   font-weight: 600;
   color: #1d4ed8;
+}
+
+.topic-heatmap-row-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topic-heatmap-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .topic-heatmap-nonzero {

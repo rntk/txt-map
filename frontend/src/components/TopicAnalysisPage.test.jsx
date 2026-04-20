@@ -216,6 +216,15 @@ describe("TopicAnalysisPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Show all 3 words/i }));
 
+    expect(await screen.findByText(/Rows 1-2 of 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/Columns 1-2 of 3/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "shared" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Next rows/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Next columns/i }));
+
     const sharedLinks = await screen.findAllByRole("link", { name: "shared" });
     expect(sharedLinks).toHaveLength(2);
     expect(

@@ -76,6 +76,24 @@ function matchesWordFilter(word, filterValue) {
 }
 
 /**
+ * @param {number} currentPage
+ * @param {number} pageCount
+ * @returns {number}
+ */
+function clampPage(currentPage, pageCount) {
+  return Math.min(Math.max(currentPage, 1), Math.max(pageCount, 1));
+}
+
+/**
+ * @param {number} page
+ * @param {number} pageSize
+ * @returns {number}
+ */
+function getPageStartIndex(page, pageSize) {
+  return (page - 1) * pageSize;
+}
+
+/**
  * @param {{
  *   submissionId: string | null,
  *   heatmapState: BigramHeatmapState,
@@ -126,6 +144,8 @@ function BigramHeatmapSection({
   const [nonZeroRowIndices, setNonZeroRowIndices] = useState(() => new Set());
   const [sortByColumnIndex, setSortByColumnIndex] = useState(null);
   const [sortByRowIndex, setSortByRowIndex] = useState(null);
+  const [rowPage, setRowPage] = useState(1);
+  const [columnPage, setColumnPage] = useState(1);
   const heatmapData = heatmapState.data;
 
   useEffect(() => {
@@ -139,6 +159,8 @@ function BigramHeatmapSection({
     setNonZeroRowIndices(new Set());
     setSortByColumnIndex(null);
     setSortByRowIndex(null);
+    setRowPage(1);
+    setColumnPage(1);
   }, [submissionId, heatmapData]);
 
   const toggleNonZeroColumn = useCallback((columnIndex) => {
@@ -151,6 +173,7 @@ function BigramHeatmapSection({
       }
       return next;
     });
+    setRowPage(1);
   }, []);
 
   const toggleNonZeroRow = useCallback((rowIndex) => {
@@ -163,16 +186,19 @@ function BigramHeatmapSection({
       }
       return next;
     });
+    setColumnPage(1);
   }, []);
 
   const toggleSortByColumn = useCallback((columnIndex) => {
     setSortByColumnIndex((current) =>
       current === columnIndex ? null : columnIndex,
     );
+    setRowPage(1);
   }, []);
 
   const toggleSortByRow = useCallback((rowIndex) => {
     setSortByRowIndex((current) => (current === rowIndex ? null : rowIndex));
+    setColumnPage(1);
   }, []);
 
   const handleHoverPosition = useCallback((rowIndex, columnIndex) => {
@@ -201,6 +227,30 @@ function BigramHeatmapSection({
       current === columnIndex ? null : columnIndex,
     );
   }, []);
+
+  const handleToggleWordCount = useCallback(() => {
+    setRowPage(1);
+    setColumnPage(1);
+    onToggleWordCount();
+  }, [onToggleWordCount]);
+
+  const handleColumnFilterChange = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} event */
+    (event) => {
+      setColumnFilterValue(event.target.value);
+      setColumnPage(1);
+    },
+    [],
+  );
+
+  const handleRowFilterChange = useCallback(
+    /** @param {React.ChangeEvent<HTMLInputElement>} event */
+    (event) => {
+      setRowFilterValue(event.target.value);
+      setRowPage(1);
+    },
+    [],
+  );
 
   const effectiveRowIndex =
     activeRowIndex !== null ? activeRowIndex : pinnedRowIndex;
@@ -234,6 +284,7 @@ function BigramHeatmapSection({
   const matrix = Array.isArray(heatmapData.matrix) ? heatmapData.matrix : [];
   const defaultVisibleWordCount = heatmapData.default_visible_word_count || 40;
   const totalWordCount = heatmapData.total_word_count || allRowWords.length;
+  const pageSize = Math.max(1, defaultVisibleWordCount);
   const normalizedColumnFilterValue = columnFilterValue.trim().toLowerCase();
   const normalizedRowFilterValue = rowFilterValue.trim().toLowerCase();
   const filteredRowEntries = allRowWords
@@ -272,17 +323,34 @@ function BigramHeatmapSection({
   if (sortByRowIndex !== null) {
     filteredColumnEntries.sort(
       ({ index: a }, { index: b }) =>
-        (matrix[sortByRowIndex]?.[b] || 0) -
-        (matrix[sortByRowIndex]?.[a] || 0),
+        (matrix[sortByRowIndex]?.[b] || 0) - (matrix[sortByRowIndex]?.[a] || 0),
     );
   }
+  const rowPageCount = showAllWords
+    ? Math.ceil(filteredRowEntries.length / pageSize)
+    : 1;
+  const columnPageCount = showAllWords
+    ? Math.ceil(filteredColumnEntries.length / pageSize)
+    : 1;
+  const effectiveRowPage = showAllWords ? clampPage(rowPage, rowPageCount) : 1;
+  const effectiveColumnPage = showAllWords
+    ? clampPage(columnPage, columnPageCount)
+    : 1;
+  const rowStartIndex = showAllWords
+    ? getPageStartIndex(effectiveRowPage, pageSize)
+    : 0;
+  const columnStartIndex = showAllWords
+    ? getPageStartIndex(effectiveColumnPage, pageSize)
+    : 0;
   const visibleRowEntries = showAllWords
-    ? filteredRowEntries
-    : filteredRowEntries.slice(0, defaultVisibleWordCount);
+    ? filteredRowEntries.slice(rowStartIndex, rowStartIndex + pageSize)
+    : filteredRowEntries.slice(0, pageSize);
   const visibleColumnEntries = showAllWords
-    ? filteredColumnEntries
-    : filteredColumnEntries.slice(0, defaultVisibleWordCount);
+    ? filteredColumnEntries.slice(columnStartIndex, columnStartIndex + pageSize)
+    : filteredColumnEntries.slice(0, pageSize);
   const showWordCountToggle = totalWordCount > defaultVisibleWordCount;
+  const showRowPagination = showAllWords && rowPageCount > 1;
+  const showColumnPagination = showAllWords && columnPageCount > 1;
   const hasVisibleRows = visibleRowEntries.length > 0;
   const hasVisibleColumns = visibleColumnEntries.length > 0;
 
@@ -300,7 +368,7 @@ function BigramHeatmapSection({
           <button
             type="button"
             className="topic-heatmap-toggle"
-            onClick={onToggleWordCount}
+            onClick={handleToggleWordCount}
           >
             {showAllWords
               ? `Show top ${defaultVisibleWordCount}`
@@ -308,6 +376,86 @@ function BigramHeatmapSection({
           </button>
         )}
       </div>
+
+      {(showRowPagination || showColumnPagination) && (
+        <div className="topic-heatmap-pagination">
+          {showRowPagination && (
+            <div className="topic-heatmap-pagination__group">
+              <span className="topic-heatmap-pagination__label">
+                Rows {rowStartIndex + 1}-
+                {Math.min(rowStartIndex + pageSize, filteredRowEntries.length)}{" "}
+                of {filteredRowEntries.length}
+              </span>
+              <button
+                type="button"
+                className="topic-heatmap-page-button"
+                onClick={() =>
+                  setRowPage((currentPage) =>
+                    clampPage(currentPage - 1, rowPageCount),
+                  )
+                }
+                disabled={effectiveRowPage <= 1}
+              >
+                Previous rows
+              </button>
+              <span className="topic-heatmap-pagination__page">
+                Page {effectiveRowPage} of {rowPageCount}
+              </span>
+              <button
+                type="button"
+                className="topic-heatmap-page-button"
+                onClick={() =>
+                  setRowPage((currentPage) =>
+                    clampPage(currentPage + 1, rowPageCount),
+                  )
+                }
+                disabled={effectiveRowPage >= rowPageCount}
+              >
+                Next rows
+              </button>
+            </div>
+          )}
+          {showColumnPagination && (
+            <div className="topic-heatmap-pagination__group">
+              <span className="topic-heatmap-pagination__label">
+                Columns {columnStartIndex + 1}-
+                {Math.min(
+                  columnStartIndex + pageSize,
+                  filteredColumnEntries.length,
+                )}{" "}
+                of {filteredColumnEntries.length}
+              </span>
+              <button
+                type="button"
+                className="topic-heatmap-page-button"
+                onClick={() =>
+                  setColumnPage((currentPage) =>
+                    clampPage(currentPage - 1, columnPageCount),
+                  )
+                }
+                disabled={effectiveColumnPage <= 1}
+              >
+                Previous columns
+              </button>
+              <span className="topic-heatmap-pagination__page">
+                Page {effectiveColumnPage} of {columnPageCount}
+              </span>
+              <button
+                type="button"
+                className="topic-heatmap-page-button"
+                onClick={() =>
+                  setColumnPage((currentPage) =>
+                    clampPage(currentPage + 1, columnPageCount),
+                  )
+                }
+                disabled={effectiveColumnPage >= columnPageCount}
+              >
+                Next columns
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         className="topic-heatmap-scroll"
@@ -324,9 +472,7 @@ function BigramHeatmapSection({
                   <input
                     type="search"
                     value={columnFilterValue}
-                    onChange={(event) =>
-                      setColumnFilterValue(event.target.value)
-                    }
+                    onChange={handleColumnFilterChange}
                     className="topic-heatmap-filter__input"
                     placeholder={columnFilterLabel}
                     aria-label={columnFilterLabel}
@@ -337,7 +483,7 @@ function BigramHeatmapSection({
                   <input
                     type="search"
                     value={rowFilterValue}
-                    onChange={(event) => setRowFilterValue(event.target.value)}
+                    onChange={handleRowFilterChange}
                     className="topic-heatmap-filter__input"
                     placeholder={rowFilterLabel}
                     aria-label={rowFilterLabel}
@@ -351,6 +497,7 @@ function BigramHeatmapSection({
                   <th
                     key={`column-${entry.word}`}
                     scope="col"
+                    aria-label={entry.word}
                     className={`topic-heatmap-column-header${
                       isColumnActive ? " is-active" : ""
                     }${isColumnPinned ? " is-pinned" : ""}`}
@@ -378,7 +525,7 @@ function BigramHeatmapSection({
                         {entry.word}
                       </a>
                     )}
-                    <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                    <div className="topic-heatmap-column-actions">
                       <label
                         className="topic-heatmap-nonzero"
                         onClick={(event) => event.stopPropagation()}
@@ -434,14 +581,12 @@ function BigramHeatmapSection({
                   >
                     <th
                       scope="row"
+                      aria-label={rowEntry.word}
                       className={`topic-heatmap-row-header${
                         isRowActive ? " is-active" : ""
                       }${isRowPinned ? " is-pinned" : ""}`}
-                      style={{ minWidth: "160px" }}
                       title={`${rowEntry.word} (${rowEntry.frequency})`}
-                      onPointerEnter={() =>
-                        handleHoverPosition(rowIndex, null)
-                      }
+                      onPointerEnter={() => handleHoverPosition(rowIndex, null)}
                       onClick={(event) => {
                         const target = event.target;
                         if (
@@ -453,7 +598,7 @@ function BigramHeatmapSection({
                         togglePinnedRow(rowIndex);
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div className="topic-heatmap-row-content">
                         {renderRowHeader ? (
                           renderRowHeader(rowEntry)
                         ) : (
@@ -464,7 +609,7 @@ function BigramHeatmapSection({
                             {rowEntry.word}
                           </a>
                         )}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <div className="topic-heatmap-row-actions">
                           <label
                             className="topic-heatmap-nonzero"
                             onClick={(event) => event.stopPropagation()}
@@ -517,8 +662,7 @@ function BigramHeatmapSection({
                           effectiveColumnIndex === columnIndex;
                         const isColumnPinned =
                           pinnedColumnIndex === columnIndex;
-                        const isCellFocus =
-                          isRowActive && isColumnActive;
+                        const isCellFocus = isRowActive && isColumnActive;
                         const cellClassName = [
                           "topic-heatmap-cell",
                           heatLevelClassName,

@@ -436,7 +436,9 @@ function WordPageContent({ word }) {
     };
 
     const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const wordPattern = word ? new RegExp(`\\b${escapeRegex(word)}\\b`, "gi") : null;
+    const wordPattern = word
+      ? new RegExp(`\\b${escapeRegex(word)}\\b`, "gi")
+      : null;
 
     /** @type {Map<string, { topicName: string, rangeStart: number, rangeEnd: number }>} */
     const matchedRangeKeys = new Map();
@@ -468,7 +470,9 @@ function WordPageContent({ word }) {
     const groups = [];
 
     matchedRangeKeys.forEach(({ topicName, rangeStart, rangeEnd }, key) => {
-      const topic = topics.find((t) => t.name === topicName) || { name: topicName };
+      const topic = topics.find((t) => t.name === topicName) || {
+        name: topicName,
+      };
 
       const sentenceIndices = [];
       const sentences = [];

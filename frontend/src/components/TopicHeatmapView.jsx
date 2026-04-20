@@ -71,10 +71,9 @@ function TopicHeatmapView({ submissionId, onClose }) {
     const controller = new AbortController();
     setHeatmapState({ data: null, loading: true, error: null });
 
-    fetch(
-      `/api/submission/${submissionId}/topic-analysis/topic-word-heatmap`,
-      { signal: controller.signal },
-    )
+    fetch(`/api/submission/${submissionId}/topic-analysis/topic-word-heatmap`, {
+      signal: controller.signal,
+    })
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
@@ -141,7 +140,9 @@ function TopicHeatmapView({ submissionId, onClose }) {
     if (!data) {
       return undefined;
     }
-    const topicCount = Array.isArray(data.col_words) ? data.col_words.length : 0;
+    const topicCount = Array.isArray(data.col_words)
+      ? data.col_words.length
+      : 0;
     return `Topics: ${topicCount} · Normalization: ${data.normalization} · Word frequency per topic`;
   }, [heatmapState.data]);
 

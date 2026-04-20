@@ -335,15 +335,13 @@ describe("WordPage header layout", () => {
     render(<WordPage />);
 
     // Should show all 3 sentences in the range, combined
-    const callWithFullRange = mockTextDisplay.mock.calls.find(
-      ([props]) => props.rawText?.includes("First sentence"),
+    const callWithFullRange = mockTextDisplay.mock.calls.find(([props]) =>
+      props.rawText?.includes("First sentence"),
     );
     expect(callWithFullRange).toBeDefined();
     const props = callWithFullRange[0];
     // All sentences in range 1-3 should be displayed
-    expect(props.rawText).toBe(
-      "First sentence Alpha beta gamma Last sentence",
-    );
+    expect(props.rawText).toBe("First sentence Alpha beta gamma Last sentence");
     expect(props.sentences).toEqual([
       "First sentence",
       "Alpha beta gamma",
