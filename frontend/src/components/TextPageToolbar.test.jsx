@@ -63,6 +63,7 @@ describe("TextPageToolbar", () => {
               "mindmap",
               "insights_generation",
               "topic_marker_summary_generation",
+              "topic_temperature_generation",
             ],
           }),
         }),

@@ -171,6 +171,7 @@ function ArticleMarkupPlainBlock({
  * @property {string|null} [topicIndexScrollTarget]
  * @property {(topicName: string) => void} [onBackToTopicIndex]
  * @property {boolean} [isInsightActive]
+ * @property {string|null} [topicColor]
  * @property {string} [submissionId]
  */
 function MarkupTopicBlock({
@@ -188,6 +189,7 @@ function MarkupTopicBlock({
   topicIndexScrollTarget = null,
   onBackToTopicIndex,
   isInsightActive = false,
+  topicColor = null,
   _submissionId,
 }) {
   const readTopicsSet = useMemo(
@@ -439,9 +441,8 @@ function MarkupTopicBlock({
         style={
           coloredHighlightMode || isHovered
             ? {
-                "--topic-highlight-color": getTopicHighlightColor(
-                  block.topic.name,
-                ),
+                "--topic-highlight-color":
+                  topicColor || getTopicHighlightColor(block.topic.name),
               }
             : undefined
         }
@@ -474,6 +475,7 @@ function MarkupTopicBlock({
  * @property {boolean} tooltipEnabled
  * @property {boolean} [coloredHighlightMode]
  * @property {Set<string>|string[]} [coloredTopicNames]
+ * @property {Map<string, string>|null} [topicColorMap]
  * @property {string|null} [topicIndexScrollTarget]
  * @property {(topicName: string) => void} [onBackToTopicIndex]
  * @property {Array<number>} [activeInsightSentenceIndices]
@@ -495,6 +497,7 @@ function ArticleMarkupView({
   tooltipEnabled,
   coloredHighlightMode = false,
   coloredTopicNames = null,
+  topicColorMap = null,
   topicIndexScrollTarget = null,
   onBackToTopicIndex,
   activeInsightSentenceIndices = [],
@@ -510,6 +513,11 @@ function ArticleMarkupView({
           : null,
     [coloredTopicNames],
   );
+  const getTopicColor = useCallback(
+    (topicName) =>
+      topicColorMap?.get(topicName) || getTopicHighlightColor(topicName),
+    [topicColorMap],
+  );
   const articleMarkupBlocks = useMemo(
     () => buildArticleMarkupBlocks(safeSentences, safeTopics, markup),
     [safeSentences, safeTopics, markup],
@@ -523,7 +531,7 @@ function ArticleMarkupView({
       if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
         return;
       }
-      const color = getTopicHighlightColor(topic.name);
+      const color = getTopicColor(topic.name);
       (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(
         (sentenceNum) => {
           if (!map.has(sentenceNum)) {
@@ -533,7 +541,7 @@ function ArticleMarkupView({
       );
     });
     return map;
-  }, [coloredHighlightMode, safeColoredTopicNames, safeTopics]);
+  }, [coloredHighlightMode, getTopicColor, safeColoredTopicNames, safeTopics]);
 
   // Active insight sentence set (0-based indices)
   const activeInsightSentenceSet = useMemo(
@@ -578,6 +586,7 @@ function ArticleMarkupView({
                 onOpenTopicSummaries={onOpenTopicSummaries}
                 tooltipEnabled={tooltipEnabled}
                 coloredHighlightMode={coloredHighlightMode}
+                topicColor={getTopicColor(block.topic.name)}
                 topicIndexScrollTarget={topicIndexScrollTarget}
                 onBackToTopicIndex={onBackToTopicIndex}
                 isInsightActive={getBlockInsightActive(block)}

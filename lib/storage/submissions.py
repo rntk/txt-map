@@ -19,6 +19,7 @@ class SubmissionsStorage:
         "insights_generation": ["split_topic_generation"],
         "markup_generation": ["split_topic_generation"],
         "topic_marker_summary_generation": ["split_topic_generation"],
+        "topic_temperature_generation": ["split_topic_generation"],
         "clustering_generation": ["split_topic_generation"],
         "topic_modeling_generation": ["split_topic_generation"],
     }
@@ -99,6 +100,12 @@ class SubmissionsStorage:
                     "completed_at": None,
                     "error": None,
                 },
+                "topic_temperature_generation": {
+                    "status": "pending",
+                    "started_at": None,
+                    "completed_at": None,
+                    "error": None,
+                },
                 "clustering_generation": {
                     "status": "pending",
                     "started_at": None,
@@ -128,6 +135,7 @@ class SubmissionsStorage:
                 "annotations": {},
                 "markup": {},
                 "topic_marker_summaries": {},
+                "topic_temperatures": {},
                 "clusters": [],
                 "topic_model": {},
             },
@@ -234,6 +242,9 @@ class SubmissionsStorage:
 
         if "topic_marker_summary_generation" in names:
             update_fields["results.topic_marker_summaries"] = {}
+
+        if "topic_temperature_generation" in names:
+            update_fields["results.topic_temperatures"] = {}
 
         if "clustering_generation" in names:
             update_fields["results.clusters"] = []

@@ -93,6 +93,7 @@ function buildSentenceCharacterRanges(rawText, sentences) {
  * @property {Array<number>} [activeInsightSentenceIndices]
  * @property {Array<{start: number, end: number}>} [activeInsightRanges]
  * @property {Set<string> | string[]} [coloredTopicNames]
+ * @property {Map<string, string> | null} [topicColorMap]
  * @property {boolean} [showTopicRangeAccents]
  * @property {Array<number>} [interactiveSentenceIndices]
  * @property {Array<{start: number, end: number}>} [interactiveHighlightRanges]
@@ -132,6 +133,7 @@ function TextDisplay({
   activeInsightSentenceIndices = EMPTY_ARRAY,
   activeInsightRanges = EMPTY_ARRAY,
   coloredTopicNames = null,
+  topicColorMap = null,
   showTopicRangeAccents = false,
   interactiveSentenceIndices = EMPTY_ARRAY,
   interactiveHighlightRanges = EMPTY_ARRAY,
@@ -167,6 +169,11 @@ function TextDisplay({
           ? new Set(coloredTopicNames)
           : null,
     [coloredTopicNames],
+  );
+  const getTopicColor = useCallback(
+    (topicName) =>
+      topicColorMap?.get(topicName) || getTopicHighlightColor(topicName),
+    [topicColorMap],
   );
   const safeParagraphMap =
     paragraphMap && typeof paragraphMap === "object" ? paragraphMap : null;
@@ -384,12 +391,17 @@ function TextDisplay({
       if (!seen.has(cssClass)) {
         seen.add(cssClass);
         lines.push(
-          `.${cssClass} { background-color: ${getTopicHighlightColor(topic.name)}; }`,
+          `.${cssClass} { background-color: ${getTopicColor(topic.name)}; }`,
         );
       }
     });
     return lines.join("\n");
-  }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
+  }, [
+    coloredHighlightMode,
+    getTopicColor,
+    safeArticleTopics,
+    safeColoredTopicNames,
+  ]);
 
   // Per-sentence color map for sentence/paragraph rendering in "Highlight All" mode
   const sentenceColorMap = useMemo(() => {
@@ -399,7 +411,7 @@ function TextDisplay({
       if (safeColoredTopicNames && !safeColoredTopicNames.has(topic.name)) {
         return;
       }
-      const color = getTopicHighlightColor(topic.name);
+      const color = getTopicColor(topic.name);
       (Array.isArray(topic.sentences) ? topic.sentences : []).forEach((num) => {
         const idx = num - 1;
         if (!map.has(idx)) {
@@ -408,7 +420,12 @@ function TextDisplay({
       });
     });
     return map;
-  }, [coloredHighlightMode, safeArticleTopics, safeColoredTopicNames]);
+  }, [
+    coloredHighlightMode,
+    getTopicColor,
+    safeArticleTopics,
+    safeColoredTopicNames,
+  ]);
 
   const sentenceAccentMap = useMemo(() => {
     if (!showTopicRangeAccents) {

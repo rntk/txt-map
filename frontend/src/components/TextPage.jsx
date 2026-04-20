@@ -28,6 +28,7 @@ import { useTopicNavigation } from "../hooks/useTopicNavigation";
 import { useTextSelection } from "../hooks/useTextSelection";
 import { getTopicHighlightColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
+import { getTemperatureColor } from "../utils/temperatureColor";
 import {
   buildModalSelectionFromSummarySource,
   buildModalSelectionFromTopic,
@@ -122,6 +123,7 @@ function TextPageContent() {
   const [compareTopicData, setCompareTopicData] = useState(null);
   const [highlightAllTopics, setHighlightAllTopics] = useState(false);
   const [highlightInsightTopics, setHighlightInsightTopics] = useState(false);
+  const [showTemperature, setShowTemperature] = useState(false);
   const [activeInsightId, setActiveInsightId] = useState(null);
   const [activeInsightSentenceIndices, setActiveInsightSentenceIndices] =
     useState([]);
@@ -133,11 +135,34 @@ function TextPageContent() {
   const rightColumnRef = useRef(null);
 
   const toggleHighlightAll = useCallback(() => {
-    setHighlightAllTopics((prev) => !prev);
+    setHighlightAllTopics((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowTemperature(false);
+      }
+      return next;
+    });
   }, []);
 
   const toggleHighlightInsightTopics = useCallback(() => {
-    setHighlightInsightTopics((prev) => !prev);
+    setHighlightInsightTopics((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowTemperature(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleTemperature = useCallback(() => {
+    setShowTemperature((prev) => {
+      const next = !prev;
+      if (next) {
+        setHighlightAllTopics(false);
+        setHighlightInsightTopics(false);
+      }
+      return next;
+    });
   }, []);
 
   const clearActiveInsight = useCallback(() => {
@@ -453,6 +478,32 @@ function TextPageContent() {
     () => (Array.isArray(results.sentences) ? results.sentences : []),
     [results.sentences],
   );
+  const topicTemperatureMap = useMemo(() => {
+    const rawTemperatures = results.topic_temperatures;
+    if (!rawTemperatures || typeof rawTemperatures !== "object") {
+      return new Map();
+    }
+
+    const map = new Map();
+    Object.entries(rawTemperatures).forEach(([topicName, value]) => {
+      const rawRate =
+        value && typeof value === "object" ? value.rate : Number(value);
+      const rate = Math.max(0, Math.min(100, Math.round(Number(rawRate))));
+      if (Number.isFinite(rate)) {
+        map.set(topicName, rate);
+      }
+    });
+    return map;
+  }, [results.topic_temperatures]);
+  const temperatureAvailable = topicTemperatureMap.size > 0;
+  const temperatureModeActive = showTemperature && temperatureAvailable;
+  const temperatureTopicColorMap = useMemo(() => {
+    const map = new Map();
+    topicTemperatureMap.forEach((rate, topicName) => {
+      map.set(topicName, getTemperatureColor(rate));
+    });
+    return map;
+  }, [topicTemperatureMap]);
 
   const handleCompareTopicRanges = useCallback(
     (topic) => {
@@ -493,6 +544,24 @@ function TextPageContent() {
 
   // Colored ranges for raw text view (character-position based, one per topic)
   const rawTextColoredRanges = useMemo(() => {
+    if (temperatureModeActive) {
+      const ranges = [];
+      safeTopics.forEach((topic) => {
+        const color = temperatureTopicColorMap.get(topic.name);
+        if (!color) {
+          return;
+        }
+        (Array.isArray(topic.ranges) ? topic.ranges : []).forEach((range) => {
+          const start = Number(range.start);
+          const end = Number(range.end);
+          if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+            ranges.push({ start, end, color });
+          }
+        });
+      });
+      return ranges;
+    }
+
     if (!highlightAllTopics && !highlightInsightTopics) return [];
     const ranges = [];
     safeTopics.forEach((topic) => {
@@ -514,6 +583,8 @@ function TextPageContent() {
     highlightAllTopics,
     highlightInsightTopics,
     safeTopics,
+    temperatureModeActive,
+    temperatureTopicColorMap,
   ]);
 
   const activeInsight = useMemo(
@@ -1058,6 +1129,9 @@ function TextPageContent() {
                   onToggleMinimap={() => setShowMinimap((prev) => !prev)}
                   showTopicsMeta={showTopicsMeta}
                   onToggleTopicsMeta={() => setShowTopicsMeta((prev) => !prev)}
+                  showTemperature={showTemperature}
+                  onToggleTemperature={toggleTemperature}
+                  temperatureAvailable={temperatureAvailable}
                   sourceUrl={submission.source_url}
                   readPercentage={readPercentage}
                 />
@@ -1091,9 +1165,16 @@ function TextPageContent() {
                         onOpenTopicSummaries={handleOpenTopicSummaries}
                         tooltipEnabled={tooltipEnabled}
                         coloredHighlightMode={
-                          highlightAllTopics || highlightInsightTopics
+                          highlightAllTopics ||
+                          highlightInsightTopics ||
+                          temperatureModeActive
                         }
                         coloredTopicNames={coloredTopicNames}
+                        topicColorMap={
+                          temperatureModeActive
+                            ? temperatureTopicColorMap
+                            : null
+                        }
                         topicIndexScrollTarget={topicIndexScrollTarget}
                         onBackToTopicIndex={handleBackToTopicIndex}
                         activeInsightSentenceIndices={
@@ -1157,13 +1238,20 @@ function TextPageContent() {
                             tooltipEnabled={tooltipEnabled}
                             submissionId={submissionId}
                             coloredHighlightMode={
-                              highlightAllTopics || highlightInsightTopics
+                              highlightAllTopics ||
+                              highlightInsightTopics ||
+                              temperatureModeActive
                             }
                             activeInsightSentenceIndices={
                               activeInsightSentenceIndices
                             }
                             activeInsightRanges={activeInsightRanges}
                             coloredTopicNames={coloredTopicNames}
+                            topicColorMap={
+                              temperatureModeActive
+                                ? temperatureTopicColorMap
+                                : null
+                            }
                             topicIndexScrollTarget={topicIndexScrollTarget}
                             onBackToTopicIndex={handleBackToTopicIndex}
                           />

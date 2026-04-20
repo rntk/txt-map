@@ -52,6 +52,7 @@ const RECALCULATE_ACTIONS = [
       "mindmap",
       "insights_generation",
       "topic_marker_summary_generation",
+      "topic_temperature_generation",
     ],
     message: "Topic-related tasks queued.",
   },
@@ -80,6 +81,11 @@ const RECALCULATE_ACTIONS = [
     label: "Marker Summary",
     tasks: ["topic_marker_summary_generation"],
     message: "Marker summary generation queued.",
+  },
+  {
+    label: "Temperature",
+    tasks: ["topic_temperature_generation"],
+    message: "Temperature generation queued.",
   },
   {
     label: "Clustering",

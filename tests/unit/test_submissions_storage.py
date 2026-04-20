@@ -49,11 +49,12 @@ class TestConstants:
             "insights_generation",
             "markup_generation",
             "topic_marker_summary_generation",
+            "topic_temperature_generation",
             "clustering_generation",
             "topic_modeling_generation",
         ]
         assert SubmissionsStorage.task_names == expected_tasks
-        assert len(SubmissionsStorage.task_names) == 10
+        assert len(SubmissionsStorage.task_names) == 11
 
     def test_task_dependencies_correctly_defined(self):
         """task_dependencies correctly defined for all tasks."""
@@ -66,6 +67,7 @@ class TestConstants:
             "insights_generation": ["split_topic_generation"],
             "markup_generation": ["split_topic_generation"],
             "topic_marker_summary_generation": ["split_topic_generation"],
+            "topic_temperature_generation": ["split_topic_generation"],
             "clustering_generation": ["split_topic_generation"],
             "topic_modeling_generation": ["split_topic_generation"],
         }
@@ -94,7 +96,7 @@ class TestInit:
     def test_task_names_list_contains_all_task_types(self, mock_db):
         """task_names list contains all task types."""
         storage = SubmissionsStorage(mock_db)
-        assert len(storage.task_names) == 10
+        assert len(storage.task_names) == 11
         assert "split_topic_generation" in storage.task_names
         assert "subtopics_generation" in storage.task_names
         assert "summarization" in storage.task_names
@@ -103,6 +105,7 @@ class TestInit:
         assert "insights_generation" in storage.task_names
         assert "markup_generation" in storage.task_names
         assert "topic_marker_summary_generation" in storage.task_names
+        assert "topic_temperature_generation" in storage.task_names
         assert "clustering_generation" in storage.task_names
         assert "topic_modeling_generation" in storage.task_names
 
@@ -123,6 +126,9 @@ class TestInit:
             "split_topic_generation"
         ]
         assert storage.task_dependencies["topic_marker_summary_generation"] == [
+            "split_topic_generation"
+        ]
+        assert storage.task_dependencies["topic_temperature_generation"] == [
             "split_topic_generation"
         ]
         assert storage.task_dependencies["clustering_generation"] == [
@@ -898,7 +904,7 @@ class TestExpandRecalculationTasks:
 
         result = storage.expand_recalculation_tasks(["split_topic_generation"])
 
-        assert len(result) == 10
+        assert len(result) == 11
         assert set(result) == set(SubmissionsStorage.task_names)
 
     def test_subtopics_generation_returns_subtopics_and_mindmap(self, mock_db):

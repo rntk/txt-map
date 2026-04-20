@@ -14,6 +14,9 @@ import "../styles/text-reading.css";
  * @property {() => void} onToggleMinimap
  * @property {boolean} showTopicsMeta
  * @property {() => void} onToggleTopicsMeta
+ * @property {boolean} showTemperature
+ * @property {() => void} onToggleTemperature
+ * @property {boolean} [temperatureAvailable]
  * @property {string|undefined} sourceUrl
  * @property {number} [readPercentage]
  */
@@ -28,6 +31,9 @@ function ArticleTabHeader({
   onToggleMinimap,
   showTopicsMeta,
   onToggleTopicsMeta,
+  showTemperature,
+  onToggleTemperature,
+  temperatureAvailable = false,
   sourceUrl,
   readPercentage = 0,
 }) {
@@ -112,6 +118,20 @@ function ArticleTabHeader({
             onChange={onToggleTopicsMeta}
           />
           Show topics meta
+        </label>
+      )}
+      {supportsMinimap && temperatureAvailable && (
+        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls article-tab-header__temperature">
+          <input
+            type="checkbox"
+            checked={showTemperature}
+            onChange={onToggleTemperature}
+          />
+          Temperature
+          <span
+            className="article-tab-header__temperature-legend"
+            aria-hidden="true"
+          />
         </label>
       )}
 

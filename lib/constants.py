@@ -12,6 +12,7 @@ TASK_NAMES: List[str] = [
     "insights_generation",
     "markup_generation",
     "topic_marker_summary_generation",
+    "topic_temperature_generation",
     "clustering_generation",
     "topic_modeling_generation",
 ]
@@ -29,6 +30,7 @@ TASK_PRIORITIES: Dict[str, int] = {
     "insights_generation": 4,
     "markup_generation": 4,
     "topic_marker_summary_generation": 4,
+    "topic_temperature_generation": 4,
     "clustering_generation": 4,
     "topic_modeling_generation": 4,
 }
