@@ -2,8 +2,9 @@ import logging
 import random
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List, Optional
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, List, Literal, Optional
 
 
 @dataclass(frozen=True)
@@ -12,6 +13,60 @@ class ProviderDefinition:
     display_name: str
     models: tuple[str, ...]
     default_model: str
+
+
+MessageRole = Literal["system", "user", "assistant", "tool"]
+
+
+@dataclass(frozen=True)
+class ToolDefinition:
+    name: str
+    description: str
+    parameters: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    name: str
+    arguments: Mapping[str, Any]
+    id: str | None = None
+
+
+@dataclass(frozen=True)
+class LLMMessage:
+    role: MessageRole
+    content: str | None = None
+    tool_calls: Sequence[ToolCall] = field(default_factory=tuple)
+    tool_call_id: str | None = None
+
+
+@dataclass(frozen=True)
+class LLMRequest:
+    user_prompt: str
+    system_prompt: str | None = None
+    tools: Sequence[ToolDefinition] = field(default_factory=tuple)
+    model: str | None = None
+    temperature: float | None = None
+    messages: Sequence[LLMMessage] = field(default_factory=tuple)
+    tool_choice: str | dict[str, Any] | None = None
+    parallel_tool_calls: bool | None = None
+
+    def all_messages(self) -> tuple[LLMMessage, ...]:
+        messages: list[LLMMessage] = []
+        if self.system_prompt:
+            messages.append(LLMMessage(role="system", content=self.system_prompt))
+        messages.extend(self.messages)
+        if self.user_prompt:
+            messages.append(LLMMessage(role="user", content=self.user_prompt))
+        return tuple(messages)
+
+
+@dataclass(frozen=True)
+class LLMResponse:
+    content: str | None = None
+    reasoning: str | None = None
+    tool_calls: Sequence[ToolCall] = field(default_factory=tuple)
+    raw: Any | None = None
 
 
 PROVIDER_DEFINITIONS: tuple[ProviderDefinition, ...] = (
@@ -106,11 +161,46 @@ class LLMClient(ABC):
         retries: Optional[int] = None,
     ) -> str:
         """Call the LLM with retry logic and exponential backoff."""
+        if not user_msgs:
+            raise RuntimeError("LLM call requires at least one user message")
+
+        response = self.complete(
+            user_prompt=user_msgs[0],
+            temperature=temperature,
+            retries=retries,
+        )
+        if response.content is None:
+            raise RuntimeError("LLM returned empty text response")
+        return response.content
+
+    def complete(
+        self,
+        user_prompt: str,
+        *,
+        system_prompt: str | None = None,
+        tools: Sequence[ToolDefinition] = (),
+        model: str | None = None,
+        temperature: float | None = None,
+        messages: Sequence[LLMMessage] = (),
+        tool_choice: str | dict[str, Any] | None = None,
+        parallel_tool_calls: bool | None = None,
+        retries: Optional[int] = None,
+    ) -> LLMResponse:
+        request = LLMRequest(
+            user_prompt=user_prompt,
+            system_prompt=system_prompt,
+            tools=tools,
+            model=model,
+            temperature=temperature,
+            messages=messages,
+            tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
+        )
         max_retries = retries if retries is not None else self._max_retries
 
         for attempt in range(max_retries + 1):
             try:
-                return self._call_single(user_msgs, temperature)
+                return self._complete_single(request)
             except RuntimeError as e:
                 if attempt < max_retries:
                     delay = self._retry_delay * (2**attempt) + random.uniform(0, 0.5)
@@ -126,5 +216,5 @@ class LLMClient(ABC):
                     raise
 
     @abstractmethod
-    def _call_single(self, user_msgs: List[str], temperature: float) -> str:
+    def _complete_single(self, request: LLMRequest) -> LLMResponse:
         pass

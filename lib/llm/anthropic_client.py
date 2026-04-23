@@ -1,7 +1,16 @@
+import json
 import logging
-from typing import Any, List
+from collections.abc import Mapping, Sequence
+from typing import Any
 
-from lib.llm.base import LLMClient
+from lib.llm.base import (
+    LLMClient,
+    LLMMessage,
+    LLMRequest,
+    LLMResponse,
+    ToolCall,
+    ToolDefinition,
+)
 
 
 class AnthropicClient(LLMClient):
@@ -39,45 +48,165 @@ class AnthropicClient(LLMClient):
     def model_name(self) -> str:
         return self._model
 
-    def _extract_reasoning(self, response: Any) -> str | None:
-        reasoning_parts: list[str] = []
+    @staticmethod
+    def _get_value(value: Any, key: str, default: Any = None) -> Any:
+        if isinstance(value, Mapping):
+            return value.get(key, default)
+        return getattr(value, key, default)
 
-        for block in getattr(response, "content", []) or []:
-            block_type = getattr(block, "type", None)
+    @staticmethod
+    def _parse_arguments(arguments: Any) -> Mapping[str, Any]:
+        if arguments is None:
+            return {}
+        if isinstance(arguments, str):
+            decoded = json.loads(arguments or "{}")
+            if not isinstance(decoded, dict):
+                raise ValueError("Tool-call arguments must decode to a JSON object.")
+            return decoded
+        if isinstance(arguments, Mapping):
+            return arguments
+        raise ValueError("Tool-call arguments must be a JSON object string or mapping.")
+
+    @staticmethod
+    def _to_provider_message(message: LLMMessage) -> dict[str, Any]:
+        blocks: list[dict[str, Any]] = []
+        if message.role != "tool" and message.content:
+            blocks.append({"type": "text", "text": message.content})
+
+        if message.role == "assistant" and message.tool_calls:
+            for tool_call in message.tool_calls:
+                blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tool_call.id or "",
+                        "name": tool_call.name,
+                        "input": dict(tool_call.arguments),
+                    }
+                )
+        elif message.role == "tool":
+            blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": message.tool_call_id or "",
+                    "content": message.content or "",
+                }
+            )
+
+        role = "user" if message.role == "tool" else message.role
+        return {"role": role, "content": blocks}
+
+    @classmethod
+    def _to_provider_messages(
+        cls,
+        messages: Sequence[LLMMessage],
+    ) -> list[dict[str, Any]]:
+        provider_messages: list[dict[str, Any]] = []
+        for message in messages:
+            if message.role == "system":
+                continue
+            provider_message = cls._to_provider_message(message)
+            if (
+                provider_messages
+                and provider_messages[-1]["role"] == provider_message["role"]
+            ):
+                provider_messages[-1]["content"].extend(provider_message["content"])
+            else:
+                provider_messages.append(provider_message)
+        return provider_messages
+
+    @staticmethod
+    def _to_provider_tools(tools: Sequence[ToolDefinition]) -> list[dict[str, Any]]:
+        provider_tools: list[dict[str, Any]] = []
+        for tool in tools:
+            provider_tools.append(
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": dict(tool.parameters),
+                }
+            )
+        return provider_tools
+
+    @classmethod
+    def _extract_response(cls, response: Any) -> LLMResponse:
+        content_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        tool_calls: list[ToolCall] = []
+
+        for block in cls._get_value(response, "content", ()) or ():
+            block_type = cls._get_value(block, "type")
             if block_type == "thinking":
-                thinking = getattr(block, "thinking", None)
-                text = getattr(block, "text", None)
+                thinking = cls._get_value(block, "thinking")
+                text = cls._get_value(block, "text")
                 if thinking:
                     reasoning_parts.append(str(thinking))
                 if text:
                     reasoning_parts.append(str(text))
             elif block_type == "redacted_thinking":
-                data = getattr(block, "data", None)
+                data = cls._get_value(block, "data")
                 if data:
                     reasoning_parts.append(str(data))
+            elif block_type == "text":
+                text = cls._get_value(block, "text")
+                if text:
+                    content_parts.append(str(text))
+            elif block_type == "tool_use":
+                tool_calls.append(
+                    ToolCall(
+                        id=cls._get_value(block, "id") or "",
+                        name=str(cls._get_value(block, "name", "")),
+                        arguments=cls._parse_arguments(
+                            cls._get_value(block, "input", {}),
+                        ),
+                    )
+                )
 
-        combined = "\n".join(part for part in reasoning_parts if part)
-        return combined or None
+        return LLMResponse(
+            content="\n".join(content_parts) if content_parts else None,
+            reasoning="\n".join(reasoning_parts) if reasoning_parts else None,
+            tool_calls=tuple(tool_calls),
+            raw=response,
+        )
 
-    def _call_single(self, user_msgs: List[str], temperature: float) -> str:
+    def _complete_single(self, request: LLMRequest) -> LLMResponse:
         try:
-            logging.info(f"LLM request: {user_msgs[0]}")
+            logging.info(f"LLM request: {request.user_prompt}")
 
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": user_msgs[0]}],
-                temperature=temperature,
-                cache_control={"type": "ephemeral"},
-            )
-            reasoning = self._extract_reasoning(response)
-            content = response.content[0].text
-            if content is None:
+            all_messages = request.all_messages()
+            system_parts = [
+                message.content
+                for message in all_messages
+                if message.role == "system" and message.content
+            ]
+
+            kwargs: dict[str, Any] = {
+                "model": request.model or self._model,
+                "max_tokens": 4096,
+                "messages": self._to_provider_messages(all_messages),
+                "cache_control": {"type": "ephemeral"},
+            }
+            if system_parts:
+                kwargs["system"] = "\n\n".join(system_parts)
+            if request.temperature is not None:
+                kwargs["temperature"] = request.temperature
+            if request.tools:
+                kwargs["tools"] = self._to_provider_tools(request.tools)
+            if request.tool_choice is not None:
+                kwargs["tool_choice"] = request.tool_choice
+
+            response = self._client.messages.create(**kwargs)
+            parsed = self._extract_response(response)
+            if parsed.content is None and not parsed.tool_calls:
                 raise RuntimeError("LLM returned empty response")
-            if reasoning:
-                logging.info(f"LLM reasoning: {reasoning}")
-            logging.info(f"LLM response: {content}")
-            return content
+            if parsed.reasoning:
+                logging.info(f"LLM reasoning: {parsed.reasoning}")
+            if parsed.content:
+                logging.info(f"LLM response: {parsed.content}")
+            if parsed.tool_calls:
+                logging.info(
+                    f"LLM tool calls: {[tool_call.name for tool_call in parsed.tool_calls]}"
+                )
+            return parsed
         except RuntimeError:
             raise
         except Exception as e:

@@ -1,7 +1,16 @@
+import json
 import logging
-from typing import Any, List
+from collections.abc import Mapping, Sequence
+from typing import Any
 
-from lib.llm.base import LLMClient
+from lib.llm.base import (
+    LLMClient,
+    LLMMessage,
+    LLMRequest,
+    LLMResponse,
+    ToolCall,
+    ToolDefinition,
+)
 
 
 class OpenAIClient(LLMClient):
@@ -39,57 +48,165 @@ class OpenAIClient(LLMClient):
     def model_name(self) -> str:
         return self._model
 
-    def _extract_reasoning(self, response: Any) -> str | None:
-        reasoning_parts: list[str] = []
+    @staticmethod
+    def _parse_arguments(arguments: Any) -> Mapping[str, Any]:
+        if arguments is None:
+            return {}
+        if isinstance(arguments, str):
+            decoded = json.loads(arguments or "{}")
+            if not isinstance(decoded, dict):
+                raise ValueError("Tool-call arguments must decode to a JSON object.")
+            return decoded
+        if isinstance(arguments, Mapping):
+            return arguments
+        raise ValueError("Tool-call arguments must be a JSON object string or mapping.")
 
-        choices = getattr(response, "choices", None) or []
-        for choice in choices:
-            message = getattr(choice, "message", None)
-            if message is None:
+    @staticmethod
+    def _to_provider_tools(tools: Sequence[ToolDefinition]) -> list[dict[str, Any]]:
+        provider_tools: list[dict[str, Any]] = []
+        for tool in tools:
+            provider_tools.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": dict(tool.parameters),
+                }
+            )
+        return provider_tools
+
+    @staticmethod
+    def _assistant_output(message: LLMMessage) -> list[dict[str, Any]]:
+        output: list[dict[str, Any]] = []
+        for tool_call in message.tool_calls:
+            output.append(
+                {
+                    "type": "function_call",
+                    "call_id": tool_call.id or "",
+                    "name": tool_call.name,
+                    "arguments": json.dumps(dict(tool_call.arguments)),
+                }
+            )
+        if message.content:
+            output.append({"type": "output_text", "text": message.content})
+        return output
+
+    @classmethod
+    def _to_input_items(cls, messages: Sequence[LLMMessage]) -> list[dict[str, Any]]:
+        input_items: list[dict[str, Any]] = []
+        for message in messages:
+            if message.role == "system":
                 continue
+            if message.role == "user":
+                input_items.append({"role": "user", "content": message.content or ""})
+            elif message.role == "assistant":
+                input_items.append(
+                    {"role": "assistant", "output": cls._assistant_output(message)}
+                )
+            elif message.role == "tool":
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": message.tool_call_id or "",
+                        "output": message.content or "",
+                    }
+                )
+        return input_items
 
-            for attr_name in ("reasoning", "reasoning_content", "thinking"):
-                attr_value = getattr(message, attr_name, None)
-                if attr_value:
-                    reasoning_parts.append(str(attr_value))
-
-            content_blocks = getattr(message, "content", None)
-            if isinstance(content_blocks, list):
-                for block in content_blocks:
-                    block_type = getattr(block, "type", None)
-                    if block_type in {"reasoning", "thinking"}:
-                        text = getattr(block, "text", None)
-                        if text:
-                            reasoning_parts.append(str(text))
-                        summary = getattr(block, "summary", None)
-                        if summary:
-                            reasoning_parts.append(str(summary))
-
+    @staticmethod
+    def _extract_reasoning(response: Any) -> str | None:
+        reasoning_parts: list[str] = []
+        for item in getattr(response, "output", []) or []:
+            item_type = getattr(item, "type", None)
+            if item_type == "reasoning":
+                for summary in getattr(item, "summary", []) or []:
+                    text = getattr(summary, "text", None)
+                    if text:
+                        reasoning_parts.append(str(text))
+            elif item_type == "message":
+                for content_item in getattr(item, "content", []) or []:
+                    if getattr(content_item, "type", None) == "reasoning":
+                        for summary in getattr(content_item, "summary", []) or []:
+                            text = getattr(summary, "text", None)
+                            if text:
+                                reasoning_parts.append(str(text))
         combined = "\n".join(part for part in reasoning_parts if part)
         return combined or None
 
-    def _call_single(self, user_msgs: List[str], temperature: float) -> str:
+    @classmethod
+    def _extract_response(cls, response: Any) -> LLMResponse:
+        content_parts: list[str] = []
+        tool_calls: list[ToolCall] = []
+
+        for item in getattr(response, "output", []) or []:
+            item_type = getattr(item, "type", None)
+            if item_type == "message":
+                for content_item in getattr(item, "content", []) or []:
+                    if getattr(content_item, "type", None) == "output_text":
+                        text = getattr(content_item, "text", None)
+                        if text:
+                            content_parts.append(str(text))
+            elif item_type == "function_call":
+                tool_calls.append(
+                    ToolCall(
+                        id=getattr(item, "call_id", None),
+                        name=str(getattr(item, "name", "")),
+                        arguments=cls._parse_arguments(
+                            getattr(item, "arguments", None),
+                        ),
+                    )
+                )
+
+        return LLMResponse(
+            content="\n".join(content_parts) if content_parts else None,
+            reasoning=cls._extract_reasoning(response),
+            tool_calls=tuple(tool_calls),
+            raw=response,
+        )
+
+    def _complete_single(self, request: LLMRequest) -> LLMResponse:
         try:
-            logging.info(f"LLM request: {user_msgs[0]}")
+            logging.info(f"LLM request: {request.user_prompt}")
 
-            # gpt-5-mini and gpt-5-nano don't support temperature parameter
-            kwargs = {"service_tier": "flex"}
-            if self._model not in ("gpt-5-mini", "gpt-5-nano"):
-                kwargs["temperature"] = temperature
+            all_messages = request.all_messages()
+            instructions_parts = [
+                message.content
+                for message in all_messages
+                if message.role == "system" and message.content
+            ]
 
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=[{"role": "user", "content": user_msgs[0]}],
-                **kwargs,
-            )
-            reasoning = self._extract_reasoning(response)
-            content = response.choices[0].message.content
-            if content is None:
+            kwargs: dict[str, Any] = {
+                "model": request.model or self._model,
+                "input": self._to_input_items(all_messages),
+            }
+            if instructions_parts:
+                kwargs["instructions"] = "\n\n".join(instructions_parts)
+            if request.tools:
+                kwargs["tools"] = self._to_provider_tools(request.tools)
+            if request.tool_choice is not None:
+                kwargs["tool_choice"] = request.tool_choice
+            if request.parallel_tool_calls is not None:
+                kwargs["parallel_tool_calls"] = request.parallel_tool_calls
+            if request.temperature is not None and kwargs["model"] not in (
+                "gpt-5-mini",
+                "gpt-5-nano",
+            ):
+                kwargs["temperature"] = request.temperature
+            kwargs["service_tier"] = "flex"
+
+            response = self._client.responses.create(**kwargs)
+            parsed = self._extract_response(response)
+            if parsed.content is None and not parsed.tool_calls:
                 raise RuntimeError("LLM returned empty response")
-            if reasoning:
-                logging.info(f"LLM reasoning: {reasoning}")
-            logging.info(f"LLM response: {content}")
-            return content
+            if parsed.reasoning:
+                logging.info(f"LLM reasoning: {parsed.reasoning}")
+            if parsed.content:
+                logging.info(f"LLM response: {parsed.content}")
+            if parsed.tool_calls:
+                logging.info(
+                    f"LLM tool calls: {[tool_call.name for tool_call in parsed.tool_calls]}"
+                )
+            return parsed
         except RuntimeError:
             raise
         except Exception as e:

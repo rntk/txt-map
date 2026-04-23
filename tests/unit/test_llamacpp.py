@@ -18,6 +18,7 @@ import json
 # =============================================================================
 
 from lib.llm.llamacpp import LLamaCPP
+from lib.llm.base import LLMMessage, ToolCall, ToolDefinition
 
 
 # =============================================================================
@@ -1524,3 +1525,110 @@ class TestIntegrationScenarios:
         self.llm.rerank("query", ["doc"])
         rerank_headers = self.mock_conn_instance.request.call_args[0][3]
         assert rerank_headers["Authorization"] == "Bearer test-token"
+
+    def test_complete_sends_tools_and_history(self):
+        """Tool-aware complete serializes messages and tool definitions."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "done"}}]}
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+
+        tool = ToolDefinition(
+            name="lookup",
+            description="Look up data",
+            parameters={"type": "object"},
+        )
+
+        response = self.llm.complete(
+            user_prompt="final question",
+            system_prompt="system text",
+            tools=(tool,),
+            messages=(
+                LLMMessage(
+                    role="assistant",
+                    content="working",
+                    tool_calls=(
+                        ToolCall(name="lookup", arguments={"id": 1}, id="call-1"),
+                    ),
+                ),
+                LLMMessage(role="tool", content='{"id":1}', tool_call_id="call-1"),
+            ),
+            tool_choice="required",
+            parallel_tool_calls=True,
+        )
+
+        assert response.content == "done"
+        body = json.loads(self.mock_conn_instance.request.call_args[0][2])
+        assert body["messages"][0]["role"] == "system"
+        assert body["messages"][1]["tool_calls"][0]["function"]["name"] == "lookup"
+        assert body["messages"][2]["tool_call_id"] == "call-1"
+        assert body["messages"][3]["role"] == "user"
+        assert body["tools"][0]["function"]["name"] == "lookup"
+        assert body["tool_choice"] == "required"
+        assert body["parallel_tool_calls"] is True
+
+    def test_complete_parses_tool_only_response(self):
+        """Tool-only llama.cpp responses are returned by complete()."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call-1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "lookup",
+                                        "arguments": '{"city":"Paris"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+
+        response = self.llm.complete(user_prompt="weather?")
+
+        assert response.content is None
+        assert len(response.tool_calls) == 1
+        assert response.tool_calls[0].id == "call-1"
+        assert response.tool_calls[0].arguments == {"city": "Paris"}
+
+    def test_call_rejects_tool_only_response_without_text(self):
+        """Legacy call() still requires text content."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call-1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "lookup",
+                                        "arguments": '{"city":"Paris"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            }
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+
+        with pytest.raises(RuntimeError, match="empty text response"):
+            self.llm.call(["weather?"])

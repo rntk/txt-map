@@ -17,8 +17,13 @@ The LLM logic is structured as a provider-based system to allow switching betwee
 ### Base Interface
 `lib/llm/base.py` defines the `LLMClient` abstract base class. All provider-specific clients must implement this interface:
 - `call(user_msgs, temperature, retries)`: The main method to send prompts.
-- `_call_single(...)`: Abstract method for the actual network request.
+- `complete(...)`: Typed direct-client API for tool-aware requests and structured responses.
+- `_complete_single(...)`: Abstract method for the actual provider request.
 - `estimate_tokens(text)`: Used for chunking logic and token-limit management.
+
+`call(...)` remains the compatibility API for existing text-only task code. It wraps
+`complete(...)` and still returns plain text. Tool-call support is currently available
+only through direct client `complete(...)` usage.
 
 ### Concrete Implementations
 - **LlamaCPP** (`lib/llm/llamacpp.py`): Connects to a local server following the OpenAI API structure, typically used for local hosting.
@@ -80,6 +85,15 @@ When a worker claims a task, it follows this pattern:
 2.  Initialize Cache: `cache_store = MongoLLMCacheStore(db)`.
 3.  Execute Task Handler: Pass both `llm` and `cache_store` to the task function.
 4.  Tasks use the `CachingLLMCallable` to perform the actual work.
+
+### Tool Calls
+- Direct synchronous client calls can now use `complete(...)` with provider-neutral
+  `ToolDefinition`, `ToolCall`, `LLMMessage`, `LLMRequest`, and `LLMResponse` types.
+- `OpenAIClient` uses the OpenAI Responses API for this typed path.
+- `AnthropicClient` and `LLamaCPP` map the same neutral structures to their native
+  message/tool formats.
+- The async queue/worker/cache path remains text-only in this version and still stores
+  plain string responses.
 
 ### In API Handlers
 The API (`handlers/settings_handler.py`) allows querying and updating these settings:
