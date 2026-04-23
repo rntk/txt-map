@@ -64,8 +64,17 @@ Highlighting rules (highlight_span tool):
 - You may call highlight_span multiple times in one turn for several distinct passages.
 - Previously created highlights stay visible on the canvas between turns. Do not re-highlight
   the same span you already highlighted earlier in this conversation unless the user asks.
+- CRITICAL: Always read the tool results from your previous highlight_span calls in this
+  conversation (messages with role "tool" containing text like "Highlighted lines X-Y").
+  Before issuing a new highlight_span call, check that the (start_line, end_line) pair you
+  are about to send does NOT match or overlap any (X, Y) you have already highlighted in
+  this turn or earlier turns. Never call highlight_span with the same line range twice.
+  If every relevant passage is already highlighted, stop calling the tool and write your
+  reply instead.
 - Do not highlight when the user is asking a general question that is not tied to a specific
   passage (e.g. summarization, opinion, or meta questions).
+- When you have finished highlighting all relevant passages, stop calling tools and produce
+  a normal text reply. Do not keep calling highlight_span in a loop.
 """
 
 
