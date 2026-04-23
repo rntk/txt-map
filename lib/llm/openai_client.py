@@ -76,10 +76,19 @@ class OpenAIClient(LLMClient):
         return provider_tools
 
     @staticmethod
-    def _assistant_output(message: LLMMessage) -> list[dict[str, Any]]:
-        output: list[dict[str, Any]] = []
+    def _assistant_items(message: LLMMessage) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        if message.content:
+            items.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "output_text", "text": message.content}
+                    ],
+                }
+            )
         for tool_call in message.tool_calls:
-            output.append(
+            items.append(
                 {
                     "type": "function_call",
                     "call_id": tool_call.id or "",
@@ -87,9 +96,7 @@ class OpenAIClient(LLMClient):
                     "arguments": json.dumps(dict(tool_call.arguments)),
                 }
             )
-        if message.content:
-            output.append({"type": "output_text", "text": message.content})
-        return output
+        return items
 
     @classmethod
     def _to_input_items(cls, messages: Sequence[LLMMessage]) -> list[dict[str, Any]]:
@@ -100,9 +107,7 @@ class OpenAIClient(LLMClient):
             if message.role == "user":
                 input_items.append({"role": "user", "content": message.content or ""})
             elif message.role == "assistant":
-                input_items.append(
-                    {"role": "assistant", "output": cls._assistant_output(message)}
-                )
+                input_items.extend(cls._assistant_items(message))
             elif message.role == "tool":
                 input_items.append(
                     {
