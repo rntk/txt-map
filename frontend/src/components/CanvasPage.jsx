@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -47,6 +48,29 @@ function buildSegments(text, highlights) {
   }
 
   return segments;
+}
+
+/**
+ * Derive highlights to render from a single event.
+ */
+function eventToHighlights(ev) {
+  if (!ev) return [];
+  if (ev.event_type === "highlight_span") {
+    const { start, end, label } = ev.data || {};
+    if (typeof start === "number" && typeof end === "number") {
+      return [{ start, end, label: label || "" }];
+    }
+  }
+  return [];
+}
+
+function eventLabel(ev, idx) {
+  if (!ev) return `#${idx + 1}`;
+  if (ev.event_type === "highlight_span") {
+    const lbl = ev.data?.label;
+    return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
+  }
+  return `${idx + 1}. ${ev.event_type || "event"}`;
 }
 
 /**
@@ -114,6 +138,61 @@ function ChatHistory({ messages, isLoading }) {
   );
 }
 
+/**
+ * Horizontal list of received events. Clicking an item selects it.
+ * Items arriving while the user is pinned to an earlier event are flagged "new".
+ */
+function Timeline({
+  events,
+  selectedIndex,
+  newIndices,
+  isLive,
+  onSelect,
+  onGoLive,
+}) {
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!isLive) return;
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [events.length, isLive]);
+
+  return (
+    <div className="canvas-timeline">
+      <button
+        type="button"
+        className={`canvas-timeline-live ${isLive ? "is-active" : ""}`}
+        onClick={onGoLive}
+        title="Follow latest events"
+      >
+        ● Live
+      </button>
+      <div className="canvas-timeline-items" ref={scrollRef}>
+        {events.length === 0 && (
+          <span className="canvas-timeline-empty">No events yet</span>
+        )}
+        {events.map((ev, i) => {
+          const classes = ["canvas-timeline-item"];
+          if (i === selectedIndex) classes.push("is-selected");
+          if (newIndices.has(i)) classes.push("is-new");
+          return (
+            <button
+              type="button"
+              key={i}
+              className={classes.join(" ")}
+              onClick={() => onSelect(i)}
+              title={eventLabel(ev, i)}
+            >
+              {eventLabel(ev, i)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function CanvasPage() {
   const articleId = window.location.pathname.split("/")[3];
 
@@ -129,11 +208,19 @@ export default function CanvasPage() {
   const lastMouse = useRef({ x: 0, y: 0 });
   const canvasWrapRef = useRef(null);
 
-  // Events / highlights
-  const [highlights, setHighlights] = useState([]);
+  // Events / timeline
+  const [events, setEvents] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isLive, setIsLive] = useState(true);
+  const [newIndices, setNewIndices] = useState(() => new Set());
   const offsetRef = useRef(0);
   const pendingEventsRef = useRef([]);
   const applyingRef = useRef(false);
+  const isLiveRef = useRef(true);
+
+  useEffect(() => {
+    isLiveRef.current = isLive;
+  }, [isLive]);
 
   // Chat
   const [messages, setMessages] = useState([]);
@@ -166,10 +253,20 @@ export default function CanvasPage() {
     applyingRef.current = true;
     const ev = pendingEventsRef.current.shift();
 
-    if (ev.event_type === "highlight_span") {
-      const { start, end, label } = ev.data;
-      setHighlights((prev) => [...prev, { start, end, label: label || "" }]);
-    }
+    setEvents((prev) => {
+      const next = [...prev, ev];
+      const newIdx = next.length - 1;
+      if (isLiveRef.current) {
+        setSelectedIndex(newIdx);
+      } else {
+        setNewIndices((s) => {
+          const n = new Set(s);
+          n.add(newIdx);
+          return n;
+        });
+      }
+      return next;
+    });
 
     setTimeout(() => {
       applyingRef.current = false;
@@ -184,7 +281,7 @@ export default function CanvasPage() {
     if (!articleId) return;
     const url = `/api/canvas/${articleId}/events?offset=${offsetRef.current}&limit=${EVENTS_LIMIT}`;
     fetch(url, { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data || !data.events || data.events.length === 0) return;
         offsetRef.current += data.events.length;
@@ -199,6 +296,29 @@ export default function CanvasPage() {
     const timer = setInterval(fetchEvents, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [fetchEvents]);
+
+  // Highlights to render = only those from the selected event
+  const currentHighlights = useMemo(
+    () => eventToHighlights(events[selectedIndex]),
+    [events, selectedIndex]
+  );
+
+  const handleSelectEvent = useCallback((idx) => {
+    setSelectedIndex(idx);
+    setIsLive(false);
+    setNewIndices((s) => {
+      if (!s.has(idx)) return s;
+      const n = new Set(s);
+      n.delete(idx);
+      return n;
+    });
+  }, []);
+
+  const handleGoLive = useCallback(() => {
+    setIsLive(true);
+    setNewIndices(new Set());
+    setSelectedIndex(events.length - 1);
+  }, [events.length]);
 
   // Canvas drag
   const handleMouseDown = useCallback((e) => {
@@ -252,7 +372,7 @@ export default function CanvasPage() {
         body: JSON.stringify({ message: msg, history: messages }),
       });
       const data = await r.json();
-      const reply = r.ok ? (data.reply || "") : (data.detail || "Error");
+      const reply = r.ok ? data.reply || "" : data.detail || "Error";
       setMessages([...newHistory, { role: "assistant", content: reply }]);
     } catch {
       setMessages([
@@ -279,60 +399,70 @@ export default function CanvasPage() {
   return (
     <div className="canvas-page">
       {/* Left: Canvas */}
-      <div
-        ref={canvasWrapRef}
-        className="canvas-area"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
-      >
+      <div className="canvas-main">
         <div
-          className="canvas-viewport"
-          style={{
-            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transformOrigin: "0 0",
-          }}
+          ref={canvasWrapRef}
+          className="canvas-area"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
         >
-          {articleLoading && (
-            <div className="canvas-status">Loading article...</div>
-          )}
-          {articleError && (
-            <div className="canvas-status canvas-status--error">
-              Error: {articleError}
-            </div>
-          )}
-          {!articleLoading && !articleError && (
-            <ArticleText text={articleText} highlights={highlights} />
-          )}
-        </div>
-        <div className="canvas-controls">
-          <button
-            type="button"
-            className="canvas-zoom-btn"
-            onClick={() => setScale((s) => Math.min(4, s * 1.2))}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="canvas-zoom-btn"
-            onClick={() => setScale((s) => Math.max(0.2, s / 1.2))}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="canvas-zoom-btn"
-            onClick={() => {
-              setScale(1);
-              setTranslate({ x: 40, y: 40 });
+          <div
+            className="canvas-viewport"
+            style={{
+              transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+              transformOrigin: "0 0",
             }}
           >
-            ⊙
-          </button>
+            {articleLoading && (
+              <div className="canvas-status">Loading article...</div>
+            )}
+            {articleError && (
+              <div className="canvas-status canvas-status--error">
+                Error: {articleError}
+              </div>
+            )}
+            {!articleLoading && !articleError && (
+              <ArticleText text={articleText} highlights={currentHighlights} />
+            )}
+          </div>
+          <div className="canvas-controls">
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => setScale((s) => Math.min(4, s * 1.2))}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => setScale((s) => Math.max(0.2, s / 1.2))}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => {
+                setScale(1);
+                setTranslate({ x: 40, y: 40 });
+              }}
+            >
+              ⊙
+            </button>
+          </div>
         </div>
+        <Timeline
+          events={events}
+          selectedIndex={selectedIndex}
+          newIndices={newIndices}
+          isLive={isLive}
+          onSelect={handleSelectEvent}
+          onGoLive={handleGoLive}
+        />
       </div>
 
       {/* Right: Chat */}
