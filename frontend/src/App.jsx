@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import CachePage from "./components/CachePage";
+import CanvasPage from "./components/CanvasPage";
 import DiffPage from "./components/DiffPage";
 import GlobalTopicsPage from "./components/GlobalTopicsPage";
 import LoginPage from "./components/LoginPage";
@@ -124,6 +125,7 @@ const navigationItems = [
 
 const PAGE_COMPONENTS = {
   cache: CachePage,
+  canvas: CanvasPage,
   diff: DiffPage,
   login: LoginPage,
   menu: MainPage,

@@ -253,6 +253,12 @@ function TextListPage() {
                       >
                         Hierarchy
                       </a>
+                      <a
+                        className="text-list-link"
+                        href={`/page/canvas/${submission.submission_id}`}
+                      >
+                        Canvas
+                      </a>
                       <RefreshButton
                         submissionId={submission.submission_id}
                         onRefresh={fetchSubmissions}

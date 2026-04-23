@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pymongo import MongoClient
 
+from lib.storage.canvas_events import CanvasEventsStorage
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.posts import PostsStorage
 from lib.storage.app_settings import AppSettingsStorage
@@ -54,10 +55,14 @@ async def lifespan(app: FastAPI):
     llm_providers_storage = LlmProvidersStorage(db)
     llm_providers_storage.prepare()
 
+    canvas_events_storage = CanvasEventsStorage(db)
+    canvas_events_storage.prepare()
+
     task_queue_storage = TaskQueueStorage(db)
     llm_queue_store = LLMQueueStore(db)
     llm_queue_store.prepare()
 
+    app.state.canvas_events_storage = canvas_events_storage
     app.state.db = db
     app.state.posts_storage = posts_storage
     app.state.submissions_storage = submissions_storage

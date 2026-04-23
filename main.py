@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 
 from handlers import (
+    canvas_handler,
     submission_handler,
     task_queue_handler,
     diff_handler,
@@ -104,6 +105,11 @@ app.include_router(
     prefix="/api",
     dependencies=[Depends(require_auth)],
 )
+app.include_router(
+    canvas_handler.router,
+    prefix="/api",
+    dependencies=[Depends(require_auth)],
+)
 
 
 FRONTEND_INDEX = "frontend/build/index.html"
@@ -121,6 +127,7 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/topics")
 @app.get("/page/topic-analysis/{submission_id}")
 @app.get("/page/topic-hierarchy/{submission_id}")
+@app.get("/page/canvas/{submission_id}")
 @app.get("/page/login")
 @app.get("/page/tokens")
 @app.get("/page/llm-providers")
