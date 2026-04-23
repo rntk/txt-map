@@ -386,6 +386,12 @@ export default function CanvasPage() {
     }
   }, [articleId, inputValue, isChatLoading, messages, fetchEvents]);
 
+  const handleNewChat = useCallback(() => {
+    if (isChatLoading) return;
+    setMessages([]);
+    setInputValue("");
+  }, [isChatLoading]);
+
   const handleKeyDown = useCallback(
     (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -467,7 +473,18 @@ export default function CanvasPage() {
 
       {/* Right: Chat */}
       <div className="canvas-chat-panel">
-        <div className="canvas-chat-header">Article Assistant</div>
+        <div className="canvas-chat-header">
+          <span>Article Assistant</span>
+          <button
+            type="button"
+            className="canvas-chat-new"
+            onClick={handleNewChat}
+            disabled={isChatLoading || messages.length === 0}
+            title="Start a new chat"
+          >
+            New Chat
+          </button>
+        </div>
         <ChatHistory messages={messages} isLoading={isChatLoading} />
         <div className="canvas-chat-input-row">
           <textarea
