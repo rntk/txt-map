@@ -1,9 +1,13 @@
+import json
 import logging
 import re
+import threading
+import uuid
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from handlers.dependencies import get_db
@@ -15,6 +19,8 @@ from lib.storage.submissions import SubmissionsStorage
 router = APIRouter()
 log = logging.getLogger("canvas_handler")
 log.setLevel(logging.DEBUG)
+
+CANVAS_CHAT_JOB_TTL = timedelta(hours=6)
 
 HIGHLIGHT_TOOL = ToolDefinition(
     name="highlight_span",
@@ -110,6 +116,98 @@ class CanvasArticleText:
     pieces: list[ArticlePiece]
 
 
+CanvasChatJobStatus = Literal["pending", "processing", "completed", "failed"]
+
+
+@dataclass
+class CanvasChatJob:
+    article_id: str
+    status: CanvasChatJobStatus
+    created_at: datetime
+    updated_at: datetime
+    reply: str | None = None
+    error: str | None = None
+
+
+_canvas_chat_jobs: dict[str, CanvasChatJob] = {}
+_canvas_chat_jobs_lock = threading.Lock()
+
+
+def _cleanup_canvas_chat_jobs(now: datetime) -> None:
+    expired_before = now - CANVAS_CHAT_JOB_TTL
+    expired_ids: list[str] = [
+        request_id
+        for request_id, job in _canvas_chat_jobs.items()
+        if job.updated_at < expired_before
+    ]
+    for request_id in expired_ids:
+        del _canvas_chat_jobs[request_id]
+
+
+def _create_canvas_chat_job(article_id: str) -> str:
+    now = datetime.now(UTC)
+    request_id = uuid.uuid4().hex
+    with _canvas_chat_jobs_lock:
+        _cleanup_canvas_chat_jobs(now)
+        _canvas_chat_jobs[request_id] = CanvasChatJob(
+            article_id=article_id,
+            status="pending",
+            created_at=now,
+            updated_at=now,
+        )
+    return request_id
+
+
+def _update_canvas_chat_job(
+    request_id: str,
+    *,
+    status: CanvasChatJobStatus,
+    reply: str | None = None,
+    error: str | None = None,
+) -> None:
+    now = datetime.now(UTC)
+    with _canvas_chat_jobs_lock:
+        job = _canvas_chat_jobs.get(request_id)
+        if job is None:
+            return
+        job.status = status
+        job.updated_at = now
+        job.reply = reply
+        job.error = error
+
+
+def _get_canvas_chat_job(request_id: str) -> CanvasChatJob | None:
+    with _canvas_chat_jobs_lock:
+        return _canvas_chat_jobs.get(request_id)
+
+
+def _run_canvas_chat_job(
+    request_id: str,
+    article_id: str,
+    submission: dict[str, Any],
+    user_message: str,
+    history: list[dict[str, str]],
+    canvas_storage: CanvasEventsStorage,
+    db: Any,
+) -> None:
+    _update_canvas_chat_job(request_id, status="processing")
+    try:
+        reply = _run_canvas_chat(
+            article_id=article_id,
+            submission=submission,
+            user_message=user_message,
+            history=history,
+            canvas_storage=canvas_storage,
+            db=db,
+        )
+    except Exception as exc:
+        log.exception("Canvas chat job error for article %s", article_id)
+        _update_canvas_chat_job(request_id, status="failed", error=str(exc))
+        return
+
+    _update_canvas_chat_job(request_id, status="completed", reply=reply)
+
+
 def _split_article_piece(text: str, offset: int = 0) -> list[ArticlePiece]:
     """Split article text into granular pieces with offsets into display text."""
     pieces: list[ArticlePiece] = []
@@ -180,6 +278,121 @@ def _build_article_text_with_lines(
     )
 
 
+def _estimate_tokens(llm: Any, text: str) -> int:
+    estimator = getattr(llm, "estimate_tokens", None)
+    if callable(estimator):
+        estimated = estimator(text)
+        if isinstance(estimated, int):
+            return estimated
+    return len(text) // 4
+
+
+def _estimate_messages_tokens(llm: Any, messages: list[LLMMessage]) -> int:
+    total = 0
+    for msg in messages:
+        if msg.content:
+            total += _estimate_tokens(llm, msg.content)
+        for tc in msg.tool_calls or ():
+            total += _estimate_tokens(llm, tc.name or "")
+            if tc.arguments:
+                total += _estimate_tokens(llm, json.dumps(tc.arguments))
+        # Per-message framing overhead (role tags, separators).
+        total += 8
+    return total
+
+
+def _estimate_tools_tokens(llm: Any, tools: list[ToolDefinition]) -> int:
+    total = 0
+    for tool in tools:
+        total += _estimate_tokens(llm, tool.name)
+        total += _estimate_tokens(llm, tool.description)
+        total += _estimate_tokens(llm, json.dumps(dict(tool.parameters)))
+    return total
+
+
+def _build_canvas_chunks(
+    pieces: list[ArticlePiece],
+    llm: Any,
+    static_overhead_tokens: int,
+    reserved_buffer_tokens: int = 4000,
+) -> list[str]:
+    """Split pieces into numbered_text chunks that fit the LLM budget.
+
+    Line numbers are global (1-based over the whole article), so each chunk
+    carries references that stay consistent with `_line_range_to_offsets`.
+    """
+    if not pieces:
+        return [""]
+
+    context_size = int(getattr(llm, "max_context_tokens", 64000) or 64000)
+    budget = int(context_size * 0.75) - static_overhead_tokens - reserved_buffer_tokens
+    # Always leave room for at least a few lines so we make forward progress.
+    budget = max(budget, 1024)
+
+    chunks: list[str] = []
+    current_lines: list[str] = []
+    current_tokens = 0
+
+    for idx, piece in enumerate(pieces, start=1):
+        line = f"{idx}: {piece.text}"
+        line_tokens = _estimate_tokens(llm, line) + 1  # newline
+        if current_lines and current_tokens + line_tokens > budget:
+            chunks.append("\n".join(current_lines))
+            current_lines = []
+            current_tokens = 0
+        current_lines.append(line)
+        current_tokens += line_tokens
+
+    if current_lines:
+        chunks.append("\n".join(current_lines))
+
+    return chunks or [""]
+
+
+_NO_INFO_PATTERNS = (
+    "no relevant",
+    "not mentioned",
+    "does not mention",
+    "doesn't mention",
+    "no information",
+    "cannot find",
+    "can't find",
+    "nothing relevant",
+)
+
+
+def _looks_like_no_info_reply(text: str) -> bool:
+    stripped = (text or "").strip().lower()
+    if not stripped:
+        return True
+    if len(stripped) < 40:
+        for pattern in _NO_INFO_PATTERNS:
+            if pattern in stripped:
+                return True
+    return False
+
+
+def _merge_chunk_replies(replies: list[str]) -> str:
+    non_empty = [r.strip() for r in replies if r and r.strip()]
+    if not non_empty:
+        return ""
+
+    informative = [r for r in non_empty if not _looks_like_no_info_reply(r)]
+    candidates = informative or non_empty
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for reply in candidates:
+        if reply in seen:
+            continue
+        seen.add(reply)
+        deduped.append(reply)
+
+    if len(deduped) == 1:
+        return deduped[0]
+    return "\n\n".join(deduped)
+
+
 def _line_range_to_offsets(
     pieces: list[ArticlePiece], start_line: int, end_line: int
 ) -> tuple[int, int]:
@@ -198,41 +411,26 @@ def _line_range_to_offsets(
     return pieces[start_idx].start, pieces[end_idx].end
 
 
-def _run_canvas_chat(
+def _run_canvas_chunk_tool_loop(
     article_id: str,
-    submission: dict[str, Any],
+    article_text: CanvasArticleText,
+    chunk_numbered_text: str,
+    chunk_index: int,
+    chunk_total: int,
+    base_messages: list[LLMMessage],
     user_message: str,
-    history: list[dict[str, str]],
+    client: Any,
     canvas_storage: CanvasEventsStorage,
-    db: Any,
+    max_tool_rounds: int = 10,
 ) -> str:
-    """Synchronous LLM tool-loop for the canvas chat endpoint."""
-    article_text: CanvasArticleText = _build_article_text_with_lines(submission)
-
-    client = create_llm_client(db=db)
-
-    messages: list[LLMMessage] = []
-    for msg in history:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role in ("user", "assistant"):
-            messages.append(LLMMessage(role=role, content=content))
-
-    # Append article after user question so LLM sees the text at inference time
-    user_content = (
+    """Run a single tool-loop session for one article chunk."""
+    messages: list[LLMMessage] = list(base_messages)
+    chunk_header = (
         f"<question>{user_message}</question>\n\n"
-        f"<article>\n{article_text.numbered_text}\n</article>"
+        f"<article chunk=\"{chunk_index + 1}/{chunk_total}\">\n"
+        f"{chunk_numbered_text}\n</article>"
     )
-    messages.append(LLMMessage(role="user", content=user_content))
-
-    max_tool_rounds = 10
-
-    log.info(
-        "Canvas chat start | article=%s user_message=%r history_len=%d",
-        article_id,
-        user_message,
-        len(messages) - 1,
-    )
+    messages.append(LLMMessage(role="user", content=chunk_header))
 
     for round_num in range(max_tool_rounds):
         log_messages = [
@@ -242,8 +440,10 @@ def _run_canvas_chat(
             )
         ]
         log.debug(
-            "Canvas LLM call | article=%s round=%d messages=%s",
+            "Canvas LLM call | article=%s chunk=%d/%d round=%d messages=%s",
             article_id,
+            chunk_index + 1,
+            chunk_total,
             round_num,
             log_messages,
         )
@@ -256,8 +456,10 @@ def _run_canvas_chat(
         )
 
         log.debug(
-            "Canvas LLM response | article=%s round=%d content=%s tool_calls=%s",
+            "Canvas LLM response | article=%s chunk=%d/%d round=%d content=%s tool_calls=%s",
             article_id,
+            chunk_index + 1,
+            chunk_total,
             round_num,
             response.content,
             [
@@ -355,6 +557,76 @@ def _run_canvas_chat(
     return "I've finished highlighting the relevant passages."
 
 
+def _run_canvas_chat(
+    article_id: str,
+    submission: dict[str, Any],
+    user_message: str,
+    history: list[dict[str, str]],
+    canvas_storage: CanvasEventsStorage,
+    db: Any,
+) -> str:
+    """Run the canvas chat, splitting long articles into chunks if needed."""
+    article_text: CanvasArticleText = _build_article_text_with_lines(submission)
+
+    client = create_llm_client(db=db)
+
+    base_messages: list[LLMMessage] = []
+    for msg in history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant"):
+            base_messages.append(LLMMessage(role=role, content=content))
+
+    # Static overhead: system prompt + history + user question envelope + tool defs.
+    question_envelope = (
+        f"<question>{user_message}</question>\n\n"
+        f'<article chunk="99/99">\n\n</article>'
+    )
+    system_overhead = _estimate_tokens(client, CANVAS_SYSTEM_PROMPT)
+    history_overhead = _estimate_messages_tokens(client, base_messages)
+    question_overhead = _estimate_tokens(client, question_envelope)
+    tools_overhead = _estimate_tools_tokens(client, [HIGHLIGHT_TOOL])
+    static_overhead = (
+        system_overhead + history_overhead + question_overhead + tools_overhead
+    )
+
+    chunks = _build_canvas_chunks(
+        pieces=list(article_text.pieces),
+        llm=client,
+        static_overhead_tokens=static_overhead,
+    )
+
+    log.info(
+        "Canvas chat start | article=%s user_message=%r history_len=%d "
+        "pieces=%d chunks=%d",
+        article_id,
+        user_message,
+        len(base_messages),
+        len(article_text.pieces),
+        len(chunks),
+    )
+
+    replies: list[str] = []
+    for chunk_index, chunk_text in enumerate(chunks):
+        reply = _run_canvas_chunk_tool_loop(
+            article_id=article_id,
+            article_text=article_text,
+            chunk_numbered_text=chunk_text,
+            chunk_index=chunk_index,
+            chunk_total=len(chunks),
+            base_messages=base_messages,
+            user_message=user_message,
+            client=client,
+            canvas_storage=canvas_storage,
+        )
+        replies.append(reply)
+
+    if len(chunks) == 1:
+        return replies[0]
+
+    return _merge_chunk_replies(replies)
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -414,27 +686,48 @@ def get_canvas_article(
 def post_canvas_chat(
     article_id: str,
     body: ChatRequest,
+    background_tasks: BackgroundTasks,
     canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
     db: Any = Depends(get_db),
-) -> dict[str, str]:
+) -> dict[str, str | None]:
     submission = submissions_storage.get_by_id(article_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
     history = [{"role": m.role, "content": m.content} for m in (body.history or [])]
+    request_id = _create_canvas_chat_job(article_id)
+    background_tasks.add_task(
+        _run_canvas_chat_job,
+        request_id=request_id,
+        article_id=article_id,
+        submission=submission,
+        user_message=body.message,
+        history=history,
+        canvas_storage=canvas_storage,
+        db=db,
+    )
 
-    try:
-        reply = _run_canvas_chat(
-            article_id=article_id,
-            submission=submission,
-            user_message=body.message,
-            history=history,
-            canvas_storage=canvas_storage,
-            db=db,
-        )
-    except Exception as exc:
-        log.exception("Canvas chat error for article %s", article_id)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"request_id": request_id, "status": "pending", "reply": None}
 
-    return {"reply": reply}
+
+@router.get("/canvas/{article_id}/chat/{request_id}")
+def get_canvas_chat_status(
+    article_id: str,
+    request_id: str,
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, str | None]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    job = _get_canvas_chat_job(request_id)
+    if job is None or job.article_id != article_id:
+        raise HTTPException(status_code=404, detail="Chat request not found")
+
+    return {
+        "request_id": request_id,
+        "status": job.status,
+        "reply": job.reply,
+        "error": job.error,
+    }
