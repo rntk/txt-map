@@ -174,24 +174,6 @@
   box-sizing: border-box;
 }
 
-.topic-hierarchy-page__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.topic-hierarchy-page__title {
-  font-size: 26px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.topic-hierarchy-page__hint {
-  font-size: 18px;
-  color: #6b7280;
-}
-
 .topic-hierarchy-page__body {
   display: flex;
   flex: 1 1 auto;
@@ -364,6 +346,14 @@
   background: rgba(255, 222, 128, 0.55);
   border-left: 3px solid #d97706;
   padding-left: 8px;
+}
+
+.topic-hierarchy-page__sentence--clickable {
+  cursor: pointer;
+}
+
+.topic-hierarchy-page__sentence--clickable:hover {
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .topic-hierarchy-page__state {
