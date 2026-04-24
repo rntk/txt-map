@@ -427,7 +427,7 @@ def _run_canvas_chunk_tool_loop(
     messages: list[LLMMessage] = list(base_messages)
     chunk_header = (
         f"<question>{user_message}</question>\n\n"
-        f"<article chunk=\"{chunk_index + 1}/{chunk_total}\">\n"
+        f'<article chunk="{chunk_index + 1}/{chunk_total}">\n'
         f"{chunk_numbered_text}\n</article>"
     )
     messages.append(LLMMessage(role="user", content=chunk_header))
@@ -579,8 +579,7 @@ def _run_canvas_chat(
 
     # Static overhead: system prompt + history + user question envelope + tool defs.
     question_envelope = (
-        f"<question>{user_message}</question>\n\n"
-        f'<article chunk="99/99">\n\n</article>'
+        f'<question>{user_message}</question>\n\n<article chunk="99/99">\n\n</article>'
     )
     system_overhead = _estimate_tokens(client, CANVAS_SYSTEM_PROMPT)
     history_overhead = _estimate_messages_tokens(client, base_messages)
