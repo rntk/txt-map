@@ -12,7 +12,8 @@ from lib.storage.canvas_events import CanvasEventsStorage
 from lib.storage.submissions import SubmissionsStorage
 
 router = APIRouter()
-log = logging.getLogger("canvas_handler"); log.setLevel(logging.DEBUG)
+log = logging.getLogger("canvas_handler")
+log.setLevel(logging.DEBUG)
 
 HIGHLIGHT_TOOL = ToolDefinition(
     name="highlight_span",
@@ -87,23 +88,21 @@ def _get_submissions_storage(request: Request) -> SubmissionsStorage:
 
 
 def _strip_html(text: str) -> str:
-    return re.sub(r'<[^>]+>', '', text)
+    return re.sub(r"<[^>]+>", "", text)
 
 
 def _build_article_text_with_lines(
     submission: dict[str, Any],
 ) -> tuple[str, str, list[str]]:
     """Return (plain_text, numbered_text, sentences) from submission."""
-    sentences: list[str] = (
-        submission.get("results", {}).get("sentences") or []
-    )
+    sentences: list[str] = submission.get("results", {}).get("sentences") or []
     text_content: str = submission.get("text_content", "") or ""
 
     if sentences:
         clean_sentences = [s for s in (_strip_html(s).strip() for s in sentences) if s]
     else:
         clean_text = _strip_html(text_content)
-        raw = re.split(r'(?<=[.!?])\s+', clean_text)
+        raw = re.split(r"(?<=[.!?])\s+", clean_text)
         clean_sentences = [s.strip() for s in raw if s.strip()]
 
     plain_text = "\n".join(clean_sentences)
@@ -129,9 +128,7 @@ def _line_range_to_offsets(
             f"article has {n} lines"
         )
     if start_idx > end_idx:
-        raise ValueError(
-            f"start_line ({start_line}) must be <= end_line ({end_line})"
-        )
+        raise ValueError(f"start_line ({start_line}) must be <= end_line ({end_line})")
 
     start_offset = 0
     for k in range(start_idx):
@@ -166,8 +163,7 @@ def _run_canvas_chat(
 
     # Append article after user question so LLM sees the text at inference time
     user_content = (
-        f"<question>{user_message}</question>\n\n"
-        f"<article>\n{numbered_text}\n</article>"
+        f"<question>{user_message}</question>\n\n<article>\n{numbered_text}\n</article>"
     )
     messages.append(LLMMessage(role="user", content=user_content))
 
@@ -272,9 +268,7 @@ def _run_canvas_chat(
                                 "label": label,
                             },
                         )
-                        result_content = (
-                            f"Highlighted lines {start_line}-{end_line}."
-                        )
+                        result_content = f"Highlighted lines {start_line}-{end_line}."
             else:
                 log.warning(
                     "Canvas unknown tool call | article=%s tool=%s arguments=%s",

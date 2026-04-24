@@ -82,9 +82,7 @@ class OpenAIClient(LLMClient):
             items.append(
                 {
                     "role": "assistant",
-                    "content": [
-                        {"type": "output_text", "text": message.content}
-                    ],
+                    "content": [{"type": "output_text", "text": message.content}],
                 }
             )
         for tool_call in message.tool_calls:
