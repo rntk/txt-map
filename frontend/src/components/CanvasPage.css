@@ -135,6 +135,18 @@
     border-color 0.15s;
 }
 
+.canvas-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #ecc94b;
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: middle;
+  box-shadow: 0 0 4px #ecc94b;
+  margin-top: -2px;
+}
+
 .canvas-panel-tab:hover {
   color: #a0aec0;
 }

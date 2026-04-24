@@ -522,6 +522,7 @@ export default function CanvasPage() {
             onClick={() => setActiveTab("events")}
           >
             Events
+            {newIndices.size > 0 && <span className="canvas-tab-dot" />}
           </button>
         </div>
 
