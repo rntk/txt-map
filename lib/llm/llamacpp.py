@@ -152,12 +152,40 @@ class LLamaCPP(LLMClient):
             ]
         return output
 
+    @staticmethod
+    def _combined_system_prompt(messages: Sequence[LLMMessage]) -> str | None:
+        system_parts: list[str] = [
+            message.content
+            for message in messages
+            if message.role == "system" and message.content
+        ]
+        return "\n\n".join(system_parts) if system_parts else None
+
     @classmethod
     def _to_provider_messages(
         cls,
         messages: Sequence[LLMMessage],
     ) -> list[dict[str, Any]]:
-        return [cls._to_provider_message(message) for message in messages]
+        provider_messages: list[dict[str, Any]] = []
+        system_prompt = cls._combined_system_prompt(messages)
+        if system_prompt:
+            provider_messages.append({"role": "system", "content": system_prompt})
+
+        provider_messages.extend(
+            cls._to_provider_message(message)
+            for message in messages
+            if message.role != "system"
+        )
+        return provider_messages
+
+    @staticmethod
+    def _request_messages(request: LLMRequest) -> tuple[LLMMessage, ...]:
+        messages = request.all_messages()
+        if request.user_prompt == "" and not any(
+            message.role == "user" for message in messages
+        ):
+            messages = (*messages, LLMMessage(role="user", content=""))
+        return messages
 
     @classmethod
     def _from_provider_tool_calls(cls, tool_calls: Any) -> tuple[ToolCall, ...]:
@@ -180,23 +208,30 @@ class LLamaCPP(LLMClient):
         """Single attempt to call the LLM without retry logic."""
         conn = self.get_connection()
         try:
-            logging.info(f"LLM request: {request.user_prompt}")
+            request_messages = self._to_provider_messages(
+                self._request_messages(request)
+            )
+            logging.info(
+                "LLM request: %d messages (system=%s)",
+                len(request_messages),
+                any(m.get("role") == "system" for m in request_messages),
+            )
 
             payload: dict[str, Any] = {
                 "model": request.model or self.__model,
-                "messages": self._to_provider_messages(request.all_messages()),
+                "messages": request_messages,
                 "temperature": (
                     request.temperature
                     if request.temperature is not None
                     else self.__temperature
                 ),
                 "cache_prompt": True,
-                "min_p": self.__min_p,
-                "repeat_penalty": self.__repeat_penalty,
-                "repeat_last_n": self.__repeat_last_n,
-                "dry_multiplier": self.__dry_multiplier,
-                "dry_base": self.__dry_base,
-                "dry_allowed_length": self.__dry_allowed_length,
+                # "min_p": self.__min_p,
+                # "repeat_penalty": self.__repeat_penalty,
+                # "repeat_last_n": self.__repeat_last_n,
+                # "dry_multiplier": self.__dry_multiplier,
+                # "dry_base": self.__dry_base,
+                # "dry_allowed_length": self.__dry_allowed_length,
                 # "stop": self.__stop,
             }
             if request.tools:

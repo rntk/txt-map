@@ -177,11 +177,17 @@ def _run_canvas_chat(
     )
 
     for round_num in range(max_tool_rounds):
+        log_messages = [
+            {"role": m.role, "content": m.content}
+            for m in (
+                [LLMMessage(role="system", content=CANVAS_SYSTEM_PROMPT)] + messages
+            )
+        ]
         log.debug(
             "Canvas LLM call | article=%s round=%d messages=%s",
             article_id,
             round_num,
-            [{"role": m.role, "content": m.content} for m in messages],
+            log_messages,
         )
 
         response = client.complete(

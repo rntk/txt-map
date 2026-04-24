@@ -1569,6 +1569,32 @@ class TestIntegrationScenarios:
         assert body["tool_choice"] == "required"
         assert body["parallel_tool_calls"] is True
 
+    def test_complete_combines_system_prompt_and_system_messages(self):
+        """System prompt content is sent as a single leading system message."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "done"}}]}
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+
+        response = self.llm.complete(
+            user_prompt="final question",
+            system_prompt="system text",
+            messages=(
+                LLMMessage(role="system", content="history system text"),
+                LLMMessage(role="assistant", content="working"),
+            ),
+        )
+
+        assert response.content == "done"
+        body = json.loads(self.mock_conn_instance.request.call_args[0][2])
+        assert body["messages"] == [
+            {"role": "system", "content": "system text\n\nhistory system text"},
+            {"role": "assistant", "content": "working"},
+            {"role": "user", "content": "final question"},
+        ]
+
     def test_complete_parses_tool_only_response(self):
         """Tool-only llama.cpp responses are returned by complete()."""
         mock_response = MagicMock()
