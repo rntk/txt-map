@@ -80,6 +80,8 @@ describe("CanvasPage highlight focusing", () => {
       };
 
     const { container } = render(<CanvasPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Events" }));
     await screen.findByRole("button", { name: "2. second" });
 
     const viewport = container.querySelector(".canvas-viewport");

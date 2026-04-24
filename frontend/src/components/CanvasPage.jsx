@@ -156,61 +156,6 @@ function ChatHistory({ messages, isLoading }) {
   );
 }
 
-/**
- * Horizontal list of received events. Clicking an item selects it.
- * Items arriving while the user is pinned to an earlier event are flagged "new".
- */
-function Timeline({
-  events,
-  selectedIndex,
-  newIndices,
-  isLive,
-  onSelect,
-  onGoLive,
-}) {
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (!isLive) return;
-    const el = scrollRef.current;
-    if (el) el.scrollLeft = el.scrollWidth;
-  }, [events.length, isLive]);
-
-  return (
-    <div className="canvas-timeline">
-      <button
-        type="button"
-        className={`canvas-timeline-live ${isLive ? "is-active" : ""}`}
-        onClick={onGoLive}
-        title="Follow latest events"
-      >
-        ● Live
-      </button>
-      <div className="canvas-timeline-items" ref={scrollRef}>
-        {events.length === 0 && (
-          <span className="canvas-timeline-empty">No events yet</span>
-        )}
-        {events.map((ev, i) => {
-          const classes = ["canvas-timeline-item"];
-          if (i === selectedIndex) classes.push("is-selected");
-          if (newIndices.has(i)) classes.push("is-new");
-          return (
-            <button
-              type="button"
-              key={i}
-              className={classes.join(" ")}
-              onClick={() => onSelect(i)}
-              title={eventLabel(ev, i)}
-            >
-              {eventLabel(ev, i)}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export default function CanvasPage() {
   const articleId = window.location.pathname.split("/")[3];
 
@@ -264,6 +209,9 @@ export default function CanvasPage() {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
+
+  // Right panel tab
+  const [activeTab, setActiveTab] = useState("chat");
 
   // Load article text
   useEffect(() => {
@@ -556,49 +504,104 @@ export default function CanvasPage() {
             </button>
           </div>
         </div>
-        <Timeline
-          events={events}
-          selectedIndex={selectedIndex}
-          newIndices={newIndices}
-          isLive={isLive}
-          onSelect={handleSelectEvent}
-          onGoLive={handleGoLive}
-        />
       </div>
 
-      {/* Right: Chat */}
+      {/* Right: Tabbed Panel */}
       <div className="canvas-chat-panel">
-        <div className="canvas-chat-header">
-          <span>Article Assistant</span>
+        <div className="canvas-panel-tabs">
           <button
             type="button"
-            className="canvas-chat-new"
-            onClick={handleNewChat}
-            disabled={isChatLoading || messages.length === 0}
-            title="Start a new chat"
+            className={`canvas-panel-tab${activeTab === "chat" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("chat")}
           >
-            New Chat
+            Chat
+          </button>
+          <button
+            type="button"
+            className={`canvas-panel-tab${activeTab === "events" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("events")}
+          >
+            Events
           </button>
         </div>
-        <ChatHistory messages={messages} isLoading={isChatLoading} />
-        <div className="canvas-chat-input-row">
-          <textarea
-            className="canvas-chat-input"
-            placeholder="Ask about this article…"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={2}
-            disabled={isChatLoading}
-          />
-          <button
-            type="button"
-            className="canvas-chat-send"
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isChatLoading}
-          >
-            Send
-          </button>
+
+        {/* Chat tab */}
+        <div
+          className={`canvas-tab-content${activeTab === "chat" ? " is-active" : ""}`}
+        >
+          <div className="canvas-chat-header">
+            <span>Article Assistant</span>
+            <button
+              type="button"
+              className="canvas-chat-new"
+              onClick={handleNewChat}
+              disabled={isChatLoading || messages.length === 0}
+              title="Start a new chat"
+            >
+              New Chat
+            </button>
+          </div>
+          <ChatHistory messages={messages} isLoading={isChatLoading} />
+          <div className="canvas-chat-input-row">
+            <textarea
+              className="canvas-chat-input"
+              placeholder="Ask about this article…"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={2}
+              disabled={isChatLoading}
+            />
+            <button
+              type="button"
+              className="canvas-chat-send"
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isChatLoading}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+
+        {/* Events tab */}
+        <div
+          className={`canvas-tab-content${activeTab === "events" ? " is-active" : ""}`}
+        >
+          <div className="canvas-events-list">
+            {events.length === 0 && (
+              <span className="canvas-events-empty">No events yet</span>
+            )}
+            {events.map((ev, i) => {
+              const classes = ["canvas-events-item"];
+              if (i === selectedIndex) classes.push("is-selected");
+              if (newIndices.has(i)) classes.push("is-new");
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  className={classes.join(" ")}
+                  onClick={() => handleSelectEvent(i)}
+                  title={eventLabel(ev, i)}
+                  aria-label={eventLabel(ev, i)}
+                >
+                  <span className="canvas-events-item-index">#{i + 1}</span>
+                  <span className="canvas-events-item-label">
+                    {eventLabel(ev, i)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="canvas-events-footer">
+            <button
+              type="button"
+              className={`canvas-timeline-live${isLive ? " is-active" : ""}`}
+              onClick={handleGoLive}
+              title="Follow latest events"
+            >
+              ● Live
+            </button>
+          </div>
         </div>
       </div>
     </div>
