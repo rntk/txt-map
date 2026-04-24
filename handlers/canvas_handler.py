@@ -1,11 +1,12 @@
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from handlers.dependencies import get_db, get_submissions_storage
+from handlers.dependencies import get_db
 from lib.llm import create_llm_client
 from lib.llm.base import LLMMessage, ToolDefinition
 from lib.storage.canvas_events import CanvasEventsStorage
@@ -18,8 +19,8 @@ log.setLevel(logging.DEBUG)
 HIGHLIGHT_TOOL = ToolDefinition(
     name="highlight_span",
     description=(
-        "Highlight a range of sentences in the article to draw the user's "
-        "attention to a specific passage. Identify sentences by the line "
+        "Highlight a range of granular article pieces to draw the user's "
+        "attention to a specific passage. Identify pieces by the line "
         "numbers shown in the <article> tag (e.g. '3: ...' is line 3)."
     ),
     parameters={
@@ -33,7 +34,7 @@ HIGHLIGHT_TOOL = ToolDefinition(
                 "type": "integer",
                 "description": (
                     "Last line number of the span (1-based, inclusive). "
-                    "Use the same value as start_line to highlight a single sentence."
+                    "Use the same value as start_line to highlight a single article piece."
                 ),
             },
             "label": {
@@ -49,8 +50,9 @@ HIGHLIGHT_TOOL = ToolDefinition(
 CANVAS_SYSTEM_PROMPT = """\
 You are an intelligent assistant helping users explore and analyze a single article.
 The article is provided after the user's question, enclosed in <article> tags.
-Each sentence is prefixed with its 1-based line number (e.g. "3: First sentence.").
-Reference sentences by these line numbers.
+The article is split into granular pieces, not always complete sentences. Each piece is
+prefixed with its 1-based line number (e.g. "3: First clause;").
+Reference article pieces by these line numbers.
 
 Your role:
 - Answer the user's question about the article.
@@ -59,7 +61,7 @@ Your role:
 
 Highlighting rules (highlight_span tool):
 - Only call highlight_span when the user asks about, refers to, or would benefit from seeing
-  specific sentences, or when you want to point to evidence that supports your answer.
+  specific article pieces, or when you want to point to evidence that supports your answer.
 - Prefer the shortest span that conveys the point; a single line is usually enough.
   Only extend across multiple lines when the passage is genuinely continuous.
 - You may call highlight_span multiple times in one turn for several distinct passages.
@@ -91,35 +93,98 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text)
 
 
+ARTICLE_PIECE_SPLIT_RE = re.compile(r"(?<=[.!?;:,。！？；：])\s+|(?<=\S)\s+(?=[—–-]\s)")
+
+
+@dataclass(frozen=True)
+class ArticlePiece:
+    text: str
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class CanvasArticleText:
+    display_text: str
+    numbered_text: str
+    pieces: list[ArticlePiece]
+
+
+def _split_article_piece(text: str, offset: int = 0) -> list[ArticlePiece]:
+    """Split article text into granular pieces with offsets into display text."""
+    pieces: list[ArticlePiece] = []
+    start: int = 0
+
+    for match in ARTICLE_PIECE_SPLIT_RE.finditer(text):
+        end: int = match.start()
+        piece_text: str = text[start:end].strip()
+        if piece_text:
+            leading_space_count: int = len(text[start:end]) - len(
+                text[start:end].lstrip()
+            )
+            piece_start: int = offset + start + leading_space_count
+            pieces.append(
+                ArticlePiece(
+                    text=piece_text,
+                    start=piece_start,
+                    end=piece_start + len(piece_text),
+                )
+            )
+        start = match.end()
+
+    tail_text: str = text[start:].strip()
+    if tail_text:
+        leading_space_count = len(text[start:]) - len(text[start:].lstrip())
+        piece_start = offset + start + leading_space_count
+        pieces.append(
+            ArticlePiece(
+                text=tail_text, start=piece_start, end=piece_start + len(tail_text)
+            )
+        )
+
+    return pieces
+
+
 def _build_article_text_with_lines(
     submission: dict[str, Any],
-) -> tuple[str, str, list[str]]:
-    """Return (plain_text, numbered_text, sentences) from submission."""
+) -> CanvasArticleText:
+    """Return readable article text and granular LLM line references."""
     sentences: list[str] = submission.get("results", {}).get("sentences") or []
     text_content: str = submission.get("text_content", "") or ""
+    source_pieces: list[tuple[str, int]] = []
 
     if sentences:
-        clean_sentences = [s for s in (_strip_html(s).strip() for s in sentences) if s]
+        clean_sentences: list[str] = [
+            s for s in (_strip_html(sentence).strip() for sentence in sentences) if s
+        ]
+        display_text: str = "\n".join(clean_sentences)
+        offset: int = 0
+        for sentence in clean_sentences:
+            source_pieces.append((sentence, offset))
+            offset += len(sentence) + 1
     else:
-        clean_text = _strip_html(text_content)
-        raw = re.split(r"(?<=[.!?])\s+", clean_text)
-        clean_sentences = [s.strip() for s in raw if s.strip()]
+        display_text = _strip_html(text_content).strip()
+        source_pieces = [(display_text, 0)]
 
-    plain_text = "\n".join(clean_sentences)
-    numbered_text = "\n".join(f"{i + 1}: {s}" for i, s in enumerate(clean_sentences))
+    mapped_pieces: list[ArticlePiece] = []
+    for source_piece, offset in source_pieces:
+        mapped_pieces.extend(_split_article_piece(source_piece, offset=offset))
 
-    return plain_text, numbered_text, clean_sentences
+    article_pieces: list[str] = [piece.text for piece in mapped_pieces]
+    numbered_text = "\n".join(f"{i + 1}: {s}" for i, s in enumerate(article_pieces))
+
+    return CanvasArticleText(
+        display_text=display_text,
+        numbered_text=numbered_text,
+        pieces=mapped_pieces,
+    )
 
 
 def _line_range_to_offsets(
-    sentences: list[str], start_line: int, end_line: int
+    pieces: list[ArticlePiece], start_line: int, end_line: int
 ) -> tuple[int, int]:
-    """Convert 1-based inclusive line numbers to char offsets in plain_text.
-
-    plain_text is sentences joined by '\\n', so sentence i (0-based) starts at
-    sum(len(sentences[k]) + 1 for k in range(i)) and has length len(sentences[i]).
-    """
-    n = len(sentences)
+    """Convert 1-based inclusive LLM line numbers to display text char offsets."""
+    n = len(pieces)
     start_idx = start_line - 1
     end_idx = end_line - 1
     if not (0 <= start_idx < n) or not (0 <= end_idx < n):
@@ -130,15 +195,7 @@ def _line_range_to_offsets(
     if start_idx > end_idx:
         raise ValueError(f"start_line ({start_line}) must be <= end_line ({end_line})")
 
-    start_offset = 0
-    for k in range(start_idx):
-        start_offset += len(sentences[k]) + 1  # +1 for the '\n' separator
-    end_offset = start_offset
-    for k in range(start_idx, end_idx + 1):
-        end_offset += len(sentences[k])
-        if k < end_idx:
-            end_offset += 1  # newline between sentences in the span
-    return start_offset, end_offset
+    return pieces[start_idx].start, pieces[end_idx].end
 
 
 def _run_canvas_chat(
@@ -150,7 +207,7 @@ def _run_canvas_chat(
     db: Any,
 ) -> str:
     """Synchronous LLM tool-loop for the canvas chat endpoint."""
-    plain_text, numbered_text, sentences = _build_article_text_with_lines(submission)
+    article_text: CanvasArticleText = _build_article_text_with_lines(submission)
 
     client = create_llm_client(db=db)
 
@@ -163,7 +220,8 @@ def _run_canvas_chat(
 
     # Append article after user question so LLM sees the text at inference time
     user_content = (
-        f"<question>{user_message}</question>\n\n<article>\n{numbered_text}\n</article>"
+        f"<question>{user_message}</question>\n\n"
+        f"<article>\n{article_text.numbered_text}\n</article>"
     )
     messages.append(LLMMessage(role="user", content=user_content))
 
@@ -243,7 +301,7 @@ def _run_canvas_chat(
                 else:
                     try:
                         start_off, end_off = _line_range_to_offsets(
-                            sentences, start_line, end_line
+                            article_text.pieces, start_line, end_line
                         )
                     except ValueError as ve:
                         result_content = f"Error: {ve}"
@@ -314,13 +372,13 @@ def get_canvas_events(
     limit: int = Query(default=50, ge=1, le=200),
     canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
-):
+) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
     events = canvas_storage.get_events(article_id, offset=offset, limit=limit)
-    serialized = []
+    serialized: list[dict[str, Any]] = []
     for ev in events:
         serialized.append(
             {
@@ -339,15 +397,15 @@ def get_canvas_events(
 def get_canvas_article(
     article_id: str,
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
-):
+) -> dict[str, str]:
     submission = submissions_storage.get_by_id(article_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    plain_text, _, _ = _build_article_text_with_lines(submission)
+    article_text: CanvasArticleText = _build_article_text_with_lines(submission)
     return {
         "article_id": article_id,
-        "text": plain_text,
+        "text": article_text.display_text,
         "source_url": submission.get("source_url", ""),
     }
 
@@ -358,8 +416,8 @@ def post_canvas_chat(
     body: ChatRequest,
     canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
-    db=Depends(get_db),
-):
+    db: Any = Depends(get_db),
+) -> dict[str, str]:
     submission = submissions_storage.get_by_id(article_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")

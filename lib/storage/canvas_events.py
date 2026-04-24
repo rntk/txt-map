@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, UTC
-from typing import Any, List, Optional
+from typing import Any, List
 
 from pymongo.database import Database
 
