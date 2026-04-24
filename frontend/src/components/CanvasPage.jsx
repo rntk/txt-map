@@ -8,11 +8,81 @@ import React, {
 import "./CanvasPage.css";
 
 const POLL_INTERVAL_MS = 2000;
+const CHAT_POLL_MAX_ATTEMPTS = 150;
 const EVENT_APPLY_DELAY_MS = 120;
 const EVENTS_LIMIT = 50;
 const HIGHLIGHT_FOCUS_SCALE = 1.4;
 const HIGHLIGHT_FOCUS_DELAY_MS = 50;
 const HIGHLIGHT_FOCUS_TRANSITION_MS = 350;
+
+/**
+ * @param {number} ms
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<void>}
+ */
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * Read a fetch response as JSON, tolerating empty or non-JSON bodies so the
+ * caller can still inspect response.ok and surface a useful error.
+ * @param {Response} response
+ * @returns {Promise<any>}
+ */
+async function readJsonSafe(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Poll a canvas chat job until the backend finishes the slow LLM work.
+ * @param {string} articleId
+ * @param {string} requestId
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<string>}
+ */
+async function pollCanvasChatReply(articleId, requestId, signal) {
+  for (let attempt = 0; attempt < CHAT_POLL_MAX_ATTEMPTS; attempt++) {
+    const response = await fetch(
+      `/api/canvas/${articleId}/chat/${requestId}`,
+      { credentials: "include", signal },
+    );
+    const data = await readJsonSafe(response);
+
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+    if (data.status === "completed") {
+      return data.reply || "";
+    }
+    if (data.status === "failed") {
+      throw new Error(data.error || "Error");
+    }
+
+    await sleep(POLL_INTERVAL_MS, signal);
+  }
+  throw new Error("Chat response timed out.");
+}
 
 /**
  * Build text segments with highlights applied.
@@ -175,6 +245,7 @@ export default function CanvasPage() {
   const scaleRef = useRef(1);
   const focusTimerRef = useRef(null);
   const transitionTimerRef = useRef(null);
+  const chatAbortRef = useRef(null);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
 
@@ -191,6 +262,12 @@ export default function CanvasPage() {
   useEffect(() => {
     isLiveRef.current = isLive;
   }, [isLive]);
+
+  useEffect(() => {
+    return () => {
+      chatAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -403,29 +480,47 @@ export default function CanvasPage() {
     if (!msg || isChatLoading) return;
 
     setInputValue("");
-    const newHistory = [...messages, { role: "user", content: msg }];
+    const history = messages;
+    const newHistory = [...history, { role: "user", content: msg }];
     setMessages(newHistory);
     setIsChatLoading(true);
+
+    const controller = new AbortController();
+    chatAbortRef.current = controller;
 
     try {
       const r = await fetch(`/api/canvas/${articleId}/chat`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history: messages }),
+        body: JSON.stringify({ message: msg, history }),
+        signal: controller.signal,
       });
-      const data = await r.json();
-      const reply = r.ok ? data.reply || "" : data.detail || "Error";
-      setMessages([...newHistory, { role: "assistant", content: reply }]);
-    } catch {
-      setMessages([
-        ...newHistory,
+      const data = await readJsonSafe(r);
+      if (!r.ok) {
+        throw new Error(data.detail || `HTTP ${r.status}`);
+      }
+
+      const reply = data.request_id
+        ? await pollCanvasChatReply(articleId, data.request_id, controller.signal)
+        : data.reply || "";
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      console.error("Canvas chat failed", err);
+      setMessages((prev) => [
+        ...prev,
         { role: "assistant", content: "Failed to get a response." },
       ]);
     } finally {
-      setIsChatLoading(false);
-      // Fetch new events after chat response (LLM may have added highlights)
-      setTimeout(fetchEvents, 300);
+      if (chatAbortRef.current === controller) {
+        chatAbortRef.current = null;
+      }
+      if (!controller.signal.aborted) {
+        setIsChatLoading(false);
+        // Fetch new events after chat response (LLM may have added highlights)
+        setTimeout(fetchEvents, 300);
+      }
     }
   }, [articleId, inputValue, isChatLoading, messages, fetchEvents]);
 

@@ -104,6 +104,80 @@ describe("CanvasPage highlight focusing", () => {
       );
     });
   });
+
+  it("polls for a delayed chat response", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url, options) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({ text: "Alpha beta." }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      if (url === "/api/canvas/article-1/chat" && options?.method === "POST") {
+        return jsonResponse({ request_id: "request-1", status: "pending" });
+      }
+
+      if (url === "/api/canvas/article-1/chat/request-1") {
+        return jsonResponse({ status: "completed", reply: "Delayed reply." });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ask about this article…"), {
+      target: { value: "What happened?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Delayed reply.")).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/canvas/article-1/chat/request-1",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("shows a generic error when the chat job fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url, options) => {
+      if (url === "/api/canvas/article-1/article") {
+        return { ok: true, json: async () => ({ text: "Alpha beta." }) };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      if (url === "/api/canvas/article-1/chat" && options?.method === "POST") {
+        return jsonResponse({ request_id: "request-1", status: "pending" });
+      }
+
+      if (url === "/api/canvas/article-1/chat/request-1") {
+        return jsonResponse({ status: "failed", error: "boom" });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ask about this article…"), {
+      target: { value: "What happened?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(
+      await screen.findByText("Failed to get a response."),
+    ).toBeInTheDocument();
+  });
 });
 
 /**
@@ -121,5 +195,19 @@ function makeRect({ left, top, width, height }) {
     x: left,
     y: top,
     toJSON: () => ({}),
+  };
+}
+
+/**
+ * @param {unknown} body
+ * @param {{ ok?: boolean, status?: number }} [init]
+ */
+function jsonResponse(body, init = {}) {
+  const text = JSON.stringify(body);
+  return {
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
+    text: async () => text,
+    json: async () => JSON.parse(text),
   };
 }
