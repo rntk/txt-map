@@ -10,12 +10,15 @@ import "./CanvasPage.css";
 const POLL_INTERVAL_MS = 2000;
 const EVENT_APPLY_DELAY_MS = 120;
 const EVENTS_LIMIT = 50;
+const HIGHLIGHT_FOCUS_SCALE = 1.4;
+const HIGHLIGHT_FOCUS_DELAY_MS = 50;
+const HIGHLIGHT_FOCUS_TRANSITION_MS = 350;
 
 /**
  * Build text segments with highlights applied.
  * @param {string} text
  * @param {{start: number, end: number, label?: string}[]} highlights
- * @returns {{text: string, highlighted: boolean, label?: string}[]}
+ * @returns {{text: string, start?: number, end?: number, highlighted: boolean, label?: string}[]}
  */
 function buildSegments(text, highlights) {
   if (!highlights.length) return [{ text, highlighted: false }];
@@ -37,11 +40,11 @@ function buildSegments(text, highlights) {
     const start = sorted[i];
     const end = sorted[i + 1];
     const chunk = text.slice(start, end);
-    const matching = highlights.filter(
-      (h) => h.start <= start && h.end >= end
-    );
+    const matching = highlights.filter((h) => h.start <= start && h.end >= end);
     segments.push({
       text: chunk,
+      start,
+      end,
       highlighted: matching.length > 0,
       label: matching.length > 0 ? matching[0].label : undefined,
     });
@@ -74,25 +77,40 @@ function eventLabel(ev, idx) {
 }
 
 /**
- * @param {{text: string, highlights: {start: number, end: number, label?: string}[]}} props
+ * @param {{
+ *   text: string,
+ *   highlights: {start: number, end: number, label?: string}[],
+ *   activeHighlightRef?: React.MutableRefObject<HTMLElement | null>
+ * }} props
  */
-function ArticleText({ text, highlights }) {
+function ArticleText({ text, highlights, activeHighlightRef }) {
   const segments = buildSegments(text, highlights);
+  let firstHighlightedSegmentFound = false;
+
   return (
     <div className="canvas-article-text">
-      {segments.map((seg, idx) =>
-        seg.highlighted ? (
+      {segments.map((seg, idx) => {
+        const isActiveHighlightTarget =
+          seg.highlighted && !firstHighlightedSegmentFound;
+        if (seg.highlighted) {
+          firstHighlightedSegmentFound = true;
+        }
+
+        return seg.highlighted ? (
           <mark
             key={idx}
             className="canvas-highlight"
+            ref={isActiveHighlightTarget ? activeHighlightRef : undefined}
             title={seg.label || undefined}
+            data-char-start={seg.start}
+            data-char-end={seg.end}
           >
             {seg.text}
           </mark>
         ) : (
           <span key={idx}>{seg.text}</span>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -207,6 +225,13 @@ export default function CanvasPage() {
   const isDragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const canvasWrapRef = useRef(null);
+  const canvasViewportRef = useRef(null);
+  const activeHighlightRef = useRef(null);
+  const scaleRef = useRef(1);
+  const focusTimerRef = useRef(null);
+  const transitionTimerRef = useRef(null);
+  const [isCanvasDragging, setIsCanvasDragging] = useState(false);
+  const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
 
   // Events / timeline
   const [events, setEvents] = useState([]);
@@ -221,6 +246,19 @@ export default function CanvasPage() {
   useEffect(() => {
     isLiveRef.current = isLive;
   }, [isLive]);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    viewport.style.setProperty("--canvas-translate-x", `${translate.x}px`);
+    viewport.style.setProperty("--canvas-translate-y", `${translate.y}px`);
+    viewport.style.setProperty("--canvas-scale", `${scale}`);
+  }, [scale, translate.x, translate.y]);
 
   // Chat
   const [messages, setMessages] = useState([]);
@@ -300,8 +338,62 @@ export default function CanvasPage() {
   // Highlights to render = only those from the selected event
   const currentHighlights = useMemo(
     () => eventToHighlights(events[selectedIndex]),
-    [events, selectedIndex]
+    [events, selectedIndex],
   );
+  const currentHighlight = currentHighlights[0] || null;
+  const currentHighlightFocusKey = currentHighlight
+    ? `${selectedIndex}:${currentHighlight.start}:${currentHighlight.end}`
+    : "";
+
+  useEffect(() => {
+    if (!currentHighlightFocusKey || articleLoading || articleError) {
+      return undefined;
+    }
+
+    if (focusTimerRef.current) {
+      clearTimeout(focusTimerRef.current);
+    }
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+    }
+
+    focusTimerRef.current = setTimeout(() => {
+      const wrap = canvasWrapRef.current;
+      const viewport = canvasViewportRef.current;
+      const target = activeHighlightRef.current;
+      if (!wrap || !viewport || !target) return;
+
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetCenterX = targetRect.left + targetRect.width / 2;
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      const currentScale = scaleRef.current || 1;
+      const nextScale = Math.max(currentScale, HIGHLIGHT_FOCUS_SCALE);
+      const localTargetX = (targetCenterX - viewportRect.left) / currentScale;
+      const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
+
+      setIsFocusingHighlight(true);
+      setScale(nextScale);
+      setTranslate({
+        x: wrapRect.width / 2 - localTargetX * nextScale,
+        y: wrapRect.height / 2 - localTargetY * nextScale,
+      });
+
+      transitionTimerRef.current = setTimeout(() => {
+        setIsFocusingHighlight(false);
+      }, HIGHLIGHT_FOCUS_TRANSITION_MS);
+    }, HIGHLIGHT_FOCUS_DELAY_MS);
+
+    return () => {
+      if (focusTimerRef.current) {
+        clearTimeout(focusTimerRef.current);
+      }
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, [articleError, articleLoading, currentHighlightFocusKey]);
 
   const handleSelectEvent = useCallback((idx) => {
     setSelectedIndex(idx);
@@ -323,6 +415,8 @@ export default function CanvasPage() {
   // Canvas drag
   const handleMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
+    setIsFocusingHighlight(false);
+    setIsCanvasDragging(true);
     isDragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
     e.preventDefault();
@@ -338,6 +432,7 @@ export default function CanvasPage() {
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
+    setIsCanvasDragging(false);
   }, []);
 
   // Canvas zoom
@@ -399,7 +494,7 @@ export default function CanvasPage() {
         handleSend();
       }
     },
-    [handleSend]
+    [handleSend],
   );
 
   return (
@@ -408,19 +503,15 @@ export default function CanvasPage() {
       <div className="canvas-main">
         <div
           ref={canvasWrapRef}
-          className="canvas-area"
+          className={`canvas-area${isCanvasDragging ? " is-dragging" : ""}`}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
         >
           <div
-            className="canvas-viewport"
-            style={{
-              transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-              transformOrigin: "0 0",
-            }}
+            ref={canvasViewportRef}
+            className={`canvas-viewport${isFocusingHighlight ? " is-focusing-highlight" : ""}`}
           >
             {articleLoading && (
               <div className="canvas-status">Loading article...</div>
@@ -431,7 +522,11 @@ export default function CanvasPage() {
               </div>
             )}
             {!articleLoading && !articleError && (
-              <ArticleText text={articleText} highlights={currentHighlights} />
+              <ArticleText
+                text={articleText}
+                highlights={currentHighlights}
+                activeHighlightRef={activeHighlightRef}
+              />
             )}
           </div>
           <div className="canvas-controls">

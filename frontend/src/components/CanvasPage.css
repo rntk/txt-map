@@ -12,13 +12,28 @@
   position: relative;
   overflow: hidden;
   user-select: none;
-  background:
-    radial-gradient(circle, #2a3040 1px, transparent 1px) 0 0 / 28px 28px;
+  cursor: grab;
+  background: radial-gradient(circle, #2a3040 1px, transparent 1px) 0 0 / 28px
+    28px;
+}
+
+.canvas-area.is-dragging {
+  cursor: grabbing;
 }
 
 .canvas-viewport {
   position: absolute;
+  transform: translate(
+      var(--canvas-translate-x, 40px),
+      var(--canvas-translate-y, 40px)
+    )
+    scale(var(--canvas-scale, 1));
+  transform-origin: 0 0;
   will-change: transform;
+}
+
+.canvas-viewport.is-focusing-highlight {
+  transition: transform 320ms ease;
 }
 
 .canvas-article-text {
