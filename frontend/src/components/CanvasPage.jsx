@@ -826,77 +826,77 @@ export default function CanvasPage() {
               />
             )}
           </div>
-          <div className="canvas-controls">
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => scrollTo("top")}
-              title="Scroll to top"
-            >
-              ⇈
-            </button>
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => scrollTo("prev")}
-              title="Previous page"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => scrollTo("next")}
-              title="Next page"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => scrollTo("bottom")}
-              title="Scroll to bottom"
-            >
-              ⇊
-            </button>
-            <div className="canvas-spacer" />
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => setScale((s) => Math.min(4, s * 1.2))}
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => setScale((s) => Math.max(0.2, s / 1.2))}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className="canvas-zoom-btn"
-              onClick={() => {
-                setScale(1);
-                setTranslate({ x: 40, y: 40 });
-              }}
-            >
-              ⊙
-            </button>
-            <button
-              type="button"
-              className={`canvas-read-toggle${showReadStatus ? " is-active" : ""}`}
-              onClick={() => setShowReadStatus((v) => !v)}
-              title={
-                showReadStatus
-                  ? "Hide read/unread status"
-                  : "Show read/unread status"
-              }
-            >
-              R
-            </button>
-          </div>
+        </div>
+        <div className="canvas-controls">
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => scrollTo("top")}
+            title="Scroll to top"
+          >
+            ⇈
+          </button>
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => scrollTo("prev")}
+            title="Previous page"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => scrollTo("next")}
+            title="Next page"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => scrollTo("bottom")}
+            title="Scroll to bottom"
+          >
+            ⇊
+          </button>
+          <div className="canvas-spacer" />
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => setScale((s) => Math.min(4, s * 1.2))}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => setScale((s) => Math.max(0.2, s / 1.2))}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="canvas-zoom-btn"
+            onClick={() => {
+              setScale(1);
+              setTranslate({ x: 40, y: 40 });
+            }}
+          >
+            ⊙
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showReadStatus ? " is-active" : ""}`}
+            onClick={() => setShowReadStatus((v) => !v)}
+            title={
+              showReadStatus
+                ? "Hide read/unread status"
+                : "Show read/unread status"
+            }
+          >
+            R
+          </button>
         </div>
       </div>
 
