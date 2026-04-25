@@ -142,6 +142,29 @@ function buildSegments(text, highlights, readRanges) {
 }
 
 /**
+ * Derive highlights to render from a single event.
+ */
+function eventToHighlights(ev) {
+  if (!ev) return [];
+  if (ev.event_type === "highlight_span") {
+    const { start, end, label } = ev.data || {};
+    if (typeof start === "number" && typeof end === "number") {
+      return [{ start, end, label: label || "" }];
+    }
+  }
+  return [];
+}
+
+function eventLabel(ev, idx) {
+  if (!ev) return `#${idx + 1}`;
+  if (ev.event_type === "highlight_span") {
+    const lbl = ev.data?.label;
+    return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
+  }
+  return `${idx + 1}. ${ev.event_type || "event"}`;
+}
+
+/**
  * Build text segments with highlights and optional read ranges applied,
  * split across pages.
  * @param {string} text
@@ -271,29 +294,6 @@ function ArticleText({
       })}
     </div>
   );
-}
-
-/**
- * Derive highlights to render from a single event.
- */
-function eventToHighlights(ev) {
-  if (!ev) return [];
-  if (ev.event_type === "highlight_span") {
-    const { start, end, label } = ev.data || {};
-    if (typeof start === "number" && typeof end === "number") {
-      return [{ start, end, label: label || "" }];
-    }
-  }
-  return [];
-}
-
-function eventLabel(ev, idx) {
-  if (!ev) return `#${idx + 1}`;
-  if (ev.event_type === "highlight_span") {
-    const lbl = ev.data?.label;
-    return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
-  }
-  return `${idx + 1}. ${ev.event_type || "event"}`;
 }
 
 /**
@@ -637,10 +637,18 @@ export default function CanvasPage() {
     // Parse context pages from input (comma-separated numbers)
     let parsedPages = null;
     if (contextPages.trim()) {
+      const maxPage = articlePages.length;
+      const seen = new Set();
       parsedPages = contextPages
         .split(",")
         .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => !isNaN(n) && n > 0);
+        .filter((n) => {
+          if (isNaN(n) || n <= 0) return false;
+          if (maxPage > 0 && n > maxPage) return false;
+          if (seen.has(n)) return false;
+          seen.add(n);
+          return true;
+        });
       if (parsedPages.length === 0) {
         parsedPages = null;
       }
@@ -694,6 +702,7 @@ export default function CanvasPage() {
     messages,
     fetchEvents,
     contextPages,
+    articlePages,
   ]);
 
   const handleNewChat = useCallback(() => {

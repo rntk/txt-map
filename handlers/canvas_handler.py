@@ -257,10 +257,19 @@ def _split_article_piece(text: str, offset: int = 0) -> list[ArticlePiece]:
     return pieces
 
 
-def _build_article_pages(display_text: str) -> list[CanvasArticlePage]:
-    """Split the full display text into pages of ~PAGE_SIZE_CHARS each."""
+def _build_article_pages(
+    display_text: str, pieces: list[ArticlePiece] | None = None
+) -> list[CanvasArticlePage]:
+    """Split the full display text into pages of ~PAGE_SIZE_CHARS each.
+
+    When `pieces` is provided, page boundaries are snapped forward to the next
+    piece end so a single piece (and any highlight over it) is never cut across
+    a page splitter.
+    """
     if not display_text:
         return []
+
+    piece_ends = sorted({p.end for p in pieces or [] if p.end > 0})
 
     pages: list[CanvasArticlePage] = []
     text_len = len(display_text)
@@ -269,14 +278,20 @@ def _build_article_pages(display_text: str) -> list[CanvasArticlePage]:
 
     while offset < text_len:
         end = min(offset + PAGE_SIZE_CHARS, text_len)
-        # If we're not at the end, try to break at a word boundary.
         if end < text_len:
-            # Look backwards up to 80 chars for a whitespace boundary.
-            search_start = max(offset, end - 80)
-            for i in range(end - 1, search_start - 1, -1):
-                if display_text[i].isspace():
-                    end = i + 1
+            snapped = None
+            for pe in piece_ends:
+                if pe > offset and pe >= end:
+                    snapped = pe
                     break
+            if snapped is not None:
+                end = snapped
+            else:
+                search_start = max(offset, end - 80)
+                for i in range(end - 1, search_start - 1, -1):
+                    if display_text[i].isspace():
+                        end = i + 1
+                        break
         pages.append(CanvasArticlePage(page_number=page_num, start=offset, end=end))
         offset = end
         page_num += 1
@@ -312,7 +327,7 @@ def _build_article_text_with_lines(
     article_pieces: list[str] = [piece.text for piece in mapped_pieces]
     numbered_text = "\n".join(f"{i + 1}: {s}" for i, s in enumerate(article_pieces))
 
-    pages = _build_article_pages(display_text)
+    pages = _build_article_pages(display_text, mapped_pieces)
 
     return CanvasArticleText(
         display_text=display_text,
@@ -614,10 +629,16 @@ def _run_canvas_chat(
     article_text: CanvasArticleText = _build_article_text_with_lines(submission)
 
     # If selected pages are specified, filter pieces to only those within the pages.
-    effective_pieces: list[ArticlePiece]
-    effective_numbered_text: str
-
     if selected_pages:
+        total_pages = len(article_text.pages)
+        valid_page_numbers = {p.page_number for p in article_text.pages}
+        unknown_pages = sorted(set(selected_pages) - valid_page_numbers)
+        if unknown_pages:
+            return (
+                f"Pages {unknown_pages} not found "
+                f"(article has {total_pages} page(s))."
+            )
+
         page_set = set(selected_pages)
         page_ranges = [
             (p.start, p.end) for p in article_text.pages if p.page_number in page_set
@@ -625,32 +646,22 @@ def _run_canvas_chat(
 
         def _piece_in_pages(piece: ArticlePiece) -> bool:
             for ps, pe in page_ranges:
-                # A piece is included if any part of it overlaps with a page range.
                 if piece.start < pe and piece.end > ps:
                     return True
             return False
 
         effective_pieces = [p for p in article_text.pieces if _piece_in_pages(p)]
-
         if not effective_pieces:
             return "No content found on the selected pages."
 
-        effective_numbered_text = "\n".join(
-            f"{i + 1}: {p.text}" for i, p in enumerate(effective_pieces)
-        )
-    else:
-        effective_pieces = list(article_text.pieces)
-        effective_numbered_text = article_text.numbered_text
-
-    # Build an adjusted article text for line-offset mapping when pages are filtered.
-    if selected_pages:
         adjusted_article_text = CanvasArticleText(
             display_text=article_text.display_text,
-            numbered_text=effective_numbered_text,
+            numbered_text=article_text.numbered_text,
             pieces=effective_pieces,
             pages=article_text.pages,
         )
     else:
+        effective_pieces = list(article_text.pieces)
         adjusted_article_text = article_text
 
     client = create_llm_client(db=db)
