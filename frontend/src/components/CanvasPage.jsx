@@ -1,3 +1,4 @@
+import TopbarPortal from "./shared/TopbarPortal";
 import React, {
   useCallback,
   useEffect,
@@ -790,6 +791,15 @@ export default function CanvasPage() {
 
   return (
     <div className="canvas-page">
+      <TopbarPortal>
+        <div className="topbar-nav-dropdown">
+          <button className="topbar-nav-btn">Canvas ▼</button>
+          <div className="topbar-nav-menu">
+            <a href={`/page/text/${articleId}`}>Read Text</a>
+            <a href={`/page/topic-hierarchy/${articleId}`}>Hierarchy</a>
+          </div>
+        </div>
+      </TopbarPortal>
       {/* Left: Canvas */}
       <div className="canvas-main">
         <div

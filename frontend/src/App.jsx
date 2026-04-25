@@ -1,3 +1,4 @@
+import "./styles/topbar-nav.css";
 import React, { useCallback, useEffect, useState } from "react";
 import CachePage from "./components/CachePage";
 import CanvasPage from "./components/CanvasPage";

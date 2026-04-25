@@ -9,7 +9,7 @@ import TopicList from "./TopicList";
 import TextDisplay from "./TextDisplay";
 import GroupedByTopicsView from "./GroupedByTopicsView";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
-import TextPageActionsPortal from "./TextPageActionsPortal";
+import TopbarPortal from "./shared/TopbarPortal";
 import VisualizationPanels from "./VisualizationPanels";
 import GlobalTopicsCompareView from "./GlobalTopicsCompareView";
 import FullScreenGraph from "./FullScreenGraph";
@@ -1073,7 +1073,14 @@ function TextPageContent() {
     status.overall === "processing" || status.overall === "pending";
   return (
     <div className="app reading-page">
-      <TextPageActionsPortal>
+      <TopbarPortal>
+        <div className="topbar-nav-dropdown">
+          <button className="topbar-nav-btn">Text ▼</button>
+          <div className="topbar-nav-menu">
+            <a href={`/page/canvas/${submissionId}`}>Canvas</a>
+            <a href={`/page/topic-hierarchy/${submissionId}`}>Hierarchy</a>
+          </div>
+        </div>
         <TextPageToolbar
           submissionId={submissionId}
           status={status}
@@ -1081,7 +1088,7 @@ function TextPageContent() {
           visualizationTabs={articles.length > 0 ? FULLSCREEN_TABS : []}
           onTabClick={handleTabClick}
         />
-      </TextPageActionsPortal>
+      </TopbarPortal>
 
       {isProcessing && (
         <div className="reading-page__toolbar-stack">

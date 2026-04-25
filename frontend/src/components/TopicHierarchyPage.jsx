@@ -1,3 +1,4 @@
+import TopbarPortal from "./shared/TopbarPortal";
 import React, {
   useState,
   useMemo,
@@ -315,6 +316,15 @@ function TopicHierarchyPageContent() {
 
   return (
     <div className="topic-hierarchy-page">
+      <TopbarPortal>
+        <div className="topbar-nav-dropdown">
+          <button className="topbar-nav-btn">Hierarchy ▼</button>
+          <div className="topbar-nav-menu">
+            <a href={`/page/text/${submissionId}`}>Read Text</a>
+            <a href={`/page/canvas/${submissionId}`}>Canvas</a>
+          </div>
+        </div>
+      </TopbarPortal>
       <div className="topic-hierarchy-page__body">
         <div
           className={`topic-hierarchy-page__viz${
