@@ -160,8 +160,8 @@
     color 0.15s;
 }
 
-.canvas-read-toggle:hover {
-  background: #f0f0f0;
+.canvas-spacer {
+  height: 4px;
 }
 
 .canvas-read-toggle.is-active {

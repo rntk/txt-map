@@ -666,6 +666,33 @@ export default function CanvasPage() {
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  // Scroll control helpers
+  const scrollTo = useCallback((pos) => {
+    const el = canvasWrapRef.current;
+    if (el) {
+      if (pos === "top") el.scrollTop = 0;
+      else if (pos === "bottom") el.scrollTop = el.scrollHeight;
+      else if (pos === "prev") el.scrollTop -= el.clientHeight;
+      else if (pos === "next") el.scrollTop += el.clientHeight;
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDownGlobal = (e) => {
+      if (
+        e.target.tagName === "INPUT" ||
+        e.target.tagName === "TEXTAREA"
+      )
+        return;
+      if (e.key === "Home") scrollTo("top");
+      else if (e.key === "End") scrollTo("bottom");
+      else if (e.key === "PageUp") scrollTo("prev");
+      else if (e.key === "PageDown") scrollTo("next");
+    };
+    window.addEventListener("keydown", handleKeyDownGlobal);
+    return () => window.removeEventListener("keydown", handleKeyDownGlobal);
+  }, [scrollTo]);
+
   // Chat submit
   const handleSend = useCallback(async () => {
     const msg = inputValue.trim();
@@ -800,6 +827,39 @@ export default function CanvasPage() {
             )}
           </div>
           <div className="canvas-controls">
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => scrollTo("top")}
+              title="Scroll to top"
+            >
+              ⇈
+            </button>
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => scrollTo("prev")}
+              title="Previous page"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => scrollTo("next")}
+              title="Next page"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="canvas-zoom-btn"
+              onClick={() => scrollTo("bottom")}
+              title="Scroll to bottom"
+            >
+              ⇊
+            </button>
+            <div className="canvas-spacer" />
             <button
               type="button"
               className="canvas-zoom-btn"
