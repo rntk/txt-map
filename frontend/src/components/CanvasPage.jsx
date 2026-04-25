@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { isTopicRead } from "../utils/topicReadUtils";
+import { getTemperatureColor } from "../utils/temperatureColor";
 import "./CanvasPage.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -123,15 +124,19 @@ async function pollCanvasChatReply(articleId, requestId, signal) {
 }
 
 /**
- * Build text segments with highlights and optional read ranges applied.
+ * Build text segments with highlights, optional read ranges, and optional
+ * temperature color ranges applied.
  * @param {string} text
  * @param {{start: number, end: number, label?: string}[]} highlights
  * @param {{start: number, end: number}[]} [readRanges]
- * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string}[]}
+ * @param {{start: number, end: number, color: string}[]} [temperatureHighlights]
+ * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
  */
-function buildSegments(text, highlights, readRanges) {
+function buildSegments(text, highlights, readRanges, temperatureHighlights) {
   const hasRead = Array.isArray(readRanges) && readRanges.length > 0;
-  if (!highlights.length && !hasRead)
+  const hasTemp =
+    Array.isArray(temperatureHighlights) && temperatureHighlights.length > 0;
+  if (!highlights.length && !hasRead && !hasTemp)
     return [{ text, highlighted: false, read: false }];
 
   const boundaries = new Set([0, text.length]);
@@ -153,6 +158,16 @@ function buildSegments(text, highlights, readRanges) {
       }
     }
   }
+  if (hasTemp) {
+    for (const t of temperatureHighlights) {
+      const s = Math.max(0, t.start);
+      const e = Math.min(text.length, t.end);
+      if (s < e) {
+        boundaries.add(s);
+        boundaries.add(e);
+      }
+    }
+  }
 
   const sorted = Array.from(boundaries).sort((a, b) => a - b);
   const segments = [];
@@ -165,6 +180,11 @@ function buildSegments(text, highlights, readRanges) {
     const matchingRead = hasRead
       ? readRanges.filter((r) => r.start <= start && r.end >= end)
       : [];
+    const matchingTemp = hasTemp
+      ? temperatureHighlights.filter(
+          (t) => t.start <= start && t.end >= end,
+        )
+      : [];
     segments.push({
       text: chunk,
       start,
@@ -172,6 +192,8 @@ function buildSegments(text, highlights, readRanges) {
       highlighted: matching.length > 0,
       read: matchingRead.length > 0,
       label: matching.length > 0 ? matching[0].label : undefined,
+      temperatureColor:
+        matchingTemp.length > 0 ? matchingTemp[0].color : undefined,
     });
   }
 
@@ -240,21 +262,30 @@ function eventLabel(ev, idx) {
 }
 
 /**
- * Build text segments with highlights and optional read ranges applied,
- * split across pages.
+ * Build text segments with highlights, optional read ranges, and optional
+ * temperature color ranges applied, split across pages.
  * @param {string} text
  * @param {{start: number, end: number, label?: string}[]} highlights
  * @param {{start: number, end: number}[]} [readRanges]
+ * @param {{start: number, end: number, color: string}[]} [temperatureHighlights]
  * @param {{page_number: number, start: number, end: number}[]} [pages]
- * @returns {{type: "page-splitter", page_number: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string}[]}
+ * @returns {{type: "page-splitter", page_number: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
  */
-function buildSegmentsWithPages(text, highlights, readRanges, pages) {
+function buildSegmentsWithPages(
+  text,
+  highlights,
+  readRanges,
+  temperatureHighlights,
+  pages,
+) {
   const hasPages = Array.isArray(pages) && pages.length > 0;
   if (!hasPages) {
-    return buildSegments(text, highlights, readRanges).map((s) => ({
-      ...s,
-      type: "segment",
-    }));
+    return buildSegments(text, highlights, readRanges, temperatureHighlights).map(
+      (s) => ({
+        ...s,
+        type: "segment",
+      }),
+    );
   }
 
   const result = [];
@@ -280,7 +311,13 @@ function buildSegmentsWithPages(text, highlights, readRanges, pages) {
       end: Math.min(page.end - page.start, r.end - page.start),
     }));
 
-    const segments = buildSegments(pageText, pageHighlights, pageRead);
+    const pageTemp = (temperatureHighlights || []).map((t) => ({
+      start: Math.max(0, t.start - page.start),
+      end: Math.min(page.end - page.start, t.end - page.start),
+      color: t.color,
+    }));
+
+    const segments = buildSegments(pageText, pageHighlights, pageRead, pageTemp);
     for (const seg of segments) {
       result.push({
         ...seg,
@@ -301,6 +338,7 @@ function buildSegmentsWithPages(text, highlights, readRanges, pages) {
  *   activeHighlightRef?: React.MutableRefObject<HTMLElement | null>,
  *   readRanges?: {start: number, end: number}[],
  *   showReadStatus?: boolean,
+ *   temperatureHighlights?: {start: number, end: number, color: string}[],
  *   pages?: {page_number: number, start: number, end: number}[]
  * }} props
  */
@@ -310,6 +348,7 @@ function ArticleText({
   activeHighlightRef,
   readRanges,
   showReadStatus,
+  temperatureHighlights,
   pages,
   textRef,
 }) {
@@ -317,6 +356,7 @@ function ArticleText({
     text,
     highlights,
     showReadStatus ? readRanges : undefined,
+    temperatureHighlights,
     pages,
   );
   let firstHighlightedSegmentFound = false;
@@ -354,6 +394,26 @@ function ArticleText({
             >
               {seg.text}
             </mark>
+          );
+        }
+
+        if (seg.temperatureColor) {
+          const classes = [
+            "canvas-temperature-highlight",
+            seg.read && showReadStatus ? "canvas-sentence--read" : undefined,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return (
+            <span
+              key={idx}
+              className={classes || undefined}
+              style={{ backgroundColor: seg.temperatureColor }}
+              data-char-start={seg.start}
+              data-char-end={seg.end}
+            >
+              {seg.text}
+            </span>
           );
         }
 
@@ -486,6 +546,10 @@ export default function CanvasPage() {
   const [inputValue, setInputValue] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
 
+  // Temperature
+  const [showTemperature, setShowTemperature] = useState(false);
+  const [topicTemperatures, setTopicTemperatures] = useState({});
+
   // Summaries layer
   const [showSummaries, setShowSummaries] = useState(false);
   const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
@@ -519,6 +583,7 @@ export default function CanvasPage() {
         setSubmissionTopics(data.topics || []);
         setReadTopics(data.read_topics || []);
         setTopicSummaries(data.topic_summaries || {});
+        setTopicTemperatures(data.topic_temperatures || {});
         setArticleLoading(false);
       })
       .catch((err) => {
@@ -621,6 +686,39 @@ export default function CanvasPage() {
     return ranges;
   }, [submissionSentences, readSentenceIndices]);
 
+  const topicTemperatureMap = useMemo(() => {
+    if (!topicTemperatures || typeof topicTemperatures !== "object") {
+      return new Map();
+    }
+    const map = new Map();
+    Object.entries(topicTemperatures).forEach(([topicName, value]) => {
+      const rawRate =
+        value && typeof value === "object" ? value.rate : Number(value);
+      const rate = Math.max(0, Math.min(100, Math.round(Number(rawRate))));
+      if (!Number.isFinite(rate)) return;
+      const rawReasoning =
+        value && typeof value === "object" ? value.reasoning : "";
+      const reasoning =
+        typeof rawReasoning === "string" ? rawReasoning.trim() : "";
+      map.set(topicName, { rate, reasoning });
+    });
+    return map;
+  }, [topicTemperatures]);
+
+  const temperatureAvailable = topicTemperatureMap.size > 0;
+
+  const temperatureTopicColorMap = useMemo(() => {
+    const map = new Map();
+    topicTemperatureMap.forEach((entry, topicName) => {
+      map.set(topicName, getTemperatureColor(entry.rate));
+    });
+    return map;
+  }, [topicTemperatureMap]);
+
+  const toggleTemperature = useCallback(() => {
+    setShowTemperature((prev) => !prev);
+  }, []);
+
   const sentenceOffsets = useMemo(() => {
     const arr = [];
     let off = 0;
@@ -678,6 +776,30 @@ export default function CanvasPage() {
     }
     return base;
   }, [currentHighlights, showSummaries, activeSummaryKey, summaryEntries]);
+
+  const temperatureHighlights = useMemo(() => {
+    if (!showTemperature || submissionSentences.length === 0) return [];
+    const ranges = [];
+    (submissionTopics || []).forEach((topic) => {
+      const color = temperatureTopicColorMap.get(topic.name);
+      if (!color) return;
+      const sentences = Array.isArray(topic.sentences) ? topic.sentences : [];
+      sentences.forEach((sentIdx) => {
+        const idx = sentIdx - 1;
+        if (idx < 0 || idx >= submissionSentences.length) return;
+        const start = sentenceOffsets[idx];
+        const end = start + submissionSentences[idx].length;
+        ranges.push({ start, end, color });
+      });
+    });
+    return ranges;
+  }, [
+    showTemperature,
+    submissionTopics,
+    temperatureTopicColorMap,
+    sentenceOffsets,
+    submissionSentences,
+  ]);
 
   useEffect(() => {
     if (!showSummaries || articleLoading || articleError) {
@@ -1084,6 +1206,7 @@ export default function CanvasPage() {
                   activeHighlightRef={activeHighlightRef}
                   readRanges={readRanges}
                   showReadStatus={showReadStatus}
+                  temperatureHighlights={temperatureHighlights}
                   pages={articlePages}
                   textRef={articleTextRef}
                 />
@@ -1248,6 +1371,19 @@ export default function CanvasPage() {
             }
           >
             S
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showTemperature ? " is-active" : ""}`}
+            onClick={toggleTemperature}
+            title={
+              showTemperature
+                ? "Hide temperature highlights"
+                : "Show temperature highlights"
+            }
+            disabled={!temperatureAvailable}
+          >
+            T
           </button>
         </div>
       </div>

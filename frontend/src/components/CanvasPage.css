@@ -301,6 +301,17 @@
   color: #3182ce;
 }
 
+.canvas-read-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.canvas-temperature-highlight {
+  border-radius: 2px;
+  padding: 0 1px;
+  opacity: 1 !important;
+}
+
 /* ── Canvas main column (canvas + timeline) ── */
 .canvas-main {
   flex: 1;
