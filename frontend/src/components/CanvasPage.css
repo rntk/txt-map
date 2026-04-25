@@ -257,22 +257,32 @@
 .canvas-events-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   background: #2d3748;
   color: #cbd5e0;
   border: 1px solid #4a5568;
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: 8px 6px 8px 12px;
   font-size: 12px;
-  cursor: pointer;
   text-align: left;
   position: relative;
   width: 100%;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .canvas-events-item:hover {
   background: #374151;
-  color: #fff;
+}
+
+.canvas-events-error {
+  background: #742a2a;
+  color: #fed7d7;
+  border: 1px solid #9b2c2c;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  margin-bottom: 4px;
 }
 
 .canvas-events-item.is-selected {
@@ -296,6 +306,44 @@
   border-radius: 50%;
   background: #ecc94b;
   box-shadow: 0 0 4px #ecc94b;
+}
+
+.canvas-events-item-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  min-width: 0;
+}
+
+.canvas-events-item-delete {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #a0aec0;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.canvas-events-item-delete:hover {
+  background: #c53030;
+  color: #fff;
 }
 
 .canvas-events-item-index {

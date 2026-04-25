@@ -850,6 +850,24 @@ def post_canvas_chat(
     return {"request_id": request_id, "status": "pending", "reply": None}
 
 
+@router.delete("/canvas/{article_id}/events/{seq}")
+def delete_canvas_event(
+    article_id: str,
+    seq: int,
+    canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    deleted = canvas_storage.delete_event(article_id, seq)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return {"deleted": True}
+
+
 @router.get("/canvas/{article_id}/chat/{request_id}")
 def get_canvas_chat_status(
     article_id: str,

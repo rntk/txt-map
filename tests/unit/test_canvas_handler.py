@@ -1,6 +1,9 @@
 import logging
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi.testclient import TestClient
 
 from handlers.canvas_handler import (
     CANVAS_SYSTEM_PROMPT,
@@ -43,17 +46,63 @@ class _CompleteClient(_StubLLM):
 class _CanvasStorage:
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
+        self._counters: dict[str, int] = {}
 
     def add_event(
         self, article_id: str, event_type: str, data: dict[str, Any]
     ) -> dict[str, Any]:
+        seq = self._counters.get(article_id, 0) + 1
+        self._counters[article_id] = seq
         event: dict[str, Any] = {
             "article_id": article_id,
             "event_type": event_type,
             "data": data,
+            "seq": seq,
         }
         self.events.append(event)
         return event
+
+    def delete_event(self, article_id: str, seq: int) -> bool:
+        initial_len = len(self.events)
+        self.events = [
+            ev
+            for ev in self.events
+            if not (ev.get("article_id") == article_id and ev.get("seq") == seq)
+        ]
+        return len(self.events) < initial_len
+
+
+@pytest.fixture
+def client():
+    with patch.dict(
+        "os.environ",
+        {
+            "MONGODB_URL": "mongodb://localhost:27017",
+            "LLAMACPP_URL": "http://localhost:8080",
+        },
+    ):
+        with patch("lifespan.MongoClient"):
+            from main import app
+            from handlers.canvas_handler import (
+                _get_canvas_events_storage,
+                _get_submissions_storage,
+            )
+
+            canvas_storage = _CanvasStorage()
+            submissions_storage = MagicMock()
+
+            app.dependency_overrides[_get_canvas_events_storage] = lambda: (
+                canvas_storage
+            )
+            app.dependency_overrides[_get_submissions_storage] = lambda: (
+                submissions_storage
+            )
+
+            with TestClient(app) as test_client:
+                yield test_client, canvas_storage, submissions_storage
+
+            app.dependency_overrides.pop(_get_canvas_events_storage, None)
+            app.dependency_overrides.pop(_get_submissions_storage, None)
 
 
 def test_build_article_text_splits_results_sentences_into_article_pieces() -> None:
@@ -332,3 +381,154 @@ def test_canvas_chat_stops_after_all_chunks_return_without_tool_calls(caplog) ->
     assert not client.responses
     assert "First chunk answer" in reply
     assert "Canvas chat complete | article=article-1 chunks_processed=" in caplog.text
+
+
+def test_delete_canvas_event_success(client):
+    test_client, canvas_storage, submissions_storage = client
+    submissions_storage.get_by_id.return_value = {"submission_id": "article-1"}
+    canvas_storage.add_event("article-1", "highlight_span", {"start": 0, "end": 5})
+    canvas_storage.add_event("article-1", "highlight_span", {"start": 6, "end": 10})
+
+    response = test_client.delete("/api/canvas/article-1/events/1")
+
+    assert response.status_code == 200
+    assert response.json()["deleted"] is True
+    assert len(canvas_storage.events) == 1
+    # seq is immutable: surviving event keeps the seq it was assigned at insert.
+    assert canvas_storage.events[0]["seq"] == 2
+    assert canvas_storage.events[0]["data"]["start"] == 6
+
+
+def test_delete_canvas_event_not_found(client):
+    test_client, canvas_storage, submissions_storage = client
+    submissions_storage.get_by_id.return_value = {"submission_id": "article-1"}
+
+    response = test_client.delete("/api/canvas/article-1/events/5")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Event not found"
+
+
+def test_delete_canvas_event_article_not_found(client):
+    test_client, _canvas_storage, submissions_storage = client
+    submissions_storage.get_by_id.return_value = None
+
+    response = test_client.delete("/api/canvas/article-1/events/1")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Article not found"
+
+
+def test_canvas_events_storage_delete_event_deletes_one() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events.delete_one.return_value = MagicMock(deleted_count=1)
+
+    result = storage.delete_event("article-1", 3)
+
+    assert result is True
+    mock_db.canvas_events.delete_one.assert_called_once_with(
+        {"article_id": "article-1", "seq": 3}
+    )
+
+
+def test_canvas_events_storage_delete_event_not_found() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events.delete_one.return_value = MagicMock(deleted_count=0)
+
+    result = storage.delete_event("article-1", 1)
+
+    assert result is False
+
+
+def test_canvas_events_storage_add_event_uses_atomic_counter() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events_counters.find_one_and_update.return_value = {
+        "_id": "article-1",
+        "seq": 7,
+    }
+
+    def _insert_one(doc):
+        doc["_id"] = "generated-id"
+        return MagicMock(inserted_id="generated-id")
+
+    mock_db.canvas_events.insert_one.side_effect = _insert_one
+
+    event = storage.add_event("article-1", "highlight_span", {"start": 0})
+
+    assert event["seq"] == 7
+    call = mock_db.canvas_events_counters.find_one_and_update.call_args
+    assert call.args[0] == {"_id": "article-1"}
+    assert call.args[1] == {"$inc": {"seq": 1}}
+    assert call.kwargs.get("upsert") is True
+    mock_db.canvas_events.count_documents.assert_not_called()
+
+
+def test_canvas_events_storage_prepare_drops_old_non_unique_index() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events.index_information.return_value = {
+        "article_id_1_seq_1": {"key": [("article_id", 1), ("seq", 1)]},
+    }
+    mock_db.canvas_events.aggregate.return_value = []
+
+    storage.prepare()
+
+    mock_db.canvas_events.drop_index.assert_called_once_with("article_id_1_seq_1")
+    mock_db.canvas_events.create_index.assert_any_call(
+        [("article_id", 1), ("seq", 1)], unique=True
+    )
+
+
+def test_canvas_events_storage_prepare_keeps_existing_unique_index() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events.index_information.return_value = {
+        "article_id_1_seq_1": {
+            "key": [("article_id", 1), ("seq", 1)],
+            "unique": True,
+        },
+    }
+    mock_db.canvas_events.aggregate.return_value = []
+
+    storage.prepare()
+
+    mock_db.canvas_events.drop_index.assert_not_called()
+
+
+def test_canvas_events_storage_prepare_backfills_counters() -> None:
+    from lib.storage.canvas_events import CanvasEventsStorage
+
+    mock_db = MagicMock()
+    storage = CanvasEventsStorage(mock_db)
+    mock_db.canvas_events.index_information.return_value = {}
+    mock_db.canvas_events.aggregate.return_value = [
+        {"_id": "article-1", "max_seq": 4},
+        {"_id": "article-2", "max_seq": 0},
+    ]
+
+    storage.prepare()
+
+    calls = mock_db.canvas_events_counters.update_one.call_args_list
+    assert len(calls) == 2
+    assert calls[0].args == (
+        {"_id": "article-1"},
+        {"$max": {"seq": 4}},
+    )
+    assert calls[0].kwargs.get("upsert") is True
+    assert calls[1].args == (
+        {"_id": "article-2"},
+        {"$max": {"seq": 0}},
+    )

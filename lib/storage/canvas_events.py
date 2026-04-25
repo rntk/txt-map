@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, UTC
 from typing import Any, List
 
+from pymongo import ReturnDocument
 from pymongo.database import Database
 
 
@@ -20,15 +21,55 @@ class CanvasEventsStorage:
                 self._log.warning(
                     "Can't create index %s. May be already exists. Info: %s", index, e
                 )
+        self._ensure_unique_seq_index()
+        self._backfill_counters()
+
+    def _ensure_unique_seq_index(self) -> None:
+        target_key = [("article_id", 1), ("seq", 1)]
         try:
-            self._db.canvas_events.create_index([("article_id", 1), ("seq", 1)])
+            existing = self._db.canvas_events.index_information()
+            for name, info in existing.items():
+                if list(info.get("key", [])) == target_key and not info.get("unique"):
+                    self._db.canvas_events.drop_index(name)
+                    break
+            self._db.canvas_events.create_index(target_key, unique=True)
         except Exception as e:
-            self._log.warning("Can't create compound index. Info: %s", e)
+            self._log.warning("Can't ensure unique compound index. Info: %s", e)
+
+    def _backfill_counters(self) -> None:
+        # Counters were introduced after add_event already used count_documents
+        # to derive seq. For any article that has events but no counter row,
+        # seed the counter to max(seq) so the next $inc returns max+1.
+        try:
+            pipeline = [
+                {"$group": {"_id": "$article_id", "max_seq": {"$max": "$seq"}}}
+            ]
+            for doc in self._db.canvas_events.aggregate(pipeline):
+                article_id = doc["_id"]
+                max_seq = doc.get("max_seq")
+                if max_seq is None:
+                    continue
+                self._db.canvas_events_counters.update_one(
+                    {"_id": article_id},
+                    {"$max": {"seq": int(max_seq)}},
+                    upsert=True,
+                )
+        except Exception as e:
+            self._log.warning("Can't backfill canvas event counters. Info: %s", e)
+
+    def _next_seq(self, article_id: str) -> int:
+        doc = self._db.canvas_events_counters.find_one_and_update(
+            {"_id": article_id},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        return int(doc["seq"])
 
     def add_event(
         self, article_id: str, event_type: str, data: dict[str, Any]
     ) -> dict[str, Any]:
-        seq = self._db.canvas_events.count_documents({"article_id": article_id})
+        seq = self._next_seq(article_id)
         event = {
             "article_id": article_id,
             "event_type": event_type,
@@ -54,3 +95,9 @@ class CanvasEventsStorage:
             doc["_id"] = str(doc["_id"])
             events.append(doc)
         return events
+
+    def delete_event(self, article_id: str, seq: int) -> bool:
+        result = self._db.canvas_events.delete_one(
+            {"article_id": article_id, "seq": seq}
+        )
+        return result.deleted_count > 0

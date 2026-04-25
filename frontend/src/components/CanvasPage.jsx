@@ -370,6 +370,9 @@ export default function CanvasPage() {
   const pendingEventsRef = useRef([]);
   const applyingRef = useRef(false);
   const isLiveRef = useRef(true);
+  const fetchInFlightRef = useRef(false);
+  const fetchGenerationRef = useRef(0);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     isLiveRef.current = isLive;
@@ -466,17 +469,25 @@ export default function CanvasPage() {
 
   // Poll events
   const fetchEvents = useCallback(() => {
-    if (!articleId) return;
+    if (!articleId || fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
+    const generation = fetchGenerationRef.current;
     const url = `/api/canvas/${articleId}/events?offset=${offsetRef.current}&limit=${EVENTS_LIMIT}`;
     fetch(url, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
+        if (generation !== fetchGenerationRef.current) return;
         if (!data || !data.events || data.events.length === 0) return;
         offsetRef.current += data.events.length;
         pendingEventsRef.current.push(...data.events);
         applyNextEvent();
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (generation === fetchGenerationRef.current) {
+          fetchInFlightRef.current = false;
+        }
+      });
   }, [articleId, applyNextEvent]);
 
   useEffect(() => {
@@ -585,6 +596,38 @@ export default function CanvasPage() {
     setNewIndices(new Set());
     setSelectedIndex(events.length - 1);
   }, [events.length]);
+
+  const handleDeleteEvent = useCallback(
+    async (seq) => {
+      if (!articleId) return;
+      if (!window.confirm("Delete this event?")) return;
+      setDeleteError(null);
+
+      try {
+        const response = await fetch(`/api/canvas/${articleId}/events/${seq}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        if (!response.ok) {
+          const data = await readJsonSafe(response);
+          throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+
+        fetchGenerationRef.current += 1;
+        setEvents([]);
+        setSelectedIndex(-1);
+        setNewIndices(new Set());
+        offsetRef.current = 0;
+        pendingEventsRef.current = [];
+        fetchInFlightRef.current = false;
+        fetchEvents();
+      } catch (err) {
+        console.error("Failed to delete event", err);
+        setDeleteError(err.message || "Failed to delete event");
+      }
+    },
+    [articleId, fetchEvents],
+  );
 
   // Canvas drag
   const handleMouseDown = useCallback((e) => {
@@ -872,7 +915,10 @@ export default function CanvasPage() {
           className={`canvas-tab-content${activeTab === "events" ? " is-active" : ""}`}
         >
           <div className="canvas-events-list">
-            {events.length === 0 && (
+            {deleteError && (
+              <div className="canvas-events-error">{deleteError}</div>
+            )}
+            {events.length === 0 && !deleteError && (
               <span className="canvas-events-empty">No events yet</span>
             )}
             {events.map((ev, i) => {
@@ -880,19 +926,32 @@ export default function CanvasPage() {
               if (i === selectedIndex) classes.push("is-selected");
               if (newIndices.has(i)) classes.push("is-new");
               return (
-                <button
-                  type="button"
-                  key={i}
-                  className={classes.join(" ")}
-                  onClick={() => handleSelectEvent(i)}
-                  title={eventLabel(ev, i)}
-                  aria-label={eventLabel(ev, i)}
-                >
-                  <span className="canvas-events-item-index">#{i + 1}</span>
-                  <span className="canvas-events-item-label">
-                    {eventLabel(ev, i)}
-                  </span>
-                </button>
+                <div key={i} className={classes.join(" ")} role="listitem">
+                  <button
+                    type="button"
+                    className="canvas-events-item-select"
+                    onClick={() => handleSelectEvent(i)}
+                    title={eventLabel(ev, i)}
+                    aria-label={eventLabel(ev, i)}
+                  >
+                    <span className="canvas-events-item-index">#{i + 1}</span>
+                    <span className="canvas-events-item-label">
+                      {eventLabel(ev, i)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="canvas-events-item-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteEvent(ev.seq);
+                    }}
+                    title="Delete event"
+                    aria-label="Delete event"
+                  >
+                    ✕
+                  </button>
+                </div>
               );
             })}
           </div>
