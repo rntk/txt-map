@@ -127,11 +127,24 @@ function TopicSentencesModal({
   const highlightWords = useMemo(() => {
     if (!normalizedTopic?.displayName) return [];
     // Split by whitespace and remove leading/trailing non-alphanumeric characters from each word
-    return normalizedTopic.displayName
+    const topicWords = normalizedTopic.displayName
       .split(/\s+/)
       .map((w) => w.replace(/^[\W_]+|[\W_]+$/g, ""))
       .filter((word) => word.length > 0);
-  }, [normalizedTopic?.displayName]);
+
+    // Also extract words from summary sentence if available
+    if (summarySentence) {
+      const summaryWords = summarySentence
+        .split(/\s+/)
+        .map((w) => w.replace(/^[\W_]+|[\W_]+$/g, ""))
+        .filter((word) => word.length > 0);
+      // Combine topic words and summary words, removing duplicates
+      const allWords = new Set([...topicWords, ...summaryWords]);
+      return Array.from(allWords);
+    }
+
+    return topicWords;
+  }, [normalizedTopic?.displayName, summarySentence]);
 
   const isRead = normalizedTopic
     ? isTopicSelectionRead(normalizedTopic, readTopics)
@@ -404,7 +417,10 @@ function TopicSentencesModal({
                         </span>
                       </header>
                       <div className="topic-sentences-modal__enriched-range-body">
-                        <MarkupRenderer html={range.html} />
+                        <MarkupRenderer
+                          html={range.html}
+                          highlightWords={highlightWords}
+                        />
                       </div>
                     </section>
                   ))}
