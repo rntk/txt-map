@@ -679,10 +679,7 @@ export default function CanvasPage() {
 
   useEffect(() => {
     const handleKeyDownGlobal = (e) => {
-      if (
-        e.target.tagName === "INPUT" ||
-        e.target.tagName === "TEXTAREA"
-      )
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
         return;
       if (e.key === "Home") scrollTo("top");
       else if (e.key === "End") scrollTo("bottom");

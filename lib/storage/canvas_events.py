@@ -41,9 +41,7 @@ class CanvasEventsStorage:
         # to derive seq. For any article that has events but no counter row,
         # seed the counter to max(seq) so the next $inc returns max+1.
         try:
-            pipeline = [
-                {"$group": {"_id": "$article_id", "max_seq": {"$max": "$seq"}}}
-            ]
+            pipeline = [{"$group": {"_id": "$article_id", "max_seq": {"$max": "$seq"}}}]
             for doc in self._db.canvas_events.aggregate(pipeline):
                 article_id = doc["_id"]
                 max_seq = doc.get("max_seq")
