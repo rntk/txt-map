@@ -127,4 +127,26 @@ describe("TopicHierarchyView", () => {
     expect(screen.getByText("Visible")).toBeInTheDocument();
     expect(screen.queryByText("Hidden")).not.toBeInTheDocument();
   });
+
+  test("marks read topic branches and leaves with the read state class", () => {
+    render(
+      <TopicHierarchyView
+        topics={[
+          { name: "Root>Read Child", sentences: [1] },
+          { name: "Other>Unread Child", sentences: [2] },
+        ]}
+        readTopics={new Set(["Root"])}
+      />,
+    );
+
+    expect(screen.getByText("Root").closest(".th-node__label")).toHaveClass(
+      "is-read",
+    );
+    expect(screen.getByText("Read Child").closest(".th-leaf")).toHaveClass(
+      "is-read",
+    );
+    expect(
+      screen.getByText("Unread Child").closest(".th-leaf"),
+    ).not.toHaveClass("is-read");
+  });
 });

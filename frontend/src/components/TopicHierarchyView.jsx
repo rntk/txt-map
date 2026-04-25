@@ -5,6 +5,7 @@ import {
   getHierarchyTopicHighlightColor,
   getHierarchyTopicAccentColor,
 } from "../utils/topicColorUtils";
+import { isTopicRead, toReadTopicsSet } from "../utils/topicReadUtils";
 import "./TopicHierarchyView.css";
 
 const DEFAULT_CHILD_LIMIT = 0;
@@ -42,6 +43,7 @@ const DEFAULT_ROOT_LIMIT = 0;
  * @property {number} [childLimit]
  * @property {number} [rootLimit]
  * @property {boolean} [drilldownMode]
+ * @property {Set<string> | string[]} [readTopics]
  * @property {(path: string, topic: TopicHierarchyTopic|null) => void} [onSelectPath]
  * @property {(path: string|null) => void} [onHoverPath]
  * @property {(path: string) => void} [onDrilldownPath]
@@ -193,6 +195,7 @@ function MoreRootIndicator({ hiddenCount, onDrilldownPath }) {
  * @param {string|null} props.hoveredPath
  * @param {number} props.childLimit
  * @param {boolean} props.drilldownMode
+ * @param {Set<string>} props.readTopicsSet
  * @param {(path: string, topic: TopicHierarchyTopic|null) => void} [props.onSelectPath]
  * @param {(path: string|null) => void} [props.onHoverPath]
  * @param {(path: string) => void} [props.onDrilldownPath]
@@ -206,6 +209,7 @@ function HierarchyNode({
   hoveredPath,
   childLimit,
   drilldownMode,
+  readTopicsSet,
   onSelectPath,
   onHoverPath,
   onDrilldownPath,
@@ -228,6 +232,7 @@ function HierarchyNode({
   const isHovered = isAncestorPath(node.fullPath, hoveredPath);
   const isSelected = isAncestorPath(node.fullPath, selectedPath);
   const isMetaActive = activeMetaTopicName === node.fullPath;
+  const isRead = isTopicRead(node.fullPath, readTopicsSet);
   const relativeDepth = Math.max(0, node.depth - startLevel);
   const highlightColor = getHierarchyTopicHighlightColor(
     node.fullPath,
@@ -281,6 +286,7 @@ function HierarchyNode({
     isSelected ? "is-selected" : "",
     isHovered ? "is-hovered" : "",
     isMetaActive ? "is-meta-active" : "",
+    isRead ? "is-read" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -391,6 +397,7 @@ function HierarchyNode({
             hoveredPath={hoveredPath}
             childLimit={childLimit}
             drilldownMode={drilldownMode}
+            readTopicsSet={readTopicsSet}
             onSelectPath={onSelectPath}
             onHoverPath={onHoverPath}
             onDrilldownPath={onDrilldownPath}
@@ -424,6 +431,7 @@ function TopicHierarchyView({
   childLimit = DEFAULT_CHILD_LIMIT,
   rootLimit = DEFAULT_ROOT_LIMIT,
   drilldownMode = false,
+  readTopics,
   onSelectPath,
   onHoverPath,
   onDrilldownPath,
@@ -433,6 +441,10 @@ function TopicHierarchyView({
   activeMetaTopicName = null,
 }) {
   const startLevel = Array.isArray(scopePath) ? scopePath.length : 0;
+  const readTopicsSet = useMemo(
+    () => toReadTopicsSet(readTopics),
+    [readTopics],
+  );
 
   const roots = useMemo(() => {
     const safeTopics = Array.isArray(topics) ? topics : [];
@@ -461,6 +473,7 @@ function TopicHierarchyView({
           hoveredPath={hoveredPath}
           childLimit={childLimit}
           drilldownMode={drilldownMode}
+          readTopicsSet={readTopicsSet}
           onSelectPath={onSelectPath}
           onHoverPath={onHoverPath}
           onDrilldownPath={onDrilldownPath}

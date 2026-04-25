@@ -178,6 +178,20 @@ function TopicHierarchyPageContent() {
     return map;
   }, [safeTopics]);
 
+  const readSentenceSet = useMemo(() => {
+    const set = new Set();
+    (safeTopics || []).forEach((topic) => {
+      if (!isTopicRead(topic.name, readTopics)) return;
+      const topicSentences = Array.isArray(topic.sentences)
+        ? topic.sentences
+        : [];
+      topicSentences.forEach((num) => {
+        set.add(num - 1);
+      });
+    });
+    return set;
+  }, [readTopics, safeTopics]);
+
   const getTooltipPosition = useCallback((clientX, clientY) => {
     let x = clientX - 10;
     let y = clientY - 10;
@@ -385,6 +399,7 @@ function TopicHierarchyPageContent() {
                 selectedPath={selectedPath}
                 hoveredPath={hoveredPath}
                 activeMetaTopicName={metaTopicName}
+                readTopics={readTopics}
                 scopePath={drilldownSegments}
                 drilldownMode
                 childLimit={0}
@@ -403,6 +418,7 @@ function TopicHierarchyPageContent() {
               selectedPath={selectedPath}
               hoveredPath={hoveredPath}
               activeMetaTopicName={metaTopicName}
+              readTopics={readTopics}
               onSelectPath={handleSelectPath}
               onHoverPath={handleHoverPath}
               onDrilldownPath={handleDrilldownPath}
@@ -428,6 +444,7 @@ function TopicHierarchyPageContent() {
               sentences.map((sentence, idx) => {
                 const isHighlighted = highlightedSentenceSet.has(idx);
                 const hasTopics = sentenceToTopicsMap.has(idx);
+                const isRead = !isHighlighted && readSentenceSet.has(idx);
                 return (
                   <span
                     key={idx}
@@ -443,7 +460,7 @@ function TopicHierarchyPageContent() {
                       isHighlighted
                         ? " topic-hierarchy-page__sentence--highlight"
                         : ""
-                    }${
+                    }${isRead ? " topic-hierarchy-page__sentence--read" : ""}${
                       tooltipEnabled && hasTopics
                         ? " topic-hierarchy-page__sentence--clickable"
                         : ""
