@@ -111,7 +111,9 @@
   fill: none;
   stroke: rgba(120, 200, 230, 0.45);
   stroke-width: 1;
-  transition: stroke 0.15s, stroke-width 0.15s;
+  transition:
+    stroke 0.15s,
+    stroke-width 0.15s;
 }
 
 .canvas-summary-connector.is-active {
@@ -123,7 +125,9 @@
   fill: rgba(120, 200, 230, 0.6);
   stroke: rgba(120, 200, 230, 0.85);
   stroke-width: 1;
-  transition: fill 0.15s, stroke 0.15s;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
 }
 
 .canvas-summary-anchor.is-active {
@@ -135,7 +139,9 @@
   fill: transparent;
   stroke: rgba(120, 200, 230, 0.6);
   stroke-width: 1.5;
-  transition: stroke 0.15s, fill 0.15s;
+  transition:
+    stroke 0.15s,
+    fill 0.15s;
 }
 
 .canvas-summary-bulb.is-active {
@@ -176,13 +182,22 @@
 .canvas-summary-card:hover,
 .canvas-summary-card.is-active {
   border-color: #7be0ff;
-  box-shadow: 0 0 0 1px rgba(123, 224, 255, 0.4),
+  box-shadow:
+    0 0 0 1px rgba(123, 224, 255, 0.4),
     0 4px 18px rgba(0, 0, 0, 0.6);
 }
 
 .canvas-summary-card.is-pinned {
   background: rgba(30, 50, 72, 0.95);
   border-color: #7be0ff;
+}
+
+.canvas-summary-card.is-focused {
+  border-color: #7be0ff;
+  box-shadow:
+    0 0 0 2px rgba(123, 224, 255, 0.6),
+    0 6px 24px rgba(0, 0, 0, 0.7);
+  transform: scale(1.02);
 }
 
 .canvas-summary-card.is-pinned::before {

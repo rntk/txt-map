@@ -181,9 +181,7 @@ function buildSegments(text, highlights, readRanges, temperatureHighlights) {
       ? readRanges.filter((r) => r.start <= start && r.end >= end)
       : [];
     const matchingTemp = hasTemp
-      ? temperatureHighlights.filter(
-          (t) => t.start <= start && t.end >= end,
-        )
+      ? temperatureHighlights.filter((t) => t.start <= start && t.end >= end)
       : [];
     segments.push({
       text: chunk,
@@ -280,12 +278,15 @@ function buildSegmentsWithPages(
 ) {
   const hasPages = Array.isArray(pages) && pages.length > 0;
   if (!hasPages) {
-    return buildSegments(text, highlights, readRanges, temperatureHighlights).map(
-      (s) => ({
-        ...s,
-        type: "segment",
-      }),
-    );
+    return buildSegments(
+      text,
+      highlights,
+      readRanges,
+      temperatureHighlights,
+    ).map((s) => ({
+      ...s,
+      type: "segment",
+    }));
   }
 
   const result = [];
@@ -317,7 +318,12 @@ function buildSegmentsWithPages(
       color: t.color,
     }));
 
-    const segments = buildSegments(pageText, pageHighlights, pageRead, pageTemp);
+    const segments = buildSegments(
+      pageText,
+      pageHighlights,
+      pageRead,
+      pageTemp,
+    );
     for (const seg of segments) {
       result.push({
         ...seg,
@@ -500,6 +506,7 @@ export default function CanvasPage() {
   const chatAbortRef = useRef(null);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
+  const [focusedTopicKey, setFocusedTopicKey] = useState(null);
 
   // Events / timeline
   const [events, setEvents] = useState([]);
@@ -1027,11 +1034,68 @@ export default function CanvasPage() {
     });
 
     setIsFocusingHighlight(false);
+    setFocusedTopicKey(null);
     scaleRef.current = nextScale;
     translateRef.current = nextTranslate;
     setScale(nextScale);
     setTranslate(nextTranslate);
   }, []);
+
+  // Zoom to a specific topic/summary
+  const handleZoomToTopic = useCallback(
+    (topicKey) => {
+      if (!topicKey) {
+        setFocusedTopicKey(null);
+        return;
+      }
+
+      const entry = summaryEntries.find((e) => e.key === topicKey);
+      if (!entry) return;
+
+      const wrap = canvasWrapRef.current;
+      const viewport = canvasViewportRef.current;
+      const articleEl = articleTextRef.current;
+      if (!wrap || !viewport || !articleEl) return;
+
+      const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
+      const midRange = rangeAtOffset(articleEl, midOff);
+      if (!midRange) return;
+
+      const midRect = midRange.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const currentScale = scaleRef.current || 1;
+      const nextScale = Math.min(
+        MAX_CANVAS_SCALE,
+        Math.max(currentScale, HIGHLIGHT_FOCUS_SCALE),
+      );
+
+      // Calculate the target position in canvas coordinates
+      const targetCenterX = midRect.left + midRect.width / 2;
+      const targetCenterY = midRect.top + midRect.height / 2;
+      const localTargetX = (targetCenterX - viewportRect.left) / currentScale;
+      const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
+
+      setFocusedTopicKey(topicKey);
+      setIsFocusingHighlight(true);
+      scaleRef.current = nextScale;
+      translateRef.current = {
+        x: wrapRect.width / 2 - localTargetX * nextScale,
+        y: wrapRect.height / 2 - localTargetY * nextScale,
+      };
+      setScale(nextScale);
+      setTranslate(translateRef.current);
+
+      // Reset the focusing state after transition completes
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+      transitionTimerRef.current = setTimeout(() => {
+        setIsFocusingHighlight(false);
+      }, HIGHLIGHT_FOCUS_TRANSITION_MS);
+    },
+    [summaryEntries],
+  );
 
   useEffect(() => {
     const el = canvasWrapRef.current;
@@ -1259,7 +1323,7 @@ export default function CanvasPage() {
                       {summaryLayout.cards.map((card) => (
                         <div
                           key={card.key}
-                          className={`canvas-summary-card${activeSummaryKey === card.key ? " is-active" : ""}${pinnedSummaryKey === card.key ? " is-pinned" : ""}`}
+                          className={`canvas-summary-card${activeSummaryKey === card.key ? " is-active" : ""}${pinnedSummaryKey === card.key ? " is-pinned" : ""}${focusedTopicKey === card.key ? " is-focused" : ""}`}
                           style={{
                             top: `${card.cardY}px`,
                             height: `${card.cardHeight}px`,
@@ -1270,11 +1334,15 @@ export default function CanvasPage() {
                               k === card.key ? null : k,
                             )
                           }
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Toggle pin behavior
                             setPinnedSummaryKey((k) =>
                               k === card.key ? null : card.key,
-                            )
-                          }
+                            );
+                            // Zoom to topic
+                            handleZoomToTopic(card.key);
+                          }}
                           title={card.topicName}
                         >
                           <div className="canvas-summary-card-topic">
@@ -1346,6 +1414,7 @@ export default function CanvasPage() {
             onClick={() => {
               setScale(1);
               setTranslate({ x: 40, y: 40 });
+              setFocusedTopicKey(null);
             }}
           >
             ⊙
