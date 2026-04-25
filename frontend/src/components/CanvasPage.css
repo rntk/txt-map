@@ -87,6 +87,136 @@
   color: #c62828;
 }
 
+/* ── Summaries layer (Expanse-style) ── */
+.canvas-article-with-summaries {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.canvas-article-with-summaries.has-summaries {
+  padding-right: 360px;
+}
+
+.canvas-summary-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.canvas-summary-connector {
+  fill: none;
+  stroke: rgba(120, 200, 230, 0.45);
+  stroke-width: 1;
+  transition: stroke 0.15s, stroke-width 0.15s;
+}
+
+.canvas-summary-connector.is-active {
+  stroke: #7be0ff;
+  stroke-width: 1.5;
+}
+
+.canvas-summary-anchor {
+  fill: rgba(120, 200, 230, 0.6);
+  stroke: rgba(120, 200, 230, 0.85);
+  stroke-width: 1;
+  transition: fill 0.15s, stroke 0.15s;
+}
+
+.canvas-summary-anchor.is-active {
+  fill: #7be0ff;
+  stroke: #ffffff;
+}
+
+.canvas-summary-bulb {
+  fill: transparent;
+  stroke: rgba(120, 200, 230, 0.6);
+  stroke-width: 1.5;
+  transition: stroke 0.15s, fill 0.15s;
+}
+
+.canvas-summary-bulb.is-active {
+  stroke: #7be0ff;
+  fill: rgba(123, 224, 255, 0.25);
+}
+
+.canvas-summary-rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.canvas-summary-card {
+  position: absolute;
+  right: 0;
+  width: 280px;
+  background: rgba(20, 28, 40, 0.92);
+  border: 1px solid rgba(120, 200, 230, 0.35);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #cbd5e0;
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.canvas-summary-card:hover,
+.canvas-summary-card.is-active {
+  border-color: #7be0ff;
+  box-shadow: 0 0 0 1px rgba(123, 224, 255, 0.4),
+    0 4px 18px rgba(0, 0, 0, 0.6);
+}
+
+.canvas-summary-card.is-pinned {
+  background: rgba(30, 50, 72, 0.95);
+  border-color: #7be0ff;
+}
+
+.canvas-summary-card.is-pinned::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  background: #7be0ff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #7be0ff;
+}
+
+.canvas-summary-card-topic {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7be0ff;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-summary-card-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #d8e1ec;
+}
+
 /* ── Page splitter ── */
 .canvas-page-splitter {
   display: flex;

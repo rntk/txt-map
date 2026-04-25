@@ -801,6 +801,9 @@ def get_canvas_article(
     ]
     topics: list[dict] = submission.get("results", {}).get("topics") or []
     read_topics: list[str] = submission.get("read_topics", [])
+    topic_summaries: dict = (
+        submission.get("results", {}).get("topic_summaries") or {}
+    )
     pages = [
         {
             "page_number": p.page_number,
@@ -816,6 +819,7 @@ def get_canvas_article(
         "sentences": clean_sentences,
         "topics": topics,
         "read_topics": read_topics,
+        "topic_summaries": topic_summaries,
         "pages": pages,
     }
 

@@ -143,6 +143,44 @@ function buildSegments(text, highlights, readRanges) {
 }
 
 /**
+ * Locate a Range at a given character offset within an article element,
+ * skipping page splitter chrome.
+ * @param {HTMLElement} rootEl
+ * @param {number} offset
+ * @returns {Range | null}
+ */
+function rangeAtOffset(rootEl, offset) {
+  if (!rootEl) return null;
+  const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      let parent = node.parentElement;
+      while (parent && parent !== rootEl) {
+        if (parent.classList?.contains("canvas-page-splitter")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        parent = parent.parentElement;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let acc = 0;
+  let node = walker.nextNode();
+  while (node) {
+    const len = node.nodeValue.length;
+    if (acc + len >= offset) {
+      const local = Math.max(0, Math.min(offset - acc, len));
+      const range = document.createRange();
+      range.setStart(node, local);
+      range.setEnd(node, Math.min(local + 1, len));
+      return range;
+    }
+    acc += len;
+    node = walker.nextNode();
+  }
+  return null;
+}
+
+/**
  * Derive highlights to render from a single event.
  */
 function eventToHighlights(ev) {
@@ -237,6 +275,7 @@ function ArticleText({
   readRanges,
   showReadStatus,
   pages,
+  textRef,
 }) {
   const segments = buildSegmentsWithPages(
     text,
@@ -247,7 +286,7 @@ function ArticleText({
   let firstHighlightedSegmentFound = false;
 
   return (
-    <div className="canvas-article-text">
+    <div className="canvas-article-text" ref={textRef}>
       {segments.map((seg, idx) => {
         if (seg.type === "page-splitter") {
           return (
@@ -346,6 +385,9 @@ export default function CanvasPage() {
   const [articlePages, setArticlePages] = useState([]);
   const [articleLoading, setArticleLoading] = useState(true);
   const [articleError, setArticleError] = useState(null);
+  const [topicSummaries, setTopicSummaries] = useState({});
+  const articleTextRef = useRef(null);
+  const summaryWrapRef = useRef(null);
 
   // Canvas transform
   const [translate, setTranslate] = useState({ x: 40, y: 40 });
@@ -403,6 +445,12 @@ export default function CanvasPage() {
   const [inputValue, setInputValue] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
 
+  // Summaries layer
+  const [showSummaries, setShowSummaries] = useState(false);
+  const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
+  const [pinnedSummaryKey, setPinnedSummaryKey] = useState(null);
+  const [summaryLayout, setSummaryLayout] = useState({ cards: [], width: 0 });
+
   // Read/unread
   const [showReadStatus, setShowReadStatus] = useState(false);
   const [submissionSentences, setSubmissionSentences] = useState([]);
@@ -429,6 +477,7 @@ export default function CanvasPage() {
         setSubmissionSentences(data.sentences || []);
         setSubmissionTopics(data.topics || []);
         setReadTopics(data.read_topics || []);
+        setTopicSummaries(data.topic_summaries || {});
         setArticleLoading(false);
       })
       .catch((err) => {
@@ -530,6 +579,143 @@ export default function CanvasPage() {
     }
     return ranges;
   }, [submissionSentences, readSentenceIndices]);
+
+  const sentenceOffsets = useMemo(() => {
+    const arr = [];
+    let off = 0;
+    for (const s of submissionSentences) {
+      arr.push(off);
+      off += s.length + 1;
+    }
+    return arr;
+  }, [submissionSentences]);
+
+  const summaryEntries = useMemo(() => {
+    if (!topicSummaries || submissionSentences.length === 0) return [];
+    const entries = [];
+    (submissionTopics || []).forEach((topic) => {
+      const text = topicSummaries[topic.name];
+      if (!text) return;
+      const sentences = Array.isArray(topic.sentences) ? topic.sentences : [];
+      if (sentences.length === 0) return;
+      const sortedSents = [...sentences]
+        .filter((n) => Number.isInteger(n) && n > 0)
+        .sort((a, b) => a - b);
+      if (sortedSents.length === 0) return;
+      const startSent = sortedSents[0];
+      const endSent = sortedSents[sortedSents.length - 1];
+      const charStart = sentenceOffsets[startSent - 1] ?? 0;
+      const lastLen = submissionSentences[endSent - 1]?.length ?? 0;
+      const charEnd = (sentenceOffsets[endSent - 1] ?? 0) + lastLen;
+      entries.push({
+        key: topic.name,
+        topicName: topic.name,
+        summaryText: text,
+        sentenceStart: startSent,
+        sentenceEnd: endSent,
+        sentences: sortedSents,
+        charStart,
+        charEnd,
+      });
+    });
+    return entries;
+  }, [topicSummaries, submissionTopics, sentenceOffsets, submissionSentences]);
+
+  const activeSummaryKey = hoveredSummaryKey || pinnedSummaryKey;
+
+  const articleHighlights = useMemo(() => {
+    const base = currentHighlights.slice();
+    if (showSummaries && activeSummaryKey) {
+      const entry = summaryEntries.find((e) => e.key === activeSummaryKey);
+      if (entry) {
+        base.push({
+          start: entry.charStart,
+          end: entry.charEnd,
+          label: entry.topicName,
+        });
+      }
+    }
+    return base;
+  }, [currentHighlights, showSummaries, activeSummaryKey, summaryEntries]);
+
+
+  useEffect(() => {
+    if (!showSummaries || articleLoading || articleError) {
+      setSummaryLayout({ cards: [], width: 0 });
+      return undefined;
+    }
+    if (summaryEntries.length === 0) {
+      setSummaryLayout({ cards: [], width: 0 });
+      return undefined;
+    }
+
+    let raf = 0;
+    const compute = () => {
+      const articleEl = articleTextRef.current;
+      const wrapEl = summaryWrapRef.current;
+      if (!articleEl || !wrapEl) return;
+      const articleRect = articleEl.getBoundingClientRect();
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const s = scaleRef.current || 1;
+
+      const positioned = summaryEntries
+        .map((entry) => {
+          const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
+          const midRange = rangeAtOffset(articleEl, midOff);
+          const startRange = rangeAtOffset(articleEl, entry.charStart);
+          const endRange = rangeAtOffset(articleEl, Math.max(0, entry.charEnd - 1));
+          if (!midRange) return null;
+          const midRect = midRange.getBoundingClientRect();
+          const startRect = startRange?.getBoundingClientRect();
+          const endRect = endRange?.getBoundingClientRect();
+          const midY = ((midRect.top + midRect.bottom) / 2 - wrapRect.top) / s;
+          const startY = startRect
+            ? (startRect.top - wrapRect.top) / s
+            : midY;
+          const endY = endRect ? (endRect.bottom - wrapRect.top) / s : midY;
+          return { ...entry, midY, startY, endY };
+        })
+        .filter(Boolean);
+
+      positioned.sort((a, b) => a.midY - b.midY);
+
+      const CARD_HEIGHT = 92;
+      const GAP = 10;
+      let lastBottom = 0;
+      for (const c of positioned) {
+        const desired = c.midY - CARD_HEIGHT / 2;
+        c.cardY = Math.max(desired, lastBottom + GAP);
+        c.cardHeight = CARD_HEIGHT;
+        lastBottom = c.cardY + CARD_HEIGHT;
+      }
+
+      setSummaryLayout({
+        cards: positioned,
+        width: wrapRect.width / s,
+        articleRight: (articleRect.right - wrapRect.left) / s,
+        articleHeight: articleEl.offsetHeight,
+      });
+    };
+
+    raf = window.requestAnimationFrame(compute);
+    const onResize = () => {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(compute);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [
+    showSummaries,
+    summaryEntries,
+    articleLoading,
+    articleError,
+    articleText,
+    articlePages,
+    scale,
+  ]);
 
   useEffect(() => {
     if (!currentHighlightFocusKey || articleLoading || articleError) {
@@ -823,14 +1009,98 @@ export default function CanvasPage() {
               </div>
             )}
             {!articleLoading && !articleError && (
-              <ArticleText
-                text={articleText}
-                highlights={currentHighlights}
-                activeHighlightRef={activeHighlightRef}
-                readRanges={readRanges}
-                showReadStatus={showReadStatus}
-                pages={articlePages}
-              />
+              <div
+                ref={summaryWrapRef}
+                className={`canvas-article-with-summaries${showSummaries ? " has-summaries" : ""}`}
+              >
+                <ArticleText
+                  text={articleText}
+                  highlights={articleHighlights}
+                  activeHighlightRef={activeHighlightRef}
+                  readRanges={readRanges}
+                  showReadStatus={showReadStatus}
+                  pages={articlePages}
+                  textRef={articleTextRef}
+                />
+                {showSummaries && summaryLayout.cards.length > 0 && (
+                  <>
+                    <svg
+                      className="canvas-summary-connectors"
+                      style={{
+                        height: Math.max(
+                          summaryLayout.articleHeight || 0,
+                          summaryLayout.cards.length > 0
+                            ? summaryLayout.cards[
+                                summaryLayout.cards.length - 1
+                              ].cardY + 100
+                            : 0,
+                        ),
+                      }}
+                    >
+                      {summaryLayout.cards.map((card) => {
+                        const x1 = summaryLayout.articleRight || 0;
+                        const y1 = card.midY;
+                        const x2 = (summaryLayout.articleRight || 0) + 80;
+                        const y2 = card.cardY + card.cardHeight / 2;
+                        const cx1 = x1 + 30;
+                        const cx2 = x2 - 30;
+                        const isActive = activeSummaryKey === card.key;
+                        return (
+                          <g key={card.key}>
+                            <circle
+                              cx={x1}
+                              cy={y1}
+                              r={3}
+                              className={`canvas-summary-anchor${isActive ? " is-active" : ""}`}
+                            />
+                            <path
+                              d={`M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`}
+                              className={`canvas-summary-connector${isActive ? " is-active" : ""}`}
+                            />
+                            <circle
+                              cx={x2}
+                              cy={y2}
+                              r={4}
+                              className={`canvas-summary-bulb${isActive ? " is-active" : ""}`}
+                            />
+                          </g>
+                        );
+                      })}
+                    </svg>
+                    <div className="canvas-summary-rail">
+                      {summaryLayout.cards.map((card) => (
+                        <div
+                          key={card.key}
+                          className={`canvas-summary-card${activeSummaryKey === card.key ? " is-active" : ""}${pinnedSummaryKey === card.key ? " is-pinned" : ""}`}
+                          style={{
+                            top: `${card.cardY}px`,
+                            height: `${card.cardHeight}px`,
+                          }}
+                          onMouseEnter={() => setHoveredSummaryKey(card.key)}
+                          onMouseLeave={() =>
+                            setHoveredSummaryKey((k) =>
+                              k === card.key ? null : k,
+                            )
+                          }
+                          onClick={() =>
+                            setPinnedSummaryKey((k) =>
+                              k === card.key ? null : card.key,
+                            )
+                          }
+                          title={card.topicName}
+                        >
+                          <div className="canvas-summary-card-topic">
+                            {card.topicName}
+                          </div>
+                          <div className="canvas-summary-card-text">
+                            {card.summaryText}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -903,6 +1173,18 @@ export default function CanvasPage() {
             }
           >
             R
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showSummaries ? " is-active" : ""}`}
+            onClick={() => setShowSummaries((v) => !v)}
+            title={
+              showSummaries
+                ? "Hide topic summaries"
+                : "Show topic summaries"
+            }
+          >
+            S
           </button>
         </div>
       </div>
