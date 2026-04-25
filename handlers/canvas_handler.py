@@ -492,6 +492,14 @@ def _run_canvas_chunk_tool_loop(
     messages.append(LLMMessage(role="user", content=chunk_header))
 
     for round_num in range(max_tool_rounds):
+        call_number: int = round_num + 1
+        log.info(
+            "Canvas LLM call start | article=%s chunk=%d/%d call=%d",
+            article_id,
+            chunk_index + 1,
+            chunk_total,
+            call_number,
+        )
         log_messages = [
             {"role": m.role, "content": m.content}
             for m in (
@@ -503,7 +511,7 @@ def _run_canvas_chunk_tool_loop(
             article_id,
             chunk_index + 1,
             chunk_total,
-            round_num,
+            call_number,
             log_messages,
         )
 
@@ -519,7 +527,7 @@ def _run_canvas_chunk_tool_loop(
             article_id,
             chunk_index + 1,
             chunk_total,
-            round_num,
+            call_number,
             response.content,
             [
                 {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
@@ -528,6 +536,14 @@ def _run_canvas_chunk_tool_loop(
         )
 
         if not response.tool_calls:
+            log.info(
+                "Canvas LLM chunk complete | article=%s chunk=%d/%d call=%d "
+                "reason=no_tool_calls",
+                article_id,
+                chunk_index + 1,
+                chunk_total,
+                call_number,
+            )
             return response.content or ""
 
         # Add assistant message with tool calls to conversation
@@ -635,8 +651,7 @@ def _run_canvas_chat(
         unknown_pages = sorted(set(selected_pages) - valid_page_numbers)
         if unknown_pages:
             return (
-                f"Pages {unknown_pages} not found "
-                f"(article has {total_pages} page(s))."
+                f"Pages {unknown_pages} not found (article has {total_pages} page(s))."
             )
 
         page_set = set(selected_pages)
@@ -716,6 +731,12 @@ def _run_canvas_chat(
             canvas_storage=canvas_storage,
         )
         replies.append(reply)
+
+    log.info(
+        "Canvas chat complete | article=%s chunks_processed=%d",
+        article_id,
+        len(replies),
+    )
 
     if len(chunks) == 1:
         return replies[0]
