@@ -1,0 +1,26 @@
+{
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "type": "openai",
+      "model": "gpt-4o",
+      "token": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "type": "anthropic",
+      "model": "claude-3-5-sonnet-20241022",
+      "token": "sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "id": "local-llama",
+      "name": "Local LLaMA (OpenAI-compatible)",
+      "type": "openai_comp",
+      "model": "llama-3.2-3b-instruct",
+      "token": "not-required",
+      "url": "http://localhost:8080"
+    }
+  ]
+}
