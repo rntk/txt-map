@@ -668,16 +668,25 @@ def get_canvas_events(
 def get_canvas_article(
     article_id: str,
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
-) -> dict[str, str]:
+) -> dict:
     submission = submissions_storage.get_by_id(article_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
     article_text: CanvasArticleText = _build_article_text_with_lines(submission)
+    raw_sentences: list[str] = submission.get("results", {}).get("sentences") or []
+    clean_sentences: list[str] = [
+        s for s in (_strip_html(sentence).strip() for sentence in raw_sentences) if s
+    ]
+    topics: list[dict] = submission.get("results", {}).get("topics") or []
+    read_topics: list[str] = submission.get("read_topics", [])
     return {
         "article_id": article_id,
         "text": article_text.display_text,
         "source_url": submission.get("source_url", ""),
+        "sentences": clean_sentences,
+        "topics": topics,
+        "read_topics": read_topics,
     }
 
 

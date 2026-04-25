@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { isTopicRead } from "../utils/topicReadUtils";
 import "./CanvasPage.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -85,13 +86,16 @@ async function pollCanvasChatReply(articleId, requestId, signal) {
 }
 
 /**
- * Build text segments with highlights applied.
+ * Build text segments with highlights and optional read ranges applied.
  * @param {string} text
  * @param {{start: number, end: number, label?: string}[]} highlights
- * @returns {{text: string, start?: number, end?: number, highlighted: boolean, label?: string}[]}
+ * @param {{start: number, end: number}[]} [readRanges]
+ * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string}[]}
  */
-function buildSegments(text, highlights) {
-  if (!highlights.length) return [{ text, highlighted: false }];
+function buildSegments(text, highlights, readRanges) {
+  const hasRead = Array.isArray(readRanges) && readRanges.length > 0;
+  if (!highlights.length && !hasRead)
+    return [{ text, highlighted: false, read: false }];
 
   const boundaries = new Set([0, text.length]);
   for (const h of highlights) {
@@ -100,6 +104,16 @@ function buildSegments(text, highlights) {
     if (s < e) {
       boundaries.add(s);
       boundaries.add(e);
+    }
+  }
+  if (hasRead) {
+    for (const r of readRanges) {
+      const s = Math.max(0, r.start);
+      const e = Math.min(text.length, r.end);
+      if (s < e) {
+        boundaries.add(s);
+        boundaries.add(e);
+      }
     }
   }
 
@@ -111,11 +125,15 @@ function buildSegments(text, highlights) {
     const end = sorted[i + 1];
     const chunk = text.slice(start, end);
     const matching = highlights.filter((h) => h.start <= start && h.end >= end);
+    const matchingRead = hasRead
+      ? readRanges.filter((r) => r.start <= start && r.end >= end)
+      : [];
     segments.push({
       text: chunk,
       start,
       end,
       highlighted: matching.length > 0,
+      read: matchingRead.length > 0,
       label: matching.length > 0 ? matching[0].label : undefined,
     });
   }
@@ -150,11 +168,23 @@ function eventLabel(ev, idx) {
  * @param {{
  *   text: string,
  *   highlights: {start: number, end: number, label?: string}[],
- *   activeHighlightRef?: React.MutableRefObject<HTMLElement | null>
+ *   activeHighlightRef?: React.MutableRefObject<HTMLElement | null>,
+ *   readRanges?: {start: number, end: number}[],
+ *   showReadStatus?: boolean
  * }} props
  */
-function ArticleText({ text, highlights, activeHighlightRef }) {
-  const segments = buildSegments(text, highlights);
+function ArticleText({
+  text,
+  highlights,
+  activeHighlightRef,
+  readRanges,
+  showReadStatus,
+}) {
+  const segments = buildSegments(
+    text,
+    highlights,
+    showReadStatus ? readRanges : undefined,
+  );
   let firstHighlightedSegmentFound = false;
 
   return (
@@ -166,19 +196,30 @@ function ArticleText({ text, highlights, activeHighlightRef }) {
           firstHighlightedSegmentFound = true;
         }
 
-        return seg.highlighted ? (
-          <mark
+        if (seg.highlighted) {
+          return (
+            <mark
+              key={idx}
+              className="canvas-highlight"
+              ref={isActiveHighlightTarget ? activeHighlightRef : undefined}
+              title={seg.label || undefined}
+              data-char-start={seg.start}
+              data-char-end={seg.end}
+            >
+              {seg.text}
+            </mark>
+          );
+        }
+
+        return (
+          <span
             key={idx}
-            className="canvas-highlight"
-            ref={isActiveHighlightTarget ? activeHighlightRef : undefined}
-            title={seg.label || undefined}
-            data-char-start={seg.start}
-            data-char-end={seg.end}
+            className={
+              seg.read && showReadStatus ? "canvas-sentence--read" : undefined
+            }
           >
             {seg.text}
-          </mark>
-        ) : (
-          <span key={idx}>{seg.text}</span>
+          </span>
         );
       })}
     </div>
@@ -287,6 +328,12 @@ export default function CanvasPage() {
   const [inputValue, setInputValue] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
 
+  // Read/unread
+  const [showReadStatus, setShowReadStatus] = useState(false);
+  const [submissionSentences, setSubmissionSentences] = useState([]);
+  const [submissionTopics, setSubmissionTopics] = useState([]);
+  const [readTopics, setReadTopics] = useState([]);
+
   // Right panel tab
   const [activeTab, setActiveTab] = useState("chat");
 
@@ -300,6 +347,9 @@ export default function CanvasPage() {
       })
       .then((data) => {
         setArticleText(data.text || "");
+        setSubmissionSentences(data.sentences || []);
+        setSubmissionTopics(data.topics || []);
+        setReadTopics(data.read_topics || []);
         setArticleLoading(false);
       })
       .catch((err) => {
@@ -369,6 +419,30 @@ export default function CanvasPage() {
   const currentHighlightFocusKey = currentHighlight
     ? `${selectedIndex}:${currentHighlight.start}:${currentHighlight.end}`
     : "";
+
+  const readSentenceIndices = useMemo(() => {
+    const set = new Set();
+    (submissionTopics || []).forEach((topic) => {
+      if (!isTopicRead(topic.name, readTopics)) return;
+      const sents = Array.isArray(topic.sentences) ? topic.sentences : [];
+      sents.forEach((num) => set.add(num - 1));
+    });
+    return set;
+  }, [submissionTopics, readTopics]);
+
+  const readRanges = useMemo(() => {
+    if (submissionSentences.length === 0) return [];
+    const ranges = [];
+    let offset = 0;
+    for (let i = 0; i < submissionSentences.length; i++) {
+      const len = submissionSentences[i].length;
+      if (readSentenceIndices.has(i)) {
+        ranges.push({ start: offset, end: offset + len });
+      }
+      offset += len + 1;
+    }
+    return ranges;
+  }, [submissionSentences, readSentenceIndices]);
 
   useEffect(() => {
     if (!currentHighlightFocusKey || articleLoading || articleError) {
@@ -573,6 +647,8 @@ export default function CanvasPage() {
                 text={articleText}
                 highlights={currentHighlights}
                 activeHighlightRef={activeHighlightRef}
+                readRanges={readRanges}
+                showReadStatus={showReadStatus}
               />
             )}
           </div>
@@ -600,6 +676,18 @@ export default function CanvasPage() {
               }}
             >
               ⊙
+            </button>
+            <button
+              type="button"
+              className={`canvas-read-toggle${showReadStatus ? " is-active" : ""}`}
+              onClick={() => setShowReadStatus((v) => !v)}
+              title={
+                showReadStatus
+                  ? "Hide read/unread status"
+                  : "Show read/unread status"
+              }
+            >
+              R
             </button>
           </div>
         </div>

@@ -49,6 +49,21 @@
   word-break: break-word;
 }
 
+.canvas-article-text span {
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.canvas-sentence--read {
+  color: #999;
+  opacity: 0.45;
+}
+
+.canvas-sentence--read:hover {
+  opacity: 0.65;
+}
+
 .canvas-highlight {
   background: #ffe082;
   border-radius: 2px;
@@ -99,6 +114,36 @@
 
 .canvas-zoom-btn:hover {
   background: #f0f0f0;
+}
+
+.canvas-read-toggle {
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  color: #555;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.canvas-read-toggle:hover {
+  background: #f0f0f0;
+}
+
+.canvas-read-toggle.is-active {
+  background: #e6f7ff;
+  border-color: #3182ce;
+  color: #3182ce;
 }
 
 /* ── Canvas main column (canvas + timeline) ── */
