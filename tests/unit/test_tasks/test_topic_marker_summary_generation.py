@@ -4,7 +4,9 @@ from unittest.mock import patch
 
 from lib.llm_queue.client import QueuedLLMClient
 from lib.tasks.topic_marker_summary_generation import (
+    _PROMPT_VERSION,
     _build_summary_text,
+    _build_topic_marker_summary_prompt,
     _normalize_marker_spans,
     _parse_marker_output,
     process_topic_marker_summary_generation,
@@ -57,6 +59,20 @@ def test_build_summary_text_joins_marker_text_in_order() -> None:
     ]
 
     assert _build_summary_text(marker_spans) == "Alpha beta delta"
+
+
+def test_topic_marker_summary_prompt_asks_for_punchy_speedrun_highlights() -> None:
+    prompt = _build_topic_marker_summary_prompt(
+        topic_name="Topic A",
+        clean_text="Alpha beta gamma.",
+        anchored_text="Alpha{{1}} beta{{2}} gamma{{3}}.",
+    )
+
+    assert _PROMPT_VERSION == "topic_marker_summary_v3"
+    assert "pitch a long article in speedrun mode" in prompt
+    assert "very short, punchy keywords and keyphrases" in prompt
+    assert "fly through the section" in prompt
+    assert "output only marker positions" in prompt
 
 
 def test_process_topic_marker_summary_generation_stores_marker_ranges() -> None:
