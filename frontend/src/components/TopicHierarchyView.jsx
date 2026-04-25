@@ -2,8 +2,8 @@ import React, { useMemo, useCallback } from "react";
 import { buildTopicTree } from "../utils/topicTree";
 import { getTopicParts, isWithinScope } from "../utils/topicHierarchy";
 import {
-  getTopicHighlightColor,
-  getTopicAccentColor,
+  getHierarchyTopicHighlightColor,
+  getHierarchyTopicAccentColor,
 } from "../utils/topicColorUtils";
 import "./TopicHierarchyView.css";
 
@@ -203,6 +203,7 @@ function HierarchyNode({
   onSelectPath,
   onHoverPath,
   onDrilldownPath,
+  startLevel,
 }) {
   const { node } = entry;
   const children = Array.from(entry.children.values());
@@ -216,8 +217,15 @@ function HierarchyNode({
 
   const isHovered = isAncestorPath(node.fullPath, hoveredPath);
   const isSelected = isAncestorPath(node.fullPath, selectedPath);
-  const highlightColor = getTopicHighlightColor(node.fullPath);
-  const accentColor = getTopicAccentColor(node.fullPath);
+  const relativeDepth = Math.max(0, node.depth - startLevel);
+  const highlightColor = getHierarchyTopicHighlightColor(
+    node.fullPath,
+    relativeDepth,
+  );
+  const accentColor = getHierarchyTopicAccentColor(
+    node.fullPath,
+    relativeDepth,
+  );
 
   const handleMouseEnter = useCallback(() => {
     if (onHoverPath) onHoverPath(node.fullPath);
@@ -307,6 +315,7 @@ function HierarchyNode({
             onSelectPath={onSelectPath}
             onHoverPath={onHoverPath}
             onDrilldownPath={onDrilldownPath}
+            startLevel={startLevel}
           />
         ))}
         {hiddenChildren.length > 0 && (
@@ -336,6 +345,8 @@ function TopicHierarchyView({
   onHoverPath,
   onDrilldownPath,
 }) {
+  const startLevel = Array.isArray(scopePath) ? scopePath.length : 0;
+
   const roots = useMemo(() => {
     const safeTopics = Array.isArray(topics) ? topics : [];
     const safeScopePath = Array.isArray(scopePath) ? scopePath : [];
@@ -366,6 +377,7 @@ function TopicHierarchyView({
           onSelectPath={onSelectPath}
           onHoverPath={onHoverPath}
           onDrilldownPath={onDrilldownPath}
+          startLevel={startLevel}
         />
       ))}
       {hiddenRootCount > 0 && (

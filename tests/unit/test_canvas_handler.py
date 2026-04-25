@@ -148,9 +148,7 @@ def test_build_canvas_chunks_splits_when_budget_is_tight() -> None:
 
 
 def test_build_canvas_chunks_empty_pieces_returns_single_empty_chunk() -> None:
-    chunks = _build_canvas_chunks(
-        pieces=[], llm=_StubLLM(), static_overhead_tokens=0
-    )
+    chunks = _build_canvas_chunks(pieces=[], llm=_StubLLM(), static_overhead_tokens=0)
     assert chunks == [""]
 
 

@@ -11,7 +11,7 @@ import TopicHierarchyView from "./TopicHierarchyView";
 import TooltipTopicName from "./shared/TooltipTopicName";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import { useTooltip } from "../hooks/useTooltip";
-import { getTopicAccentColor } from "../utils/topicColorUtils";
+import { getHierarchyTopicAccentColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
 import "./TopicHierarchyView.css";
 
@@ -294,7 +294,10 @@ function TopicHierarchyPageContent() {
                     key={partialPath}
                     className="topic-hierarchy-page__collapsed-label"
                     style={{
-                      borderLeftColor: getTopicAccentColor(partialPath),
+                      borderLeftColor: getHierarchyTopicAccentColor(
+                        partialPath,
+                        idx,
+                      ),
                     }}
                   >
                     {segment}

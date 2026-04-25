@@ -63,10 +63,10 @@ async function readJsonSafe(response) {
  */
 async function pollCanvasChatReply(articleId, requestId, signal) {
   for (let attempt = 0; attempt < CHAT_POLL_MAX_ATTEMPTS; attempt++) {
-    const response = await fetch(
-      `/api/canvas/${articleId}/chat/${requestId}`,
-      { credentials: "include", signal },
-    );
+    const response = await fetch(`/api/canvas/${articleId}/chat/${requestId}`, {
+      credentials: "include",
+      signal,
+    });
     const data = await readJsonSafe(response);
 
     if (!response.ok) {
@@ -502,7 +502,11 @@ export default function CanvasPage() {
       }
 
       const reply = data.request_id
-        ? await pollCanvasChatReply(articleId, data.request_id, controller.signal)
+        ? await pollCanvasChatReply(
+            articleId,
+            data.request_id,
+            controller.signal,
+          )
         : data.reply || "";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
