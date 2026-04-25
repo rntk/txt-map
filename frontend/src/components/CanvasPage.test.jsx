@@ -105,6 +105,51 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("zooms around the cursor position on wheel", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({ text: "Alpha beta gamma." }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    const { container } = render(<CanvasPage />);
+
+    await screen.findByText("Alpha beta gamma.");
+
+    const area = container.querySelector(".canvas-area");
+    const viewport = container.querySelector(".canvas-viewport");
+    fireEvent.wheel(area, { deltaY: -100, clientX: 300, clientY: 200 });
+
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.1");
+      expect(viewport.style.getPropertyValue("--canvas-translate-x")).toBe(
+        "14px",
+      );
+      expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
+        "24px",
+      );
+    });
+  });
+
   it("polls for a delayed chat response", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url, options) => {

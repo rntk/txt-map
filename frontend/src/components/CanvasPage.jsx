@@ -16,6 +16,42 @@ const EVENTS_LIMIT = 50;
 const HIGHLIGHT_FOCUS_SCALE = 1.4;
 const HIGHLIGHT_FOCUS_DELAY_MS = 50;
 const HIGHLIGHT_FOCUS_TRANSITION_MS = 350;
+const MIN_CANVAS_SCALE = 0.2;
+const MAX_CANVAS_SCALE = 4;
+const WHEEL_ZOOM_IN_FACTOR = 1.1;
+const WHEEL_ZOOM_OUT_FACTOR = 0.9;
+
+/**
+ * @typedef {{x: number, y: number}} CanvasPoint
+ */
+
+/**
+ * @param {number} value
+ * @returns {number}
+ */
+function clampCanvasScale(value) {
+  return Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value));
+}
+
+/**
+ * Keep the canvas coordinate under the cursor at the same viewport position
+ * while changing scale.
+ * @param {{cursor: CanvasPoint, translate: CanvasPoint, currentScale: number, nextScale: number}} params
+ * @returns {CanvasPoint}
+ */
+function getCursorAnchoredTranslate({
+  cursor,
+  translate,
+  currentScale,
+  nextScale,
+}) {
+  const canvasX = (cursor.x - translate.x) / currentScale;
+  const canvasY = (cursor.y - translate.y) / currentScale;
+  return {
+    x: cursor.x - canvasX * nextScale,
+    y: cursor.y - canvasY * nextScale,
+  };
+}
 
 /**
  * @param {number} ms
@@ -398,6 +434,7 @@ export default function CanvasPage() {
   const canvasViewportRef = useRef(null);
   const activeHighlightRef = useRef(null);
   const scaleRef = useRef(1);
+  const translateRef = useRef({ x: 40, y: 40 });
   const focusTimerRef = useRef(null);
   const transitionTimerRef = useRef(null);
   const chatAbortRef = useRef(null);
@@ -430,6 +467,10 @@ export default function CanvasPage() {
   useEffect(() => {
     scaleRef.current = scale;
   }, [scale]);
+
+  useEffect(() => {
+    translateRef.current = translate;
+  }, [translate]);
 
   useEffect(() => {
     const viewport = canvasViewportRef.current;
@@ -638,7 +679,6 @@ export default function CanvasPage() {
     return base;
   }, [currentHighlights, showSummaries, activeSummaryKey, summaryEntries]);
 
-
   useEffect(() => {
     if (!showSummaries || articleLoading || articleError) {
       setSummaryLayout({ cards: [], width: 0 });
@@ -663,15 +703,16 @@ export default function CanvasPage() {
           const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
           const midRange = rangeAtOffset(articleEl, midOff);
           const startRange = rangeAtOffset(articleEl, entry.charStart);
-          const endRange = rangeAtOffset(articleEl, Math.max(0, entry.charEnd - 1));
+          const endRange = rangeAtOffset(
+            articleEl,
+            Math.max(0, entry.charEnd - 1),
+          );
           if (!midRange) return null;
           const midRect = midRange.getBoundingClientRect();
           const startRect = startRange?.getBoundingClientRect();
           const endRect = endRange?.getBoundingClientRect();
           const midY = ((midRect.top + midRect.bottom) / 2 - wrapRect.top) / s;
-          const startY = startRect
-            ? (startRect.top - wrapRect.top) / s
-            : midY;
+          const startY = startRect ? (startRect.top - wrapRect.top) / s : midY;
           const endY = endRect ? (endRect.bottom - wrapRect.top) / s : midY;
           return { ...entry, midY, startY, endY };
         })
@@ -746,11 +787,13 @@ export default function CanvasPage() {
       const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
 
       setIsFocusingHighlight(true);
-      setScale(nextScale);
-      setTranslate({
+      scaleRef.current = nextScale;
+      translateRef.current = {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
+      };
+      setScale(nextScale);
+      setTranslate(translateRef.current);
 
       transitionTimerRef.current = setTimeout(() => {
         setIsFocusingHighlight(false);
@@ -842,8 +885,30 @@ export default function CanvasPage() {
   // Canvas zoom
   const handleWheel = useCallback((e) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((prev) => Math.min(4, Math.max(0.2, prev * delta)));
+    const wrap = canvasWrapRef.current;
+    if (!wrap) return;
+
+    const currentScale = scaleRef.current || 1;
+    const delta = e.deltaY > 0 ? WHEEL_ZOOM_OUT_FACTOR : WHEEL_ZOOM_IN_FACTOR;
+    const nextScale = clampCanvasScale(currentScale * delta);
+    if (nextScale === currentScale) return;
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const nextTranslate = getCursorAnchoredTranslate({
+      cursor: {
+        x: e.clientX - wrapRect.left,
+        y: e.clientY - wrapRect.top,
+      },
+      translate: translateRef.current,
+      currentScale,
+      nextScale,
+    });
+
+    setIsFocusingHighlight(false);
+    scaleRef.current = nextScale;
+    translateRef.current = nextTranslate;
+    setScale(nextScale);
+    setTranslate(nextTranslate);
   }, []);
 
   useEffect(() => {
@@ -1141,14 +1206,14 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => setScale((s) => Math.min(4, s * 1.2))}
+            onClick={() => setScale((s) => clampCanvasScale(s * 1.2))}
           >
             +
           </button>
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => setScale((s) => Math.max(0.2, s / 1.2))}
+            onClick={() => setScale((s) => clampCanvasScale(s / 1.2))}
           >
             −
           </button>
@@ -1179,9 +1244,7 @@ export default function CanvasPage() {
             className={`canvas-read-toggle${showSummaries ? " is-active" : ""}`}
             onClick={() => setShowSummaries((v) => !v)}
             title={
-              showSummaries
-                ? "Hide topic summaries"
-                : "Show topic summaries"
+              showSummaries ? "Hide topic summaries" : "Show topic summaries"
             }
           >
             S
