@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import "../styles/text-reading.css";
 
 /**
  * @typedef {{ word: string, frequency: number }} WordFreq

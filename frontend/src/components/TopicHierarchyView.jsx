@@ -45,6 +45,8 @@ const DEFAULT_ROOT_LIMIT = 0;
  * @property {(path: string, topic: TopicHierarchyTopic|null) => void} [onSelectPath]
  * @property {(path: string|null) => void} [onHoverPath]
  * @property {(path: string) => void} [onDrilldownPath]
+ * @property {(topic: TopicHierarchyTopic) => void} [onOpenTopicMeta]
+ * @property {string|null} [activeMetaTopicName]
  */
 
 /**
@@ -192,6 +194,8 @@ function MoreRootIndicator({ hiddenCount, onDrilldownPath }) {
  * @param {(path: string, topic: TopicHierarchyTopic|null) => void} [props.onSelectPath]
  * @param {(path: string|null) => void} [props.onHoverPath]
  * @param {(path: string) => void} [props.onDrilldownPath]
+ * @param {(topic: TopicHierarchyTopic) => void} [props.onOpenTopicMeta]
+ * @param {string|null} [props.activeMetaTopicName]
  * @returns {React.ReactElement}
  */
 function HierarchyNode({
@@ -203,6 +207,8 @@ function HierarchyNode({
   onSelectPath,
   onHoverPath,
   onDrilldownPath,
+  onOpenTopicMeta,
+  activeMetaTopicName,
   startLevel,
 }) {
   const { node } = entry;
@@ -217,6 +223,7 @@ function HierarchyNode({
 
   const isHovered = isAncestorPath(node.fullPath, hoveredPath);
   const isSelected = isAncestorPath(node.fullPath, selectedPath);
+  const isMetaActive = activeMetaTopicName === node.fullPath;
   const relativeDepth = Math.max(0, node.depth - startLevel);
   const highlightColor = getHierarchyTopicHighlightColor(
     node.fullPath,
@@ -247,9 +254,19 @@ function HierarchyNode({
     [isLeaf, onDrilldownPath, onSelectPath, node.fullPath, node.topic],
   );
 
+  const handleMetaClick = useCallback(
+    (event) => {
+      event.stopPropagation();
+      if (!onOpenTopicMeta) return;
+      onOpenTopicMeta(node.topic || { name: node.fullPath, sentences: [] });
+    },
+    [node.fullPath, node.topic, onOpenTopicMeta],
+  );
+
   const stateClass = [
     isSelected ? "is-selected" : "",
     isHovered ? "is-hovered" : "",
+    isMetaActive ? "is-meta-active" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -271,9 +288,22 @@ function HierarchyNode({
         title={`${node.fullPath} (${sentenceCount} sentences)`}
       >
         <span className="th-leaf__label">{node.name}</span>
-        {sentenceCount > 0 && (
-          <span className="th-leaf__count">{sentenceCount}</span>
-        )}
+        <span className="th-leaf__actions">
+          {sentenceCount > 0 && (
+            <span className="th-leaf__count">{sentenceCount}</span>
+          )}
+          {onOpenTopicMeta && (
+            <button
+              type="button"
+              className="th-leaf__meta-button"
+              onClick={handleMetaClick}
+              title={`Show topics meta for ${node.fullPath}`}
+              aria-label={`Show topics meta for ${node.fullPath}`}
+            >
+              i
+            </button>
+          )}
+        </span>
       </div>
     );
   }
@@ -315,6 +345,8 @@ function HierarchyNode({
             onSelectPath={onSelectPath}
             onHoverPath={onHoverPath}
             onDrilldownPath={onDrilldownPath}
+            onOpenTopicMeta={onOpenTopicMeta}
+            activeMetaTopicName={activeMetaTopicName}
             startLevel={startLevel}
           />
         ))}
@@ -344,6 +376,8 @@ function TopicHierarchyView({
   onSelectPath,
   onHoverPath,
   onDrilldownPath,
+  onOpenTopicMeta,
+  activeMetaTopicName = null,
 }) {
   const startLevel = Array.isArray(scopePath) ? scopePath.length : 0;
 
@@ -377,6 +411,8 @@ function TopicHierarchyView({
           onSelectPath={onSelectPath}
           onHoverPath={onHoverPath}
           onDrilldownPath={onDrilldownPath}
+          onOpenTopicMeta={onOpenTopicMeta}
+          activeMetaTopicName={activeMetaTopicName}
           startLevel={startLevel}
         />
       ))}

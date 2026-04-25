@@ -53,6 +53,29 @@ describe("TopicHierarchyView", () => {
     expect(onSelectPath).not.toHaveBeenCalled();
   });
 
+  test("clicking a leaf meta button opens topic meta without selecting the leaf", () => {
+    const onOpenTopicMeta = vi.fn();
+    const onSelectPath = vi.fn();
+    const topic = { name: "Root>Child 1", sentences: [1] };
+
+    render(
+      <TopicHierarchyView
+        topics={[topic]}
+        onOpenTopicMeta={onOpenTopicMeta}
+        onSelectPath={onSelectPath}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Show topics meta for Root>Child 1",
+      }),
+    );
+
+    expect(onOpenTopicMeta).toHaveBeenCalledWith(topic);
+    expect(onSelectPath).not.toHaveBeenCalled();
+  });
+
   test("sizes parent rows to their rendered descendant count", () => {
     const { container } = render(
       <TopicHierarchyView topics={makeDenseTopics(4)} />,

@@ -10,6 +10,7 @@ import { ArticleProvider, useArticle } from "../contexts/ArticleContext";
 import TopicHierarchyView from "./TopicHierarchyView";
 import TooltipTopicName from "./shared/TooltipTopicName";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
+import TopicsMetaPanel from "./TopicsMetaPanel";
 import { useTooltip } from "../hooks/useTooltip";
 import { getHierarchyTopicAccentColor } from "../utils/topicColorUtils";
 import { isTopicRead } from "../utils/topicReadUtils";
@@ -82,8 +83,10 @@ function TopicHierarchyPageContent() {
   const [selectedPath, setSelectedPath] = useState(null);
   const [hoveredPath, setHoveredPath] = useState(null);
   const [drilldownPath, setDrilldownPath] = useState(null);
-  const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const [tooltipEnabled] = useState(true);
   const [summaryModalTopic, setSummaryModalTopic] = useState(null);
+  /** @type {[string|null, React.Dispatch<React.SetStateAction<string|null>>]} */
+  const [metaTopicName, setMetaTopicName] = useState(null);
 
   const isArticleOpen = Boolean(selectedPath);
   const isDrillingDown = drilldownPath !== null;
@@ -100,6 +103,15 @@ function TopicHierarchyPageContent() {
 
   const handleHoverPath = useCallback((path) => {
     setHoveredPath(path);
+  }, []);
+
+  const handleOpenTopicMeta = useCallback((topic) => {
+    if (!topic?.name) return;
+    setMetaTopicName(topic.name);
+  }, []);
+
+  const handleCloseTopicMeta = useCallback(() => {
+    setMetaTopicName(null);
   }, []);
 
   const selectedTopic = useMemo(() => {
@@ -356,6 +368,7 @@ function TopicHierarchyPageContent() {
                 topics={safeTopics}
                 selectedPath={selectedPath}
                 hoveredPath={hoveredPath}
+                activeMetaTopicName={metaTopicName}
                 scopePath={drilldownSegments}
                 drilldownMode
                 childLimit={0}
@@ -363,6 +376,7 @@ function TopicHierarchyPageContent() {
                 onSelectPath={handleSelectPath}
                 onHoverPath={handleHoverPath}
                 onDrilldownPath={handleDrilldownPath}
+                onOpenTopicMeta={handleOpenTopicMeta}
               />
             </div>
           ) : (
@@ -370,9 +384,11 @@ function TopicHierarchyPageContent() {
               topics={safeTopics}
               selectedPath={selectedPath}
               hoveredPath={hoveredPath}
+              activeMetaTopicName={metaTopicName}
               onSelectPath={handleSelectPath}
               onHoverPath={handleHoverPath}
               onDrilldownPath={handleDrilldownPath}
+              onOpenTopicMeta={handleOpenTopicMeta}
             />
           )}
         </div>
@@ -511,6 +527,26 @@ function TopicHierarchyPageContent() {
             </div>,
             document.body,
           )}
+        {metaTopicName && (
+          <div className="topic-hierarchy-page__meta-window">
+            <button
+              type="button"
+              className="topic-hierarchy-page__meta-close"
+              onClick={handleCloseTopicMeta}
+              aria-label="Close topics meta"
+              title="Close topics meta"
+            >
+              &times;
+            </button>
+            <TopicsMetaPanel
+              submissionId={submissionId}
+              selectedTopicName={metaTopicName}
+              topicMarkerSummaries={
+                submission?.results?.topic_marker_summaries || null
+              }
+            />
+          </div>
+        )}
       </div>
       {summaryModalTopic && (
         <TopicSentencesModal
