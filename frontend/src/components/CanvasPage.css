@@ -87,6 +87,30 @@
   color: #c62828;
 }
 
+/* ── Page splitter ── */
+.canvas-page-splitter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  user-select: none;
+}
+
+.canvas-page-splitter-line {
+  flex: 1;
+  height: 1px;
+  background: #bbb;
+}
+
+.canvas-page-splitter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
 /* Zoom controls */
 .canvas-controls {
   position: absolute;
@@ -338,6 +362,46 @@
   border-bottom: 1px solid #2d3748;
   color: #90cdf4;
   letter-spacing: 0.3px;
+}
+
+/* ── Context limiter ── */
+.canvas-chat-context-limiter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #2d3748;
+  font-size: 12px;
+  color: #718096;
+}
+
+.canvas-chat-context-limiter label {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.canvas-chat-context-pages-input {
+  flex: 1;
+  background: #2d3748;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+  font-family: inherit;
+}
+
+.canvas-chat-context-pages-input:focus {
+  border-color: #63b3ed;
+}
+
+.canvas-chat-context-pages-input::placeholder {
+  color: #718096;
+}
+
+.canvas-chat-context-pages-input:disabled {
+  opacity: 0.5;
 }
 
 .canvas-chat-history {

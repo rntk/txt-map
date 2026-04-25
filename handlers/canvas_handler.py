@@ -101,6 +101,10 @@ def _strip_html(text: str) -> str:
 
 ARTICLE_PIECE_SPLIT_RE = re.compile(r"(?<=[.!?;:,。！？；：])\s+|(?<=\S)\s+(?=[—–-]\s)")
 
+# Rough character budget per "page" for the visual canvas splitter.
+# This keeps each page to a screenful of text while preserving word boundaries.
+PAGE_SIZE_CHARS = 3000
+
 
 @dataclass(frozen=True)
 class ArticlePiece:
@@ -110,10 +114,18 @@ class ArticlePiece:
 
 
 @dataclass(frozen=True)
+class CanvasArticlePage:
+    page_number: int
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
 class CanvasArticleText:
     display_text: str
     numbered_text: str
     pieces: list[ArticlePiece]
+    pages: list[CanvasArticlePage]
 
 
 CanvasChatJobStatus = Literal["pending", "processing", "completed", "failed"]
@@ -189,6 +201,7 @@ def _run_canvas_chat_job(
     history: list[dict[str, str]],
     canvas_storage: CanvasEventsStorage,
     db: Any,
+    selected_pages: list[int] | None = None,
 ) -> None:
     _update_canvas_chat_job(request_id, status="processing")
     try:
@@ -199,6 +212,7 @@ def _run_canvas_chat_job(
             history=history,
             canvas_storage=canvas_storage,
             db=db,
+            selected_pages=selected_pages,
         )
     except Exception as exc:
         log.exception("Canvas chat job error for article %s", article_id)
@@ -243,6 +257,33 @@ def _split_article_piece(text: str, offset: int = 0) -> list[ArticlePiece]:
     return pieces
 
 
+def _build_article_pages(display_text: str) -> list[CanvasArticlePage]:
+    """Split the full display text into pages of ~PAGE_SIZE_CHARS each."""
+    if not display_text:
+        return []
+
+    pages: list[CanvasArticlePage] = []
+    text_len = len(display_text)
+    offset = 0
+    page_num = 1
+
+    while offset < text_len:
+        end = min(offset + PAGE_SIZE_CHARS, text_len)
+        # If we're not at the end, try to break at a word boundary.
+        if end < text_len:
+            # Look backwards up to 80 chars for a whitespace boundary.
+            search_start = max(offset, end - 80)
+            for i in range(end - 1, search_start - 1, -1):
+                if display_text[i].isspace():
+                    end = i + 1
+                    break
+        pages.append(CanvasArticlePage(page_number=page_num, start=offset, end=end))
+        offset = end
+        page_num += 1
+
+    return pages
+
+
 def _build_article_text_with_lines(
     submission: dict[str, Any],
 ) -> CanvasArticleText:
@@ -271,10 +312,13 @@ def _build_article_text_with_lines(
     article_pieces: list[str] = [piece.text for piece in mapped_pieces]
     numbered_text = "\n".join(f"{i + 1}: {s}" for i, s in enumerate(article_pieces))
 
+    pages = _build_article_pages(display_text)
+
     return CanvasArticleText(
         display_text=display_text,
         numbered_text=numbered_text,
         pieces=mapped_pieces,
+        pages=pages,
     )
 
 
@@ -564,9 +608,50 @@ def _run_canvas_chat(
     history: list[dict[str, str]],
     canvas_storage: CanvasEventsStorage,
     db: Any,
+    selected_pages: list[int] | None = None,
 ) -> str:
     """Run the canvas chat, splitting long articles into chunks if needed."""
     article_text: CanvasArticleText = _build_article_text_with_lines(submission)
+
+    # If selected pages are specified, filter pieces to only those within the pages.
+    effective_pieces: list[ArticlePiece]
+    effective_numbered_text: str
+
+    if selected_pages:
+        page_set = set(selected_pages)
+        page_ranges = [
+            (p.start, p.end) for p in article_text.pages if p.page_number in page_set
+        ]
+
+        def _piece_in_pages(piece: ArticlePiece) -> bool:
+            for ps, pe in page_ranges:
+                # A piece is included if any part of it overlaps with a page range.
+                if piece.start < pe and piece.end > ps:
+                    return True
+            return False
+
+        effective_pieces = [p for p in article_text.pieces if _piece_in_pages(p)]
+
+        if not effective_pieces:
+            return "No content found on the selected pages."
+
+        effective_numbered_text = "\n".join(
+            f"{i + 1}: {p.text}" for i, p in enumerate(effective_pieces)
+        )
+    else:
+        effective_pieces = list(article_text.pieces)
+        effective_numbered_text = article_text.numbered_text
+
+    # Build an adjusted article text for line-offset mapping when pages are filtered.
+    if selected_pages:
+        adjusted_article_text = CanvasArticleText(
+            display_text=article_text.display_text,
+            numbered_text=effective_numbered_text,
+            pieces=effective_pieces,
+            pages=article_text.pages,
+        )
+    else:
+        adjusted_article_text = article_text
 
     client = create_llm_client(db=db)
 
@@ -590,18 +675,19 @@ def _run_canvas_chat(
     )
 
     chunks = _build_canvas_chunks(
-        pieces=list(article_text.pieces),
+        pieces=list(effective_pieces),
         llm=client,
         static_overhead_tokens=static_overhead,
     )
 
     log.info(
         "Canvas chat start | article=%s user_message=%r history_len=%d "
-        "pieces=%d chunks=%d",
+        "pieces=%d pages=%r chunks=%d",
         article_id,
         user_message,
         len(base_messages),
-        len(article_text.pieces),
+        len(effective_pieces),
+        selected_pages or "all",
         len(chunks),
     )
 
@@ -609,7 +695,7 @@ def _run_canvas_chat(
     for chunk_index, chunk_text in enumerate(chunks):
         reply = _run_canvas_chunk_tool_loop(
             article_id=article_id,
-            article_text=article_text,
+            article_text=adjusted_article_text,
             chunk_numbered_text=chunk_text,
             chunk_index=chunk_index,
             chunk_total=len(chunks),
@@ -634,6 +720,9 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = None
+    pages: Optional[List[int]] = (
+        None  # If provided, only these pages are used as context
+    )
 
 
 @router.get("/canvas/{article_id}/events")
@@ -680,6 +769,14 @@ def get_canvas_article(
     ]
     topics: list[dict] = submission.get("results", {}).get("topics") or []
     read_topics: list[str] = submission.get("read_topics", [])
+    pages = [
+        {
+            "page_number": p.page_number,
+            "start": p.start,
+            "end": p.end,
+        }
+        for p in article_text.pages
+    ]
     return {
         "article_id": article_id,
         "text": article_text.display_text,
@@ -687,6 +784,7 @@ def get_canvas_article(
         "sentences": clean_sentences,
         "topics": topics,
         "read_topics": read_topics,
+        "pages": pages,
     }
 
 
@@ -714,6 +812,7 @@ def post_canvas_chat(
         history=history,
         canvas_storage=canvas_storage,
         db=db,
+        selected_pages=body.pages,
     )
 
     return {"request_id": request_id, "status": "pending", "reply": None}

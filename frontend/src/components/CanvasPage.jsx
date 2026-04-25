@@ -142,26 +142,58 @@ function buildSegments(text, highlights, readRanges) {
 }
 
 /**
- * Derive highlights to render from a single event.
+ * Build text segments with highlights and optional read ranges applied,
+ * split across pages.
+ * @param {string} text
+ * @param {{start: number, end: number, label?: string}[]} highlights
+ * @param {{start: number, end: number}[]} [readRanges]
+ * @param {{page_number: number, start: number, end: number}[]} [pages]
+ * @returns {{type: "page-splitter", page_number: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string}[]}
  */
-function eventToHighlights(ev) {
-  if (!ev) return [];
-  if (ev.event_type === "highlight_span") {
-    const { start, end, label } = ev.data || {};
-    if (typeof start === "number" && typeof end === "number") {
-      return [{ start, end, label: label || "" }];
+function buildSegmentsWithPages(text, highlights, readRanges, pages) {
+  const hasPages = Array.isArray(pages) && pages.length > 0;
+  if (!hasPages) {
+    return buildSegments(text, highlights, readRanges).map((s) => ({
+      ...s,
+      type: "segment",
+    }));
+  }
+
+  const result = [];
+
+  for (let p = 0; p < pages.length; p++) {
+    const page = pages[p];
+    const pageText = text.slice(page.start, page.end);
+
+    if (p > 0) {
+      result.push({ type: "page-splitter", page_number: page.page_number });
+    }
+
+    const pageHighlights = highlights
+      .map((h) => ({
+        start: Math.max(0, h.start - page.start),
+        end: Math.min(page.end - page.start, h.end - page.start),
+        label: h.label,
+      }))
+      .filter((h) => h.start < h.end && h.end > 0 && h.start < pageText.length);
+
+    const pageRead = (readRanges || []).map((r) => ({
+      start: Math.max(0, r.start - page.start),
+      end: Math.min(page.end - page.start, r.end - page.start),
+    }));
+
+    const segments = buildSegments(pageText, pageHighlights, pageRead);
+    for (const seg of segments) {
+      result.push({
+        ...seg,
+        type: "segment",
+        start: seg.start !== undefined ? seg.start + page.start : undefined,
+        end: seg.end !== undefined ? seg.end + page.start : undefined,
+      });
     }
   }
-  return [];
-}
 
-function eventLabel(ev, idx) {
-  if (!ev) return `#${idx + 1}`;
-  if (ev.event_type === "highlight_span") {
-    const lbl = ev.data?.label;
-    return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
-  }
-  return `${idx + 1}. ${ev.event_type || "event"}`;
+  return result;
 }
 
 /**
@@ -170,7 +202,8 @@ function eventLabel(ev, idx) {
  *   highlights: {start: number, end: number, label?: string}[],
  *   activeHighlightRef?: React.MutableRefObject<HTMLElement | null>,
  *   readRanges?: {start: number, end: number}[],
- *   showReadStatus?: boolean
+ *   showReadStatus?: boolean,
+ *   pages?: {page_number: number, start: number, end: number}[]
  * }} props
  */
 function ArticleText({
@@ -179,17 +212,31 @@ function ArticleText({
   activeHighlightRef,
   readRanges,
   showReadStatus,
+  pages,
 }) {
-  const segments = buildSegments(
+  const segments = buildSegmentsWithPages(
     text,
     highlights,
     showReadStatus ? readRanges : undefined,
+    pages,
   );
   let firstHighlightedSegmentFound = false;
 
   return (
     <div className="canvas-article-text">
       {segments.map((seg, idx) => {
+        if (seg.type === "page-splitter") {
+          return (
+            <div key={idx} className="canvas-page-splitter">
+              <span className="canvas-page-splitter-line" />
+              <span className="canvas-page-splitter-label">
+                Page {seg.page_number}
+              </span>
+              <span className="canvas-page-splitter-line" />
+            </div>
+          );
+        }
+
         const isActiveHighlightTarget =
           seg.highlighted && !firstHighlightedSegmentFound;
         if (seg.highlighted) {
@@ -224,6 +271,29 @@ function ArticleText({
       })}
     </div>
   );
+}
+
+/**
+ * Derive highlights to render from a single event.
+ */
+function eventToHighlights(ev) {
+  if (!ev) return [];
+  if (ev.event_type === "highlight_span") {
+    const { start, end, label } = ev.data || {};
+    if (typeof start === "number" && typeof end === "number") {
+      return [{ start, end, label: label || "" }];
+    }
+  }
+  return [];
+}
+
+function eventLabel(ev, idx) {
+  if (!ev) return `#${idx + 1}`;
+  if (ev.event_type === "highlight_span") {
+    const lbl = ev.data?.label;
+    return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
+  }
+  return `${idx + 1}. ${ev.event_type || "event"}`;
 }
 
 /**
@@ -272,6 +342,7 @@ export default function CanvasPage() {
 
   // Article text
   const [articleText, setArticleText] = useState("");
+  const [articlePages, setArticlePages] = useState([]);
   const [articleLoading, setArticleLoading] = useState(true);
   const [articleError, setArticleError] = useState(null);
 
@@ -334,6 +405,9 @@ export default function CanvasPage() {
   const [submissionTopics, setSubmissionTopics] = useState([]);
   const [readTopics, setReadTopics] = useState([]);
 
+  // Context limiter: comma-separated page numbers for chat
+  const [contextPages, setContextPages] = useState("");
+
   // Right panel tab
   const [activeTab, setActiveTab] = useState("chat");
 
@@ -347,6 +421,7 @@ export default function CanvasPage() {
       })
       .then((data) => {
         setArticleText(data.text || "");
+        setArticlePages(data.pages || []);
         setSubmissionSentences(data.sentences || []);
         setSubmissionTopics(data.topics || []);
         setReadTopics(data.read_topics || []);
@@ -559,6 +634,18 @@ export default function CanvasPage() {
     setMessages(newHistory);
     setIsChatLoading(true);
 
+    // Parse context pages from input (comma-separated numbers)
+    let parsedPages = null;
+    if (contextPages.trim()) {
+      parsedPages = contextPages
+        .split(",")
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+      if (parsedPages.length === 0) {
+        parsedPages = null;
+      }
+    }
+
     const controller = new AbortController();
     chatAbortRef.current = controller;
 
@@ -567,7 +654,7 @@ export default function CanvasPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history }),
+        body: JSON.stringify({ message: msg, history, pages: parsedPages }),
         signal: controller.signal,
       });
       const data = await readJsonSafe(r);
@@ -600,7 +687,14 @@ export default function CanvasPage() {
         setTimeout(fetchEvents, 300);
       }
     }
-  }, [articleId, inputValue, isChatLoading, messages, fetchEvents]);
+  }, [
+    articleId,
+    inputValue,
+    isChatLoading,
+    messages,
+    fetchEvents,
+    contextPages,
+  ]);
 
   const handleNewChat = useCallback(() => {
     if (isChatLoading) return;
@@ -649,6 +743,7 @@ export default function CanvasPage() {
                 activeHighlightRef={activeHighlightRef}
                 readRanges={readRanges}
                 showReadStatus={showReadStatus}
+                pages={articlePages}
               />
             )}
           </div>
@@ -728,6 +823,18 @@ export default function CanvasPage() {
             >
               New Chat
             </button>
+          </div>
+          <div className="canvas-chat-context-limiter">
+            <label htmlFor="context-pages-input">Context pages:</label>
+            <input
+              id="context-pages-input"
+              className="canvas-chat-context-pages-input"
+              type="text"
+              placeholder="e.g. 1,3,5 (all if empty)"
+              value={contextPages}
+              onChange={(e) => setContextPages(e.target.value)}
+              disabled={isChatLoading}
+            />
           </div>
           <ChatHistory messages={messages} isLoading={isChatLoading} />
           <div className="canvas-chat-input-row">
