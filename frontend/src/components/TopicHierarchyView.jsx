@@ -46,6 +46,8 @@ const DEFAULT_ROOT_LIMIT = 0;
  * @property {(path: string|null) => void} [onHoverPath]
  * @property {(path: string) => void} [onDrilldownPath]
  * @property {(topic: TopicHierarchyTopic) => void} [onOpenTopicMeta]
+ * @property {() => void} [onCloseTopicMeta]
+ * @property {(topic: TopicHierarchyTopic) => React.ReactNode} [renderMetaPanel]
  * @property {string|null} [activeMetaTopicName]
  */
 
@@ -208,6 +210,8 @@ function HierarchyNode({
   onHoverPath,
   onDrilldownPath,
   onOpenTopicMeta,
+  onCloseTopicMeta,
+  renderMetaPanel,
   activeMetaTopicName,
   startLevel,
 }) {
@@ -257,10 +261,20 @@ function HierarchyNode({
   const handleMetaClick = useCallback(
     (event) => {
       event.stopPropagation();
+      if (isMetaActive && onCloseTopicMeta) {
+        onCloseTopicMeta();
+        return;
+      }
       if (!onOpenTopicMeta) return;
       onOpenTopicMeta(node.topic || { name: node.fullPath, sentences: [] });
     },
-    [node.fullPath, node.topic, onOpenTopicMeta],
+    [
+      isMetaActive,
+      node.fullPath,
+      node.topic,
+      onCloseTopicMeta,
+      onOpenTopicMeta,
+    ],
   );
 
   const stateClass = [
@@ -275,36 +289,71 @@ function HierarchyNode({
     const sentenceCount = Array.isArray(node.topic?.sentences)
       ? node.topic.sentences.length
       : 0;
+    const metaTopic = node.topic || { name: node.fullPath, sentences: [] };
     return (
-      <div
-        className={`th-leaf ${stateClass}`}
-        style={{
-          backgroundColor: highlightColor,
-          borderLeftColor: accentColor,
-        }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
-        title={`${node.fullPath} (${sentenceCount} sentences)`}
-      >
-        <span className="th-leaf__label">{node.name}</span>
-        <span className="th-leaf__actions">
-          {sentenceCount > 0 && (
-            <span className="th-leaf__count">{sentenceCount}</span>
-          )}
-          {onOpenTopicMeta && (
-            <button
-              type="button"
-              className="th-leaf__meta-button"
-              onClick={handleMetaClick}
-              title={`Show topics meta for ${node.fullPath}`}
-              aria-label={`Show topics meta for ${node.fullPath}`}
-            >
-              i
-            </button>
-          )}
-        </span>
-      </div>
+      <>
+        <div
+          className={`th-leaf ${stateClass}`}
+          style={{
+            backgroundColor: highlightColor,
+            borderLeftColor: accentColor,
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleClick}
+          title={`${node.fullPath} (${sentenceCount} sentences)`}
+        >
+          <span className="th-leaf__label">{node.name}</span>
+          <span className="th-leaf__actions">
+            {sentenceCount > 0 && (
+              <span className="th-leaf__count">{sentenceCount}</span>
+            )}
+            {onOpenTopicMeta && (
+              <button
+                type="button"
+                className="th-leaf__meta-button"
+                onClick={handleMetaClick}
+                title={`Show topics meta for ${node.fullPath}`}
+                aria-label={`Show topics meta for ${node.fullPath}`}
+              >
+                i
+              </button>
+            )}
+          </span>
+        </div>
+        {isMetaActive && renderMetaPanel && (
+          <div
+            className="th-meta-embed"
+            style={{
+              borderLeftColor: accentColor,
+              backgroundColor: highlightColor,
+            }}
+          >
+            <div className="th-meta-embed__header">
+              <span className="th-meta-embed__title" title={node.fullPath}>
+                {node.name}
+              </span>
+              {onCloseTopicMeta && (
+                <button
+                  type="button"
+                  className="th-meta-embed__close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseTopicMeta();
+                  }}
+                  aria-label="Close topics meta"
+                  title="Close topics meta"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+            <div className="th-meta-embed__body">
+              {renderMetaPanel(metaTopic)}
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -346,6 +395,8 @@ function HierarchyNode({
             onHoverPath={onHoverPath}
             onDrilldownPath={onDrilldownPath}
             onOpenTopicMeta={onOpenTopicMeta}
+            onCloseTopicMeta={onCloseTopicMeta}
+            renderMetaPanel={renderMetaPanel}
             activeMetaTopicName={activeMetaTopicName}
             startLevel={startLevel}
           />
@@ -377,6 +428,8 @@ function TopicHierarchyView({
   onHoverPath,
   onDrilldownPath,
   onOpenTopicMeta,
+  onCloseTopicMeta,
+  renderMetaPanel,
   activeMetaTopicName = null,
 }) {
   const startLevel = Array.isArray(scopePath) ? scopePath.length : 0;
@@ -412,6 +465,8 @@ function TopicHierarchyView({
           onHoverPath={onHoverPath}
           onDrilldownPath={onDrilldownPath}
           onOpenTopicMeta={onOpenTopicMeta}
+          onCloseTopicMeta={onCloseTopicMeta}
+          renderMetaPanel={renderMetaPanel}
           activeMetaTopicName={activeMetaTopicName}
           startLevel={startLevel}
         />

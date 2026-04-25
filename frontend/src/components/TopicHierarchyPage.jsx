@@ -114,6 +114,19 @@ function TopicHierarchyPageContent() {
     setMetaTopicName(null);
   }, []);
 
+  const renderMetaPanel = useCallback(
+    () => (
+      <TopicsMetaPanel
+        submissionId={submissionId}
+        selectedTopicName={metaTopicName}
+        topicMarkerSummaries={
+          submission?.results?.topic_marker_summaries || null
+        }
+      />
+    ),
+    [submissionId, metaTopicName, submission],
+  );
+
   const selectedTopic = useMemo(() => {
     if (!selectedPath) return null;
     return (safeTopics || []).find((t) => t.name === selectedPath) || null;
@@ -231,7 +244,10 @@ function TopicHierarchyPageContent() {
       hideTooltip();
     };
     const onKey = (e) => {
-      if (e.key === "Escape") hideTooltip();
+      if (e.key === "Escape") {
+        hideTooltip();
+        handleCloseTopicMeta();
+      }
     };
     document.addEventListener("click", onOutside, true);
     document.addEventListener("keydown", onKey);
@@ -239,7 +255,7 @@ function TopicHierarchyPageContent() {
       document.removeEventListener("click", onOutside, true);
       document.removeEventListener("keydown", onKey);
     };
-  }, [hideTooltip]);
+  }, [hideTooltip, handleCloseTopicMeta]);
 
   useEffect(() => {
     if (!isArticleOpen) hideTooltip();
@@ -377,6 +393,8 @@ function TopicHierarchyPageContent() {
                 onHoverPath={handleHoverPath}
                 onDrilldownPath={handleDrilldownPath}
                 onOpenTopicMeta={handleOpenTopicMeta}
+                onCloseTopicMeta={handleCloseTopicMeta}
+                renderMetaPanel={renderMetaPanel}
               />
             </div>
           ) : (
@@ -389,6 +407,8 @@ function TopicHierarchyPageContent() {
               onHoverPath={handleHoverPath}
               onDrilldownPath={handleDrilldownPath}
               onOpenTopicMeta={handleOpenTopicMeta}
+              onCloseTopicMeta={handleCloseTopicMeta}
+              renderMetaPanel={renderMetaPanel}
             />
           )}
         </div>
@@ -527,26 +547,6 @@ function TopicHierarchyPageContent() {
             </div>,
             document.body,
           )}
-        {metaTopicName && (
-          <div className="topic-hierarchy-page__meta-window">
-            <button
-              type="button"
-              className="topic-hierarchy-page__meta-close"
-              onClick={handleCloseTopicMeta}
-              aria-label="Close topics meta"
-              title="Close topics meta"
-            >
-              &times;
-            </button>
-            <TopicsMetaPanel
-              submissionId={submissionId}
-              selectedTopicName={metaTopicName}
-              topicMarkerSummaries={
-                submission?.results?.topic_marker_summaries || null
-              }
-            />
-          </div>
-        )}
       </div>
       {summaryModalTopic && (
         <TopicSentencesModal
