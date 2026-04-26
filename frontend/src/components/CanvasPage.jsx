@@ -8,6 +8,10 @@ import React, {
 } from "react";
 import { isTopicRead } from "../utils/topicReadUtils";
 import { getTemperatureColor } from "../utils/temperatureColor";
+import TopicLevelSwitcher from "./shared/TopicLevelSwitcher";
+import { useTopicLevel } from "../hooks/useTopicLevel";
+import { buildScopedChartData, getTopicParts } from "../utils/topicHierarchy";
+import { getHierarchyTopicAccentColor } from "../utils/topicColorUtils";
 import "./CanvasPage.css";
 
 const POLL_INTERVAL_MS = 2000;
@@ -21,6 +25,9 @@ const MIN_CANVAS_SCALE = 0.2;
 const MAX_CANVAS_SCALE = 4;
 const WHEEL_ZOOM_IN_FACTOR = 1.1;
 const WHEEL_ZOOM_OUT_FACTOR = 0.9;
+const TOPIC_HIERARCHY_CARD_WIDTH = 190;
+const TOPIC_HIERARCHY_COLUMN_GAP = 18;
+const TOPIC_HIERARCHY_RAIL_PADDING = 24;
 
 /**
  * @typedef {{x: number, y: number}} CanvasPoint
@@ -257,6 +264,204 @@ function eventLabel(ev, idx) {
     return lbl ? `${idx + 1}. ${lbl}` : `${idx + 1}. highlight`;
   }
   return `${idx + 1}. ${ev.event_type || "event"}`;
+}
+
+/**
+ * @param {{name?: string, fullPath?: string, displayName?: string}} topic
+ * @returns {string}
+ */
+function getTopicDisplayName(topic) {
+  if (topic?.displayName) return topic.displayName;
+  const parts = getTopicParts(topic?.fullPath || topic?.name || "");
+  return parts[parts.length - 1] || topic?.name || "";
+}
+
+/**
+ * @param {{sentences?: number[], sentenceIndices?: number[]}} topic
+ * @returns {number[]}
+ */
+function getTopicSentenceNumbers(topic) {
+  const source = Array.isArray(topic?.sentenceIndices)
+    ? topic.sentenceIndices
+    : topic?.sentences;
+  return Array.isArray(source)
+    ? source.filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+}
+
+/**
+ * @param {{sentences?: number[], sentenceIndices?: number[]}} topic
+ * @param {number[]} sentenceOffsets
+ * @param {string[]} submissionSentences
+ * @returns {{charStart: number, charEnd: number} | null}
+ */
+function getTopicTextRange(topic, sentenceOffsets, submissionSentences) {
+  const sentenceNumbers = getTopicSentenceNumbers(topic).filter(
+    (value) => value <= submissionSentences.length,
+  );
+  if (sentenceNumbers.length === 0) return null;
+
+  const startSent = Math.min(...sentenceNumbers);
+  const endSent = Math.max(...sentenceNumbers);
+  const charStart = sentenceOffsets[startSent - 1];
+  const endOffset = sentenceOffsets[endSent - 1];
+  const endSentence = submissionSentences[endSent - 1];
+
+  if (
+    !Number.isFinite(charStart) ||
+    !Number.isFinite(endOffset) ||
+    typeof endSentence !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    charStart,
+    charEnd: endOffset + endSentence.length,
+  };
+}
+
+/**
+ * @param {{sentences?: number[], sentenceIndices?: number[]}} topic
+ * @param {number[]} sentenceOffsets
+ * @param {string[]} submissionSentences
+ * @returns {{charStart: number, charEnd: number}[]}
+ */
+function getTopicSentenceTextRanges(
+  topic,
+  sentenceOffsets,
+  submissionSentences,
+) {
+  return getTopicSentenceNumbers(topic)
+    .filter((value) => value <= submissionSentences.length)
+    .map((sentenceNumber) => {
+      const sentenceIndex = sentenceNumber - 1;
+      const charStart = sentenceOffsets[sentenceIndex];
+      const sentenceText = submissionSentences[sentenceIndex];
+      if (!Number.isFinite(charStart) || typeof sentenceText !== "string") {
+        return null;
+      }
+      return {
+        charStart,
+        charEnd: charStart + sentenceText.length,
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * @param {{
+ *   show: boolean,
+ *   selectedLevel: number,
+ *   maxLevel: number,
+ *   onLevelChange: (level: number) => void,
+ *   topicCards: Array<{
+ *     key: string,
+ *     fullPath: string,
+ *     displayName: string,
+ *     sentenceCount: number,
+ *     startSentence: number,
+ *     endSentence: number,
+ *     top: number,
+ *     height: number,
+ *     depth: number,
+ *     levelIndex: number,
+ *     right: number,
+ *   }>,
+ *   railWidth: number,
+ *   activeTopicKey: string | null,
+ *   selectedTopicKey: string | null,
+ *   onTopicEnter: (topicKey: string) => void,
+ *   onTopicLeave: (topicKey: string) => void,
+ *   onTopicClick: (topicKey: string) => void,
+ * }} props
+ */
+function CanvasTopicHierarchyRail({
+  show,
+  selectedLevel,
+  maxLevel,
+  onLevelChange,
+  topicCards,
+  railWidth,
+  activeTopicKey,
+  selectedTopicKey,
+  onTopicEnter,
+  onTopicLeave,
+  onTopicClick,
+}) {
+  if (!show) return null;
+
+  return (
+    <aside
+      className="canvas-topic-hierarchy"
+      aria-label="Topic hierarchy"
+      onMouseDown={(event) => event.stopPropagation()}
+      style={{ "--canvas-topic-hierarchy-width": `${railWidth}px` }}
+    >
+      <div className="canvas-topic-hierarchy__header">
+        <span className="canvas-topic-hierarchy__title">Topics</span>
+        <TopicLevelSwitcher
+          className="canvas-topic-hierarchy__levels"
+          selectedLevel={selectedLevel}
+          maxLevel={maxLevel}
+          onChange={onLevelChange}
+          label="Level"
+        />
+      </div>
+      <div className="canvas-topic-hierarchy__body">
+        {topicCards.length === 0 ? (
+          <p className="canvas-topic-hierarchy__empty">
+            No topics at this level.
+          </p>
+        ) : (
+          <>
+            {topicCards.map((card) => {
+              const isActive = activeTopicKey === card.fullPath;
+              const isSelected = selectedTopicKey === card.fullPath;
+              const classes = [
+                "canvas-topic-hierarchy__card",
+                card.levelIndex === 0
+                  ? "canvas-topic-hierarchy__card--root"
+                  : "canvas-topic-hierarchy__card--child",
+                isActive ? "is-active" : "",
+                isSelected ? "is-selected" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <button
+                  key={card.key}
+                  type="button"
+                  className={classes}
+                  style={{
+                    "--topic-card-top": `${card.top}px`,
+                    "--topic-card-height": `${card.height}px`,
+                    "--topic-card-right": `${card.right}px`,
+                    "--topic-accent-color": getHierarchyTopicAccentColor(
+                      card.fullPath,
+                      card.depth,
+                    ),
+                  }}
+                  onMouseEnter={() => onTopicEnter(card.fullPath)}
+                  onMouseLeave={() => onTopicLeave(card.fullPath)}
+                  onClick={() => onTopicClick(card.fullPath)}
+                  title={`${card.fullPath}: sentences ${card.startSentence}-${card.endSentence}`}
+                >
+                  <span className="canvas-topic-hierarchy__card-name">
+                    {card.displayName}
+                  </span>
+                  <span className="canvas-topic-hierarchy__card-meta">
+                    {card.sentenceCount} sent.
+                  </span>
+                </button>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </aside>
+  );
 }
 
 /**
@@ -563,11 +768,21 @@ export default function CanvasPage() {
   const [pinnedSummaryKey, setPinnedSummaryKey] = useState(null);
   const [summaryLayout, setSummaryLayout] = useState({ cards: [], width: 0 });
 
+  // Topic hierarchy layer
+  const [showTopicHierarchy, setShowTopicHierarchy] = useState(false);
+  const [hoveredTopicKey, setHoveredTopicKey] = useState(null);
+  const [selectedTopicKey, setSelectedTopicKey] = useState(null);
+  const [topicHierarchyLayout, setTopicHierarchyLayout] = useState({
+    topicCards: [],
+  });
+
   // Read/unread
   const [showReadStatus, setShowReadStatus] = useState(false);
   const [submissionSentences, setSubmissionSentences] = useState([]);
   const [submissionTopics, setSubmissionTopics] = useState([]);
   const [readTopics, setReadTopics] = useState([]);
+  const { selectedLevel, setSelectedLevel, maxLevel } =
+    useTopicLevel(submissionTopics);
 
   // Context limiter: comma-separated page numbers for chat
   const [contextPages, setContextPages] = useState("");
@@ -768,6 +983,35 @@ export default function CanvasPage() {
   }, [topicSummaries, submissionTopics, sentenceOffsets, submissionSentences]);
 
   const activeSummaryKey = hoveredSummaryKey || pinnedSummaryKey;
+  const activeTopicKey = hoveredTopicKey || selectedTopicKey;
+
+  const selectedTopic = useMemo(() => {
+    if (!activeTopicKey) return null;
+    return (
+      (submissionTopics || []).find((topic) => topic.name === activeTopicKey) ||
+      null
+    );
+  }, [activeTopicKey, submissionTopics]);
+
+  const topicHierarchyRowsByLevel = useMemo(() => {
+    return Array.from({ length: selectedLevel + 1 }, (_, level) =>
+      buildScopedChartData(submissionTopics, submissionSentences, [], level),
+    );
+  }, [selectedLevel, submissionSentences, submissionTopics]);
+
+  const activeTopicSelection = useMemo(() => {
+    if (!activeTopicKey) return null;
+    const rows = topicHierarchyRowsByLevel.flat();
+    return rows.find((row) => row.fullPath === activeTopicKey) || selectedTopic;
+  }, [activeTopicKey, selectedTopic, topicHierarchyRowsByLevel]);
+
+  const topicHierarchyRailWidth = useMemo(
+    () =>
+      (selectedLevel + 1) * TOPIC_HIERARCHY_CARD_WIDTH +
+      selectedLevel * TOPIC_HIERARCHY_COLUMN_GAP +
+      TOPIC_HIERARCHY_RAIL_PADDING * 2,
+    [selectedLevel],
+  );
 
   const articleHighlights = useMemo(() => {
     const base = currentHighlights.slice();
@@ -781,8 +1025,31 @@ export default function CanvasPage() {
         });
       }
     }
+    if (showTopicHierarchy && activeTopicSelection) {
+      const textRanges = getTopicSentenceTextRanges(
+        activeTopicSelection,
+        sentenceOffsets,
+        submissionSentences,
+      );
+      textRanges.forEach((textRange) => {
+        base.push({
+          start: textRange.charStart,
+          end: textRange.charEnd,
+          label: activeTopicSelection.fullPath || activeTopicSelection.name,
+        });
+      });
+    }
     return base;
-  }, [currentHighlights, showSummaries, activeSummaryKey, summaryEntries]);
+  }, [
+    currentHighlights,
+    showSummaries,
+    activeSummaryKey,
+    summaryEntries,
+    showTopicHierarchy,
+    activeTopicSelection,
+    sentenceOffsets,
+    submissionSentences,
+  ]);
 
   const temperatureHighlights = useMemo(() => {
     if (!showTemperature || submissionSentences.length === 0) return [];
@@ -885,6 +1152,105 @@ export default function CanvasPage() {
     articleText,
     articlePages,
     scale,
+    showTopicHierarchy,
+  ]);
+
+  useEffect(() => {
+    if (!showTopicHierarchy || articleLoading || articleError) {
+      setTopicHierarchyLayout({ topicCards: [] });
+      return undefined;
+    }
+    if (topicHierarchyRowsByLevel.every((rows) => rows.length === 0)) {
+      setTopicHierarchyLayout({ topicCards: [] });
+      return undefined;
+    }
+
+    let raf = 0;
+    const compute = () => {
+      const articleEl = articleTextRef.current;
+      const wrapEl = summaryWrapRef.current;
+      if (!articleEl || !wrapEl) return;
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const s = scaleRef.current || 1;
+
+      const toPositionedCard = (row, levelIndex) => {
+        const textRange = getTopicTextRange(
+          row,
+          sentenceOffsets,
+          submissionSentences,
+        );
+        if (!textRange) return null;
+
+        const startRange = rangeAtOffset(articleEl, textRange.charStart);
+        const endRange = rangeAtOffset(
+          articleEl,
+          Math.max(0, textRange.charEnd - 1),
+        );
+        if (!startRange || !endRange) return null;
+
+        const startRect = startRange.getBoundingClientRect();
+        const endRect = endRange.getBoundingClientRect();
+        const rawTop = (startRect.top - wrapRect.top) / s;
+        const rawBottom = (endRect.bottom - wrapRect.top) / s;
+        const sentenceNumbers = getTopicSentenceNumbers(row);
+        const startSentence =
+          sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
+        const endSentence =
+          sentenceNumbers.length > 0 ? Math.max(...sentenceNumbers) : 0;
+        const height = Math.max(1, rawBottom - rawTop);
+
+        return {
+          key: `${levelIndex}:${row.fullPath}`,
+          fullPath: row.fullPath,
+          displayName: getTopicDisplayName(row),
+          sentenceCount: sentenceNumbers.length,
+          startSentence,
+          endSentence,
+          top: rawTop,
+          height,
+          depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
+          levelIndex,
+          right:
+            TOPIC_HIERARCHY_RAIL_PADDING +
+            levelIndex *
+              (TOPIC_HIERARCHY_CARD_WIDTH + TOPIC_HIERARCHY_COLUMN_GAP),
+        };
+      };
+
+      const topicCards = topicHierarchyRowsByLevel
+        .flatMap((rows, levelIndex) =>
+          rows.map((row) => toPositionedCard(row, levelIndex)),
+        )
+        .filter(Boolean)
+        .sort(
+          (left, right) =>
+            left.levelIndex - right.levelIndex || left.top - right.top,
+        );
+
+      setTopicHierarchyLayout({ topicCards });
+    };
+
+    raf = window.requestAnimationFrame(compute);
+    const onResize = () => {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(compute);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [
+    articleError,
+    articleLoading,
+    articlePages,
+    articleText,
+    scale,
+    selectedLevel,
+    sentenceOffsets,
+    showTopicHierarchy,
+    submissionSentences,
+    topicHierarchyRowsByLevel,
   ]);
 
   useEffect(() => {
@@ -1104,29 +1470,78 @@ export default function CanvasPage() {
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
-  // Scroll control helpers
-  const scrollTo = useCallback((pos) => {
-    const el = canvasWrapRef.current;
-    if (el) {
-      if (pos === "top") el.scrollTop = 0;
-      else if (pos === "bottom") el.scrollTop = el.scrollHeight;
-      else if (pos === "prev") el.scrollTop -= el.clientHeight;
-      else if (pos === "next") el.scrollTop += el.clientHeight;
-    }
+  // Canvas navigation helpers
+  const navigateCanvas = useCallback((pos) => {
+    const wrap = canvasWrapRef.current;
+    const content = summaryWrapRef.current || canvasViewportRef.current;
+    if (!wrap) return;
+
+    const currentScale = scaleRef.current || 1;
+    const wrapRect = wrap.getBoundingClientRect();
+    const viewportHeight = wrap.clientHeight || wrapRect.height || 0;
+    const contentHeight =
+      (content?.scrollHeight ||
+        content?.offsetHeight ||
+        content?.getBoundingClientRect().height ||
+        0) * currentScale;
+    const pageStep = Math.max(120, viewportHeight * 0.8);
+    const topY = 40;
+    const bottomY =
+      contentHeight > viewportHeight
+        ? viewportHeight - contentHeight - topY
+        : topY;
+    const minY = Math.min(topY, bottomY);
+    const maxY = Math.max(topY, bottomY);
+
+    setIsFocusingHighlight(false);
+    setFocusedTopicKey(null);
+    setTranslate((prev) => {
+      let nextY = prev.y;
+      if (pos === "top") nextY = topY;
+      else if (pos === "bottom") nextY = bottomY;
+      else if (pos === "prev") nextY = prev.y + pageStep;
+      else if (pos === "next") nextY = prev.y - pageStep;
+
+      if (contentHeight > 0 && viewportHeight > 0) {
+        nextY = Math.min(maxY, Math.max(minY, nextY));
+      }
+
+      const nextTranslate = { ...prev, y: nextY };
+      translateRef.current = nextTranslate;
+      return nextTranslate;
+    });
   }, []);
 
   useEffect(() => {
     const handleKeyDownGlobal = (e) => {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
+      const target = e.target;
+      const tagName = target?.tagName;
+      const isEditable =
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT" ||
+        target?.isContentEditable;
+      if (isEditable) {
         return;
-      if (e.key === "Home") scrollTo("top");
-      else if (e.key === "End") scrollTo("bottom");
-      else if (e.key === "PageUp") scrollTo("prev");
-      else if (e.key === "PageDown") scrollTo("next");
+      }
+
+      if (e.key === "Home") {
+        e.preventDefault();
+        navigateCanvas("top");
+      } else if (e.key === "End") {
+        e.preventDefault();
+        navigateCanvas("bottom");
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        navigateCanvas("prev");
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        navigateCanvas("next");
+      }
     };
     window.addEventListener("keydown", handleKeyDownGlobal);
     return () => window.removeEventListener("keydown", handleKeyDownGlobal);
-  }, [scrollTo]);
+  }, [navigateCanvas]);
 
   // Chat submit
   const handleSend = useCallback(async () => {
@@ -1262,7 +1677,10 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries ? " has-summaries" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries ? " has-summaries" : ""}${showTopicHierarchy ? " has-topic-hierarchy" : ""}`}
+                style={{
+                  "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
+                }}
               >
                 <ArticleText
                   text={articleText}
@@ -1356,6 +1774,31 @@ export default function CanvasPage() {
                     </div>
                   </>
                 )}
+                <CanvasTopicHierarchyRail
+                  show={showTopicHierarchy}
+                  selectedLevel={selectedLevel}
+                  maxLevel={maxLevel}
+                  onLevelChange={(level) => {
+                    setSelectedLevel(level);
+                    setHoveredTopicKey(null);
+                    setSelectedTopicKey(null);
+                  }}
+                  topicCards={topicHierarchyLayout.topicCards}
+                  railWidth={topicHierarchyRailWidth}
+                  activeTopicKey={activeTopicKey}
+                  selectedTopicKey={selectedTopicKey}
+                  onTopicEnter={setHoveredTopicKey}
+                  onTopicLeave={(topicKey) => {
+                    setHoveredTopicKey((current) =>
+                      current === topicKey ? null : current,
+                    );
+                  }}
+                  onTopicClick={(topicKey) => {
+                    setSelectedTopicKey((current) =>
+                      current === topicKey ? null : topicKey,
+                    );
+                  }}
+                />
               </div>
             )}
           </div>
@@ -1364,7 +1807,7 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => scrollTo("top")}
+            onClick={() => navigateCanvas("top")}
             title="Scroll to top"
           >
             ⇈
@@ -1372,7 +1815,7 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => scrollTo("prev")}
+            onClick={() => navigateCanvas("prev")}
             title="Previous page"
           >
             ↑
@@ -1380,7 +1823,7 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => scrollTo("next")}
+            onClick={() => navigateCanvas("next")}
             title="Next page"
           >
             ↓
@@ -1388,7 +1831,7 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => scrollTo("bottom")}
+            onClick={() => navigateCanvas("bottom")}
             title="Scroll to bottom"
           >
             ⇊
@@ -1440,6 +1883,18 @@ export default function CanvasPage() {
             }
           >
             S
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showTopicHierarchy ? " is-active" : ""}`}
+            onClick={() => setShowTopicHierarchy((value) => !value)}
+            title={
+              showTopicHierarchy
+                ? "Hide topic hierarchy"
+                : "Show topic hierarchy"
+            }
+          >
+            H
           </button>
           <button
             type="button"
