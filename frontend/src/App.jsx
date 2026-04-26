@@ -266,6 +266,8 @@ function AppShell({
   isSuperuser,
   onLogout,
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   // Build navigation items based on auth state
   const navItems = [...navigationItems];
 
@@ -285,11 +287,31 @@ function AppShell({
     });
   }
 
+  const toggleMenu = () => setMenuOpen((prev) => !prev);
+
+  // Close menu on navigation
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [currentPath]);
+
   return (
     <div className={`app-shell${pageKey === "menu" ? " app-shell--home" : ""}`}>
       <div className="app-shell__main">
         <div className="app-shell__topbar">
-          <nav className="app-shell__topnav" aria-label="Global navigation">
+          <button
+            className="app-shell__burger-btn"
+            onClick={toggleMenu}
+            aria-label="Toggle navigation menu"
+            aria-expanded={menuOpen}
+          >
+            <span className="app-shell__burger-line"></span>
+            <span className="app-shell__burger-line"></span>
+            <span className="app-shell__burger-line"></span>
+          </button>
+          <nav
+            className={`app-shell__topnav${menuOpen ? " app-shell__topnav--open" : ""}`}
+            aria-label="Global navigation"
+          >
             {navItems.map((item) => (
               <ShellNavLink
                 key={item.link}
@@ -297,24 +319,24 @@ function AppShell({
                 currentPath={currentPath}
               />
             ))}
+            <div className="app-shell__topnav-actions">
+              <div
+                id="global-menu-portal-target"
+                className="app-shell__portal-target"
+              />
+              {actions}
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  className="app-shell__logout-btn"
+                  onClick={onLogout}
+                  title="Sign out"
+                >
+                  Logout
+                </button>
+              )}
+            </div>
           </nav>
-          <div className="app-shell__topbar-actions">
-            <div
-              id="global-menu-portal-target"
-              className="app-shell__portal-target"
-            />
-            {actions}
-            {isAuthenticated && (
-              <button
-                type="button"
-                className="app-shell__logout-btn"
-                onClick={onLogout}
-                title="Sign out"
-              >
-                Logout
-              </button>
-            )}
-          </div>
         </div>
         <main className="global-page-content">
           <div

@@ -180,35 +180,42 @@ export default function CanvasPage() {
     };
   }, []);
 
-  const handleTouchStart = useCallback((e) => {
-    const touches = e.touches;
-    if (touches.length === 1) {
-      touchDragStart.current = { x: touches[0].clientX, y: touches[0].clientY };
-      lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
-      isTouchDragging.current = true;
-      touchHasMoved.current = false;
-      setIsFocusingHighlight(false);
-      userMovedCanvasRef.current = true;
-    } else if (touches.length === 2) {
-      isTouchDragging.current = false;
-      touchHasMoved.current = false;
-      setIsCanvasDragging(false);
-      pinchState.current = {
-        startDistance: getTouchDistance(touches),
-        startScale: scaleRef.current || 1,
-        startTranslate: { ...translateRef.current },
-      };
-      setIsFocusingHighlight(false);
-      userMovedCanvasRef.current = true;
-    }
-  }, [getTouchDistance]);
+  const handleTouchStart = useCallback(
+    (e) => {
+      const touches = e.touches;
+      if (touches.length === 1) {
+        touchDragStart.current = {
+          x: touches[0].clientX,
+          y: touches[0].clientY,
+        };
+        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+        isTouchDragging.current = true;
+        touchHasMoved.current = false;
+        setIsFocusingHighlight(false);
+        userMovedCanvasRef.current = true;
+      } else if (touches.length === 2) {
+        isTouchDragging.current = false;
+        touchHasMoved.current = false;
+        setIsCanvasDragging(false);
+        pinchState.current = {
+          startDistance: getTouchDistance(touches),
+          startScale: scaleRef.current || 1,
+          startTranslate: { ...translateRef.current },
+        };
+        setIsFocusingHighlight(false);
+        userMovedCanvasRef.current = true;
+      }
+    },
+    [getTouchDistance],
+  );
 
   const handleTouchMove = useCallback(
     (e) => {
       const touches = e.touches;
       if (pinchState.current && touches.length === 2) {
         e.preventDefault();
-        const { startDistance, startScale, startTranslate } = pinchState.current;
+        const { startDistance, startScale, startTranslate } =
+          pinchState.current;
         const newDistance = getTouchDistance(touches);
         if (startDistance === 0) return;
         const nextScale = clampCanvasScale(
@@ -248,11 +255,7 @@ export default function CanvasPage() {
         });
       }
     },
-    [
-      getTouchDistance,
-      getTouchMidpoint,
-      scheduleCanvasTransform,
-    ],
+    [getTouchDistance, getTouchMidpoint, scheduleCanvasTransform],
   );
 
   const handleTouchEnd = useCallback((e) => {
@@ -370,7 +373,7 @@ export default function CanvasPage() {
   // Chat
   const [messages, setMessages] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showChat, setShowChat] = useState(true);
+  const [showChat, setShowChat] = useState(false);
 
   // Temperature
   const [showTemperature, setShowTemperature] = useState(false);

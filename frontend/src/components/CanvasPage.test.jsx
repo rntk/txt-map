@@ -3,6 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import CanvasPage from "./CanvasPage";
 
+/**
+ * Opens the chat panel if it's closed (chat is now hidden by default).
+ */
+function openChatPanel() {
+  const chatToggleBtn = document.querySelector(
+    '.canvas-read-toggle[title="Show chat panel"]',
+  );
+  if (chatToggleBtn) {
+    fireEvent.click(chatToggleBtn);
+  }
+}
+
 describe("CanvasPage highlight focusing", () => {
   const originalFetch = global.fetch;
   const originalGetBoundingClientRect =
@@ -88,6 +100,8 @@ describe("CanvasPage highlight focusing", () => {
       };
 
     const { container } = render(<CanvasPage />);
+
+    openChatPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Events" }));
     await screen.findByRole("button", { name: "2. second" });
@@ -272,6 +286,8 @@ describe("CanvasPage highlight focusing", () => {
 
     render(<CanvasPage />);
 
+    openChatPanel();
+
     fireEvent.change(screen.getByPlaceholderText("Ask about this article…"), {
       target: { value: "What happened?" },
     });
@@ -308,6 +324,8 @@ describe("CanvasPage highlight focusing", () => {
     });
 
     render(<CanvasPage />);
+
+    openChatPanel();
 
     fireEvent.change(screen.getByPlaceholderText("Ask about this article…"), {
       target: { value: "What happened?" },
