@@ -338,7 +338,10 @@ export function rangeAtOffset(rootEl, offset) {
     acceptNode(node) {
       let parent = node.parentElement;
       while (parent && parent !== rootEl) {
-        if (parent.classList?.contains("canvas-page-splitter")) {
+        if (
+          parent.classList?.contains("canvas-page-splitter") ||
+          parent.classList?.contains("canvas-article-image")
+        ) {
           return NodeFilter.FILTER_REJECT;
         }
         parent = parent.parentElement;

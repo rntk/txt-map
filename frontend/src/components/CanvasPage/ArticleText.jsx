@@ -10,6 +10,7 @@ import { buildSegmentsWithPages } from "./utils";
  *   showReadStatus?: boolean,
  *   temperatureHighlights?: {start: number, end: number, color: string}[],
  *   pages?: {page_number: number, start: number, end: number}[],
+ *   images?: {src: string, alt: string, title?: string, anchorOffset: number}[],
  *   textRef?: React.RefObject<HTMLDivElement | null>,
  *   sentenceOffsets?: number[],
  *   onTextClick?: (e: React.MouseEvent<HTMLDivElement>) => void,
@@ -23,17 +24,32 @@ export default function ArticleText({
   showReadStatus,
   temperatureHighlights,
   pages,
+  images,
   textRef,
   sentenceOffsets,
   onTextClick,
 }) {
+  const sortedImages = Array.isArray(images)
+    ? [...images]
+        .filter(
+          (image) =>
+            image?.src &&
+            Number.isFinite(Number(image.anchorOffset)) &&
+            Number(image.anchorOffset) >= 0,
+        )
+        .sort((left, right) => left.anchorOffset - right.anchorOffset)
+    : [];
+  const segmentBoundaries = [
+    ...(Array.isArray(sentenceOffsets) ? sentenceOffsets : []),
+    ...sortedImages.map((image) => Number(image.anchorOffset)),
+  ];
   const segments = buildSegmentsWithPages(
     text,
     highlights,
     showReadStatus ? readRanges : undefined,
     temperatureHighlights,
     pages,
-    sentenceOffsets,
+    segmentBoundaries,
   );
 
   const sentenceIndexFor = (start) => {
@@ -60,26 +76,54 @@ export default function ArticleText({
   };
 
   let firstHighlightedSegmentFound = false;
+  let nextImageIndex = 0;
+
+  const renderArticleImage = (image, key) => (
+    <figure className="canvas-article-image" key={key}>
+      <img
+        className="canvas-article-image__media"
+        src={image.src}
+        alt={image.alt}
+        title={image.title}
+        loading="lazy"
+      />
+      {image.alt && image.alt !== "Article image" && (
+        <figcaption className="canvas-article-image__caption">
+          {image.alt}
+        </figcaption>
+      )}
+    </figure>
+  );
+
+  const takeImagesBefore = (offset) => {
+    const rendered = [];
+    while (
+      nextImageIndex < sortedImages.length &&
+      sortedImages[nextImageIndex].anchorOffset <= offset
+    ) {
+      const image = sortedImages[nextImageIndex];
+      rendered.push(renderArticleImage(image, `image-${nextImageIndex}`));
+      nextImageIndex += 1;
+    }
+    return rendered;
+  };
 
   return (
-    <div
-      className="canvas-article-text"
-      ref={textRef}
-      onClick={onTextClick}
-    >
-      {segments.map((seg, idx) => {
+    <div className="canvas-article-text" ref={textRef} onClick={onTextClick}>
+      {segments.flatMap((seg, idx) => {
         if (seg.type === "page-splitter") {
-          return (
+          return [
             <div key={idx} className="canvas-page-splitter">
               <span className="canvas-page-splitter-line" />
               <span className="canvas-page-splitter-label">
                 Page {seg.page_number}
               </span>
               <span className="canvas-page-splitter-line" />
-            </div>
-          );
+            </div>,
+          ];
         }
 
+        const imagesBeforeSegment = takeImagesBefore(seg.start ?? 0);
         const isActiveHighlightTarget =
           seg.highlighted && !firstHighlightedSegmentFound;
         if (seg.highlighted) {
@@ -91,7 +135,8 @@ export default function ArticleText({
           sentenceIdx !== undefined ? String(sentenceIdx) : undefined;
 
         if (seg.highlighted) {
-          return (
+          return [
+            ...imagesBeforeSegment,
             <mark
               key={idx}
               className="canvas-highlight"
@@ -102,8 +147,8 @@ export default function ArticleText({
               data-sentence-index={sentenceAttr}
             >
               {seg.text}
-            </mark>
-          );
+            </mark>,
+          ];
         }
 
         if (seg.temperatureColor) {
@@ -113,7 +158,8 @@ export default function ArticleText({
           ]
             .filter(Boolean)
             .join(" ");
-          return (
+          return [
+            ...imagesBeforeSegment,
             <span
               key={idx}
               className={classes || undefined}
@@ -123,11 +169,12 @@ export default function ArticleText({
               data-sentence-index={sentenceAttr}
             >
               {seg.text}
-            </span>
-          );
+            </span>,
+          ];
         }
 
-        return (
+        return [
+          ...imagesBeforeSegment,
           <span
             key={idx}
             className={
@@ -138,9 +185,10 @@ export default function ArticleText({
             data-sentence-index={sentenceAttr}
           >
             {seg.text}
-          </span>
-        );
+          </span>,
+        ];
       })}
+      {takeImagesBefore(text.length)}
     </div>
   );
 }

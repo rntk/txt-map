@@ -172,6 +172,140 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("moves to the rendered article bottom on End", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({ text: "Alpha beta gamma." }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        if (this.classList.contains("canvas-viewport")) {
+          return makeRect({ left: 40, top: 40, width: 752, height: 2200 });
+        }
+
+        if (this.classList.contains("canvas-article-text")) {
+          return makeRect({ left: 40, top: 40, width: 752, height: 2000 });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    const { container } = render(<CanvasPage />);
+
+    await screen.findByText("Alpha beta gamma.");
+
+    const viewport = container.querySelector(".canvas-viewport");
+    fireEvent.keyDown(window, { key: "End" });
+
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
+        "-1240px",
+      );
+    });
+  });
+
+  it("renders images from the original article html", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Alpha\nBeta gamma.",
+            sentences: ["Alpha", "Beta gamma."],
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (url === "/api/submission/article-1") {
+        return {
+          ok: true,
+          json: async () => ({
+            html_content:
+              '<article><p>Alpha</p><img src="/media/chart.png" alt="Article chart" /><p>Beta gamma.</p></article>',
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    const image = await screen.findByAltText("Article chart");
+    expect(image).toHaveAttribute("src", "https://example.com/media/chart.png");
+    const article = document.querySelector(".canvas-article-text");
+    const imageBlock = image.closest(".canvas-article-image");
+    expect(article.children[0].textContent).toBe("Alpha");
+    expect(article.children[1]).toBe(imageBlock);
+    expect(article.children[2].textContent).toBe("\n");
+    expect(article.children[3].textContent).toBe("Beta gamma.");
+  });
+
+  it("uses following article text when image prefix text does not match", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Alpha\nBeta gamma.",
+            sentences: ["Alpha", "Beta gamma."],
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (url === "/api/submission/article-1") {
+        return {
+          ok: true,
+          json: async () => ({
+            html_content:
+              '<article><p>Navigation text not in article.</p><img src="/media/chart.png" alt="Article chart" /><p>Beta gamma.</p></article>',
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    const image = await screen.findByAltText("Article chart");
+    const article = document.querySelector(".canvas-article-text");
+    const imageBlock = image.closest(".canvas-article-image");
+    expect(article.children[0].textContent).toBe("Alpha\n");
+    expect(article.children[1]).toBe(imageBlock);
+    expect(article.children[2].textContent).toBe("Beta gamma.");
+  });
+
   it("counter-scales topic hierarchy titles and cards when zooming out", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url) => {

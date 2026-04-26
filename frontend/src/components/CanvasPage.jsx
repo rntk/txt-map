@@ -43,6 +43,311 @@ import { useTooltip } from "../hooks/useTooltip";
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
+const IMAGE_ANCHOR_CONTEXT_CHARS = 160;
+const HTML_FLOW_BLOCK_TAGS = new Set([
+  "article",
+  "aside",
+  "blockquote",
+  "br",
+  "caption",
+  "dd",
+  "div",
+  "dt",
+  "figcaption",
+  "figure",
+  "footer",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "li",
+  "main",
+  "nav",
+  "ol",
+  "p",
+  "section",
+  "td",
+  "th",
+  "tr",
+  "ul",
+]);
+
+/**
+ * @typedef {{
+ *   src: string,
+ *   alt: string,
+ *   title?: string,
+ *   anchorOffset: number,
+ * }} ArticleImage
+ */
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isSafeImageSrc(value) {
+  const src = String(value || "").trim();
+  if (!src) return false;
+  if (
+    /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(src)
+  ) {
+    return true;
+  }
+  return (
+    /^(https?:)?\/\//i.test(src) ||
+    src.startsWith("/") ||
+    !/^[a-z][a-z0-9+.-]*:/i.test(src)
+  );
+}
+
+/**
+ * @param {string} rawSrc
+ * @param {string} sourceUrl
+ * @returns {string}
+ */
+function resolveArticleImageSrc(rawSrc, sourceUrl) {
+  const src = String(rawSrc || "").trim();
+  if (!src || src.startsWith("data:")) return src;
+  try {
+    if (sourceUrl) {
+      return new URL(src, sourceUrl).toString();
+    }
+    if (src.startsWith("//")) {
+      return `${window.location.protocol}${src}`;
+    }
+  } catch {
+    return src;
+  }
+  return src;
+}
+
+/**
+ * @param {string} srcset
+ * @returns {string}
+ */
+function getFirstSrcsetUrl(srcset) {
+  return (
+    String(srcset || "")
+      .split(",")
+      .map((entry) => entry.trim().split(/\s+/)[0])
+      .find(Boolean) || ""
+  );
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeArticleText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * @param {string} text
+ * @returns {{text: string, offsets: number[]}}
+ */
+function buildNormalizedTextOffsetMap(text) {
+  let normalized = "";
+  /** @type {number[]} */
+  const offsets = [];
+  let pendingSpaceOffset = null;
+
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (/\s/.test(char)) {
+      if (normalized.length > 0) {
+        pendingSpaceOffset = pendingSpaceOffset ?? index;
+      }
+      continue;
+    }
+    if (pendingSpaceOffset !== null) {
+      normalized += " ";
+      offsets.push(pendingSpaceOffset);
+      pendingSpaceOffset = null;
+    }
+    normalized += char;
+    offsets.push(index);
+  }
+
+  return { text: normalized.trimEnd(), offsets };
+}
+
+/**
+ * @param {{text: string, offsets: number[]}} normalizedArticle
+ * @param {number} normalizedEnd
+ * @returns {number}
+ */
+function getDisplayOffsetAfterNormalizedIndex(
+  normalizedArticle,
+  normalizedEnd,
+) {
+  const previousOffset =
+    normalizedArticle.offsets[
+      Math.min(normalizedEnd - 1, normalizedArticle.offsets.length - 1)
+    ] ?? 0;
+  return previousOffset + 1;
+}
+
+/**
+ * @param {{text: string, offsets: number[]}} normalizedArticle
+ * @param {number} normalizedStart
+ * @returns {number}
+ */
+function getDisplayOffsetAtNormalizedIndex(normalizedArticle, normalizedStart) {
+  return normalizedArticle.offsets[Math.max(0, normalizedStart)] ?? 0;
+}
+
+/**
+ * @param {string} textBeforeImage
+ * @param {string} textAfterImage
+ * @param {{text: string, offsets: number[]}} normalizedArticle
+ * @param {number} articleTextLength
+ * @returns {number | null}
+ */
+function getImageAnchorOffset(
+  textBeforeImage,
+  textAfterImage,
+  normalizedArticle,
+  articleTextLength,
+) {
+  const normalizedBefore = normalizeArticleText(textBeforeImage);
+  const normalizedAfter = normalizeArticleText(textAfterImage);
+
+  if (normalizedBefore) {
+    let normalizedEnd = normalizedArticle.text.indexOf(normalizedBefore);
+    if (normalizedEnd !== -1) {
+      normalizedEnd += normalizedBefore.length;
+      return getDisplayOffsetAfterNormalizedIndex(
+        normalizedArticle,
+        normalizedEnd,
+      );
+    }
+
+    const suffix = normalizedBefore.slice(
+      Math.max(0, normalizedBefore.length - IMAGE_ANCHOR_CONTEXT_CHARS),
+    );
+    const suffixIndex = normalizedArticle.text.indexOf(suffix);
+    if (suffixIndex !== -1) {
+      return getDisplayOffsetAfterNormalizedIndex(
+        normalizedArticle,
+        suffixIndex + suffix.length,
+      );
+    }
+  }
+
+  if (normalizedAfter) {
+    let normalizedStart = normalizedArticle.text.indexOf(normalizedAfter);
+    if (normalizedStart !== -1) {
+      return getDisplayOffsetAtNormalizedIndex(
+        normalizedArticle,
+        normalizedStart,
+      );
+    }
+
+    const prefix = normalizedAfter.slice(0, IMAGE_ANCHOR_CONTEXT_CHARS);
+    const prefixIndex = normalizedArticle.text.indexOf(prefix);
+    if (prefixIndex !== -1) {
+      return getDisplayOffsetAtNormalizedIndex(normalizedArticle, prefixIndex);
+    }
+  }
+
+  return normalizedBefore ? articleTextLength : null;
+}
+
+/**
+ * @param {string} html
+ * @param {string} sourceUrl
+ * @param {string} articleText
+ * @returns {ArticleImage[]}
+ */
+function extractArticleImages(html, sourceUrl, articleText) {
+  if (!html || typeof document === "undefined") return [];
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const seen = new Set();
+  const normalizedArticle = buildNormalizedTextOffsetMap(articleText);
+  /** @type {ArticleImage[]} */
+  const images = [];
+  /** @type {({type: "text", text: string} | {type: "image", element: Element})[]} */
+  const tokens = [];
+
+  const pushTextToken = (text) => {
+    if (!text) return;
+    const previous = tokens[tokens.length - 1];
+    if (previous?.type === "text") {
+      previous.text += text;
+    } else {
+      tokens.push({ type: "text", text });
+    }
+  };
+
+  const visit = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      pushTextToken(node.nodeValue || "");
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const element = node;
+    const tagName = element.tagName?.toLowerCase() || "";
+    if (tagName === "img") {
+      tokens.push({ type: "image", element });
+      return;
+    }
+    if (tagName === "br") {
+      pushTextToken(" ");
+      return;
+    }
+
+    const isBlock = HTML_FLOW_BLOCK_TAGS.has(tagName);
+    if (isBlock) pushTextToken(" ");
+    Array.from(element.childNodes || []).forEach(visit);
+    if (isBlock) pushTextToken(" ");
+  };
+
+  Array.from(template.content.childNodes).forEach(visit);
+  let textBeforeImage = "";
+  tokens.forEach((token, index) => {
+    if (token.type === "text") {
+      textBeforeImage += token.text;
+      return;
+    }
+
+    const element = token.element;
+    const rawSrc =
+      element.getAttribute("src") ||
+      getFirstSrcsetUrl(element.getAttribute("srcset") || "");
+    if (!isSafeImageSrc(rawSrc)) return;
+    const src = resolveArticleImageSrc(rawSrc, sourceUrl);
+    if (!isSafeImageSrc(src) || seen.has(src)) return;
+
+    const textAfterImage = tokens
+      .slice(index + 1)
+      .map((candidate) => (candidate.type === "text" ? candidate.text : ""))
+      .join("");
+    const anchorOffset = getImageAnchorOffset(
+      textBeforeImage,
+      textAfterImage,
+      normalizedArticle,
+      articleText.length,
+    );
+    if (anchorOffset === null) return;
+
+    seen.add(src);
+    images.push({
+      src,
+      alt: element.getAttribute("alt") || "Article image",
+      title: element.getAttribute("title") || undefined,
+      anchorOffset,
+    });
+  });
+  return images.sort((left, right) => left.anchorOffset - right.anchorOffset);
+}
 
 function getHoverWord(rootEl, clientX, clientY) {
   if (!rootEl) return null;
@@ -83,6 +388,8 @@ export default function CanvasPage() {
   // Article text
   const [articleText, setArticleText] = useState("");
   const [articlePages, setArticlePages] = useState([]);
+  /** @type {[ArticleImage[], React.Dispatch<React.SetStateAction<ArticleImage[]>>]} */
+  const [articleImages, setArticleImages] = useState([]);
   const [articleLoading, setArticleLoading] = useState(true);
   const [articleError, setArticleError] = useState(null);
   const [topicSummaries, setTopicSummaries] = useState({});
@@ -359,8 +666,22 @@ export default function CanvasPage() {
       const currentTranslate = translateRef.current;
       let nextY = currentTranslate.y;
       if (pos === "top") nextY = topY;
-      else if (pos === "bottom") nextY = currentTranslate.y - pageStep * 4;
-      else if (pos === "prev") nextY = currentTranslate.y + pageStep;
+      else if (pos === "bottom") {
+        const viewport = canvasViewportRef.current;
+        const content = articleTextRef.current || summaryWrapRef.current;
+        if (viewport && content) {
+          const viewportRect = viewport.getBoundingClientRect();
+          const contentRect = content.getBoundingClientRect();
+          const contentBottom =
+            (contentRect.bottom - viewportRect.top) / currentScale;
+          nextY = Math.min(
+            topY,
+            viewportHeight - contentBottom * currentScale - topY,
+          );
+        } else {
+          nextY = currentTranslate.y - pageStep;
+        }
+      } else if (pos === "prev") nextY = currentTranslate.y + pageStep;
       else if (pos === "next") nextY = currentTranslate.y - pageStep;
       setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
     },
@@ -472,6 +793,31 @@ export default function CanvasPage() {
         setTopicSummaries(data.topic_summaries || {});
         setTopicSummaryIndex(data.topic_summary_index || {});
         setTopicTemperatures(data.topic_temperatures || {});
+        if (data.html_content) {
+          setArticleImages(
+            extractArticleImages(
+              data.html_content,
+              data.source_url || "",
+              data.text || "",
+            ),
+          );
+        } else {
+          fetch(`/api/submission/${articleId}`, { credentials: "include" })
+            .then((submissionResponse) =>
+              submissionResponse.ok ? submissionResponse.json() : null,
+            )
+            .then((submissionData) => {
+              if (!submissionData?.html_content) return;
+              setArticleImages(
+                extractArticleImages(
+                  submissionData.html_content,
+                  submissionData.source_url || data.source_url || "",
+                  data.text || "",
+                ),
+              );
+            })
+            .catch(() => {});
+        }
         setArticleLoading(false);
       })
       .catch((err) => {
@@ -1011,6 +1357,7 @@ export default function CanvasPage() {
     articleError,
     articleText,
     articlePages,
+    articleImages,
     showTopicHierarchy,
   ]);
 
@@ -1133,6 +1480,7 @@ export default function CanvasPage() {
     articleError,
     articleLoading,
     articlePages,
+    articleImages,
     articleText,
     selectedLevel,
     sentenceOffsets,
@@ -1282,6 +1630,7 @@ export default function CanvasPage() {
                     showReadStatus={showReadStatus}
                     temperatureHighlights={temperatureHighlights}
                     pages={articlePages}
+                    images={articleImages}
                     textRef={articleTextRef}
                     sentenceOffsets={sentenceOffsets}
                     onTextClick={handleArticleClick}
