@@ -37,6 +37,13 @@ function TileGrid({ items, onTileClick, isBackground }) {
               {item.previewText && (
                 <div className="grid-view-tile-preview">{item.previewText}</div>
               )}
+              {Array.isArray(item.bullets) && item.bullets.length > 0 && (
+                <ul className="grid-view-tile-bullets">
+                  {item.bullets.map((bullet, bi) => (
+                    <li key={bi}>{bullet}</li>
+                  ))}
+                </ul>
+              )}
               {item.tags && item.tags.length > 0 ? (
                 <div className="grid-view-tags-cloud">
                   {item.tags.map((tag) => (

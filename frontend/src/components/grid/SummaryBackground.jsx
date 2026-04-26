@@ -28,6 +28,13 @@ function SummaryBackground({ items, cols }) {
             {item.summary && (
               <div className="grid-view-tile-summary-text">{item.summary}</div>
             )}
+            {Array.isArray(item.bullets) && item.bullets.length > 0 && (
+              <ul className="grid-view-tile-summary-bullets">
+                {item.bullets.map((bullet, bi) => (
+                  <li key={bi}>{bullet}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>

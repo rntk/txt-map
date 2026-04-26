@@ -259,6 +259,7 @@ function VisualizationPanels({
         <GridView
           topics={safeTopics}
           topicSummaries={results.topic_summaries || {}}
+          topicSummaryIndex={results.topic_summary_index || {}}
           sentences={safeSentences}
           onClose={onClose}
           readTopics={readTopics}

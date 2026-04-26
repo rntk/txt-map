@@ -2912,6 +2912,25 @@
   -webkit-box-orient: vertical;
 }
 
+.grid-view-tile-summary-bullets,
+.grid-view-tile-bullets {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--shell-muted-strong);
+}
+
+.grid-view-tile-summary-bullets li,
+.grid-view-tile-bullets li {
+  margin-bottom: 0.2rem;
+}
+
+.grid-view-tile-bullets {
+  font-size: 0.85rem;
+  color: var(--shell-muted);
+}
+
 /* Radar Chart Styles */
 .radar-chart {
   background-color: #f8f9fa;

@@ -46,6 +46,7 @@ const TILE_GRID_COLS = 2;
 function GridView({
   topics,
   topicSummaries,
+  topicSummaryIndex,
   sentences,
   onClose,
   readTopics,
@@ -60,6 +61,20 @@ function GridView({
     () => (readTopics instanceof Set ? readTopics : new Set(readTopics || [])),
     [readTopics],
   );
+
+  const getNodeSummary = (fullPath) => {
+    const entry = topicSummaryIndex && topicSummaryIndex[fullPath];
+    if (entry) {
+      return {
+        text: entry.text || "",
+        bullets: Array.isArray(entry.bullets) ? entry.bullets : [],
+      };
+    }
+    return {
+      text: (topicSummaries && topicSummaries[fullPath]) || "",
+      bullets: [],
+    };
+  };
 
   const hierarchy = useMemo(
     () => buildHierarchy(topics, currentPath),
@@ -97,7 +112,7 @@ function GridView({
         const isLeaf = segmentIsLeaf(topics, currentPath, segment);
         const tilePath = [...currentPath, segment];
         const fullPath = tilePath.join(">");
-        const summary = topicSummaries[fullPath] || "";
+        const { text: summary, bullets } = getNodeSummary(fullPath);
         const fallbackSentence = getFirstScopedSentence(data.topics, sentences);
         const previewText = truncateWithEllipsis(
           summary || fallbackSentence,
@@ -109,6 +124,7 @@ function GridView({
           label: segment,
           previewLabel,
           previewText,
+          bullets,
           tags: buildTopTags(data.topics, sentences),
           topicCount: data.topics.length,
           sentenceCount: data.sentenceCount,
@@ -132,11 +148,12 @@ function GridView({
           currentPath.length > 0
             ? [...currentPath, item.segment].join(">")
             : item.segment;
-        const summary = topicSummaries[fullPath] || "";
+        const { text: summary, bullets } = getNodeSummary(fullPath);
         const isRead = safeReadTopics.has(fullPath);
         return {
           label: item.label,
           summary,
+          bullets,
           isRead,
           fullPath,
         };
@@ -151,7 +168,7 @@ function GridView({
           ([segment, data]) => {
             const tilePath = [...nextPath, segment];
             const fullPath = tilePath.join(">");
-            const summary = topicSummaries[fullPath] || "";
+            const { text: summary, bullets } = getNodeSummary(fullPath);
             const fallbackSentence = getFirstScopedSentence(
               data.topics,
               sentences,
@@ -166,6 +183,7 @@ function GridView({
               label: segment,
               previewLabel,
               previewText,
+              bullets,
               tags: buildTopTags(data.topics, sentences),
               topicCount: data.topics.length,
               sentenceCount: data.sentenceCount,
