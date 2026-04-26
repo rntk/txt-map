@@ -18,9 +18,6 @@ const POLL_INTERVAL_MS = 2000;
 const CHAT_POLL_MAX_ATTEMPTS = 150;
 const EVENT_APPLY_DELAY_MS = 120;
 const EVENTS_LIMIT = 50;
-const HIGHLIGHT_FOCUS_SCALE = 1.4;
-const HIGHLIGHT_FOCUS_DELAY_MS = 50;
-const HIGHLIGHT_FOCUS_TRANSITION_MS = 350;
 const MIN_CANVAS_SCALE = 0.2;
 const MAX_CANVAS_SCALE = 4;
 const WHEEL_ZOOM_IN_FACTOR = 1.1;
@@ -739,6 +736,7 @@ export default function CanvasPage() {
   const [articleLoading, setArticleLoading] = useState(true);
   const [articleError, setArticleError] = useState(null);
   const [topicSummaries, setTopicSummaries] = useState({});
+  const [topicSummaryIndex, setTopicSummaryIndex] = useState({});
   const articleTextRef = useRef(null);
   const summaryWrapRef = useRef(null);
 
@@ -754,10 +752,10 @@ export default function CanvasPage() {
   const translateRef = useRef({ x: 40, y: 40 });
   const transformFrameRef = useRef(0);
   const pendingTransformRef = useRef(null);
-  const focusTimerRef = useRef(null);
-  const transitionTimerRef = useRef(null);
   const chatAbortRef = useRef(null);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
+  const userMovedCanvasRef = useRef(false);
+  const smoothZoomTimerRef = useRef(null);
   const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
   const [focusedTopicKey, setFocusedTopicKey] = useState(null);
 
@@ -817,10 +815,14 @@ export default function CanvasPage() {
   const [showTemperature, setShowTemperature] = useState(false);
   const [topicTemperatures, setTopicTemperatures] = useState({});
 
+  // Summary view mode (replaces article text with topic summaries at the selected level)
+  const [showSummaryMode, setShowSummaryMode] = useState(false);
+  const summaryCardRefs = useRef({});
+
   // Summaries layer
   const [showSummaries, setShowSummaries] = useState(false);
   const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
-  const [pinnedSummaryKey, setPinnedSummaryKey] = useState(null);
+  const [pinnedSummaryKey] = useState(null);
   const [summaryLayout, setSummaryLayout] = useState({ cards: [], width: 0 });
 
   // Topic hierarchy layer
@@ -860,6 +862,7 @@ export default function CanvasPage() {
         setSubmissionTopics(data.topics || []);
         setReadTopics(data.read_topics || []);
         setTopicSummaries(data.topic_summaries || {});
+        setTopicSummaryIndex(data.topic_summary_index || {});
         setTopicTemperatures(data.topic_temperatures || {});
         setArticleLoading(false);
       })
@@ -934,11 +937,6 @@ export default function CanvasPage() {
     () => eventToHighlights(events[selectedIndex]),
     [events, selectedIndex],
   );
-  const currentHighlight = currentHighlights[0] || null;
-  const currentHighlightFocusKey = currentHighlight
-    ? `${selectedIndex}:${currentHighlight.start}:${currentHighlight.end}`
-    : "";
-
   const readSentenceIndices = useMemo(() => {
     const set = new Set();
     (submissionTopics || []).forEach((topic) => {
@@ -1053,6 +1051,53 @@ export default function CanvasPage() {
       buildScopedChartData(submissionTopics, submissionSentences, [], level),
     );
   }, [selectedLevel, submissionSentences, submissionTopics]);
+
+  const summaryViewCards = useMemo(() => {
+    if (!topicSummaryIndex || typeof topicSummaryIndex !== "object") return [];
+    const targetLevel = selectedLevel + 1;
+    const entries = Object.entries(topicSummaryIndex)
+      .filter(([path, entry]) => {
+        if (!path || !entry || typeof entry !== "object") return false;
+        if (entry.level !== targetLevel) return false;
+        const text = entry.text || "";
+        const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
+        return Boolean(text) || bullets.length > 0;
+      })
+      .map(([path, entry]) => {
+        const sourceSentences = Array.isArray(entry.source_sentences)
+          ? entry.source_sentences.filter((n) => Number.isInteger(n) && n > 0)
+          : [];
+        const startSent = sourceSentences.length
+          ? Math.min(...sourceSentences)
+          : 0;
+        return {
+          path,
+          name: getTopicParts(path).slice(-1)[0] || path,
+          text: entry.text || "",
+          bullets: Array.isArray(entry.bullets) ? entry.bullets : [],
+          sourceSentences,
+          startSentence: startSent,
+        };
+      })
+      .sort((a, b) => a.startSentence - b.startSentence);
+    return entries;
+  }, [topicSummaryIndex, selectedLevel]);
+
+  const summaryViewActivePath = useMemo(() => {
+    if (!showSummaryMode) return null;
+    const candidate = activeTopicKey || focusedTopicKey;
+    if (!candidate) return null;
+    const exact = summaryViewCards.find((c) => c.path === candidate);
+    if (exact) return exact.path;
+    const ancestor = summaryViewCards.find(
+      (c) => candidate === c.path || candidate.startsWith(`${c.path}>`),
+    );
+    if (ancestor) return ancestor.path;
+    const descendant = summaryViewCards.find((c) =>
+      c.path.startsWith(`${candidate}>`),
+    );
+    return descendant ? descendant.path : null;
+  }, [showSummaryMode, activeTopicKey, focusedTopicKey, summaryViewCards]);
 
   const activeTopicSelection = useMemo(() => {
     if (!activeTopicKey) return null;
@@ -1229,7 +1274,8 @@ export default function CanvasPage() {
   ]);
 
   useEffect(() => {
-    if (!showTopicHierarchy || articleLoading || articleError) {
+    const hierarchyVisible = showTopicHierarchy || showSummaryMode;
+    if (!hierarchyVisible || articleLoading || articleError) {
       setTopicHierarchyLayout({ topicCards: [] });
       return undefined;
     }
@@ -1246,25 +1292,57 @@ export default function CanvasPage() {
       const wrapRect = wrapEl.getBoundingClientRect();
       const s = scaleRef.current || 1;
 
+      const summaryRectForRow = (row) => {
+        const matching = summaryViewCards.filter(
+          (c) =>
+            c.path === row.fullPath ||
+            c.path.startsWith(`${row.fullPath}>`) ||
+            row.fullPath.startsWith(`${c.path}>`),
+        );
+        if (matching.length === 0) return null;
+        let top = Number.POSITIVE_INFINITY;
+        let bottom = Number.NEGATIVE_INFINITY;
+        for (const c of matching) {
+          const el = summaryCardRefs.current[c.path];
+          if (!el) continue;
+          const r = el.getBoundingClientRect();
+          if (r.top < top) top = r.top;
+          if (r.bottom > bottom) bottom = r.bottom;
+        }
+        if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
+        return { top, bottom };
+      };
+
       const toPositionedCard = (row, levelIndex) => {
-        const textRange = getTopicTextRange(
-          row,
-          sentenceOffsets,
-          submissionSentences,
-        );
-        if (!textRange) return null;
+        let rawTop;
+        let rawBottom;
 
-        const startRange = rangeAtOffset(articleEl, textRange.charStart);
-        const endRange = rangeAtOffset(
-          articleEl,
-          Math.max(0, textRange.charEnd - 1),
-        );
-        if (!startRange || !endRange) return null;
+        if (showSummaryMode) {
+          const rect = summaryRectForRow(row);
+          if (!rect) return null;
+          rawTop = (rect.top - wrapRect.top) / s;
+          rawBottom = (rect.bottom - wrapRect.top) / s;
+        } else {
+          const textRange = getTopicTextRange(
+            row,
+            sentenceOffsets,
+            submissionSentences,
+          );
+          if (!textRange) return null;
 
-        const startRect = startRange.getBoundingClientRect();
-        const endRect = endRange.getBoundingClientRect();
-        const rawTop = (startRect.top - wrapRect.top) / s;
-        const rawBottom = (endRect.bottom - wrapRect.top) / s;
+          const startRange = rangeAtOffset(articleEl, textRange.charStart);
+          const endRange = rangeAtOffset(
+            articleEl,
+            Math.max(0, textRange.charEnd - 1),
+          );
+          if (!startRange || !endRange) return null;
+
+          const startRect = startRange.getBoundingClientRect();
+          const endRect = endRange.getBoundingClientRect();
+          rawTop = (startRect.top - wrapRect.top) / s;
+          rawBottom = (endRect.bottom - wrapRect.top) / s;
+        }
+
         const sentenceNumbers = getTopicSentenceNumbers(row);
         const startSentence =
           sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
@@ -1317,7 +1395,9 @@ export default function CanvasPage() {
     selectedLevel,
     sentenceOffsets,
     showTopicHierarchy,
+    showSummaryMode,
     submissionSentences,
+    summaryViewCards,
     topicHierarchyRowsByLevel,
   ]);
 
@@ -1361,61 +1441,9 @@ export default function CanvasPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!currentHighlightFocusKey || articleLoading || articleError) {
-      return undefined;
-    }
-
-    if (focusTimerRef.current) {
-      clearTimeout(focusTimerRef.current);
-    }
-    if (transitionTimerRef.current) {
-      clearTimeout(transitionTimerRef.current);
-    }
-
-    focusTimerRef.current = setTimeout(() => {
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      const target = activeHighlightRef.current;
-      if (!wrap || !viewport || !target) return;
-
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
-      const targetCenterX = targetRect.left + targetRect.width / 2;
-      const targetCenterY = targetRect.top + targetRect.height / 2;
-      const currentScale = scaleRef.current || 1;
-      const nextScale = Math.max(currentScale, HIGHLIGHT_FOCUS_SCALE);
-      const localTargetX = (targetCenterX - viewportRect.left) / currentScale;
-      const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
-
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-
-      transitionTimerRef.current = setTimeout(() => {
-        setIsFocusingHighlight(false);
-      }, HIGHLIGHT_FOCUS_TRANSITION_MS);
-    }, HIGHLIGHT_FOCUS_DELAY_MS);
-
-    return () => {
-      if (focusTimerRef.current) {
-        clearTimeout(focusTimerRef.current);
-      }
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-      }
-    };
-  }, [
-    articleError,
-    articleLoading,
-    currentHighlightFocusKey,
-    setCanvasTransformNow,
-  ]);
 
   const handleSelectEvent = useCallback((idx) => {
+    userMovedCanvasRef.current = false;
     setSelectedIndex(idx);
     setIsLive(false);
     setNewIndices((s) => {
@@ -1470,6 +1498,7 @@ export default function CanvasPage() {
     setIsFocusingHighlight(false);
     setIsCanvasDragging(true);
     isDragging.current = true;
+    userMovedCanvasRef.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
     e.preventDefault();
   }, []);
@@ -1518,80 +1547,10 @@ export default function CanvasPage() {
 
       setIsFocusingHighlight(false);
       setFocusedTopicKey(null);
+      userMovedCanvasRef.current = true;
       scheduleCanvasTransform(nextScale, nextTranslate);
     },
     [scheduleCanvasTransform],
-  );
-
-  // Zoom to a specific topic/summary
-  const handleZoomToTopic = useCallback(
-    (topicKey) => {
-      if (!topicKey) {
-        setFocusedTopicKey(null);
-        return;
-      }
-
-      const summaryEntry = summaryEntries.find(
-        (entry) => entry.key === topicKey,
-      );
-      const topicEntry =
-        summaryEntry ||
-        topicHierarchyRowsByLevel
-          .flat()
-          .find((row) => row.fullPath === topicKey || row.name === topicKey);
-      if (!topicEntry) return;
-
-      const textRange = summaryEntry
-        ? { charStart: summaryEntry.charStart, charEnd: summaryEntry.charEnd }
-        : getTopicTextRange(topicEntry, sentenceOffsets, submissionSentences);
-      if (!textRange) return;
-
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      const articleEl = articleTextRef.current;
-      if (!wrap || !viewport || !articleEl) return;
-
-      const midOff = Math.floor((textRange.charStart + textRange.charEnd) / 2);
-      const midRange = rangeAtOffset(articleEl, midOff);
-      if (!midRange) return;
-
-      const midRect = midRange.getBoundingClientRect();
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const currentScale = scaleRef.current || 1;
-      const nextScale = Math.min(
-        MAX_CANVAS_SCALE,
-        Math.max(currentScale, HIGHLIGHT_FOCUS_SCALE),
-      );
-
-      // Calculate the target position in canvas coordinates
-      const targetCenterX = midRect.left + midRect.width / 2;
-      const targetCenterY = midRect.top + midRect.height / 2;
-      const localTargetX = (targetCenterX - viewportRect.left) / currentScale;
-      const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
-
-      setFocusedTopicKey(topicKey);
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-
-      // Reset the focusing state after transition completes
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-      }
-      transitionTimerRef.current = setTimeout(() => {
-        setIsFocusingHighlight(false);
-      }, HIGHLIGHT_FOCUS_TRANSITION_MS);
-    },
-    [
-      sentenceOffsets,
-      submissionSentences,
-      summaryEntries,
-      topicHierarchyRowsByLevel,
-      setCanvasTransformNow,
-    ],
   );
 
   useEffect(() => {
@@ -1601,46 +1560,71 @@ export default function CanvasPage() {
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  const zoomToSummaryCard = useCallback(
+    (topicKey) => {
+      if (!topicKey || !showSummaryMode) return;
+      const cardEl =
+        summaryCardRefs.current[topicKey] ||
+        summaryViewCards
+          .filter(
+            (c) => topicKey === c.path || topicKey.startsWith(`${c.path}>`),
+          )
+          .map((c) => summaryCardRefs.current[c.path])
+          .find(Boolean);
+      if (!cardEl) return;
+      const wrap = canvasWrapRef.current;
+      const viewport = canvasViewportRef.current;
+      if (!wrap || !viewport) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = cardEl.getBoundingClientRect();
+      const currentScale = scaleRef.current || 1;
+      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
+      const localTargetX =
+        (targetRect.left + targetRect.width / 2 - viewportRect.left) /
+        currentScale;
+      const localTargetY =
+        (targetRect.top + targetRect.height / 2 - viewportRect.top) /
+        currentScale;
+      setFocusedTopicKey(topicKey);
+      setIsFocusingHighlight(true);
+      setCanvasTransformNow(nextScale, {
+        x: wrapRect.width / 2 - localTargetX * nextScale,
+        y: wrapRect.height / 2 - localTargetY * nextScale,
+      });
+      if (smoothZoomTimerRef.current) {
+        clearTimeout(smoothZoomTimerRef.current);
+      }
+      smoothZoomTimerRef.current = setTimeout(() => {
+        setIsFocusingHighlight(false);
+      }, 380);
+    },
+    [showSummaryMode, summaryViewCards, setCanvasTransformNow],
+  );
+
   // Canvas navigation helpers
   const navigateCanvas = useCallback(
     (pos) => {
       const wrap = canvasWrapRef.current;
-      const content = summaryWrapRef.current || canvasViewportRef.current;
       if (!wrap) return;
 
       const currentScale = scaleRef.current || 1;
       const wrapRect = wrap.getBoundingClientRect();
       const viewportHeight = wrap.clientHeight || wrapRect.height || 0;
-      const contentHeight =
-        (content?.scrollHeight ||
-          content?.offsetHeight ||
-          content?.getBoundingClientRect().height ||
-          0) * currentScale;
       const pageStep = Math.max(120, viewportHeight * 0.8);
       const topY = 40;
-      const bottomY =
-        contentHeight > viewportHeight
-          ? viewportHeight - contentHeight - topY
-          : topY;
-      const minY = Math.min(topY, bottomY);
-      const maxY = Math.max(topY, bottomY);
 
       setIsFocusingHighlight(false);
       setFocusedTopicKey(null);
-      {
-        const currentTranslate = translateRef.current;
-        let nextY = currentTranslate.y;
-        if (pos === "top") nextY = topY;
-        else if (pos === "bottom") nextY = bottomY;
-        else if (pos === "prev") nextY = currentTranslate.y + pageStep;
-        else if (pos === "next") nextY = currentTranslate.y - pageStep;
+      userMovedCanvasRef.current = true;
+      const currentTranslate = translateRef.current;
+      let nextY = currentTranslate.y;
+      if (pos === "top") nextY = topY;
+      else if (pos === "bottom") nextY = currentTranslate.y - pageStep * 4;
+      else if (pos === "prev") nextY = currentTranslate.y + pageStep;
+      else if (pos === "next") nextY = currentTranslate.y - pageStep;
 
-        if (contentHeight > 0 && viewportHeight > 0) {
-          nextY = Math.min(maxY, Math.max(minY, nextY));
-        }
-
-        setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
-      }
+      setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
     },
     [setCanvasTransformNow],
   );
@@ -1810,22 +1794,81 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries ? " has-summaries" : ""}${showTopicHierarchy ? " has-topic-hierarchy" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                 }}
               >
-                <ArticleText
-                  text={articleText}
-                  highlights={articleHighlights}
-                  activeHighlightRef={activeHighlightRef}
-                  readRanges={readRanges}
-                  showReadStatus={showReadStatus}
-                  temperatureHighlights={temperatureHighlights}
-                  pages={articlePages}
-                  textRef={articleTextRef}
-                />
-                {showSummaries && summaryLayout.cards.length > 0 && (
+                {showSummaryMode ? (
+                  <div className="canvas-summary-view" ref={articleTextRef}>
+                    {summaryViewCards.length === 0 ? (
+                      <p className="canvas-summary-view__empty">
+                        No summaries available at this level.
+                      </p>
+                    ) : (
+                      <div className="canvas-summary-view__cards">
+                        {summaryViewCards.map((card) => {
+                          const isActive = summaryViewActivePath === card.path;
+                          return (
+                            <article
+                              key={card.path}
+                              ref={(el) => {
+                                if (el) summaryCardRefs.current[card.path] = el;
+                                else delete summaryCardRefs.current[card.path];
+                              }}
+                              className={`canvas-summary-view__card${isActive ? " is-active" : ""}`}
+                              onMouseEnter={() =>
+                                setHoveredTopicKey(card.path)
+                              }
+                              onMouseLeave={() =>
+                                setHoveredTopicKey((current) =>
+                                  current === card.path ? null : current,
+                                )
+                              }
+                              title={card.path}
+                            >
+                              <header className="canvas-summary-view__card-header">
+                                <span className="canvas-summary-view__card-path">
+                                  {card.path}
+                                </span>
+                                {card.sourceSentences.length > 0 && (
+                                  <span className="canvas-summary-view__card-meta">
+                                    sentences {card.startSentence} (
+                                    {card.sourceSentences.length})
+                                  </span>
+                                )}
+                              </header>
+                              {card.text && (
+                                <p className="canvas-summary-view__card-text">
+                                  {card.text}
+                                </p>
+                              )}
+                              {card.bullets.length > 0 && (
+                                <ul className="canvas-summary-view__card-bullets">
+                                  {card.bullets.map((b, i) => (
+                                    <li key={i}>{b}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <ArticleText
+                    text={articleText}
+                    highlights={articleHighlights}
+                    activeHighlightRef={activeHighlightRef}
+                    readRanges={readRanges}
+                    showReadStatus={showReadStatus}
+                    temperatureHighlights={temperatureHighlights}
+                    pages={articlePages}
+                    textRef={articleTextRef}
+                  />
+                )}
+                {!showSummaryMode && showSummaries && summaryLayout.cards.length > 0 && (
                   <>
                     <svg
                       className="canvas-summary-connectors"
@@ -1885,15 +1928,6 @@ export default function CanvasPage() {
                               k === card.key ? null : k,
                             )
                           }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Toggle pin behavior
-                            setPinnedSummaryKey((k) =>
-                              k === card.key ? null : card.key,
-                            );
-                            // Zoom to topic
-                            handleZoomToTopic(card.key);
-                          }}
                           title={card.topicName}
                         >
                           <div className="canvas-summary-card-topic">
@@ -1908,7 +1942,7 @@ export default function CanvasPage() {
                   </>
                 )}
                 <CanvasTopicHierarchyRail
-                  show={showTopicHierarchy}
+                  show={showTopicHierarchy || showSummaryMode}
                   selectedLevel={selectedLevel}
                   maxLevel={maxLevel}
                   onLevelChange={(level) => {
@@ -1931,7 +1965,7 @@ export default function CanvasPage() {
                     setSelectedTopicKey((current) =>
                       current === topicKey ? null : topicKey,
                     );
-                    handleZoomToTopic(topicKey);
+                    zoomToSummaryCard(topicKey);
                   }}
                 />
               </div>
@@ -2002,6 +2036,7 @@ export default function CanvasPage() {
             onClick={() => {
               setCanvasTransformNow(1, { x: 40, y: 40 });
               setFocusedTopicKey(null);
+              userMovedCanvasRef.current = false;
             }}
           >
             ⊙
@@ -2017,6 +2052,18 @@ export default function CanvasPage() {
             }
           >
             R
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showSummaryMode ? " is-active" : ""}`}
+            onClick={() => setShowSummaryMode((v) => !v)}
+            title={
+              showSummaryMode
+                ? "Show article text"
+                : "Show summary view (per topic level)"
+            }
+          >
+            M
           </button>
           <button
             type="button"
