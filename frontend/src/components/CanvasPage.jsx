@@ -1471,15 +1471,27 @@ export default function CanvasPage() {
         return;
       }
 
-      const entry = summaryEntries.find((e) => e.key === topicKey);
-      if (!entry) return;
+      const summaryEntry = summaryEntries.find(
+        (entry) => entry.key === topicKey,
+      );
+      const topicEntry =
+        summaryEntry ||
+        topicHierarchyRowsByLevel
+          .flat()
+          .find((row) => row.fullPath === topicKey || row.name === topicKey);
+      if (!topicEntry) return;
+
+      const textRange = summaryEntry
+        ? { charStart: summaryEntry.charStart, charEnd: summaryEntry.charEnd }
+        : getTopicTextRange(topicEntry, sentenceOffsets, submissionSentences);
+      if (!textRange) return;
 
       const wrap = canvasWrapRef.current;
       const viewport = canvasViewportRef.current;
       const articleEl = articleTextRef.current;
       if (!wrap || !viewport || !articleEl) return;
 
-      const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
+      const midOff = Math.floor((textRange.charStart + textRange.charEnd) / 2);
       const midRange = rangeAtOffset(articleEl, midOff);
       if (!midRange) return;
 
@@ -1516,7 +1528,12 @@ export default function CanvasPage() {
         setIsFocusingHighlight(false);
       }, HIGHLIGHT_FOCUS_TRANSITION_MS);
     },
-    [summaryEntries],
+    [
+      sentenceOffsets,
+      submissionSentences,
+      summaryEntries,
+      topicHierarchyRowsByLevel,
+    ],
   );
 
   useEffect(() => {
@@ -1854,6 +1871,7 @@ export default function CanvasPage() {
                     setSelectedTopicKey((current) =>
                       current === topicKey ? null : topicKey,
                     );
+                    handleZoomToTopic(topicKey);
                   }}
                 />
               </div>

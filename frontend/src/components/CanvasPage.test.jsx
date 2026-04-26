@@ -231,6 +231,18 @@ describe("CanvasPage highlight focusing", () => {
         ),
       ).toBeCloseTo(5.602, 3);
     });
+
+    fireEvent.click(topicCard);
+
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.4");
+      expect(
+        parseFloat(viewport.style.getPropertyValue("--canvas-translate-x")),
+      ).toBeCloseTo(-28.889, 3);
+      expect(
+        parseFloat(viewport.style.getPropertyValue("--canvas-translate-y")),
+      ).toBeCloseTo(213.333, 3);
+    });
   });
 
   it("polls for a delayed chat response", async () => {
