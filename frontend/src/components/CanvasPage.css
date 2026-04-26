@@ -13,6 +13,7 @@
   overflow: hidden;
   user-select: none;
   cursor: grab;
+  touch-action: none;
   background: radial-gradient(circle, #2a3040 1px, transparent 1px) 0 0 / 28px
     28px;
 }

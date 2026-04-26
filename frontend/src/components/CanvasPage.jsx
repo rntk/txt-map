@@ -67,6 +67,11 @@ export default function CanvasPage() {
   const pendingTransformRef = useRef(null);
   const userMovedCanvasRef = useRef(false);
   const smoothZoomTimerRef = useRef(null);
+  const isTouchDragging = useRef(false);
+  const lastTouch = useRef({ x: 0, y: 0 });
+  const touchDragStart = useRef({ x: 0, y: 0 });
+  const touchHasMoved = useRef(false);
+  const pinchState = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -160,6 +165,112 @@ export default function CanvasPage() {
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
     setIsCanvasDragging(false);
+  }, []);
+
+  const getTouchDistance = useCallback((touches) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, []);
+
+  const getTouchMidpoint = useCallback((touches) => {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }, []);
+
+  const handleTouchStart = useCallback((e) => {
+    const touches = e.touches;
+    if (touches.length === 1) {
+      touchDragStart.current = { x: touches[0].clientX, y: touches[0].clientY };
+      lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+      isTouchDragging.current = true;
+      touchHasMoved.current = false;
+      setIsFocusingHighlight(false);
+      userMovedCanvasRef.current = true;
+    } else if (touches.length === 2) {
+      isTouchDragging.current = false;
+      touchHasMoved.current = false;
+      setIsCanvasDragging(false);
+      pinchState.current = {
+        startDistance: getTouchDistance(touches),
+        startScale: scaleRef.current || 1,
+        startTranslate: { ...translateRef.current },
+      };
+      setIsFocusingHighlight(false);
+      userMovedCanvasRef.current = true;
+    }
+  }, [getTouchDistance]);
+
+  const handleTouchMove = useCallback(
+    (e) => {
+      const touches = e.touches;
+      if (pinchState.current && touches.length === 2) {
+        e.preventDefault();
+        const { startDistance, startScale, startTranslate } = pinchState.current;
+        const newDistance = getTouchDistance(touches);
+        if (startDistance === 0) return;
+        const nextScale = clampCanvasScale(
+          startScale * (newDistance / startDistance),
+        );
+        const wrap = canvasWrapRef.current;
+        if (!wrap) return;
+        const wrapRect = wrap.getBoundingClientRect();
+        const midpoint = getTouchMidpoint(touches);
+        const cursor = {
+          x: midpoint.x - wrapRect.left,
+          y: midpoint.y - wrapRect.top,
+        };
+        const nextTranslate = getCursorAnchoredTranslate({
+          cursor,
+          translate: startTranslate,
+          currentScale: startScale,
+          nextScale,
+        });
+        scheduleCanvasTransform(nextScale, nextTranslate);
+      } else if (isTouchDragging.current && touches.length === 1) {
+        const dx = touches[0].clientX - touchDragStart.current.x;
+        const dy = touches[0].clientY - touchDragStart.current.y;
+        if (!touchHasMoved.current) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 6) return;
+          touchHasMoved.current = true;
+          setIsCanvasDragging(true);
+        }
+        e.preventDefault();
+        const moveDx = touches[0].clientX - lastTouch.current.x;
+        const moveDy = touches[0].clientY - lastTouch.current.y;
+        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+        scheduleCanvasTransform(scaleRef.current || 1, {
+          x: translateRef.current.x + moveDx,
+          y: translateRef.current.y + moveDy,
+        });
+      }
+    },
+    [
+      getTouchDistance,
+      getTouchMidpoint,
+      scheduleCanvasTransform,
+    ],
+  );
+
+  const handleTouchEnd = useCallback((e) => {
+    const touches = e.touches;
+    if (touches.length === 0) {
+      isTouchDragging.current = false;
+      setIsCanvasDragging(false);
+      pinchState.current = null;
+      touchHasMoved.current = false;
+    } else if (touches.length === 1 && pinchState.current) {
+      pinchState.current = null;
+      isTouchDragging.current = true;
+      touchHasMoved.current = false;
+      touchDragStart.current = { x: touches[0].clientX, y: touches[0].clientY };
+      lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+    } else if (touches.length < 2) {
+      pinchState.current = null;
+    }
   }, []);
 
   const handleWheel = useCallback(
@@ -929,6 +1040,9 @@ export default function CanvasPage() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <div
             ref={canvasViewportRef}
