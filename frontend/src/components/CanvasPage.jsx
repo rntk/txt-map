@@ -752,6 +752,8 @@ export default function CanvasPage() {
   const activeHighlightRef = useRef(null);
   const scaleRef = useRef(1);
   const translateRef = useRef({ x: 40, y: 40 });
+  const transformFrameRef = useRef(0);
+  const pendingTransformRef = useRef(null);
   const focusTimerRef = useRef(null);
   const transitionTimerRef = useRef(null);
   const chatAbortRef = useRef(null);
@@ -779,6 +781,9 @@ export default function CanvasPage() {
   useEffect(() => {
     return () => {
       chatAbortRef.current?.abort();
+      if (transformFrameRef.current) {
+        window.cancelAnimationFrame(transformFrameRef.current);
+      }
     };
   }, []);
 
@@ -1068,6 +1073,20 @@ export default function CanvasPage() {
     [selectedLevel, topicHierarchyCardWidth],
   );
 
+  const zoomAdjustedTopicCards = useMemo(() => {
+    return topicHierarchyLayout.topicCards.map((card) => ({
+      ...card,
+      titleFontSize: getTopicTitleFontSize({
+        scale,
+        height: card.height,
+      }),
+      right:
+        TOPIC_HIERARCHY_RAIL_PADDING +
+        card.levelIndex *
+          (topicHierarchyCardWidth + TOPIC_HIERARCHY_COLUMN_GAP),
+    }));
+  }, [scale, topicHierarchyCardWidth, topicHierarchyLayout.topicCards]);
+
   const articleHighlights = useMemo(() => {
     const base = currentHighlights.slice();
     if (showSummaries && activeSummaryKey) {
@@ -1206,7 +1225,6 @@ export default function CanvasPage() {
     articleError,
     articleText,
     articlePages,
-    scale,
     showTopicHierarchy,
   ]);
 
@@ -1227,7 +1245,6 @@ export default function CanvasPage() {
       if (!articleEl || !wrapEl) return;
       const wrapRect = wrapEl.getBoundingClientRect();
       const s = scaleRef.current || 1;
-      const cardWidth = getZoomAdjustedTopicCardWidth(s);
 
       const toPositionedCard = (row, levelIndex) => {
         const textRange = getTopicTextRange(
@@ -1264,12 +1281,8 @@ export default function CanvasPage() {
           endSentence,
           top: rawTop,
           height,
-          titleFontSize: getTopicTitleFontSize({ scale: s, height }),
           depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
           levelIndex,
-          right:
-            TOPIC_HIERARCHY_RAIL_PADDING +
-            levelIndex * (cardWidth + TOPIC_HIERARCHY_COLUMN_GAP),
         };
       };
 
@@ -1301,13 +1314,52 @@ export default function CanvasPage() {
     articleLoading,
     articlePages,
     articleText,
-    scale,
     selectedLevel,
     sentenceOffsets,
     showTopicHierarchy,
     submissionSentences,
     topicHierarchyRowsByLevel,
   ]);
+
+  const cancelPendingCanvasTransform = useCallback(() => {
+    if (transformFrameRef.current) {
+      window.cancelAnimationFrame(transformFrameRef.current);
+      transformFrameRef.current = 0;
+    }
+    pendingTransformRef.current = null;
+  }, []);
+
+  const setCanvasTransformNow = useCallback(
+    (nextScale, nextTranslate) => {
+      cancelPendingCanvasTransform();
+      scaleRef.current = nextScale;
+      translateRef.current = nextTranslate;
+      setScale(nextScale);
+      setTranslate(nextTranslate);
+    },
+    [cancelPendingCanvasTransform],
+  );
+
+  const scheduleCanvasTransform = useCallback((nextScale, nextTranslate) => {
+    scaleRef.current = nextScale;
+    translateRef.current = nextTranslate;
+    pendingTransformRef.current = {
+      scale: nextScale,
+      translate: nextTranslate,
+    };
+
+    if (transformFrameRef.current) return;
+
+    transformFrameRef.current = window.requestAnimationFrame(() => {
+      transformFrameRef.current = 0;
+      const pendingTransform = pendingTransformRef.current;
+      pendingTransformRef.current = null;
+      if (!pendingTransform) return;
+
+      setScale(pendingTransform.scale);
+      setTranslate(pendingTransform.translate);
+    });
+  }, []);
 
   useEffect(() => {
     if (!currentHighlightFocusKey || articleLoading || articleError) {
@@ -1338,13 +1390,10 @@ export default function CanvasPage() {
       const localTargetY = (targetCenterY - viewportRect.top) / currentScale;
 
       setIsFocusingHighlight(true);
-      scaleRef.current = nextScale;
-      translateRef.current = {
+      setCanvasTransformNow(nextScale, {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
-      };
-      setScale(nextScale);
-      setTranslate(translateRef.current);
+      });
 
       transitionTimerRef.current = setTimeout(() => {
         setIsFocusingHighlight(false);
@@ -1359,7 +1408,12 @@ export default function CanvasPage() {
         clearTimeout(transitionTimerRef.current);
       }
     };
-  }, [articleError, articleLoading, currentHighlightFocusKey]);
+  }, [
+    articleError,
+    articleLoading,
+    currentHighlightFocusKey,
+    setCanvasTransformNow,
+  ]);
 
   const handleSelectEvent = useCallback((idx) => {
     setSelectedIndex(idx);
@@ -1420,13 +1474,19 @@ export default function CanvasPage() {
     e.preventDefault();
   }, []);
 
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragging.current) return;
-    const dx = e.clientX - lastMouse.current.x;
-    const dy = e.clientY - lastMouse.current.y;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-    setTranslate((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-  }, []);
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isDragging.current) return;
+      const dx = e.clientX - lastMouse.current.x;
+      const dy = e.clientY - lastMouse.current.y;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      scheduleCanvasTransform(scaleRef.current || 1, {
+        x: translateRef.current.x + dx,
+        y: translateRef.current.y + dy,
+      });
+    },
+    [scheduleCanvasTransform],
+  );
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
@@ -1434,34 +1494,34 @@ export default function CanvasPage() {
   }, []);
 
   // Canvas zoom
-  const handleWheel = useCallback((e) => {
-    e.preventDefault();
-    const wrap = canvasWrapRef.current;
-    if (!wrap) return;
+  const handleWheel = useCallback(
+    (e) => {
+      e.preventDefault();
+      const wrap = canvasWrapRef.current;
+      if (!wrap) return;
 
-    const currentScale = scaleRef.current || 1;
-    const delta = e.deltaY > 0 ? WHEEL_ZOOM_OUT_FACTOR : WHEEL_ZOOM_IN_FACTOR;
-    const nextScale = clampCanvasScale(currentScale * delta);
-    if (nextScale === currentScale) return;
+      const currentScale = scaleRef.current || 1;
+      const delta = e.deltaY > 0 ? WHEEL_ZOOM_OUT_FACTOR : WHEEL_ZOOM_IN_FACTOR;
+      const nextScale = clampCanvasScale(currentScale * delta);
+      if (nextScale === currentScale) return;
 
-    const wrapRect = wrap.getBoundingClientRect();
-    const nextTranslate = getCursorAnchoredTranslate({
-      cursor: {
-        x: e.clientX - wrapRect.left,
-        y: e.clientY - wrapRect.top,
-      },
-      translate: translateRef.current,
-      currentScale,
-      nextScale,
-    });
+      const wrapRect = wrap.getBoundingClientRect();
+      const nextTranslate = getCursorAnchoredTranslate({
+        cursor: {
+          x: e.clientX - wrapRect.left,
+          y: e.clientY - wrapRect.top,
+        },
+        translate: translateRef.current,
+        currentScale,
+        nextScale,
+      });
 
-    setIsFocusingHighlight(false);
-    setFocusedTopicKey(null);
-    scaleRef.current = nextScale;
-    translateRef.current = nextTranslate;
-    setScale(nextScale);
-    setTranslate(nextTranslate);
-  }, []);
+      setIsFocusingHighlight(false);
+      setFocusedTopicKey(null);
+      scheduleCanvasTransform(nextScale, nextTranslate);
+    },
+    [scheduleCanvasTransform],
+  );
 
   // Zoom to a specific topic/summary
   const handleZoomToTopic = useCallback(
@@ -1512,13 +1572,10 @@ export default function CanvasPage() {
 
       setFocusedTopicKey(topicKey);
       setIsFocusingHighlight(true);
-      scaleRef.current = nextScale;
-      translateRef.current = {
+      setCanvasTransformNow(nextScale, {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
-      };
-      setScale(nextScale);
-      setTranslate(translateRef.current);
+      });
 
       // Reset the focusing state after transition completes
       if (transitionTimerRef.current) {
@@ -1533,6 +1590,7 @@ export default function CanvasPage() {
       submissionSentences,
       summaryEntries,
       topicHierarchyRowsByLevel,
+      setCanvasTransformNow,
     ],
   );
 
@@ -1544,46 +1602,48 @@ export default function CanvasPage() {
   }, [handleWheel]);
 
   // Canvas navigation helpers
-  const navigateCanvas = useCallback((pos) => {
-    const wrap = canvasWrapRef.current;
-    const content = summaryWrapRef.current || canvasViewportRef.current;
-    if (!wrap) return;
+  const navigateCanvas = useCallback(
+    (pos) => {
+      const wrap = canvasWrapRef.current;
+      const content = summaryWrapRef.current || canvasViewportRef.current;
+      if (!wrap) return;
 
-    const currentScale = scaleRef.current || 1;
-    const wrapRect = wrap.getBoundingClientRect();
-    const viewportHeight = wrap.clientHeight || wrapRect.height || 0;
-    const contentHeight =
-      (content?.scrollHeight ||
-        content?.offsetHeight ||
-        content?.getBoundingClientRect().height ||
-        0) * currentScale;
-    const pageStep = Math.max(120, viewportHeight * 0.8);
-    const topY = 40;
-    const bottomY =
-      contentHeight > viewportHeight
-        ? viewportHeight - contentHeight - topY
-        : topY;
-    const minY = Math.min(topY, bottomY);
-    const maxY = Math.max(topY, bottomY);
+      const currentScale = scaleRef.current || 1;
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportHeight = wrap.clientHeight || wrapRect.height || 0;
+      const contentHeight =
+        (content?.scrollHeight ||
+          content?.offsetHeight ||
+          content?.getBoundingClientRect().height ||
+          0) * currentScale;
+      const pageStep = Math.max(120, viewportHeight * 0.8);
+      const topY = 40;
+      const bottomY =
+        contentHeight > viewportHeight
+          ? viewportHeight - contentHeight - topY
+          : topY;
+      const minY = Math.min(topY, bottomY);
+      const maxY = Math.max(topY, bottomY);
 
-    setIsFocusingHighlight(false);
-    setFocusedTopicKey(null);
-    setTranslate((prev) => {
-      let nextY = prev.y;
-      if (pos === "top") nextY = topY;
-      else if (pos === "bottom") nextY = bottomY;
-      else if (pos === "prev") nextY = prev.y + pageStep;
-      else if (pos === "next") nextY = prev.y - pageStep;
+      setIsFocusingHighlight(false);
+      setFocusedTopicKey(null);
+      {
+        const currentTranslate = translateRef.current;
+        let nextY = currentTranslate.y;
+        if (pos === "top") nextY = topY;
+        else if (pos === "bottom") nextY = bottomY;
+        else if (pos === "prev") nextY = currentTranslate.y + pageStep;
+        else if (pos === "next") nextY = currentTranslate.y - pageStep;
 
-      if (contentHeight > 0 && viewportHeight > 0) {
-        nextY = Math.min(maxY, Math.max(minY, nextY));
+        if (contentHeight > 0 && viewportHeight > 0) {
+          nextY = Math.min(maxY, Math.max(minY, nextY));
+        }
+
+        setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
       }
-
-      const nextTranslate = { ...prev, y: nextY };
-      translateRef.current = nextTranslate;
-      return nextTranslate;
-    });
-  }, []);
+    },
+    [setCanvasTransformNow],
+  );
 
   useEffect(() => {
     const handleKeyDownGlobal = (e) => {
@@ -1856,7 +1916,7 @@ export default function CanvasPage() {
                     setHoveredTopicKey(null);
                     setSelectedTopicKey(null);
                   }}
-                  topicCards={topicHierarchyLayout.topicCards}
+                  topicCards={zoomAdjustedTopicCards}
                   railWidth={topicHierarchyRailWidth}
                   cardWidth={topicHierarchyCardWidth}
                   activeTopicKey={activeTopicKey}
@@ -1915,14 +1975,24 @@ export default function CanvasPage() {
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => setScale((s) => clampCanvasScale(s * 1.2))}
+            onClick={() =>
+              setCanvasTransformNow(
+                clampCanvasScale((scaleRef.current || 1) * 1.2),
+                translateRef.current,
+              )
+            }
           >
             +
           </button>
           <button
             type="button"
             className="canvas-zoom-btn"
-            onClick={() => setScale((s) => clampCanvasScale(s / 1.2))}
+            onClick={() =>
+              setCanvasTransformNow(
+                clampCanvasScale((scaleRef.current || 1) / 1.2),
+                translateRef.current,
+              )
+            }
           >
             −
           </button>
@@ -1930,8 +2000,7 @@ export default function CanvasPage() {
             type="button"
             className="canvas-zoom-btn"
             onClick={() => {
-              setScale(1);
-              setTranslate({ x: 40, y: 40 });
+              setCanvasTransformNow(1, { x: 40, y: 40 });
               setFocusedTopicKey(null);
             }}
           >
