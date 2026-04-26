@@ -172,7 +172,9 @@ export function buildSegments(
   const hasSentences =
     Array.isArray(sentenceBoundaries) && sentenceBoundaries.length > 0;
   if (!highlights.length && !hasRead && !hasTemp && !hasSentences)
-    return [{ text, highlighted: false, read: false }];
+    return [
+      { text, start: 0, end: text.length, highlighted: false, read: false },
+    ];
 
   const boundaries = new Set([0, text.length]);
   for (const h of highlights) {
@@ -248,7 +250,7 @@ export function buildSegments(
  * @param {{start: number, end: number}[]} [readRanges]
  * @param {{start: number, end: number, color: string}[]} [temperatureHighlights]
  * @param {{page_number: number, start: number, end: number}[]} [pages]
- * @returns {{type: "page-splitter", page_number: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
+ * @returns {{type: "page-splitter", page_number: number, start: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
  */
 export function buildSegmentsWithPages(
   text,
@@ -279,7 +281,11 @@ export function buildSegmentsWithPages(
     const pageText = text.slice(page.start, page.end);
 
     if (p > 0) {
-      result.push({ type: "page-splitter", page_number: page.page_number });
+      result.push({
+        type: "page-splitter",
+        page_number: page.page_number,
+        start: page.start,
+      });
     }
 
     const pageHighlights = highlights

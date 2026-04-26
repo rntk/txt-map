@@ -83,11 +83,11 @@ export default function ArticleText({
       <img
         className="canvas-article-image__media"
         src={image.src}
-        alt={image.alt}
+        alt={image.alt || ""}
         title={image.title}
         loading="lazy"
       />
-      {image.alt && image.alt !== "Article image" && (
+      {image.alt && (
         <figcaption className="canvas-article-image__caption">
           {image.alt}
         </figcaption>
@@ -113,6 +113,7 @@ export default function ArticleText({
       {segments.flatMap((seg, idx) => {
         if (seg.type === "page-splitter") {
           return [
+            ...takeImagesBefore(seg.start ?? text.length),
             <div key={idx} className="canvas-page-splitter">
               <span className="canvas-page-splitter-line" />
               <span className="canvas-page-splitter-label">

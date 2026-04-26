@@ -15,6 +15,36 @@ function openChatPanel() {
   }
 }
 
+/**
+ * @param {Node} before
+ * @param {Node} target
+ * @param {Node} after
+ */
+function expectNodeBetween(before, target, after) {
+  expect(
+    Boolean(
+      before.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+  ).toBe(true);
+  expect(
+    Boolean(
+      target.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+  ).toBe(true);
+}
+
+function createDeferred() {
+  /** @type {(value: unknown) => void} */
+  let resolve = () => {};
+  /** @type {(reason?: unknown) => void} */
+  let reject = () => {};
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("CanvasPage highlight focusing", () => {
   const originalFetch = global.fetch;
   const originalGetBoundingClientRect =
@@ -172,7 +202,7 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
-  it("moves to the rendered article bottom on End", async () => {
+  it("moves to the rendered article bottom on End at the current scale", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url) => {
       if (url === "/api/canvas/article-1/article") {
@@ -200,7 +230,17 @@ describe("CanvasPage highlight focusing", () => {
         }
 
         if (this.classList.contains("canvas-article-text")) {
-          return makeRect({ left: 40, top: 40, width: 752, height: 2000 });
+          const currentScale = Number(
+            document
+              .querySelector(".canvas-viewport")
+              ?.style.getPropertyValue("--canvas-scale") || 1,
+          );
+          return makeRect({
+            left: 40,
+            top: 40,
+            width: 752 * currentScale,
+            height: 2000 * currentScale,
+          });
         }
 
         return makeRect({ left: 0, top: 0, width: 0, height: 0 });
@@ -211,11 +251,18 @@ describe("CanvasPage highlight focusing", () => {
     await screen.findByText("Alpha beta gamma.");
 
     const viewport = container.querySelector(".canvas-viewport");
+    const area = container.querySelector(".canvas-area");
+    fireEvent.wheel(area, { deltaY: -100, clientX: 300, clientY: 200 });
+
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.1");
+    });
+
     fireEvent.keyDown(window, { key: "End" });
 
     await waitFor(() => {
       expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
-        "-1240px",
+        "-1440px",
       );
     });
   });
@@ -256,12 +303,10 @@ describe("CanvasPage highlight focusing", () => {
 
     const image = await screen.findByAltText("Article chart");
     expect(image).toHaveAttribute("src", "https://example.com/media/chart.png");
-    const article = document.querySelector(".canvas-article-text");
     const imageBlock = image.closest(".canvas-article-image");
-    expect(article.children[0].textContent).toBe("Alpha");
-    expect(article.children[1]).toBe(imageBlock);
-    expect(article.children[2].textContent).toBe("\n");
-    expect(article.children[3].textContent).toBe("Beta gamma.");
+    const alpha = document.querySelector('[data-char-start="0"]');
+    const beta = document.querySelector('[data-char-start="6"]');
+    expectNodeBetween(alpha, imageBlock, beta);
   });
 
   it("uses following article text when image prefix text does not match", async () => {
@@ -299,11 +344,116 @@ describe("CanvasPage highlight focusing", () => {
     render(<CanvasPage />);
 
     const image = await screen.findByAltText("Article chart");
-    const article = document.querySelector(".canvas-article-text");
     const imageBlock = image.closest(".canvas-article-image");
-    expect(article.children[0].textContent).toBe("Alpha\n");
-    expect(article.children[1]).toBe(imageBlock);
-    expect(article.children[2].textContent).toBe("Beta gamma.");
+    const alpha = document.querySelector('[data-char-start="0"]');
+    const beta = document.querySelector('[data-char-start="6"]');
+    expectNodeBetween(alpha, imageBlock, beta);
+  });
+
+  it("ignores stale submission image fetches after article navigation", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const firstSubmission = createDeferred();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "First article.",
+            source_url: "https://example.com/first.html",
+          }),
+        };
+      }
+
+      if (url === "/api/submission/article-1") {
+        return firstSubmission.promise;
+      }
+
+      if (url === "/api/canvas/article-2/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Second article.",
+            html_content:
+              '<article><p>Second article.</p><img src="/new.png" alt="New image" /></article>',
+            source_url: "https://example.com/second.html",
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const { rerender } = render(<CanvasPage />);
+    await screen.findByText("First article.");
+
+    window.history.pushState({}, "", "/page/canvas/article-2");
+    rerender(<CanvasPage />);
+    await screen.findByText("Second article.");
+
+    firstSubmission.resolve({
+      ok: true,
+      json: async () => ({
+        html_content:
+          '<article><p>First article.</p><img src="/old.png" alt="Old image" /></article>',
+        source_url: "https://example.com/first.html",
+      }),
+    });
+
+    expect(await screen.findByAltText("New image")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByAltText("Old image")).not.toBeInTheDocument();
+    });
+  });
+
+  it("renders boundary images before the page splitter", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Alpha\nBeta",
+            sentences: ["Alpha", "Beta"],
+            pages: [
+              { page_number: 1, start: 0, end: 6 },
+              { page_number: 2, start: 6, end: 10 },
+            ],
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (url === "/api/submission/article-1") {
+        return {
+          ok: true,
+          json: async () => ({
+            html_content:
+              '<article><p>Navigation text not in article.</p><img src="/media/chart.png" alt="Article chart" /><p>Beta</p></article>',
+            source_url: "https://example.com/articles/story.html",
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    const image = await screen.findByAltText("Article chart");
+    const imageBlock = image.closest(".canvas-article-image");
+    const splitter = screen
+      .getByText("Page 2")
+      .closest(".canvas-page-splitter");
+    const beta = document.querySelector('[data-char-start="6"]');
+    expectNodeBetween(imageBlock, splitter, beta);
   });
 
   it("counter-scales topic hierarchy titles and cards when zooming out", async () => {
