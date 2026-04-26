@@ -28,6 +28,10 @@ const WHEEL_ZOOM_OUT_FACTOR = 0.9;
 const TOPIC_HIERARCHY_CARD_WIDTH = 190;
 const TOPIC_HIERARCHY_COLUMN_GAP = 18;
 const TOPIC_HIERARCHY_RAIL_PADDING = 24;
+const TOPIC_HIERARCHY_TITLE_FONT_SIZE_PX = 12;
+const TOPIC_HIERARCHY_TITLE_LINE_HEIGHT = 1.2;
+const TOPIC_HIERARCHY_TITLE_MAX_LINES = 2;
+const TOPIC_HIERARCHY_CARD_VERTICAL_CHROME_PX = 31;
 
 /**
  * @typedef {{x: number, y: number}} CanvasPoint
@@ -39,6 +43,41 @@ const TOPIC_HIERARCHY_RAIL_PADDING = 24;
  */
 function clampCanvasScale(value) {
   return Math.min(MAX_CANVAS_SCALE, Math.max(MIN_CANVAS_SCALE, value));
+}
+
+/**
+ * @param {number} scale
+ * @returns {number}
+ */
+function getZoomAdjustedTopicTitleFontSize(scale) {
+  const safeScale = clampCanvasScale(scale || 1);
+  return TOPIC_HIERARCHY_TITLE_FONT_SIZE_PX * Math.max(1, 1 / safeScale);
+}
+
+/**
+ * @param {number} scale
+ * @returns {number}
+ */
+function getZoomAdjustedTopicCardWidth(scale) {
+  const safeScale = clampCanvasScale(scale || 1);
+  return TOPIC_HIERARCHY_CARD_WIDTH * Math.max(1, 1 / safeScale);
+}
+
+/**
+ * @param {{scale: number, height: number}} params
+ * @returns {number}
+ */
+function getTopicTitleFontSize({ scale, height }) {
+  const zoomAdjustedFontSize = getZoomAdjustedTopicTitleFontSize(scale);
+  const availableTitleHeight = Math.max(
+    1,
+    height - TOPIC_HIERARCHY_CARD_VERTICAL_CHROME_PX,
+  );
+  const heightCappedFontSize =
+    availableTitleHeight /
+    (TOPIC_HIERARCHY_TITLE_LINE_HEIGHT * TOPIC_HIERARCHY_TITLE_MAX_LINES);
+
+  return Math.max(1, Math.min(zoomAdjustedFontSize, heightCappedFontSize));
 }
 
 /**
@@ -364,11 +403,13 @@ function getTopicSentenceTextRanges(
  *     endSentence: number,
  *     top: number,
  *     height: number,
+ *     titleFontSize: number,
  *     depth: number,
  *     levelIndex: number,
  *     right: number,
  *   }>,
  *   railWidth: number,
+ *   cardWidth: number,
  *   activeTopicKey: string | null,
  *   selectedTopicKey: string | null,
  *   onTopicEnter: (topicKey: string) => void,
@@ -383,6 +424,7 @@ function CanvasTopicHierarchyRail({
   onLevelChange,
   topicCards,
   railWidth,
+  cardWidth,
   activeTopicKey,
   selectedTopicKey,
   onTopicEnter,
@@ -396,7 +438,10 @@ function CanvasTopicHierarchyRail({
       className="canvas-topic-hierarchy"
       aria-label="Topic hierarchy"
       onMouseDown={(event) => event.stopPropagation()}
-      style={{ "--canvas-topic-hierarchy-width": `${railWidth}px` }}
+      style={{
+        "--canvas-topic-hierarchy-width": `${railWidth}px`,
+        "--topic-card-width": `${cardWidth}px`,
+      }}
     >
       <div className="canvas-topic-hierarchy__header">
         <span className="canvas-topic-hierarchy__title">Topics</span>
@@ -437,6 +482,7 @@ function CanvasTopicHierarchyRail({
                   style={{
                     "--topic-card-top": `${card.top}px`,
                     "--topic-card-height": `${card.height}px`,
+                    "--topic-card-title-font-size": `${card.titleFontSize}px`,
                     "--topic-card-right": `${card.right}px`,
                     "--topic-accent-color": getHierarchyTopicAccentColor(
                       card.fullPath,
@@ -751,6 +797,10 @@ export default function CanvasPage() {
     viewport.style.setProperty("--canvas-translate-x", `${translate.x}px`);
     viewport.style.setProperty("--canvas-translate-y", `${translate.y}px`);
     viewport.style.setProperty("--canvas-scale", `${scale}`);
+    viewport.style.setProperty(
+      "--canvas-topic-title-font-size",
+      `${getZoomAdjustedTopicTitleFontSize(scale)}px`,
+    );
   }, [scale, translate.x, translate.y]);
 
   // Chat
@@ -1005,12 +1055,17 @@ export default function CanvasPage() {
     return rows.find((row) => row.fullPath === activeTopicKey) || selectedTopic;
   }, [activeTopicKey, selectedTopic, topicHierarchyRowsByLevel]);
 
+  const topicHierarchyCardWidth = useMemo(
+    () => getZoomAdjustedTopicCardWidth(scale),
+    [scale],
+  );
+
   const topicHierarchyRailWidth = useMemo(
     () =>
-      (selectedLevel + 1) * TOPIC_HIERARCHY_CARD_WIDTH +
+      (selectedLevel + 1) * topicHierarchyCardWidth +
       selectedLevel * TOPIC_HIERARCHY_COLUMN_GAP +
       TOPIC_HIERARCHY_RAIL_PADDING * 2,
-    [selectedLevel],
+    [selectedLevel, topicHierarchyCardWidth],
   );
 
   const articleHighlights = useMemo(() => {
@@ -1172,6 +1227,7 @@ export default function CanvasPage() {
       if (!articleEl || !wrapEl) return;
       const wrapRect = wrapEl.getBoundingClientRect();
       const s = scaleRef.current || 1;
+      const cardWidth = getZoomAdjustedTopicCardWidth(s);
 
       const toPositionedCard = (row, levelIndex) => {
         const textRange = getTopicTextRange(
@@ -1208,12 +1264,12 @@ export default function CanvasPage() {
           endSentence,
           top: rawTop,
           height,
+          titleFontSize: getTopicTitleFontSize({ scale: s, height }),
           depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
           levelIndex,
           right:
             TOPIC_HIERARCHY_RAIL_PADDING +
-            levelIndex *
-              (TOPIC_HIERARCHY_CARD_WIDTH + TOPIC_HIERARCHY_COLUMN_GAP),
+            levelIndex * (cardWidth + TOPIC_HIERARCHY_COLUMN_GAP),
         };
       };
 
@@ -1785,6 +1841,7 @@ export default function CanvasPage() {
                   }}
                   topicCards={topicHierarchyLayout.topicCards}
                   railWidth={topicHierarchyRailWidth}
+                  cardWidth={topicHierarchyCardWidth}
                   activeTopicKey={activeTopicKey}
                   selectedTopicKey={selectedTopicKey}
                   onTopicEnter={setHoveredTopicKey}

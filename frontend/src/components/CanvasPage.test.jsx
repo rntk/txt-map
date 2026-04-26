@@ -8,6 +8,8 @@ describe("CanvasPage highlight focusing", () => {
   const originalGetBoundingClientRect =
     HTMLElement.prototype.getBoundingClientRect;
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  const originalRangeGetBoundingClientRect =
+    Range.prototype.getBoundingClientRect;
 
   beforeEach(() => {
     window.history.pushState({}, "", "/page/canvas/article-1");
@@ -17,6 +19,12 @@ describe("CanvasPage highlight focusing", () => {
     global.fetch = originalFetch;
     HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
     HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    if (originalRangeGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect =
+        originalRangeGetBoundingClientRect;
+    } else {
+      delete Range.prototype.getBoundingClientRect;
+    }
     vi.restoreAllMocks();
   });
 
@@ -147,6 +155,81 @@ describe("CanvasPage highlight focusing", () => {
       expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
         "24px",
       );
+    });
+  });
+
+  it("counter-scales topic hierarchy titles and cards when zooming out", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Alpha beta gamma.",
+            sentences: ["Alpha beta gamma."],
+            topics: [
+              {
+                name: "Very Long Main Topic Title For Zoomed Out Canvas",
+                sentences: [1],
+              },
+            ],
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    const { container } = render(<CanvasPage />);
+
+    await screen.findByText("Alpha beta gamma.");
+
+    const area = container.querySelector(".canvas-area");
+    const viewport = container.querySelector(".canvas-viewport");
+    fireEvent.wheel(area, { deltaY: 100, clientX: 300, clientY: 200 });
+
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("0.9");
+      expect(
+        parseFloat(
+          viewport.style.getPropertyValue("--canvas-topic-title-font-size"),
+        ),
+      ).toBeCloseTo(13.333, 3);
+    });
+
+    Range.prototype.getBoundingClientRect = vi.fn(() =>
+      makeRect({ left: 40, top: 100, width: 600, height: 40 }),
+    );
+
+    fireEvent.click(screen.getByTitle("Show topic hierarchy"));
+
+    const hierarchy = await screen.findByLabelText("Topic hierarchy");
+    const topicCard = await screen.findByRole("button", {
+      name: /Very Long Main Topic Title/,
+    });
+
+    await waitFor(() => {
+      expect(
+        parseFloat(hierarchy.style.getPropertyValue("--topic-card-width")),
+      ).toBeCloseTo(211.111, 3);
+      expect(
+        parseFloat(
+          topicCard.style.getPropertyValue("--topic-card-title-font-size"),
+        ),
+      ).toBeCloseTo(5.602, 3);
     });
   });
 
