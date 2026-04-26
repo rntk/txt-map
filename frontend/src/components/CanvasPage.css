@@ -959,7 +959,10 @@
   border-radius: 8px;
   padding: 12px 14px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
 }
 
 .canvas-summary-view__card:hover {

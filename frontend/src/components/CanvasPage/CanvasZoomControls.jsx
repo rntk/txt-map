@@ -19,6 +19,8 @@ import React from "react";
  *   showTemperature: boolean,
  *   onToggleTemperature: () => void,
  *   temperatureAvailable: boolean,
+ *   showChat: boolean,
+ *   onToggleChat: () => void,
  * }} props
  */
 export default function CanvasZoomControls({
@@ -37,6 +39,8 @@ export default function CanvasZoomControls({
   showTemperature,
   onToggleTemperature,
   temperatureAvailable,
+  showChat,
+  onToggleChat,
 }) {
   return (
     <div className="canvas-controls">
@@ -149,6 +153,14 @@ export default function CanvasZoomControls({
         disabled={!temperatureAvailable}
       >
         T
+      </button>
+      <button
+        type="button"
+        className={`canvas-read-toggle${showChat ? " is-active" : ""}`}
+        onClick={onToggleChat}
+        title={showChat ? "Hide chat panel" : "Show chat panel"}
+      >
+        C
       </button>
     </div>
   );

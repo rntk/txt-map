@@ -18,6 +18,7 @@ const inlineStyleAllowlist = [
   'src/components/annotations/ArticleTreeNav.jsx',
   'src/components/ArticleMarkupView.jsx',
   'src/components/CanvasPage.jsx',
+  'src/components/CanvasPage/**/*',
   'src/components/ArticleReadProgress.jsx',
   'src/components/ArticleStructureChart.jsx',
   'src/components/CircularPackingChart.jsx',
