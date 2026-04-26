@@ -164,11 +164,14 @@ export function buildSegments(
   highlights,
   readRanges,
   temperatureHighlights,
+  sentenceBoundaries,
 ) {
   const hasRead = Array.isArray(readRanges) && readRanges.length > 0;
   const hasTemp =
     Array.isArray(temperatureHighlights) && temperatureHighlights.length > 0;
-  if (!highlights.length && !hasRead && !hasTemp)
+  const hasSentences =
+    Array.isArray(sentenceBoundaries) && sentenceBoundaries.length > 0;
+  if (!highlights.length && !hasRead && !hasTemp && !hasSentences)
     return [{ text, highlighted: false, read: false }];
 
   const boundaries = new Set([0, text.length]);
@@ -197,6 +200,13 @@ export function buildSegments(
       if (s < e) {
         boundaries.add(s);
         boundaries.add(e);
+      }
+    }
+  }
+  if (hasSentences) {
+    for (const b of sentenceBoundaries) {
+      if (Number.isFinite(b) && b > 0 && b < text.length) {
+        boundaries.add(b);
       }
     }
   }
@@ -246,6 +256,7 @@ export function buildSegmentsWithPages(
   readRanges,
   temperatureHighlights,
   pages,
+  sentenceOffsets,
 ) {
   const hasPages = Array.isArray(pages) && pages.length > 0;
   if (!hasPages) {
@@ -254,6 +265,7 @@ export function buildSegmentsWithPages(
       highlights,
       readRanges,
       temperatureHighlights,
+      sentenceOffsets,
     ).map((s) => ({
       ...s,
       type: "segment",
@@ -289,11 +301,16 @@ export function buildSegmentsWithPages(
       color: t.color,
     }));
 
+    const pageSentences = (sentenceOffsets || [])
+      .map((off) => off - page.start)
+      .filter((off) => off > 0 && off < page.end - page.start);
+
     const segments = buildSegments(
       pageText,
       pageHighlights,
       pageRead,
       pageTemp,
+      pageSentences,
     );
     for (const seg of segments) {
       result.push({

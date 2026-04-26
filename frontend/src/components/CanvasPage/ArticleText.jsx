@@ -11,6 +11,8 @@ import { buildSegmentsWithPages } from "./utils";
  *   temperatureHighlights?: {start: number, end: number, color: string}[],
  *   pages?: {page_number: number, start: number, end: number}[],
  *   textRef?: React.RefObject<HTMLDivElement | null>,
+ *   sentenceOffsets?: number[],
+ *   onTextClick?: (e: React.MouseEvent<HTMLDivElement>) => void,
  * }} props
  */
 export default function ArticleText({
@@ -22,6 +24,8 @@ export default function ArticleText({
   temperatureHighlights,
   pages,
   textRef,
+  sentenceOffsets,
+  onTextClick,
 }) {
   const segments = buildSegmentsWithPages(
     text,
@@ -29,11 +33,40 @@ export default function ArticleText({
     showReadStatus ? readRanges : undefined,
     temperatureHighlights,
     pages,
+    sentenceOffsets,
   );
+
+  const sentenceIndexFor = (start) => {
+    if (
+      !Array.isArray(sentenceOffsets) ||
+      sentenceOffsets.length === 0 ||
+      typeof start !== "number"
+    ) {
+      return undefined;
+    }
+    let lo = 0;
+    let hi = sentenceOffsets.length - 1;
+    let result = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (sentenceOffsets[mid] <= start) {
+        result = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return result >= 0 ? result : undefined;
+  };
+
   let firstHighlightedSegmentFound = false;
 
   return (
-    <div className="canvas-article-text" ref={textRef}>
+    <div
+      className="canvas-article-text"
+      ref={textRef}
+      onClick={onTextClick}
+    >
       {segments.map((seg, idx) => {
         if (seg.type === "page-splitter") {
           return (
@@ -53,6 +86,10 @@ export default function ArticleText({
           firstHighlightedSegmentFound = true;
         }
 
+        const sentenceIdx = sentenceIndexFor(seg.start);
+        const sentenceAttr =
+          sentenceIdx !== undefined ? String(sentenceIdx) : undefined;
+
         if (seg.highlighted) {
           return (
             <mark
@@ -62,6 +99,7 @@ export default function ArticleText({
               title={seg.label || undefined}
               data-char-start={seg.start}
               data-char-end={seg.end}
+              data-sentence-index={sentenceAttr}
             >
               {seg.text}
             </mark>
@@ -82,6 +120,7 @@ export default function ArticleText({
               style={{ backgroundColor: seg.temperatureColor }}
               data-char-start={seg.start}
               data-char-end={seg.end}
+              data-sentence-index={sentenceAttr}
             >
               {seg.text}
             </span>
@@ -94,6 +133,9 @@ export default function ArticleText({
             className={
               seg.read && showReadStatus ? "canvas-sentence--read" : undefined
             }
+            data-char-start={seg.start}
+            data-char-end={seg.end}
+            data-sentence-index={sentenceAttr}
           >
             {seg.text}
           </span>

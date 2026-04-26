@@ -41,6 +41,8 @@ export default function CanvasZoomControls({
   temperatureAvailable,
   showChat,
   onToggleChat,
+  tooltipEnabled,
+  onToggleTooltip,
 }) {
   return (
     <div className="canvas-controls">
@@ -153,6 +155,18 @@ export default function CanvasZoomControls({
         disabled={!temperatureAvailable}
       >
         T
+      </button>
+      <button
+        type="button"
+        className={`canvas-read-toggle${tooltipEnabled ? " is-active" : ""}`}
+        onClick={onToggleTooltip}
+        title={
+          tooltipEnabled
+            ? "Disable click tooltip"
+            : "Enable click tooltip"
+        }
+      >
+        ?
       </button>
       <button
         type="button"

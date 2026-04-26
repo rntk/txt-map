@@ -36,7 +36,46 @@ import CanvasChatPanel from "./CanvasPage/CanvasChatPanel";
 import CanvasEventsPanel from "./CanvasPage/CanvasEventsPanel";
 import CanvasZoomControls from "./CanvasPage/CanvasZoomControls";
 import CanvasSummaryView from "./CanvasPage/CanvasSummaryView";
+import CanvasArticleTooltip from "./CanvasPage/CanvasArticleTooltip";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
+import { useTooltip } from "../hooks/useTooltip";
+
+const TOOLTIP_WIDTH = 260;
+const TOOLTIP_HEIGHT_ESTIMATE = 100;
+const TOOLTIP_VIEWPORT_MARGIN = 10;
+
+function getHoverWord(rootEl, clientX, clientY) {
+  if (!rootEl) return null;
+  const normalize = (value) => {
+    const cleaned = String(value || "").replace(/[^a-zA-ZÀ-ÿ0-9\-']/g, "");
+    return cleaned.length > 1 ? cleaned : null;
+  };
+
+  let node = null;
+  let offset = null;
+  if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(clientX, clientY);
+    if (pos?.offsetNode && rootEl.contains(pos.offsetNode)) {
+      node = pos.offsetNode;
+      offset = pos.offset;
+    }
+  } else if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(clientX, clientY);
+    if (range?.startContainer && rootEl.contains(range.startContainer)) {
+      node = range.startContainer;
+      offset = range.startOffset;
+    }
+  }
+
+  if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+
+  const text = node.nodeValue || "";
+  let start = offset;
+  let end = offset;
+  while (start > 0 && /[a-zA-ZÀ-ÿ0-9\-']/.test(text[start - 1])) start -= 1;
+  while (end < text.length && /[a-zA-ZÀ-ÿ0-9\-']/.test(text[end])) end += 1;
+  return normalize(text.slice(start, end));
+}
 
 export default function CanvasPage() {
   const articleId = window.location.pathname.split("/")[3];
@@ -410,6 +449,12 @@ export default function CanvasPage() {
   // Right panel tab
   const [activeTab, setActiveTab] = useState("chat");
 
+  // Tooltip
+  const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const { tooltip, lastTargetRef, showTooltip, hideTooltip } =
+    useTooltip(tooltipEnabled);
+  const tooltipContainerRef = useRef(null);
+
   // Load article text
   useEffect(() => {
     if (!articleId) return;
@@ -434,6 +479,139 @@ export default function CanvasPage() {
         setArticleLoading(false);
       });
   }, [articleId]);
+
+  // Sentence-to-topic mapping for tooltip
+  const sentenceToTopicsMap = useMemo(() => {
+    const map = new Map();
+    (submissionTopics || []).forEach((topic) => {
+      const sents = Array.isArray(topic.sentences) ? topic.sentences : [];
+      sents.forEach((num) => {
+        const idx = num - 1;
+        if (!map.has(idx)) map.set(idx, []);
+        map.get(idx).push(topic);
+      });
+    });
+    return map;
+  }, [submissionTopics]);
+
+  const persistReadTopics = useCallback(
+    (nextTopics) => {
+      if (!articleId) return;
+      fetch(`/api/submission/${articleId}/read-topics`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ read_topics: nextTopics }),
+      }).catch(() => {});
+    },
+    [articleId],
+  );
+
+  const toggleTopicRead = useCallback(
+    (topicName) => {
+      setReadTopics((prev) => {
+        const set = new Set(prev || []);
+        if (set.has(topicName)) {
+          set.delete(topicName);
+        } else {
+          set.add(topicName);
+        }
+        const next = Array.from(set);
+        persistReadTopics(next);
+        return next;
+      });
+    },
+    [persistReadTopics],
+  );
+
+  const [highlightedTopicNames, setHighlightedTopicNames] = useState(
+    () => new Set(),
+  );
+
+  const toggleTopicHighlight = useCallback((topicName) => {
+    setHighlightedTopicNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicName)) {
+        next.delete(topicName);
+      } else {
+        next.add(topicName);
+      }
+      return next;
+    });
+  }, []);
+
+  const getTooltipPosition = useCallback((clientX, clientY) => {
+    let x = clientX - 10;
+    let y = clientY - 10;
+    const maxX = window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_MARGIN;
+    const maxY =
+      window.innerHeight - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_VIEWPORT_MARGIN;
+    x = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(x, maxX));
+    y = Math.max(TOOLTIP_VIEWPORT_MARGIN, Math.min(y, maxY));
+    return { x, y };
+  }, []);
+
+  const handleArticleClick = useCallback(
+    (e) => {
+      if (!tooltipEnabled) return;
+      const token = e.target.closest("[data-sentence-index]");
+      if (!token) {
+        hideTooltip();
+        return;
+      }
+      if (token === lastTargetRef.current && tooltip) {
+        hideTooltip();
+        return;
+      }
+      const sentenceIdx = Number(token.getAttribute("data-sentence-index"));
+      if (!Number.isInteger(sentenceIdx)) {
+        hideTooltip();
+        return;
+      }
+      const topics = sentenceToTopicsMap.get(sentenceIdx) || [];
+      const matchedTopics = topics.map((t) => ({ topic: t }));
+      const word = getHoverWord(articleTextRef.current, e.clientX, e.clientY);
+      if (matchedTopics.length === 0 && !word) {
+        hideTooltip();
+        return;
+      }
+      lastTargetRef.current = token;
+      const { x, y } = getTooltipPosition(e.clientX, e.clientY);
+      showTooltip(matchedTopics, x, y, {
+        sentenceIdx,
+        totalSentences: submissionSentences.length,
+        word,
+      });
+    },
+    [
+      tooltipEnabled,
+      tooltip,
+      lastTargetRef,
+      sentenceToTopicsMap,
+      submissionSentences.length,
+      getTooltipPosition,
+      hideTooltip,
+      showTooltip,
+    ],
+  );
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!tooltip) return;
+      if (tooltipContainerRef.current?.contains(e.target)) return;
+      if (articleTextRef.current?.contains(e.target)) return;
+      hideTooltip();
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") hideTooltip();
+    };
+    document.addEventListener("click", handleOutsideClick, true);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick, true);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [hideTooltip, tooltip]);
 
   // Read ranges
   const readSentenceIndices = useMemo(() => {
@@ -661,6 +839,23 @@ export default function CanvasPage() {
         });
       });
     }
+    if (highlightedTopicNames.size > 0) {
+      (submissionTopics || []).forEach((topic) => {
+        if (!highlightedTopicNames.has(topic.name)) return;
+        const textRanges = getTopicSentenceTextRanges(
+          topic,
+          sentenceOffsets,
+          submissionSentences,
+        );
+        textRanges.forEach((textRange) => {
+          base.push({
+            start: textRange.charStart,
+            end: textRange.charEnd,
+            label: topic.name,
+          });
+        });
+      });
+    }
     return base;
   }, [
     currentHighlights,
@@ -671,6 +866,8 @@ export default function CanvasPage() {
     activeTopicSelection,
     sentenceOffsets,
     submissionSentences,
+    highlightedTopicNames,
+    submissionTopics,
   ]);
 
   // Auto-focus canvas on the selected highlight event
@@ -1086,6 +1283,8 @@ export default function CanvasPage() {
                     temperatureHighlights={temperatureHighlights}
                     pages={articlePages}
                     textRef={articleTextRef}
+                    sentenceOffsets={sentenceOffsets}
+                    onTextClick={handleArticleClick}
                   />
                 )}
                 {!showSummaryMode &&
@@ -1227,8 +1426,21 @@ export default function CanvasPage() {
           temperatureAvailable={temperatureAvailable}
           showChat={showChat}
           onToggleChat={() => setShowChat((v) => !v)}
+          tooltipEnabled={tooltipEnabled}
+          onToggleTooltip={() => setTooltipEnabled((v) => !v)}
         />
       </div>
+
+      <CanvasArticleTooltip
+        tooltip={tooltip}
+        containerRef={tooltipContainerRef}
+        readTopics={readTopics}
+        highlightedTopicNames={highlightedTopicNames}
+        onToggleHighlight={toggleTopicHighlight}
+        onToggleRead={toggleTopicRead}
+        onHide={hideTooltip}
+        submissionId={articleId}
+      />
 
       {/* Right: Tabbed Panel */}
       {showChat && (
