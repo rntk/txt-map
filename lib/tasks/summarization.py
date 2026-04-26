@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from lib.llm_queue.client import QueuedLLMClient
@@ -684,6 +685,307 @@ def generate_article_summary(
     return _fallback_merge_article_summary(chunk_summaries)
 
 
+@dataclass
+class TopicNode:
+    path: str
+    name: str
+    level: int
+    own_sentences: List[int] = field(default_factory=list)
+    source_sentences: List[int] = field(default_factory=list)
+    children: List["TopicNode"] = field(default_factory=list)
+    summary: Optional[Dict[str, Any]] = None
+
+
+def build_topic_tree(
+    topics: List[Dict[str, Any]],
+    subtopics: List[Dict[str, Any]],
+    total_sentences: int,
+) -> TopicNode:
+    """
+    Build a hierarchical TopicNode tree from '>'-delimited topic paths and
+    optional subtopic leaves. Internal nodes that don't appear in `topics`
+    explicitly are synthesized so the path is fully connected back to the root.
+    """
+    root = TopicNode(path="", name="", level=0)
+    nodes: Dict[str, TopicNode] = {"": root}
+
+    def get_or_create(path: str) -> TopicNode:
+        if path in nodes:
+            return nodes[path]
+        parts = path.split(">")
+        parent_path = ">".join(parts[:-1])
+        parent = get_or_create(parent_path)
+        node = TopicNode(path=path, name=parts[-1], level=len(parts))
+        parent.children.append(node)
+        nodes[path] = node
+        return node
+
+    for topic in topics or []:
+        name = topic.get("name", "")
+        if not name or name == "no_topic":
+            continue
+        node = get_or_create(name)
+        node.own_sentences = sorted(set(topic.get("sentences", []) or []))
+
+    for sub in subtopics or []:
+        parent_path = sub.get("parent_topic", "")
+        sub_name = sub.get("name", "")
+        if not parent_path or not sub_name or parent_path == "no_topic":
+            continue
+        parent = get_or_create(parent_path)
+        leaf_path = f"{parent_path}>{sub_name}"
+        if leaf_path in nodes:
+            leaf = nodes[leaf_path]
+        else:
+            leaf = TopicNode(path=leaf_path, name=sub_name, level=parent.level + 1)
+            parent.children.append(leaf)
+            nodes[leaf_path] = leaf
+        leaf.own_sentences = sorted(
+            set(leaf.own_sentences) | set(sub.get("sentences", []) or [])
+        )
+
+    def aggregate(node: TopicNode) -> List[int]:
+        agg = set(node.own_sentences)
+        for child in node.children:
+            agg.update(aggregate(child))
+        node.source_sentences = sorted(agg)
+        return node.source_sentences
+
+    if not root.children:
+        root.source_sentences = list(range(1, total_sentences + 1))
+    else:
+        aggregate(root)
+
+    return root
+
+
+def _group_children_for_merge(
+    child_records: List[Dict[str, Any]],
+    llm_client: Any,
+    max_output_tokens_buffer: int = 1200,
+) -> List[List[Dict[str, Any]]]:
+    """Pack child summary records into groups that fit the merge prompt budget."""
+    template_tokens = llm_client.estimate_tokens(
+        ARTICLE_SUMMARY_MERGE_PROMPT_TEMPLATE.format(chunk_summaries="")
+    )
+    max_chunk_tokens = max(
+        1, llm_client.max_context_tokens - template_tokens - max_output_tokens_buffer
+    )
+
+    groups: List[List[Dict[str, Any]]] = []
+    current: List[Dict[str, Any]] = []
+    current_tokens = 0
+    for rec in child_records:
+        rec_tokens = max(
+            1, llm_client.estimate_tokens(_format_chunk_summaries_for_merge([rec]))
+        )
+        if current and current_tokens + rec_tokens > max_chunk_tokens:
+            groups.append(current)
+            current = []
+            current_tokens = 0
+        current.append(rec)
+        current_tokens += rec_tokens
+    if current:
+        groups.append(current)
+    return groups
+
+
+def _run_merge(
+    child_records: List[Dict[str, Any]],
+    primary_call: Callable[[str, float], str],
+    retry_call: Callable[[str, float], str],
+    max_attempts: int,
+) -> Dict[str, Any]:
+    base_merge_prompt = _build_article_summary_merge_prompt(
+        _format_chunk_summaries_for_merge(child_records)
+    )
+    last_response_text = ""
+    for attempt in range(1, max_attempts + 1):
+        prompt = (
+            base_merge_prompt if attempt == 1 else base_merge_prompt + _RETRY_SUFFIX
+        )
+        call = primary_call if attempt == 1 else retry_call
+        response_text = call(prompt, 0.8)
+        last_response_text = response_text
+        parsed = parse_article_summary_response(response_text)
+        if _article_summary_has_required_content(parsed):
+            return parsed
+        logger.warning(
+            "Topic-tree merge parse failed on attempt %s/%s. Response preview: %s",
+            attempt,
+            max_attempts,
+            _response_preview(response_text),
+        )
+    logger.warning(
+        "Topic-tree merge returned invalid JSON. Using merged fallback. "
+        "Last response preview: %s",
+        _response_preview(last_response_text),
+    )
+    return _fallback_merge_article_summary(child_records)
+
+
+def _merge_records_recursively(
+    records: List[Dict[str, Any]],
+    primary_call: Callable[[str, float], str],
+    retry_call: Callable[[str, float], str],
+    llm_client: Any,
+    max_attempts: int,
+) -> Dict[str, Any]:
+    if len(records) == 1:
+        return records[0]["summary"]
+    groups = _group_children_for_merge(records, llm_client)
+    if len(groups) == 1:
+        return _run_merge(groups[0], primary_call, retry_call, max_attempts)
+    merged_records = []
+    for grp in groups:
+        merged_records.append(
+            {
+                "start_sentence": grp[0]["start_sentence"],
+                "end_sentence": grp[-1]["end_sentence"],
+                "summary": _run_merge(grp, primary_call, retry_call, max_attempts),
+            }
+        )
+    return _merge_records_recursively(
+        merged_records, primary_call, retry_call, llm_client, max_attempts
+    )
+
+
+def _children_to_records(children: List[TopicNode]) -> List[Dict[str, Any]]:
+    records = []
+    for c in children:
+        start = c.source_sentences[0] if c.source_sentences else 0
+        end = c.source_sentences[-1] if c.source_sentences else 0
+        records.append(
+            {
+                "start_sentence": start,
+                "end_sentence": end,
+                "summary": c.summary or {"text": "", "bullets": []},
+            }
+        )
+    return records
+
+
+def summarize_topic_tree(
+    root: TopicNode,
+    sentences: List[str],
+    cached_llm: Any,
+    llm_client: Any,
+    overlap_sentences: int = 2,
+    max_attempts: int = ARTICLE_SUMMARY_MAX_ATTEMPTS,
+) -> None:
+    """Sequential bottom-up summarization. Mutates `root` in place."""
+    primary = cached_llm.call
+    retry = _LLMAdapter(llm_client).call
+
+    def visit(node: TopicNode) -> None:
+        for child in node.children:
+            visit(child)
+        if not node.children:
+            leaf_sents = [
+                sentences[i - 1]
+                for i in node.source_sentences
+                if 1 <= i <= len(sentences)
+            ]
+            node.summary = (
+                generate_article_summary(
+                    leaf_sents,
+                    cached_llm,
+                    llm_client,
+                    overlap_sentences=overlap_sentences,
+                    max_attempts=max_attempts,
+                )
+                if leaf_sents
+                else {"text": "", "bullets": []}
+            )
+            return
+        if len(node.children) == 1:
+            node.summary = node.children[0].summary
+            return
+        node.summary = _merge_records_recursively(
+            _children_to_records(node.children),
+            primary,
+            retry,
+            llm_client,
+            max_attempts,
+        )
+
+    visit(root)
+
+
+def _parallel_summarize_topic_tree(
+    root: TopicNode,
+    sentences: List[str],
+    llm: "QueuedLLMClient",
+    overlap_sentences: int = 2,
+    max_attempts: int = ARTICLE_SUMMARY_MAX_ATTEMPTS,
+) -> None:
+    """Parallel bottom-up summarization. Each leaf parallelizes its own chunks."""
+    primary = llm.call
+    retry = llm.call
+
+    def visit(node: TopicNode) -> None:
+        for child in node.children:
+            visit(child)
+        if not node.children:
+            leaf_sents = [
+                sentences[i - 1]
+                for i in node.source_sentences
+                if 1 <= i <= len(sentences)
+            ]
+            node.summary = (
+                _parallel_generate_article_summary(
+                    leaf_sents,
+                    llm,
+                    overlap_sentences=overlap_sentences,
+                    max_attempts=max_attempts,
+                )
+                if leaf_sents
+                else {"text": "", "bullets": []}
+            )
+            return
+        if len(node.children) == 1:
+            node.summary = node.children[0].summary
+            return
+        node.summary = _merge_records_recursively(
+            _children_to_records(node.children),
+            primary,
+            retry,
+            llm,
+            max_attempts,
+        )
+
+    visit(root)
+
+
+def topic_tree_to_dict(node: TopicNode) -> Dict[str, Any]:
+    return {
+        "path": node.path,
+        "name": node.name,
+        "level": node.level,
+        "summary": node.summary or {"text": "", "bullets": []},
+        "source_sentences": node.source_sentences,
+        "children": [topic_tree_to_dict(c) for c in node.children],
+    }
+
+
+def topic_tree_to_flat_index(root: TopicNode) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+
+    def walk(n: TopicNode) -> None:
+        s = n.summary or {"text": "", "bullets": []}
+        out[n.path] = {
+            "text": s.get("text", ""),
+            "bullets": s.get("bullets", []),
+            "level": n.level,
+            "source_sentences": n.source_sentences,
+        }
+        for c in n.children:
+            walk(c)
+
+    walk(root)
+    return out
+
+
 def process_summarization(
     submission: Dict[str, Any], db: Any, llm: Any, cache_store: Any = None
 ) -> None:
@@ -702,50 +1004,24 @@ def process_summarization(
 
     sentences = results.get("sentences", [])
     topics = results.get("topics", [])
+    subtopics = results.get("subtopics", [])
 
     if not sentences:
         raise ValueError("Text splitting must be completed first")
 
-    if isinstance(llm, QueuedLLMClient):
-        # ── Parallel path ─────────────────────────────────────────────────────
-        # Submit sentence summaries, article chunks, and topic summaries all
-        # concurrently to the LLM queue, then gather results.
-        # Cache and network retries are handled by QueuedLLMClient / LLM workers.
+    topic_tree = build_topic_tree(topics, subtopics, len(sentences))
 
+    if isinstance(llm, QueuedLLMClient):
         print(f"Generating overall summary for {len(sentences)} sentences (parallel)")
         summary_sentences, summary_mappings = _parallel_summarize_sentence_groups(
             sentences, llm
         )
-        article_summary = _parallel_generate_article_summary(sentences, llm)
-        if not _article_summary_has_required_content(article_summary):
-            raise ArticleSummaryGenerationError(
-                f"Article summary generation produced empty content for submission {submission_id}"
-            )
-
-        # Topic summaries — submit all in parallel.
-        topic_summaries: Dict[str, str] = {}
-        if topics:
-            print(f"Generating summaries for {len(topics)} topics (parallel)")
-            valid_topics_futures: List[tuple] = []
-            for topic in topics:
-                if topic["sentences"] and topic["name"] != "no_topic":
-                    topic_sentences_text = [
-                        sentences[idx - 1]
-                        for idx in topic["sentences"]
-                        if 0 <= idx - 1 < len(sentences)
-                    ]
-                    if topic_sentences_text:
-                        topic_text = " ".join(topic_sentences_text)
-                        prompt = _build_sentence_summary_prompt(topic_text)
-                        valid_topics_futures.append(
-                            (topic["name"], llm.submit(prompt, 0.8))
-                        )
-            for topic_name, future in valid_topics_futures:
-                result = future.result().strip()
-                topic_summaries[topic_name] = result
+        print(
+            f"Summarizing topic tree ({len(topic_tree_to_flat_index(topic_tree))} nodes, parallel)"
+        )
+        _parallel_summarize_topic_tree(topic_tree, sentences, llm)
 
     else:
-        # ── Sequential path (legacy LLMClient or test mocks) ──────────────────
         llm_adapter = _LLMAdapter(llm)
         if cache_store is not None:
             cached_llm = CachingLLMCallable(
@@ -767,38 +1043,31 @@ def process_summarization(
         summary_sentences, summary_mappings = summarize_by_sentence_groups(
             sentences, cached_llm, llm
         )
-        article_summary = generate_article_summary(
-            sentences,
-            article_summary_cached_llm,
-            llm,
+        print("Summarizing topic tree")
+        summarize_topic_tree(topic_tree, sentences, article_summary_cached_llm, llm)
+
+    article_summary = topic_tree.summary or {"text": "", "bullets": []}
+    if not _article_summary_has_required_content(article_summary):
+        raise ArticleSummaryGenerationError(
+            f"Article summary generation produced empty content for submission {submission_id}"
         )
-        if not _article_summary_has_required_content(article_summary):
-            raise ArticleSummaryGenerationError(
-                f"Article summary generation produced empty content for submission {submission_id}"
-            )
 
-        topic_summaries = {}
-        if topics:
-            print(f"Generating summaries for {len(topics)} topics")
-            for topic in topics:
-                if topic["sentences"] and topic["name"] != "no_topic":
-                    topic_sentences_text = [
-                        sentences[idx - 1]
-                        for idx in topic["sentences"]
-                        if 0 <= idx - 1 < len(sentences)
-                    ]
-                    if topic_sentences_text:
-                        topic_text = " ".join(topic_sentences_text)
-                        ts_summary, _ = summarize_by_sentence_groups(
-                            [topic_text], cached_llm, llm
-                        )
-                        topic_summaries[topic["name"]] = (
-                            ts_summary[0] if ts_summary else ""
-                        )
+    topic_summary_tree = topic_tree_to_dict(topic_tree)
+    topic_summary_index = topic_tree_to_flat_index(topic_tree)
 
-    # Update submission with results
+    # Back-compat: leaf-name → text mapping keyed by full topic path.
+    topic_summaries: Dict[str, str] = {}
+    for topic in topics or []:
+        name = topic.get("name", "")
+        if not name or name == "no_topic":
+            continue
+        entry = topic_summary_index.get(name)
+        if entry:
+            topic_summaries[name] = entry.get("text", "")
+
     print(
-        f"Storing {len(topic_summaries)} topic summaries for submission {submission_id}"
+        f"Storing {len(topic_summary_index)} tree-node summaries "
+        f"({len(topic_summaries)} legacy topic summaries) for submission {submission_id}"
     )
     submissions_storage = SubmissionsStorage(db)
     submissions_storage.update_results(
@@ -808,11 +1077,13 @@ def process_summarization(
             "summary_mappings": summary_mappings,
             "topic_summaries": topic_summaries,
             "article_summary": article_summary,
+            "topic_summary_tree": topic_summary_tree,
+            "topic_summary_index": topic_summary_index,
         },
     )
 
     print(
         f"Summarization completed for submission {submission_id}: "
-        f"{len(summary_sentences)} summaries, {len(topic_summaries)} topic summaries, "
+        f"{len(summary_sentences)} summaries, {len(topic_summary_index)} tree nodes, "
         f"{len(article_summary.get('bullets', []))} article bullets"
     )
