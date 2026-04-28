@@ -13,6 +13,7 @@ import { buildScopedChartData } from "../utils/topicHierarchy";
 import "./CanvasPage.css";
 
 import {
+  TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX,
   TOPIC_HIERARCHY_COLUMN_GAP,
   TOPIC_HIERARCHY_RAIL_PADDING,
 } from "./CanvasPage/constants";
@@ -1167,10 +1168,13 @@ export default function CanvasPage() {
           sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
         const endSentence =
           sentenceNumbers.length > 0 ? Math.max(...sentenceNumbers) : 0;
-        const height = Math.max(1, rawBottom - rawTop);
+        const height = Math.max(
+          TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX,
+          rawBottom - rawTop,
+        );
 
         return {
-          key: `${levelIndex}:${row.fullPath}`,
+          key: `${levelIndex}:${row.occurrenceKey || row.fullPath}`,
           fullPath: row.fullPath,
           displayName: getTopicDisplayName(row),
           sentenceCount: sentenceNumbers.length,
@@ -1183,7 +1187,10 @@ export default function CanvasPage() {
         };
       };
 
-      const topicCards = topicHierarchyRowsByLevel
+      const layoutRowsByLevel = showSummaryMode
+        ? topicHierarchyRowsByLevel
+        : topicHierarchyRowsByLevel.map(splitTopicHierarchyRowsForArticleOrder);
+      const topicCards = layoutRowsByLevel
         .flatMap((rows, levelIndex) =>
           rows.map((row) => toPositionedCard(row, levelIndex)),
         )
@@ -1578,4 +1585,69 @@ export default function CanvasPage() {
 
 function getTopicParts(fullPath) {
   return (fullPath || "").split(">").filter(Boolean);
+}
+
+/**
+ * @typedef {{
+ *   fullPath: string,
+ *   sentenceIndices?: number[] | Set<number>,
+ *   sentences?: number[],
+ *   occurrenceKey?: string,
+ * }} CanvasTopicHierarchyRow
+ */
+
+/**
+ * Render recurring topics where they appear in the article instead of drawing
+ * one large card from the first sentence through the last.
+ * @param {CanvasTopicHierarchyRow[]} rows
+ * @returns {CanvasTopicHierarchyRow[]}
+ */
+function splitTopicHierarchyRowsForArticleOrder(rows) {
+  return rows
+    .flatMap((row) => {
+      const sentenceNumbers = getTopicSentenceNumbers(row)
+        .slice()
+        .sort((left, right) => left - right);
+      if (sentenceNumbers.length <= 1) {
+        return [
+          {
+            ...row,
+            sentenceIndices: sentenceNumbers,
+            occurrenceKey: `${row.fullPath}:0`,
+          },
+        ];
+      }
+
+      /** @type {number[][]} */
+      const runs = [];
+      let currentRun = [sentenceNumbers[0]];
+      for (let index = 1; index < sentenceNumbers.length; index += 1) {
+        const sentenceNumber = sentenceNumbers[index];
+        const previousSentenceNumber = sentenceNumbers[index - 1];
+        if (sentenceNumber === previousSentenceNumber + 1) {
+          currentRun.push(sentenceNumber);
+        } else {
+          runs.push(currentRun);
+          currentRun = [sentenceNumber];
+        }
+      }
+      runs.push(currentRun);
+
+      return runs.map((run, index) => ({
+        ...row,
+        sentenceIndices: run,
+        occurrenceKey: `${row.fullPath}:${index}`,
+      }));
+    })
+    .sort((left, right) => {
+      const leftSentences = getTopicSentenceNumbers(left);
+      const rightSentences = getTopicSentenceNumbers(right);
+      const leftStart =
+        leftSentences.length > 0 ? Math.min(...leftSentences) : 0;
+      const rightStart =
+        rightSentences.length > 0 ? Math.min(...rightSentences) : 0;
+      return (
+        leftStart - rightStart || left.fullPath.localeCompare(right.fullPath)
+      );
+    });
 }

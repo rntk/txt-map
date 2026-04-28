@@ -543,6 +543,112 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("renders interleaved top-level topic cards in article order", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Politics opens. Law follows. Politics returns.",
+            sentences: ["Politics opens.", "Law follows.", "Politics returns."],
+            topics: [
+              { name: "Politics", sentences: [1, 3] },
+              { name: "Law", sentences: [2] },
+            ],
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    render(<CanvasPage />);
+
+    await screen.findByText("Politics opens.");
+
+    Range.prototype.getBoundingClientRect = vi
+      .fn()
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 110, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 122, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 134, width: 300, height: 8 }),
+      );
+
+    fireEvent.click(screen.getByTitle("Show topic hierarchy"));
+
+    await screen.findByRole("button", { name: /Law/ });
+
+    await waitFor(() => {
+      const politicsCards = screen.getAllByRole("button", {
+        name: /Politics/,
+      });
+      const lawCard = screen.getByRole("button", { name: /Law/ });
+
+      expect(politicsCards).toHaveLength(2);
+      expect(politicsCards[0]).toHaveAttribute(
+        "title",
+        expect.stringContaining("sentences 1-1"),
+      );
+      expect(lawCard).toHaveAttribute(
+        "title",
+        expect.stringContaining("sentences 2-2"),
+      );
+      expect(politicsCards[1]).toHaveAttribute(
+        "title",
+        expect.stringContaining("sentences 3-3"),
+      );
+
+      const firstPoliticsTop = parseFloat(
+        politicsCards[0].style.getPropertyValue("--topic-card-top"),
+      );
+      const firstPoliticsHeight = parseFloat(
+        politicsCards[0].style.getPropertyValue("--topic-card-height"),
+      );
+      const lawTop = parseFloat(
+        lawCard.style.getPropertyValue("--topic-card-top"),
+      );
+      const lawHeight = parseFloat(
+        lawCard.style.getPropertyValue("--topic-card-height"),
+      );
+      const secondPoliticsTop = parseFloat(
+        politicsCards[1].style.getPropertyValue("--topic-card-top"),
+      );
+
+      expect(firstPoliticsTop).toBeCloseTo(100, 3);
+      expect(lawTop).toBeCloseTo(112, 3);
+      expect(secondPoliticsTop).toBeCloseTo(124, 3);
+      expect(firstPoliticsHeight).toBeGreaterThanOrEqual(32);
+      expect(lawHeight).toBeGreaterThanOrEqual(32);
+    });
+  });
+
   it("polls for a delayed chat response", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url, options) => {
