@@ -153,6 +153,22 @@ export default function CanvasPage() {
     );
   }, [scale, translate.x, translate.y]);
 
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    const viewport = canvasViewportRef.current;
+    if (!wrap || !viewport) return;
+    const update = () => {
+      viewport.style.setProperty(
+        "--canvas-area-height",
+        `${wrap.clientHeight}px`,
+      );
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
   const cancelPendingCanvasTransform = useCallback(() => {
     if (transformFrameRef.current) {
       window.cancelAnimationFrame(transformFrameRef.current);

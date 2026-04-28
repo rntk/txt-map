@@ -362,7 +362,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
+  gap: 0;
   width: var(--topic-card-width, 190px);
   padding: 8px 10px 8px 12px;
   border: 1px solid color-mix(in srgb, var(--topic-accent-color) 45%, #fff);
@@ -385,6 +385,7 @@
     transform 0.15s ease,
     border-color 0.15s ease;
   right: var(--topic-card-right);
+  overflow: hidden;
 }
 
 .canvas-topic-hierarchy__card:hover,
@@ -421,6 +422,64 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/*
+ * Sticky label within tall topic cards.
+ *
+ * The canvas uses a CSS transform (translate + scale) rather than scroll,
+ * so `position: sticky` does not work. Instead we compute a translateY offset
+ * using CSS custom properties so the label tracks the visible slice of the
+ * card without leaving the card's bounds.
+ *
+ * Variables used (all inherited from ancestor elements):
+ *   --canvas-translate-y  set on .canvas-viewport
+ *   --canvas-scale        set on .canvas-viewport
+ *   --canvas-area-height  set on .canvas-viewport via ResizeObserver
+ *   --topic-card-top      set on the parent .canvas-topic-hierarchy__card
+ *   --topic-card-height   set on the parent .canvas-topic-hierarchy__card
+ */
+.canvas-topic-hierarchy__card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  /* Estimate of the rendered label height (name up to 2 lines + gap + meta). */
+  --_lh: 50px;
+  /* Minimum distance from the card edge to the label edge. */
+  --_p: 6px;
+
+  /* Visible portion of this card in card-local coordinates. */
+  --_vis-top: max(
+    0px,
+    calc(
+      -1 * var(--canvas-translate-y) / var(--canvas-scale) -
+        var(--topic-card-top)
+    )
+  );
+  --_vis-bot: min(
+    var(--topic-card-height),
+    calc(
+      (var(--canvas-area-height, 100dvh) - var(--canvas-translate-y)) /
+        var(--canvas-scale) - var(--topic-card-top)
+    )
+  );
+
+  /* Center of the visible slice. */
+  --_vis-center: calc((var(--_vis-top) + var(--_vis-bot)) / 2);
+
+  /*
+   * Offset from the natural flex-center (topic-card-height / 2) to the
+   * desired sticky center, clamped so the label never leaves the card.
+   */
+  --_offset: clamp(
+    calc(var(--_lh) / 2 + var(--_p) - var(--topic-card-height) / 2),
+    calc(var(--_vis-center) - var(--topic-card-height) / 2),
+    calc(var(--topic-card-height) / 2 - var(--_lh) / 2 - var(--_p))
+  );
+
+  transform: translateY(var(--_offset));
+  will-change: transform;
 }
 
 .canvas-topic-hierarchy__parent-band {

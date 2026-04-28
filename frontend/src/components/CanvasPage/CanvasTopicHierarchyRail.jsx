@@ -108,12 +108,14 @@ export default function CanvasTopicHierarchyRail({
                   onClick={() => onTopicClick(card.fullPath)}
                   title={`${card.fullPath}: sentences ${card.startSentence}-${card.endSentence}`}
                 >
-                  <span className="canvas-topic-hierarchy__card-name">
-                    {card.displayName}
-                  </span>
-                  <span className="canvas-topic-hierarchy__card-meta">
-                    {card.sentenceCount} sent.
-                  </span>
+                  <div className="canvas-topic-hierarchy__card-content">
+                    <span className="canvas-topic-hierarchy__card-name">
+                      {card.displayName}
+                    </span>
+                    <span className="canvas-topic-hierarchy__card-meta">
+                      {card.sentenceCount} sent.
+                    </span>
+                  </div>
                 </button>
               );
             })}
