@@ -482,3 +482,150 @@ export function getTopicSentenceTextRanges(
     })
     .filter(Boolean);
 }
+
+/**
+ * @typedef {{
+ *   fullPath: string,
+ *   sentenceIndices?: number[] | Set<number>,
+ *   sentences?: number[],
+ *   summaryCardPaths?: string[],
+ *   occurrenceKey?: string,
+ * }} CanvasTopicHierarchyRow
+ */
+
+/**
+ * @typedef {{
+ *   path: string,
+ *   name: string,
+ *   text: string,
+ *   bullets: string[],
+ *   sourceSentences: number[],
+ *   startSentence: number,
+ * }} CanvasSummaryCard
+ */
+
+/**
+ * Splits recurring topics into per-occurrence runs in article reading order.
+ * @param {CanvasTopicHierarchyRow[]} rows
+ * @returns {CanvasTopicHierarchyRow[]}
+ */
+export function splitTopicHierarchyRowsForArticleOrder(rows) {
+  return rows
+    .flatMap((row) => {
+      const sentenceNumbers = getTopicSentenceNumbers(row)
+        .slice()
+        .sort((left, right) => left - right);
+      if (sentenceNumbers.length <= 1) {
+        return [
+          {
+            ...row,
+            sentenceIndices: sentenceNumbers,
+            occurrenceKey: `${row.fullPath}:0`,
+          },
+        ];
+      }
+
+      /** @type {number[][]} */
+      const runs = [];
+      let currentRun = [sentenceNumbers[0]];
+      for (let index = 1; index < sentenceNumbers.length; index += 1) {
+        const sentenceNumber = sentenceNumbers[index];
+        const previousSentenceNumber = sentenceNumbers[index - 1];
+        if (sentenceNumber === previousSentenceNumber + 1) {
+          currentRun.push(sentenceNumber);
+        } else {
+          runs.push(currentRun);
+          currentRun = [sentenceNumber];
+        }
+      }
+      runs.push(currentRun);
+
+      return runs.map((run, index) => ({
+        ...row,
+        sentenceIndices: run,
+        occurrenceKey: `${row.fullPath}:${index}`,
+      }));
+    })
+    .sort((left, right) => {
+      const leftSentences = getTopicSentenceNumbers(left);
+      const rightSentences = getTopicSentenceNumbers(right);
+      const leftStart =
+        leftSentences.length > 0 ? Math.min(...leftSentences) : 0;
+      const rightStart =
+        rightSentences.length > 0 ? Math.min(...rightSentences) : 0;
+      return (
+        leftStart - rightStart || left.fullPath.localeCompare(right.fullPath)
+      );
+    });
+}
+
+/**
+ * Returns the summary cards that correspond to a given hierarchy row.
+ * @param {CanvasTopicHierarchyRow} row
+ * @param {CanvasSummaryCard[]} summaryCards
+ * @returns {CanvasSummaryCard[]}
+ */
+export function getMatchingSummaryCardsForHierarchyRow(row, summaryCards) {
+  if (Array.isArray(row.summaryCardPaths) && row.summaryCardPaths.length > 0) {
+    const allowedPaths = new Set(row.summaryCardPaths);
+    return summaryCards.filter((card) => allowedPaths.has(card.path));
+  }
+
+  return summaryCards.filter(
+    (card) =>
+      card.path === row.fullPath ||
+      card.path.startsWith(`${row.fullPath}>`) ||
+      row.fullPath.startsWith(`${card.path}>`),
+  );
+}
+
+/**
+ * Splits hierarchy rows for summary-mode, aligning parent topics to contiguous
+ * runs in the visible summary-card order.
+ * @param {CanvasTopicHierarchyRow[]} rows
+ * @param {CanvasSummaryCard[]} summaryCards
+ * @returns {CanvasTopicHierarchyRow[]}
+ */
+export function splitTopicHierarchyRowsForSummaryOrder(rows, summaryCards) {
+  return rows.flatMap((row) => {
+    const matchingCards = getMatchingSummaryCardsForHierarchyRow(
+      row,
+      summaryCards,
+    );
+    if (matchingCards.length <= 1) {
+      return [
+        {
+          ...row,
+          summaryCardPaths: matchingCards.map((card) => card.path),
+          occurrenceKey: `${row.fullPath}:summary:0`,
+        },
+      ];
+    }
+
+    const matchingPaths = new Set(matchingCards.map((card) => card.path));
+    /** @type {CanvasSummaryCard[][]} */
+    const runs = [];
+    let currentRun = [];
+
+    summaryCards.forEach((card) => {
+      if (!matchingPaths.has(card.path)) {
+        if (currentRun.length > 0) {
+          runs.push(currentRun);
+          currentRun = [];
+        }
+        return;
+      }
+      currentRun.push(card);
+    });
+
+    if (currentRun.length > 0) {
+      runs.push(currentRun);
+    }
+
+    return runs.map((run, index) => ({
+      ...row,
+      summaryCardPaths: run.map((card) => card.path),
+      occurrenceKey: `${row.fullPath}:summary:${index}`,
+    }));
+  });
+}

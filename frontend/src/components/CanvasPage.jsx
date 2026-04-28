@@ -6,14 +6,12 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { isTopicRead } from "../utils/topicReadUtils";
-import { getTemperatureColor } from "../utils/temperatureColor";
 import { useTopicLevel } from "../hooks/useTopicLevel";
 import { buildScopedChartData } from "../utils/topicHierarchy";
+import { getTopicParts } from "../utils/topicHierarchy";
 import "./CanvasPage.css";
 
 import {
-  TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX,
   TOPIC_HIERARCHY_COLUMN_GAP,
   TOPIC_HIERARCHY_RAIL_PADDING,
 } from "./CanvasPage/constants";
@@ -22,38 +20,30 @@ import {
   getTopicTitleFontSize,
   getZoomAdjustedTopicCardWidth,
   getZoomAdjustedTopicTitleFontSize,
-  getCursorAnchoredTranslate,
   getTopicDisplayName,
   getTopicSentenceNumbers,
   getTopicSentenceTextRanges,
   getTopicTextRange,
   rangeAtOffset,
-  WHEEL_ZOOM_IN_FACTOR,
-  WHEEL_ZOOM_OUT_FACTOR,
 } from "./CanvasPage/utils";
 import CanvasTopicHierarchyRail from "./CanvasPage/CanvasTopicHierarchyRail";
 import ArticleText from "./CanvasPage/ArticleText";
-import CanvasChatPanel from "./CanvasPage/CanvasChatPanel";
-import CanvasEventsPanel from "./CanvasPage/CanvasEventsPanel";
 import CanvasZoomControls from "./CanvasPage/CanvasZoomControls";
 import CanvasSummaryView from "./CanvasPage/CanvasSummaryView";
 import CanvasArticleTooltip from "./CanvasPage/CanvasArticleTooltip";
+import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
+import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
-import { extractArticleImages } from "./CanvasPage/articleImages";
 import { useTooltip } from "../hooks/useTooltip";
+import { useArticleData } from "./CanvasPage/useArticleData";
+import { useTopicReadStatus } from "./CanvasPage/useTopicReadStatus";
+import { useTopicTemperature } from "./CanvasPage/useTopicTemperature";
+import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
+import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
 const TOOLTIP_VIEWPORT_MARGIN = 10;
-
-/**
- * @typedef {{
- *   src: string,
- *   alt: string,
- *   title?: string,
- *   anchorOffset: number,
- * }} ArticleImage
- */
 
 function getHoverWord(rootEl, clientX, clientY) {
   if (!rootEl) return null;
@@ -91,26 +81,10 @@ function getHoverWord(rootEl, clientX, clientY) {
 export default function CanvasPage() {
   const articleId = window.location.pathname.split("/")[3];
 
-  // Article text
-  const [articleText, setArticleText] = useState("");
-  const [articlePages, setArticlePages] = useState([]);
-  /** @type {[ArticleImage[], React.Dispatch<React.SetStateAction<ArticleImage[]>>]} */
-  const [articleImages, setArticleImages] = useState([]);
-  const [articleLoading, setArticleLoading] = useState(true);
-  const [articleError, setArticleError] = useState(null);
-  const [topicSummaries, setTopicSummaries] = useState({});
-  const [topicSummaryIndex, setTopicSummaryIndex] = useState({});
+  // Refs
   const articleTextRef = useRef(null);
   const summaryWrapRef = useRef(null);
   const activeHighlightRef = useRef(null);
-
-  // Canvas transform
-  const [translate, setTranslate] = useState({ x: 40, y: 40 });
-  const [scale, setScale] = useState(1);
-  const [isCanvasDragging, setIsCanvasDragging] = useState(false);
-  const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
-  const isDragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
   const canvasWrapRef = useRef(null);
   const canvasViewportRef = useRef(null);
   const scaleRef = useRef(1);
@@ -119,11 +93,98 @@ export default function CanvasPage() {
   const pendingTransformRef = useRef(null);
   const userMovedCanvasRef = useRef(false);
   const smoothZoomTimerRef = useRef(null);
+  const isDragging = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
   const isTouchDragging = useRef(false);
   const lastTouch = useRef({ x: 0, y: 0 });
   const touchDragStart = useRef({ x: 0, y: 0 });
   const touchHasMoved = useRef(false);
   const pinchState = useRef(null);
+  const summaryCardRefs = useRef({});
+
+  // Canvas transform state
+  const [translate, setTranslate] = useState({ x: 40, y: 40 });
+  const [scale, setScale] = useState(1);
+  const [isCanvasDragging, setIsCanvasDragging] = useState(false);
+  const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
+
+  // Article data
+  const {
+    articleText,
+    articlePages,
+    articleImages,
+    articleLoading,
+    articleError,
+    topicSummaries,
+    topicSummaryIndex,
+    submissionSentences,
+    submissionTopics,
+    readTopics,
+    setReadTopics,
+    topicTemperatures,
+  } = useArticleData(articleId);
+
+  // Events / timeline
+  const {
+    events,
+    selectedIndex,
+    isLive,
+    newIndices,
+    deleteError,
+    currentHighlights,
+    handleSelectEvent,
+    handleGoLive,
+    handleDeleteEvent,
+    fetchEvents,
+  } = useCanvasEvents(articleId);
+
+  // Chat
+  const [messages, setMessages] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [contextPages, setContextPages] = useState("");
+
+  // View modes
+  const [showSummaryMode, setShowSummaryMode] = useState(false);
+  const [showSummaries, setShowSummaries] = useState(false);
+  const [showTopicHierarchy, setShowTopicHierarchy] = useState(false);
+  const [showReadStatus, setShowReadStatus] = useState(false);
+
+  // Topic interaction state
+  const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
+  const [hoveredTopicKey, setHoveredTopicKey] = useState(null);
+  const [selectedTopicKey, setSelectedTopicKey] = useState(null);
+  const [highlightedTopicNames, setHighlightedTopicNames] = useState(
+    () => new Set(),
+  );
+
+  // Tooltip
+  const [tooltipEnabled, setTooltipEnabled] = useState(true);
+  const { tooltip, lastTargetRef, showTooltip, hideTooltip } =
+    useTooltip(tooltipEnabled);
+  const tooltipContainerRef = useRef(null);
+
+  const { selectedLevel, setSelectedLevel, maxLevel } =
+    useTopicLevel(submissionTopics);
+
+  const { toggleTopicRead, readSentenceIndices, readRanges } =
+    useTopicReadStatus({
+      articleId,
+      submissionTopics,
+      submissionSentences,
+      readTopics,
+      setReadTopics,
+    });
+
+  const {
+    showTemperature,
+    toggleTemperature,
+    topicTemperatureMap,
+    temperatureAvailable,
+    temperatureTopicColorMap,
+  } = useTopicTemperature(topicTemperatures);
+
+  // ── Canvas transform helpers ──────
 
   useEffect(() => {
     return () => {
@@ -206,6 +267,8 @@ export default function CanvasPage() {
     });
   }, []);
 
+  // ── Mouse handlers ──────────────────────
+
   const handleMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
     isDragging.current = true;
@@ -235,18 +298,21 @@ export default function CanvasPage() {
     setIsCanvasDragging(false);
   }, []);
 
+  // ── Touch handlers ────────────────────────────────────────────────────────
+
   const getTouchDistance = useCallback((touches) => {
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
     return Math.sqrt(dx * dx + dy * dy);
   }, []);
 
-  const getTouchMidpoint = useCallback((touches) => {
-    return {
+  const getTouchMidpoint = useCallback(
+    (touches) => ({
       x: (touches[0].clientX + touches[1].clientX) / 2,
       y: (touches[0].clientY + touches[1].clientY) / 2,
-    };
-  }, []);
+    }),
+    [],
+  );
 
   const handleTouchStart = useCallback(
     (e) => {
@@ -297,19 +363,18 @@ export default function CanvasPage() {
           x: midpoint.x - wrapRect.left,
           y: midpoint.y - wrapRect.top,
         };
-        const nextTranslate = getCursorAnchoredTranslate({
-          cursor,
-          translate: startTranslate,
-          currentScale: startScale,
-          nextScale,
-        });
+        // Compute cursor-anchored translate manually (same logic as getCursorAnchoredTranslate)
+        const scaleRatio = nextScale / startScale;
+        const nextTranslate = {
+          x: cursor.x - scaleRatio * (cursor.x - startTranslate.x),
+          y: cursor.y - scaleRatio * (cursor.y - startTranslate.y),
+        };
         scheduleCanvasTransform(nextScale, nextTranslate);
       } else if (isTouchDragging.current && touches.length === 1) {
         const dx = touches[0].clientX - touchDragStart.current.x;
         const dy = touches[0].clientY - touchDragStart.current.y;
         if (!touchHasMoved.current) {
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < 6) return;
+          if (Math.sqrt(dx * dx + dy * dy) < 6) return;
           touchHasMoved.current = true;
           setIsCanvasDragging(true);
         }
@@ -344,22 +409,27 @@ export default function CanvasPage() {
     }
   }, []);
 
+  // ── Wheel zoom ─────────────────────────────────────────────────────────────
+
   const handleWheel = useCallback(
     (e) => {
       e.preventDefault();
       const wrap = canvasWrapRef.current;
       if (!wrap) return;
       const currentScale = scaleRef.current || 1;
-      const delta = e.deltaY > 0 ? WHEEL_ZOOM_OUT_FACTOR : WHEEL_ZOOM_IN_FACTOR;
-      const nextScale = clampCanvasScale(currentScale * delta);
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      const nextScale = clampCanvasScale(currentScale * factor);
       if (nextScale === currentScale) return;
       const wrapRect = wrap.getBoundingClientRect();
-      const nextTranslate = getCursorAnchoredTranslate({
-        cursor: { x: e.clientX - wrapRect.left, y: e.clientY - wrapRect.top },
-        translate: translateRef.current,
-        currentScale,
-        nextScale,
-      });
+      const cursor = {
+        x: e.clientX - wrapRect.left,
+        y: e.clientY - wrapRect.top,
+      };
+      const scaleRatio = nextScale / currentScale;
+      const nextTranslate = {
+        x: cursor.x - scaleRatio * (cursor.x - translateRef.current.x),
+        y: cursor.y - scaleRatio * (cursor.y - translateRef.current.y),
+      };
       setIsFocusingHighlight(false);
       userMovedCanvasRef.current = true;
       scheduleCanvasTransform(nextScale, nextTranslate);
@@ -374,21 +444,24 @@ export default function CanvasPage() {
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  // ── Keyboard navigation ────────────────────────────────────────────────────
+
   const navigateCanvas = useCallback(
     (pos) => {
       const wrap = canvasWrapRef.current;
       if (!wrap) return;
       const currentScale = scaleRef.current || 1;
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportHeight = wrap.clientHeight || wrapRect.height || 0;
+      const viewportHeight =
+        wrap.clientHeight || wrap.getBoundingClientRect().height || 0;
       const pageStep = Math.max(120, viewportHeight * 0.8);
       const topY = 40;
       setIsFocusingHighlight(false);
       userMovedCanvasRef.current = true;
       const currentTranslate = translateRef.current;
       let nextY = currentTranslate.y;
-      if (pos === "top") nextY = topY;
-      else if (pos === "bottom") {
+      if (pos === "top") {
+        nextY = topY;
+      } else if (pos === "bottom") {
         const viewport = canvasViewportRef.current;
         const content = articleTextRef.current || summaryWrapRef.current;
         if (viewport && content) {
@@ -399,8 +472,11 @@ export default function CanvasPage() {
         } else {
           nextY = currentTranslate.y - pageStep;
         }
-      } else if (pos === "prev") nextY = currentTranslate.y + pageStep;
-      else if (pos === "next") nextY = currentTranslate.y - pageStep;
+      } else if (pos === "prev") {
+        nextY = currentTranslate.y + pageStep;
+      } else if (pos === "next") {
+        nextY = currentTranslate.y - pageStep;
+      }
       setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
     },
     [setCanvasTransformNow],
@@ -434,146 +510,8 @@ export default function CanvasPage() {
     return () => window.removeEventListener("keydown", handleKeyDownGlobal);
   }, [navigateCanvas]);
 
-  // Events / timeline
-  const {
-    events,
-    selectedIndex,
-    isLive,
-    newIndices,
-    deleteError,
-    currentHighlights,
-    handleSelectEvent,
-    handleGoLive,
-    handleDeleteEvent,
-    fetchEvents,
-  } = useCanvasEvents(articleId);
+  // ── Tooltip ──────────────────────────────────────────────────────────────
 
-  // Chat
-  const [messages, setMessages] = useState([]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-
-  // Temperature
-  const [showTemperature, setShowTemperature] = useState(false);
-  const [topicTemperatures, setTopicTemperatures] = useState({});
-
-  // Summary view mode
-  const [showSummaryMode, setShowSummaryMode] = useState(false);
-  const summaryCardRefs = useRef({});
-
-  // Summaries layer
-  const [showSummaries, setShowSummaries] = useState(false);
-  const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
-  const [summaryLayout, setSummaryLayout] = useState({ cards: [], width: 0 });
-
-  // Topic hierarchy
-  const [showTopicHierarchy, setShowTopicHierarchy] = useState(false);
-  const [hoveredTopicKey, setHoveredTopicKey] = useState(null);
-  const [selectedTopicKey, setSelectedTopicKey] = useState(null);
-  const [topicHierarchyLayout, setTopicHierarchyLayout] = useState({
-    topicCards: [],
-  });
-
-  // Read/unread
-  const [showReadStatus, setShowReadStatus] = useState(false);
-  const [submissionSentences, setSubmissionSentences] = useState([]);
-  const [submissionTopics, setSubmissionTopics] = useState([]);
-  const [readTopics, setReadTopics] = useState([]);
-  const { selectedLevel, setSelectedLevel, maxLevel } =
-    useTopicLevel(submissionTopics);
-
-  // Context limiter
-  const [contextPages, setContextPages] = useState("");
-
-  // Right panel tab
-  const [activeTab, setActiveTab] = useState("chat");
-
-  // Tooltip
-  const [tooltipEnabled, setTooltipEnabled] = useState(true);
-  const { tooltip, lastTargetRef, showTooltip, hideTooltip } =
-    useTooltip(tooltipEnabled);
-  const tooltipContainerRef = useRef(null);
-
-  // Load article text
-  useEffect(() => {
-    if (!articleId) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    setArticleLoading(true);
-    setArticleError(null);
-    setArticleImages([]);
-
-    const loadArticle = async () => {
-      try {
-        const response = await fetch(`/api/canvas/${articleId}/article`, {
-          credentials: "include",
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (cancelled) return;
-
-        setArticleText(data.text || "");
-        setArticlePages(data.pages || []);
-        setSubmissionSentences(data.sentences || []);
-        setSubmissionTopics(data.topics || []);
-        setReadTopics(data.read_topics || []);
-        setTopicSummaries(data.topic_summaries || {});
-        setTopicSummaryIndex(data.topic_summary_index || {});
-        setTopicTemperatures(data.topic_temperatures || {});
-        setArticleLoading(false);
-
-        let images = [];
-        if (data.html_content) {
-          images = extractArticleImages(
-            data.html_content,
-            data.source_url || "",
-            data.text || "",
-          );
-        } else {
-          try {
-            const submissionResponse = await fetch(
-              `/api/submission/${articleId}`,
-              {
-                credentials: "include",
-                signal: controller.signal,
-              },
-            );
-            const submissionData = submissionResponse.ok
-              ? await submissionResponse.json()
-              : null;
-            if (cancelled) return;
-            if (submissionData?.html_content) {
-              images = extractArticleImages(
-                submissionData.html_content,
-                submissionData.source_url || data.source_url || "",
-                data.text || "",
-              );
-            }
-          } catch (err) {
-            if (err?.name === "AbortError") return;
-          }
-        }
-
-        if (cancelled) return;
-        setArticleImages(images);
-      } catch (err) {
-        if (err?.name === "AbortError") return;
-        if (cancelled) return;
-        setArticleError(err.message);
-        setArticleLoading(false);
-      }
-    };
-
-    loadArticle();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [articleId]);
-
-  // Sentence-to-topic mapping for tooltip
   const sentenceToTopicsMap = useMemo(() => {
     const map = new Map();
     (submissionTopics || []).forEach((topic) => {
@@ -586,52 +524,6 @@ export default function CanvasPage() {
     });
     return map;
   }, [submissionTopics]);
-
-  const persistReadTopics = useCallback(
-    (nextTopics) => {
-      if (!articleId) return;
-      fetch(`/api/submission/${articleId}/read-topics`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ read_topics: nextTopics }),
-      }).catch(() => {});
-    },
-    [articleId],
-  );
-
-  const toggleTopicRead = useCallback(
-    (topicName) => {
-      setReadTopics((prev) => {
-        const set = new Set(prev || []);
-        if (set.has(topicName)) {
-          set.delete(topicName);
-        } else {
-          set.add(topicName);
-        }
-        const next = Array.from(set);
-        persistReadTopics(next);
-        return next;
-      });
-    },
-    [persistReadTopics],
-  );
-
-  const [highlightedTopicNames, setHighlightedTopicNames] = useState(
-    () => new Set(),
-  );
-
-  const toggleTopicHighlight = useCallback((topicName) => {
-    setHighlightedTopicNames((prev) => {
-      const next = new Set(prev);
-      if (next.has(topicName)) {
-        next.delete(topicName);
-      } else {
-        next.add(topicName);
-      }
-      return next;
-    });
-  }, []);
 
   const getTooltipPosition = useCallback((clientX, clientY) => {
     let x = clientX - 10;
@@ -706,62 +598,19 @@ export default function CanvasPage() {
     };
   }, [hideTooltip, tooltip]);
 
-  // Read ranges
-  const readSentenceIndices = useMemo(() => {
-    const set = new Set();
-    (submissionTopics || []).forEach((topic) => {
-      if (!isTopicRead(topic.name, readTopics)) return;
-      const sents = Array.isArray(topic.sentences) ? topic.sentences : [];
-      sents.forEach((num) => set.add(num - 1));
+  // ── Topic highlight toggle ─────────────────────────────────────────────────
+
+  const toggleTopicHighlight = useCallback((topicName) => {
+    setHighlightedTopicNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicName)) next.delete(topicName);
+      else next.add(topicName);
+      return next;
     });
-    return set;
-  }, [submissionTopics, readTopics]);
-
-  const readRanges = useMemo(() => {
-    if (submissionSentences.length === 0) return [];
-    const ranges = [];
-    let offset = 0;
-    for (let i = 0; i < submissionSentences.length; i++) {
-      const len = submissionSentences[i].length;
-      if (readSentenceIndices.has(i)) {
-        ranges.push({ start: offset, end: offset + len });
-      }
-      offset += len + 1;
-    }
-    return ranges;
-  }, [submissionSentences, readSentenceIndices]);
-
-  // Temperature
-  const topicTemperatureMap = useMemo(() => {
-    if (!topicTemperatures || typeof topicTemperatures !== "object") {
-      return new Map();
-    }
-    const map = new Map();
-    Object.entries(topicTemperatures).forEach(([topicName, value]) => {
-      const rawRate =
-        value && typeof value === "object" ? value.rate : Number(value);
-      const rate = Math.max(0, Math.min(100, Math.round(Number(rawRate))));
-      if (!Number.isFinite(rate)) return;
-      map.set(topicName, { rate });
-    });
-    return map;
-  }, [topicTemperatures]);
-
-  const temperatureAvailable = topicTemperatureMap.size > 0;
-
-  const temperatureTopicColorMap = useMemo(() => {
-    const map = new Map();
-    topicTemperatureMap.forEach((entry, topicName) => {
-      map.set(topicName, getTemperatureColor(entry.rate));
-    });
-    return map;
-  }, [topicTemperatureMap]);
-
-  const toggleTemperature = useCallback(() => {
-    setShowTemperature((prev) => !prev);
   }, []);
 
-  // Sentence offsets
+  // ── data Derived ────────────────
+
   const sentenceOffsets = useMemo(() => {
     const arr = [];
     let off = 0;
@@ -772,7 +621,6 @@ export default function CanvasPage() {
     return arr;
   }, [submissionSentences]);
 
-  // Summary entries
   const summaryEntries = useMemo(() => {
     if (!topicSummaries || submissionSentences.length === 0) return [];
     const entries = [];
@@ -804,31 +652,18 @@ export default function CanvasPage() {
     return entries;
   }, [topicSummaries, submissionTopics, sentenceOffsets, submissionSentences]);
 
-  const activeSummaryKey = hoveredSummaryKey;
+  const topicHierarchyRowsByLevel = useMemo(
+    () =>
+      Array.from({ length: selectedLevel + 1 }, (_, level) =>
+        buildScopedChartData(submissionTopics, submissionSentences, [], level),
+      ),
+    [selectedLevel, submissionSentences, submissionTopics],
+  );
 
-  // Active topic key
-  const activeTopicKey = hoveredTopicKey || selectedTopicKey;
-
-  const selectedTopic = useMemo(() => {
-    if (!activeTopicKey) return null;
-    return (
-      (submissionTopics || []).find((topic) => topic.name === activeTopicKey) ||
-      null
-    );
-  }, [activeTopicKey, submissionTopics]);
-
-  // Topic hierarchy rows
-  const topicHierarchyRowsByLevel = useMemo(() => {
-    return Array.from({ length: selectedLevel + 1 }, (_, level) =>
-      buildScopedChartData(submissionTopics, submissionSentences, [], level),
-    );
-  }, [selectedLevel, submissionSentences, submissionTopics]);
-
-  // Summary view cards
   const summaryViewCards = useMemo(() => {
     if (!topicSummaryIndex || typeof topicSummaryIndex !== "object") return [];
     const targetLevel = selectedLevel + 1;
-    const entries = Object.entries(topicSummaryIndex)
+    return Object.entries(topicSummaryIndex)
       .filter(([path, entry]) => {
         if (!path || !entry || typeof entry !== "object") return false;
         if (entry.level !== targetLevel) return false;
@@ -840,34 +675,43 @@ export default function CanvasPage() {
         const sourceSentences = Array.isArray(entry.source_sentences)
           ? entry.source_sentences.filter((n) => Number.isInteger(n) && n > 0)
           : [];
-        const startSent = sourceSentences.length
-          ? Math.min(...sourceSentences)
-          : 0;
         return {
           path,
           name: getTopicParts(path).slice(-1)[0] || path,
           text: entry.text || "",
           bullets: Array.isArray(entry.bullets) ? entry.bullets : [],
           sourceSentences,
-          startSentence: startSent,
+          startSentence: sourceSentences.length
+            ? Math.min(...sourceSentences)
+            : 0,
         };
       })
       .sort((a, b) => a.startSentence - b.startSentence);
-    return entries;
   }, [topicSummaryIndex, selectedLevel]);
 
+  const activeSummaryKey = hoveredSummaryKey;
+  const activeTopicKey = hoveredTopicKey || selectedTopicKey;
+
+  const selectedTopic = useMemo(
+    () =>
+      !activeTopicKey
+        ? null
+        : (submissionTopics || []).find((t) => t.name === activeTopicKey) ||
+          null,
+    [activeTopicKey, submissionTopics],
+  );
+
   const summaryViewActivePath = useMemo(() => {
-    if (!showSummaryMode) return null;
-    const candidate = activeTopicKey;
-    if (!candidate) return null;
-    const exact = summaryViewCards.find((c) => c.path === candidate);
+    if (!showSummaryMode || !activeTopicKey) return null;
+    const exact = summaryViewCards.find((c) => c.path === activeTopicKey);
     if (exact) return exact.path;
     const ancestor = summaryViewCards.find(
-      (c) => candidate === c.path || candidate.startsWith(`${c.path}>`),
+      (c) =>
+        activeTopicKey === c.path || activeTopicKey.startsWith(`${c.path}>`),
     );
     if (ancestor) return ancestor.path;
     const descendant = summaryViewCards.find((c) =>
-      c.path.startsWith(`${candidate}>`),
+      c.path.startsWith(`${activeTopicKey}>`),
     );
     return descendant ? descendant.path : null;
   }, [showSummaryMode, activeTopicKey, summaryViewCards]);
@@ -891,21 +735,56 @@ export default function CanvasPage() {
     [selectedLevel, topicHierarchyCardWidth],
   );
 
-  const zoomAdjustedTopicCards = useMemo(() => {
-    return topicHierarchyLayout.topicCards.map((card) => ({
-      ...card,
-      titleFontSize: getTopicTitleFontSize({
-        scale,
-        height: card.height,
-      }),
-      right:
-        TOPIC_HIERARCHY_RAIL_PADDING +
-        card.levelIndex *
-          (topicHierarchyCardWidth + TOPIC_HIERARCHY_COLUMN_GAP),
-    }));
-  }, [scale, topicHierarchyCardWidth, topicHierarchyLayout.topicCards]);
+  // ── Layout hooks ───────────────────────────────────────────────────────────
 
-  // Article highlights
+  const summaryLayout = useSummaryLayout({
+    showSummaries,
+    articleLoading,
+    articleError,
+    summaryEntries,
+    articleText,
+    articlePages,
+    articleImages,
+    showTopicHierarchy,
+    articleTextRef,
+    summaryWrapRef,
+    scaleRef,
+  });
+
+  const topicHierarchyLayout = useTopicHierarchyLayout({
+    showTopicHierarchy,
+    showSummaryMode,
+    articleLoading,
+    articleError,
+    topicHierarchyRowsByLevel,
+    summaryViewCards,
+    sentenceOffsets,
+    submissionSentences,
+    articleText,
+    articlePages,
+    articleImages,
+    selectedLevel,
+    articleTextRef,
+    summaryWrapRef,
+    summaryCardRefs,
+    scaleRef,
+  });
+
+  const zoomAdjustedTopicCards = useMemo(
+    () =>
+      topicHierarchyLayout.topicCards.map((card) => ({
+        ...card,
+        titleFontSize: getTopicTitleFontSize({ scale, height: card.height }),
+        right:
+          TOPIC_HIERARCHY_RAIL_PADDING +
+          card.levelIndex *
+            (topicHierarchyCardWidth + TOPIC_HIERARCHY_COLUMN_GAP),
+      })),
+    [scale, topicHierarchyCardWidth, topicHierarchyLayout.topicCards],
+  );
+
+  // ── Article highlights ─────────────────────────────────────────────────────
+
   const articleHighlights = useMemo(() => {
     const base = currentHighlights.slice();
     if (showSummaries && activeSummaryKey) {
@@ -919,15 +798,14 @@ export default function CanvasPage() {
       }
     }
     if (showTopicHierarchy && activeTopicSelection) {
-      const textRanges = getTopicSentenceTextRanges(
+      getTopicSentenceTextRanges(
         activeTopicSelection,
         sentenceOffsets,
         submissionSentences,
-      );
-      textRanges.forEach((textRange) => {
+      ).forEach((r) => {
         base.push({
-          start: textRange.charStart,
-          end: textRange.charEnd,
+          start: r.charStart,
+          end: r.charEnd,
           label: activeTopicSelection.fullPath || activeTopicSelection.name,
         });
       });
@@ -935,17 +813,12 @@ export default function CanvasPage() {
     if (highlightedTopicNames.size > 0) {
       (submissionTopics || []).forEach((topic) => {
         if (!highlightedTopicNames.has(topic.name)) return;
-        const textRanges = getTopicSentenceTextRanges(
+        getTopicSentenceTextRanges(
           topic,
           sentenceOffsets,
           submissionSentences,
-        );
-        textRanges.forEach((textRange) => {
-          base.push({
-            start: textRange.charStart,
-            end: textRange.charEnd,
-            label: topic.name,
-          });
+        ).forEach((r) => {
+          base.push({ start: r.charStart, end: r.charEnd, label: topic.name });
         });
       });
     }
@@ -963,19 +836,44 @@ export default function CanvasPage() {
     submissionTopics,
   ]);
 
-  // Auto-focus canvas on the selected highlight event
+  const temperatureHighlights = useMemo(() => {
+    if (!showTemperature || submissionSentences.length === 0) return [];
+    const ranges = [];
+    (submissionTopics || []).forEach((topic) => {
+      const color = temperatureTopicColorMap.get(topic.name);
+      if (!color) return;
+      (Array.isArray(topic.sentences) ? topic.sentences : []).forEach(
+        (sentIdx) => {
+          const idx = sentIdx - 1;
+          if (idx < 0 || idx >= submissionSentences.length) return;
+          ranges.push({
+            start: sentenceOffsets[idx],
+            end: sentenceOffsets[idx] + submissionSentences[idx].length,
+            color,
+          });
+        },
+      );
+    });
+    return ranges;
+  }, [
+    showTemperature,
+    submissionTopics,
+    temperatureTopicColorMap,
+    sentenceOffsets,
+    submissionSentences,
+  ]);
+
+  // ── Auto-focus on highlight event ─────────────────────────────────────────
+
   useEffect(() => {
     if (currentHighlights.length === 0) return;
     if (userMovedCanvasRef.current) return;
-
-    // Defer to the next paint so the highlight DOM has rendered
     const raf = window.requestAnimationFrame(() => {
       const el = activeHighlightRef.current;
       if (!el) return;
       const wrap = canvasWrapRef.current;
       const viewport = canvasViewportRef.current;
       if (!wrap || !viewport) return;
-
       const wrapRect = wrap.getBoundingClientRect();
       const viewportRect = viewport.getBoundingClientRect();
       const targetRect = el.getBoundingClientRect();
@@ -992,257 +890,16 @@ export default function CanvasPage() {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
       });
-      if (smoothZoomTimerRef.current) {
-        clearTimeout(smoothZoomTimerRef.current);
-      }
-      smoothZoomTimerRef.current = setTimeout(() => {
-        setIsFocusingHighlight(false);
-      }, 380);
+      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+      smoothZoomTimerRef.current = setTimeout(
+        () => setIsFocusingHighlight(false),
+        380,
+      );
     });
     return () => window.cancelAnimationFrame(raf);
   }, [currentHighlights, setCanvasTransformNow]);
 
-  // Temperature highlights
-  const temperatureHighlights = useMemo(() => {
-    if (!showTemperature || submissionSentences.length === 0) return [];
-    const ranges = [];
-    (submissionTopics || []).forEach((topic) => {
-      const color = temperatureTopicColorMap.get(topic.name);
-      if (!color) return;
-      const sentences = Array.isArray(topic.sentences) ? topic.sentences : [];
-      sentences.forEach((sentIdx) => {
-        const idx = sentIdx - 1;
-        if (idx < 0 || idx >= submissionSentences.length) return;
-        const start = sentenceOffsets[idx];
-        const end = start + submissionSentences[idx].length;
-        ranges.push({ start, end, color });
-      });
-    });
-    return ranges;
-  }, [
-    showTemperature,
-    submissionTopics,
-    temperatureTopicColorMap,
-    sentenceOffsets,
-    submissionSentences,
-  ]);
-
-  // Summary layout computation
-  useEffect(() => {
-    if (!showSummaries || articleLoading || articleError) {
-      setSummaryLayout({ cards: [], width: 0 });
-      return undefined;
-    }
-    if (summaryEntries.length === 0) {
-      setSummaryLayout({ cards: [], width: 0 });
-      return undefined;
-    }
-
-    let raf = 0;
-    const compute = () => {
-      const articleEl = articleTextRef.current;
-      const wrapEl = summaryWrapRef.current;
-      if (!articleEl || !wrapEl) return;
-      const articleRect = articleEl.getBoundingClientRect();
-      const wrapRect = wrapEl.getBoundingClientRect();
-      const s = scaleRef.current || 1;
-
-      const positioned = summaryEntries
-        .map((entry) => {
-          const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
-          const midRange = rangeAtOffset(articleEl, midOff);
-          const startRange = rangeAtOffset(articleEl, entry.charStart);
-          const endRange = rangeAtOffset(
-            articleEl,
-            Math.max(0, entry.charEnd - 1),
-          );
-          if (!midRange) return null;
-          const midRect = midRange.getBoundingClientRect();
-          const startRect = startRange?.getBoundingClientRect();
-          const endRect = endRange?.getBoundingClientRect();
-          const midY = ((midRect.top + midRect.bottom) / 2 - wrapRect.top) / s;
-          const startY = startRect ? (startRect.top - wrapRect.top) / s : midY;
-          const endY = endRect ? (endRect.bottom - wrapRect.top) / s : midY;
-          return { ...entry, midY, startY, endY };
-        })
-        .filter(Boolean);
-
-      positioned.sort((a, b) => a.midY - b.midY);
-
-      const CARD_HEIGHT = 92;
-      const GAP = 10;
-      let lastBottom = 0;
-      for (const c of positioned) {
-        const desired = c.midY - CARD_HEIGHT / 2;
-        c.cardY = Math.max(desired, lastBottom + GAP);
-        c.cardHeight = CARD_HEIGHT;
-        lastBottom = c.cardY + CARD_HEIGHT;
-      }
-
-      setSummaryLayout({
-        cards: positioned,
-        width: wrapRect.width / s,
-        articleRight: (articleRect.right - wrapRect.left) / s,
-        articleHeight: articleEl.offsetHeight,
-      });
-    };
-
-    raf = window.requestAnimationFrame(compute);
-    const onResize = () => {
-      window.cancelAnimationFrame(raf);
-      raf = window.requestAnimationFrame(compute);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [
-    showSummaries,
-    summaryEntries,
-    articleLoading,
-    articleError,
-    articleText,
-    articlePages,
-    articleImages,
-    showTopicHierarchy,
-  ]);
-
-  // Topic hierarchy layout computation
-  useEffect(() => {
-    const hierarchyVisible = showTopicHierarchy || showSummaryMode;
-    if (!hierarchyVisible || articleLoading || articleError) {
-      setTopicHierarchyLayout({ topicCards: [] });
-      return undefined;
-    }
-    if (topicHierarchyRowsByLevel.every((rows) => rows.length === 0)) {
-      setTopicHierarchyLayout({ topicCards: [] });
-      return undefined;
-    }
-
-    let raf = 0;
-    const compute = () => {
-      const articleEl = articleTextRef.current;
-      const wrapEl = summaryWrapRef.current;
-      if (!articleEl || !wrapEl) return;
-      const wrapRect = wrapEl.getBoundingClientRect();
-      const s = scaleRef.current || 1;
-
-      const summaryRectForRow = (row) => {
-        const matching = getMatchingSummaryCardsForHierarchyRow(
-          row,
-          summaryViewCards,
-        );
-        if (matching.length === 0) return null;
-        let top = Number.POSITIVE_INFINITY;
-        let bottom = Number.NEGATIVE_INFINITY;
-        for (const c of matching) {
-          const el = summaryCardRefs.current[c.path];
-          if (!el) continue;
-          const r = el.getBoundingClientRect();
-          if (r.top < top) top = r.top;
-          if (r.bottom > bottom) bottom = r.bottom;
-        }
-        if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
-        return { top, bottom };
-      };
-
-      const toPositionedCard = (row, levelIndex) => {
-        let rawTop;
-        let rawBottom;
-
-        if (showSummaryMode) {
-          const rect = summaryRectForRow(row);
-          if (!rect) return null;
-          rawTop = (rect.top - wrapRect.top) / s;
-          rawBottom = (rect.bottom - wrapRect.top) / s;
-        } else {
-          const textRange = getTopicTextRange(
-            row,
-            sentenceOffsets,
-            submissionSentences,
-          );
-          if (!textRange) return null;
-
-          const startRange = rangeAtOffset(articleEl, textRange.charStart);
-          const endRange = rangeAtOffset(
-            articleEl,
-            Math.max(0, textRange.charEnd - 1),
-          );
-          if (!startRange || !endRange) return null;
-
-          const startRect = startRange.getBoundingClientRect();
-          const endRect = endRange.getBoundingClientRect();
-          rawTop = (startRect.top - wrapRect.top) / s;
-          rawBottom = (endRect.bottom - wrapRect.top) / s;
-        }
-
-        const sentenceNumbers = getTopicSentenceNumbers(row);
-        const startSentence =
-          sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
-        const endSentence =
-          sentenceNumbers.length > 0 ? Math.max(...sentenceNumbers) : 0;
-        const height = Math.max(
-          TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX,
-          rawBottom - rawTop,
-        );
-
-        return {
-          key: `${levelIndex}:${row.occurrenceKey || row.fullPath}`,
-          fullPath: row.fullPath,
-          displayName: getTopicDisplayName(row),
-          sentenceCount: sentenceNumbers.length,
-          startSentence,
-          endSentence,
-          top: rawTop,
-          height,
-          depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
-          levelIndex,
-        };
-      };
-
-      const layoutRowsByLevel = showSummaryMode
-        ? topicHierarchyRowsByLevel.map((rows) =>
-            splitTopicHierarchyRowsForSummaryOrder(rows, summaryViewCards),
-          )
-        : topicHierarchyRowsByLevel.map(splitTopicHierarchyRowsForArticleOrder);
-      const topicCards = layoutRowsByLevel
-        .flatMap((rows, levelIndex) =>
-          rows.map((row) => toPositionedCard(row, levelIndex)),
-        )
-        .filter(Boolean)
-        .sort(
-          (left, right) =>
-            left.levelIndex - right.levelIndex || left.top - right.top,
-        );
-
-      setTopicHierarchyLayout({ topicCards });
-    };
-
-    raf = window.requestAnimationFrame(compute);
-    const onResize = () => {
-      window.cancelAnimationFrame(raf);
-      raf = window.requestAnimationFrame(compute);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [
-    articleError,
-    articleLoading,
-    articlePages,
-    articleImages,
-    articleText,
-    selectedLevel,
-    sentenceOffsets,
-    showTopicHierarchy,
-    showSummaryMode,
-    submissionSentences,
-    summaryViewCards,
-    topicHierarchyRowsByLevel,
-  ]);
+  // ── Zoom to summary card ───────────────────────────────────────────────────
 
   const zoomToSummaryCard = useCallback(
     (topicKey) => {
@@ -1276,7 +933,6 @@ export default function CanvasPage() {
           (targetRect.top + targetRect.height / 2 - viewportRect.top) /
           currentScale;
       } else {
-        // Use the topic's text range in the article for positioning
         const topic = submissionTopics.find((t) => t.name === topicKey);
         if (!topic) return;
         const textRange = getTopicTextRange(
@@ -1303,12 +959,11 @@ export default function CanvasPage() {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
       });
-      if (smoothZoomTimerRef.current) {
-        clearTimeout(smoothZoomTimerRef.current);
-      }
-      smoothZoomTimerRef.current = setTimeout(() => {
-        setIsFocusingHighlight(false);
-      }, 380);
+      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+      smoothZoomTimerRef.current = setTimeout(
+        () => setIsFocusingHighlight(false),
+        380,
+      );
     },
     [
       showSummaryMode,
@@ -1319,6 +974,8 @@ export default function CanvasPage() {
       setCanvasTransformNow,
     ],
   );
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="canvas-page">
@@ -1389,81 +1046,18 @@ export default function CanvasPage() {
                     onTextClick={handleArticleClick}
                   />
                 )}
-                {!showSummaryMode &&
-                  showSummaries &&
-                  summaryLayout.cards.length > 0 && (
-                    <>
-                      <svg
-                        className="canvas-summary-connectors"
-                        style={{
-                          height: Math.max(
-                            summaryLayout.articleHeight || 0,
-                            summaryLayout.cards.length > 0
-                              ? summaryLayout.cards[
-                                  summaryLayout.cards.length - 1
-                                ].cardY + 100
-                              : 0,
-                          ),
-                        }}
-                      >
-                        {summaryLayout.cards.map((card) => {
-                          const x1 = summaryLayout.articleRight || 0;
-                          const y1 = card.midY;
-                          const x2 = (summaryLayout.articleRight || 0) + 80;
-                          const y2 = card.cardY + card.cardHeight / 2;
-                          const cx1 = x1 + 30;
-                          const cx2 = x2 - 30;
-                          const isActive = activeSummaryKey === card.key;
-                          return (
-                            <g key={card.key}>
-                              <circle
-                                cx={x1}
-                                cy={y1}
-                                r={3}
-                                className={`canvas-summary-anchor${isActive ? " is-active" : ""}`}
-                              />
-                              <path
-                                d={`M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`}
-                                className={`canvas-summary-connector${isActive ? " is-active" : ""}`}
-                              />
-                              <circle
-                                cx={x2}
-                                cy={y2}
-                                r={4}
-                                className={`canvas-summary-bulb${isActive ? " is-active" : ""}`}
-                              />
-                            </g>
-                          );
-                        })}
-                      </svg>
-                      <div className="canvas-summary-rail">
-                        {summaryLayout.cards.map((card) => (
-                          <div
-                            key={card.key}
-                            className={`canvas-summary-card${activeSummaryKey === card.key ? " is-active" : ""}`}
-                            style={{
-                              top: `${card.cardY}px`,
-                              height: `${card.cardHeight}px`,
-                            }}
-                            onMouseEnter={() => setHoveredSummaryKey(card.key)}
-                            onMouseLeave={() =>
-                              setHoveredSummaryKey((k) =>
-                                k === card.key ? null : k,
-                              )
-                            }
-                            title={card.topicName}
-                          >
-                            <div className="canvas-summary-card-topic">
-                              {card.topicName}
-                            </div>
-                            <div className="canvas-summary-card-text">
-                              {card.summaryText}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+
+                {!showSummaryMode && showSummaries && (
+                  <CanvasSummaryRail
+                    summaryLayout={summaryLayout}
+                    activeSummaryKey={activeSummaryKey}
+                    onCardEnter={setHoveredSummaryKey}
+                    onCardLeave={(key) =>
+                      setHoveredSummaryKey((k) => (k === key ? null : k))
+                    }
+                  />
+                )}
+
                 <CanvasTopicHierarchyRail
                   show={showTopicHierarchy || showSummaryMode}
                   selectedLevel={selectedLevel}
@@ -1479,11 +1073,11 @@ export default function CanvasPage() {
                   activeTopicKey={activeTopicKey}
                   selectedTopicKey={selectedTopicKey}
                   onTopicEnter={setHoveredTopicKey}
-                  onTopicLeave={(topicKey) => {
+                  onTopicLeave={(topicKey) =>
                     setHoveredTopicKey((current) =>
                       current === topicKey ? null : current,
-                    );
-                  }}
+                    )
+                  }
                   onTopicClick={(topicKey) => {
                     setSelectedTopicKey((current) =>
                       current === topicKey ? null : topicKey,
@@ -1510,9 +1104,7 @@ export default function CanvasPage() {
               translateRef.current,
             )
           }
-          onReset={() => {
-            setCanvasTransformNow(1, { x: 40, y: 40 });
-          }}
+          onReset={() => setCanvasTransformNow(1, { x: 40, y: 40 })}
           showReadStatus={showReadStatus}
           onToggleRead={() => setShowReadStatus((v) => !v)}
           showSummaryMode={showSummaryMode}
@@ -1520,9 +1112,7 @@ export default function CanvasPage() {
           showSummaries={showSummaries}
           onToggleSummaries={() => setShowSummaries((v) => !v)}
           showTopicHierarchy={showTopicHierarchy}
-          onToggleTopicHierarchy={() =>
-            setShowTopicHierarchy((value) => !value)
-          }
+          onToggleTopicHierarchy={() => setShowTopicHierarchy((v) => !v)}
           showTemperature={showTemperature}
           onToggleTemperature={toggleTemperature}
           temperatureAvailable={temperatureAvailable}
@@ -1544,208 +1134,26 @@ export default function CanvasPage() {
         submissionId={articleId}
       />
 
-      {/* Right: Tabbed Panel */}
-      {showChat && (
-        <div className="canvas-chat-panel">
-          <div className="canvas-panel-tabs">
-            <button
-              type="button"
-              className={`canvas-panel-tab${activeTab === "chat" ? " is-active" : ""}`}
-              onClick={() => setActiveTab("chat")}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              className={`canvas-panel-tab${activeTab === "events" ? " is-active" : ""}`}
-              onClick={() => setActiveTab("events")}
-            >
-              Events
-              {newIndices.size > 0 && <span className="canvas-tab-dot" />}
-            </button>
-          </div>
-
-          {/* Chat tab */}
-          {activeTab === "chat" && (
-            <CanvasChatPanel
-              articleId={articleId}
-              messages={messages}
-              setMessages={setMessages}
-              isChatLoading={isChatLoading}
-              setIsChatLoading={setIsChatLoading}
-              contextPages={contextPages}
-              setContextPages={setContextPages}
-              articlePages={articlePages}
-              fetchEvents={fetchEvents}
-            />
-          )}
-
-          {/* Events tab */}
-          {activeTab === "events" && (
-            <CanvasEventsPanel
-              events={events}
-              selectedIndex={selectedIndex}
-              isLive={isLive}
-              newIndices={newIndices}
-              deleteError={deleteError}
-              onSelectEvent={handleSelectEvent}
-              onGoLive={handleGoLive}
-              onDeleteEvent={handleDeleteEvent}
-            />
-          )}
-        </div>
-      )}
+      <CanvasRightPanel
+        show={showChat}
+        newIndices={newIndices}
+        articleId={articleId}
+        messages={messages}
+        setMessages={setMessages}
+        isChatLoading={isChatLoading}
+        setIsChatLoading={setIsChatLoading}
+        contextPages={contextPages}
+        setContextPages={setContextPages}
+        articlePages={articlePages}
+        fetchEvents={fetchEvents}
+        events={events}
+        selectedIndex={selectedIndex}
+        isLive={isLive}
+        deleteError={deleteError}
+        onSelectEvent={handleSelectEvent}
+        onGoLive={handleGoLive}
+        onDeleteEvent={handleDeleteEvent}
+      />
     </div>
   );
-}
-
-function getTopicParts(fullPath) {
-  return (fullPath || "").split(">").filter(Boolean);
-}
-
-/**
- * @typedef {{
- *   fullPath: string,
- *   sentenceIndices?: number[] | Set<number>,
- *   sentences?: number[],
- *   summaryCardPaths?: string[],
- *   occurrenceKey?: string,
- * }} CanvasTopicHierarchyRow
- */
-
-/**
- * @typedef {{
- *   path: string,
- *   name: string,
- *   text: string,
- *   bullets: string[],
- *   sourceSentences: number[],
- *   startSentence: number,
- * }} CanvasSummaryCard
- */
-
-/**
- * Render recurring topics where they appear in the article instead of drawing
- * one large card from the first sentence through the last.
- * @param {CanvasTopicHierarchyRow[]} rows
- * @returns {CanvasTopicHierarchyRow[]}
- */
-function splitTopicHierarchyRowsForArticleOrder(rows) {
-  return rows
-    .flatMap((row) => {
-      const sentenceNumbers = getTopicSentenceNumbers(row)
-        .slice()
-        .sort((left, right) => left - right);
-      if (sentenceNumbers.length <= 1) {
-        return [
-          {
-            ...row,
-            sentenceIndices: sentenceNumbers,
-            occurrenceKey: `${row.fullPath}:0`,
-          },
-        ];
-      }
-
-      /** @type {number[][]} */
-      const runs = [];
-      let currentRun = [sentenceNumbers[0]];
-      for (let index = 1; index < sentenceNumbers.length; index += 1) {
-        const sentenceNumber = sentenceNumbers[index];
-        const previousSentenceNumber = sentenceNumbers[index - 1];
-        if (sentenceNumber === previousSentenceNumber + 1) {
-          currentRun.push(sentenceNumber);
-        } else {
-          runs.push(currentRun);
-          currentRun = [sentenceNumber];
-        }
-      }
-      runs.push(currentRun);
-
-      return runs.map((run, index) => ({
-        ...row,
-        sentenceIndices: run,
-        occurrenceKey: `${row.fullPath}:${index}`,
-      }));
-    })
-    .sort((left, right) => {
-      const leftSentences = getTopicSentenceNumbers(left);
-      const rightSentences = getTopicSentenceNumbers(right);
-      const leftStart =
-        leftSentences.length > 0 ? Math.min(...leftSentences) : 0;
-      const rightStart =
-        rightSentences.length > 0 ? Math.min(...rightSentences) : 0;
-      return (
-        leftStart - rightStart || left.fullPath.localeCompare(right.fullPath)
-      );
-    });
-}
-
-/**
- * @param {CanvasTopicHierarchyRow} row
- * @param {CanvasSummaryCard[]} summaryCards
- * @returns {CanvasSummaryCard[]}
- */
-function getMatchingSummaryCardsForHierarchyRow(row, summaryCards) {
-  if (Array.isArray(row.summaryCardPaths) && row.summaryCardPaths.length > 0) {
-    const allowedPaths = new Set(row.summaryCardPaths);
-    return summaryCards.filter((card) => allowedPaths.has(card.path));
-  }
-
-  return summaryCards.filter(
-    (card) =>
-      card.path === row.fullPath ||
-      card.path.startsWith(`${row.fullPath}>`) ||
-      row.fullPath.startsWith(`${card.path}>`),
-  );
-}
-
-/**
- * Render summary-mode hierarchy rows against contiguous runs in the visible
- * summary-card order, so parent topics can recur around interleaved peers.
- * @param {CanvasTopicHierarchyRow[]} rows
- * @param {CanvasSummaryCard[]} summaryCards
- * @returns {CanvasTopicHierarchyRow[]}
- */
-function splitTopicHierarchyRowsForSummaryOrder(rows, summaryCards) {
-  return rows.flatMap((row) => {
-    const matchingCards = getMatchingSummaryCardsForHierarchyRow(
-      row,
-      summaryCards,
-    );
-    if (matchingCards.length <= 1) {
-      return [
-        {
-          ...row,
-          summaryCardPaths: matchingCards.map((card) => card.path),
-          occurrenceKey: `${row.fullPath}:summary:0`,
-        },
-      ];
-    }
-
-    const matchingPaths = new Set(matchingCards.map((card) => card.path));
-    /** @type {CanvasSummaryCard[][]} */
-    const runs = [];
-    let currentRun = [];
-
-    summaryCards.forEach((card) => {
-      if (!matchingPaths.has(card.path)) {
-        if (currentRun.length > 0) {
-          runs.push(currentRun);
-          currentRun = [];
-        }
-        return;
-      }
-      currentRun.push(card);
-    });
-
-    if (currentRun.length > 0) {
-      runs.push(currentRun);
-    }
-
-    return runs.map((run, index) => ({
-      ...row,
-      summaryCardPaths: run.map((card) => card.path),
-      occurrenceKey: `${row.fullPath}:summary:${index}`,
-    }));
-  });
 }

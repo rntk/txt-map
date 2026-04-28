@@ -9,9 +9,12 @@ import {
 
 /**
  * Hook that manages canvas transform (scale + translate) state,
- * drag handling, wheel zoom, and keyboard navigation.
+ * drag/touch/pinch handling, wheel zoom, and keyboard navigation.
+ * @param {{ contentRef?: React.RefObject<HTMLElement> }} [options]
+ *   contentRef – used to calculate the accurate "bottom" position when
+ *   navigating to the end of the canvas content.
  */
-export function useCanvasTransform() {
+export function useCanvasTransform({ contentRef } = {}) {
   const [translate, setTranslate] = useState({ x: 40, y: 40 });
   const [scale, setScale] = useState(1);
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
@@ -27,6 +30,13 @@ export function useCanvasTransform() {
   const pendingTransformRef = useRef(null);
   const userMovedCanvasRef = useRef(false);
   const smoothZoomTimerRef = useRef(null);
+
+  // Touch / pinch state
+  const isTouchDragging = useRef(false);
+  const lastTouch = useRef({ x: 0, y: 0 });
+  const touchDragStart = useRef({ x: 0, y: 0 });
+  const touchHasMoved = useRef(false);
+  const pinchState = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -162,6 +172,135 @@ export function useCanvasTransform() {
     return () => el.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  useEffect(() => {
+    const wrap = canvasWrapRef.current;
+    const viewport = canvasViewportRef.current;
+    if (!wrap || !viewport) return;
+    const update = () => {
+      viewport.style.setProperty(
+        "--canvas-area-height",
+        `${wrap.clientHeight}px`,
+      );
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
+  const getTouchDistance = useCallback((touches) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, []);
+
+  const getTouchMidpoint = useCallback(
+    (touches) => ({
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    }),
+    [],
+  );
+
+  const handleTouchStart = useCallback(
+    (e) => {
+      const touches = e.touches;
+      if (touches.length === 1) {
+        touchDragStart.current = {
+          x: touches[0].clientX,
+          y: touches[0].clientY,
+        };
+        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+        isTouchDragging.current = true;
+        touchHasMoved.current = false;
+        setIsFocusingHighlight(false);
+        userMovedCanvasRef.current = true;
+      } else if (touches.length === 2) {
+        isTouchDragging.current = false;
+        touchHasMoved.current = false;
+        setIsCanvasDragging(false);
+        pinchState.current = {
+          startDistance: getTouchDistance(touches),
+          startScale: scaleRef.current || 1,
+          startTranslate: { ...translateRef.current },
+        };
+        setIsFocusingHighlight(false);
+        userMovedCanvasRef.current = true;
+      }
+    },
+    [getTouchDistance],
+  );
+
+  const handleTouchMove = useCallback(
+    (e) => {
+      const touches = e.touches;
+      if (pinchState.current && touches.length === 2) {
+        e.preventDefault();
+        const { startDistance, startScale, startTranslate } =
+          pinchState.current;
+        const newDistance = getTouchDistance(touches);
+        if (startDistance === 0) return;
+        const nextScale = clampCanvasScale(
+          startScale * (newDistance / startDistance),
+        );
+        const wrap = canvasWrapRef.current;
+        if (!wrap) return;
+        const wrapRect = wrap.getBoundingClientRect();
+        const midpoint = getTouchMidpoint(touches);
+        const cursor = {
+          x: midpoint.x - wrapRect.left,
+          y: midpoint.y - wrapRect.top,
+        };
+        const nextTranslate = getCursorAnchoredTranslate({
+          cursor,
+          translate: startTranslate,
+          currentScale: startScale,
+          nextScale,
+        });
+        scheduleCanvasTransform(nextScale, nextTranslate);
+      } else if (isTouchDragging.current && touches.length === 1) {
+        const dx = touches[0].clientX - touchDragStart.current.x;
+        const dy = touches[0].clientY - touchDragStart.current.y;
+        if (!touchHasMoved.current) {
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 6) return;
+          touchHasMoved.current = true;
+          setIsCanvasDragging(true);
+        }
+        e.preventDefault();
+        const moveDx = touches[0].clientX - lastTouch.current.x;
+        const moveDy = touches[0].clientY - lastTouch.current.y;
+        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+        scheduleCanvasTransform(scaleRef.current || 1, {
+          x: translateRef.current.x + moveDx,
+          y: translateRef.current.y + moveDy,
+        });
+      }
+    },
+    [getTouchDistance, getTouchMidpoint, scheduleCanvasTransform],
+  );
+
+  const handleTouchEnd = useCallback((e) => {
+    const touches = e.touches;
+    if (touches.length === 0) {
+      isTouchDragging.current = false;
+      setIsCanvasDragging(false);
+      pinchState.current = null;
+      touchHasMoved.current = false;
+    } else if (touches.length === 1 && pinchState.current) {
+      pinchState.current = null;
+      isTouchDragging.current = true;
+      touchHasMoved.current = false;
+      touchDragStart.current = {
+        x: touches[0].clientX,
+        y: touches[0].clientY,
+      };
+      lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
+    } else if (touches.length < 2) {
+      pinchState.current = null;
+    }
+  }, []);
+
   const navigateCanvas = useCallback(
     (pos) => {
       const wrap = canvasWrapRef.current;
@@ -177,14 +316,28 @@ export function useCanvasTransform() {
       userMovedCanvasRef.current = true;
       const currentTranslate = translateRef.current;
       let nextY = currentTranslate.y;
-      if (pos === "top") nextY = topY;
-      else if (pos === "bottom") nextY = currentTranslate.y - pageStep * 4;
-      else if (pos === "prev") nextY = currentTranslate.y + pageStep;
-      else if (pos === "next") nextY = currentTranslate.y - pageStep;
+      if (pos === "top") {
+        nextY = topY;
+      } else if (pos === "bottom") {
+        const viewport = canvasViewportRef.current;
+        const content = contentRef?.current;
+        if (viewport && content) {
+          const viewportRect = viewport.getBoundingClientRect();
+          const contentRect = content.getBoundingClientRect();
+          const scaledContentBottom = contentRect.bottom - viewportRect.top;
+          nextY = Math.min(topY, viewportHeight - scaledContentBottom - topY);
+        } else {
+          nextY = currentTranslate.y - pageStep;
+        }
+      } else if (pos === "prev") {
+        nextY = currentTranslate.y + pageStep;
+      } else if (pos === "next") {
+        nextY = currentTranslate.y - pageStep;
+      }
 
       setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
     },
-    [setCanvasTransformNow],
+    [setCanvasTransformNow, contentRef],
   );
 
   useEffect(() => {
@@ -263,12 +416,17 @@ export function useCanvasTransform() {
     canvasViewportRef,
     scaleRef,
     translateRef,
-    // Actions
-    setCanvasTransformNow,
-    scheduleCanvasTransform,
+    // Mouse handlers
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    // Touch handlers
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    // Actions
+    setCanvasTransformNow,
+    scheduleCanvasTransform,
     navigateCanvas,
     zoomToTarget,
     setIsFocusingHighlight,

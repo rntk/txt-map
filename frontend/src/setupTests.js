@@ -17,3 +17,19 @@ class MockIntersectionObserver {
 if (typeof global.IntersectionObserver === "undefined") {
   global.IntersectionObserver = MockIntersectionObserver;
 }
+
+class MockResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+  }
+
+  disconnect() {}
+
+  observe() {}
+
+  unobserve() {}
+}
+
+if (typeof global.ResizeObserver === "undefined") {
+  global.ResizeObserver = MockResizeObserver;
+}

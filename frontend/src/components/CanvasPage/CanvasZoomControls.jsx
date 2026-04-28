@@ -161,9 +161,7 @@ export default function CanvasZoomControls({
         className={`canvas-read-toggle${tooltipEnabled ? " is-active" : ""}`}
         onClick={onToggleTooltip}
         title={
-          tooltipEnabled
-            ? "Disable click tooltip"
-            : "Enable click tooltip"
+          tooltipEnabled ? "Disable click tooltip" : "Enable click tooltip"
         }
       >
         ?
