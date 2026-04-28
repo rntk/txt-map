@@ -1055,6 +1055,8 @@ export default function CanvasPage() {
                     onCardLeave={(key) =>
                       setHoveredSummaryKey((k) => (k === key ? null : k))
                     }
+                    translate={translate}
+                    scale={scale}
                   />
                 )}
 
