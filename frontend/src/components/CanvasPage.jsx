@@ -1113,11 +1113,9 @@ export default function CanvasPage() {
       const s = scaleRef.current || 1;
 
       const summaryRectForRow = (row) => {
-        const matching = summaryViewCards.filter(
-          (c) =>
-            c.path === row.fullPath ||
-            c.path.startsWith(`${row.fullPath}>`) ||
-            row.fullPath.startsWith(`${c.path}>`),
+        const matching = getMatchingSummaryCardsForHierarchyRow(
+          row,
+          summaryViewCards,
         );
         if (matching.length === 0) return null;
         let top = Number.POSITIVE_INFINITY;
@@ -1188,7 +1186,9 @@ export default function CanvasPage() {
       };
 
       const layoutRowsByLevel = showSummaryMode
-        ? topicHierarchyRowsByLevel
+        ? topicHierarchyRowsByLevel.map((rows) =>
+            splitTopicHierarchyRowsForSummaryOrder(rows, summaryViewCards),
+          )
         : topicHierarchyRowsByLevel.map(splitTopicHierarchyRowsForArticleOrder);
       const topicCards = layoutRowsByLevel
         .flatMap((rows, levelIndex) =>
@@ -1592,8 +1592,20 @@ function getTopicParts(fullPath) {
  *   fullPath: string,
  *   sentenceIndices?: number[] | Set<number>,
  *   sentences?: number[],
+ *   summaryCardPaths?: string[],
  *   occurrenceKey?: string,
  * }} CanvasTopicHierarchyRow
+ */
+
+/**
+ * @typedef {{
+ *   path: string,
+ *   name: string,
+ *   text: string,
+ *   bullets: string[],
+ *   sourceSentences: number[],
+ *   startSentence: number,
+ * }} CanvasSummaryCard
  */
 
 /**
@@ -1650,4 +1662,74 @@ function splitTopicHierarchyRowsForArticleOrder(rows) {
         leftStart - rightStart || left.fullPath.localeCompare(right.fullPath)
       );
     });
+}
+
+/**
+ * @param {CanvasTopicHierarchyRow} row
+ * @param {CanvasSummaryCard[]} summaryCards
+ * @returns {CanvasSummaryCard[]}
+ */
+function getMatchingSummaryCardsForHierarchyRow(row, summaryCards) {
+  if (Array.isArray(row.summaryCardPaths) && row.summaryCardPaths.length > 0) {
+    const allowedPaths = new Set(row.summaryCardPaths);
+    return summaryCards.filter((card) => allowedPaths.has(card.path));
+  }
+
+  return summaryCards.filter(
+    (card) =>
+      card.path === row.fullPath ||
+      card.path.startsWith(`${row.fullPath}>`) ||
+      row.fullPath.startsWith(`${card.path}>`),
+  );
+}
+
+/**
+ * Render summary-mode hierarchy rows against contiguous runs in the visible
+ * summary-card order, so parent topics can recur around interleaved peers.
+ * @param {CanvasTopicHierarchyRow[]} rows
+ * @param {CanvasSummaryCard[]} summaryCards
+ * @returns {CanvasTopicHierarchyRow[]}
+ */
+function splitTopicHierarchyRowsForSummaryOrder(rows, summaryCards) {
+  return rows.flatMap((row) => {
+    const matchingCards = getMatchingSummaryCardsForHierarchyRow(
+      row,
+      summaryCards,
+    );
+    if (matchingCards.length <= 1) {
+      return [
+        {
+          ...row,
+          summaryCardPaths: matchingCards.map((card) => card.path),
+          occurrenceKey: `${row.fullPath}:summary:0`,
+        },
+      ];
+    }
+
+    const matchingPaths = new Set(matchingCards.map((card) => card.path));
+    /** @type {CanvasSummaryCard[][]} */
+    const runs = [];
+    let currentRun = [];
+
+    summaryCards.forEach((card) => {
+      if (!matchingPaths.has(card.path)) {
+        if (currentRun.length > 0) {
+          runs.push(currentRun);
+          currentRun = [];
+        }
+        return;
+      }
+      currentRun.push(card);
+    });
+
+    if (currentRun.length > 0) {
+      runs.push(currentRun);
+    }
+
+    return runs.map((run, index) => ({
+      ...row,
+      summaryCardPaths: run.map((card) => card.path),
+      occurrenceKey: `${row.fullPath}:summary:${index}`,
+    }));
+  });
 }

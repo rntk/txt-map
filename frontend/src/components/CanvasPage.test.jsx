@@ -649,6 +649,111 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("renders interleaved topic hierarchy cards in summary view order", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Politics opens. Law follows. Politics returns.",
+            sentences: ["Politics opens.", "Law follows.", "Politics returns."],
+            topics: [
+              { name: "Politics>Campaign", sentences: [1] },
+              { name: "Law>Courts", sentences: [2] },
+              { name: "Politics>Election", sentences: [3] },
+            ],
+            topic_summary_index: {
+              "Politics>Campaign": {
+                level: 2,
+                text: "Campaign summary.",
+                source_sentences: [1],
+              },
+              "Law>Courts": {
+                level: 2,
+                text: "Courts summary.",
+                source_sentences: [2],
+              },
+              "Politics>Election": {
+                level: 2,
+                text: "Election summary.",
+                source_sentences: [3],
+              },
+            },
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        if (this.classList.contains("canvas-summary-view__card")) {
+          const cardTops = {
+            "Politics>Campaign": 100,
+            "Law>Courts": 112,
+            "Politics>Election": 124,
+          };
+          return makeRect({
+            left: 0,
+            top: cardTops[this.getAttribute("title")] ?? 0,
+            width: 720,
+            height: 8,
+          });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    render(<CanvasPage />);
+
+    await screen.findByText("Politics opens.");
+
+    fireEvent.click(screen.getByTitle("Show summary view (per topic level)"));
+    fireEvent.click(await screen.findByRole("button", { name: "L1" }));
+
+    await screen.findByText("Campaign summary.");
+
+    await waitFor(() => {
+      const politicsCards = screen.getAllByRole("button", {
+        name: /Politics/,
+      });
+      const campaignCard = screen.getByRole("button", { name: /Campaign/ });
+      const lawCard = screen.getByRole("button", { name: /Law/ });
+      const courtsCard = screen.getByRole("button", { name: /Courts/ });
+      const electionCard = screen.getByRole("button", { name: /Election/ });
+
+      expect(politicsCards).toHaveLength(2);
+      expect(
+        parseFloat(politicsCards[0].style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(100, 3);
+      expect(
+        parseFloat(lawCard.style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(112, 3);
+      expect(
+        parseFloat(politicsCards[1].style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(124, 3);
+      expect(
+        parseFloat(campaignCard.style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(100, 3);
+      expect(
+        parseFloat(courtsCard.style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(112, 3);
+      expect(
+        parseFloat(electionCard.style.getPropertyValue("--topic-card-top")),
+      ).toBeCloseTo(124, 3);
+    });
+  });
+
   it("polls for a delayed chat response", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url, options) => {
