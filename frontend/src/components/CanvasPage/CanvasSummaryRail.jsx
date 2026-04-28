@@ -35,6 +35,7 @@ function getStickyTop(card, viewportTop, scale) {
  *   onCardLeave: (key: string) => void,
  *   translate: {x: number, y: number},
  *   scale: number,
+ *   isAnimating: boolean,
  * }} props
  */
 export default function CanvasSummaryRail({
@@ -44,6 +45,7 @@ export default function CanvasSummaryRail({
   onCardLeave,
   translate,
   scale,
+  isAnimating,
 }) {
   const { cards, articleRight = 0, articleHeight = 0 } = summaryLayout;
 
@@ -100,6 +102,7 @@ export default function CanvasSummaryRail({
               style={{
                 top: `${effectiveTop}px`,
                 height: `${card.cardHeight}px`,
+                transition: isAnimating ? "top 320ms ease" : undefined,
               }}
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}

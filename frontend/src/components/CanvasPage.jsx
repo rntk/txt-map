@@ -455,7 +455,6 @@ export default function CanvasPage() {
         wrap.clientHeight || wrap.getBoundingClientRect().height || 0;
       const pageStep = Math.max(120, viewportHeight * 0.8);
       const topY = 40;
-      setIsFocusingHighlight(false);
       userMovedCanvasRef.current = true;
       const currentTranslate = translateRef.current;
       let nextY = currentTranslate.y;
@@ -477,7 +476,13 @@ export default function CanvasPage() {
       } else if (pos === "next") {
         nextY = currentTranslate.y - pageStep;
       }
+      setIsFocusingHighlight(true);
       setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
+      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+      smoothZoomTimerRef.current = setTimeout(
+        () => setIsFocusingHighlight(false),
+        380,
+      );
     },
     [setCanvasTransformNow],
   );
@@ -1057,6 +1062,7 @@ export default function CanvasPage() {
                     }
                     translate={translate}
                     scale={scale}
+                    isAnimating={isFocusingHighlight}
                   />
                 )}
 
