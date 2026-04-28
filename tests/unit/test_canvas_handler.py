@@ -12,6 +12,7 @@ from handlers.canvas_handler import (
     CanvasArticleText,
     _build_article_text_with_lines,
     _build_canvas_chunks,
+    _cp_offsets_to_js,
     _line_range_to_offsets,
     _merge_chunk_replies,
     _run_canvas_chat,
@@ -532,3 +533,52 @@ def test_canvas_events_storage_prepare_backfills_counters() -> None:
         {"_id": "article-2"},
         {"$max": {"seq": 0}},
     )
+
+
+# ---------------------------------------------------------------------------
+# _cp_offsets_to_js — Python code-point → JavaScript UTF-16 offset conversion
+# ---------------------------------------------------------------------------
+
+
+def test_cp_offsets_to_js_empty_offsets_returns_empty() -> None:
+    assert _cp_offsets_to_js("hello", []) == []
+
+
+def test_cp_offsets_to_js_bmp_only_returns_unchanged() -> None:
+    # All characters ≤ U+FFFF: code-point and UTF-16 offsets are identical.
+    text = "hello world"
+    offsets = [0, 5, 11]
+    assert _cp_offsets_to_js(text, offsets) == offsets
+
+
+def test_cp_offsets_to_js_supplementary_char_at_start() -> None:
+    # U+1F600 (😀) is a supplementary character: 1 code point but 2 UTF-16 units.
+    text = "\U0001F600abc"  # cp offsets: 0=😀, 1=a, 2=b, 3=c, 4=end
+    # JS UTF-16 offsets:            0=😀(2 units), 2=a, 3=b, 4=c, 5=end
+    assert _cp_offsets_to_js(text, [0]) == [0]
+    assert _cp_offsets_to_js(text, [1]) == [2]
+    assert _cp_offsets_to_js(text, [2]) == [3]
+    assert _cp_offsets_to_js(text, [4]) == [5]  # end-of-string
+
+
+def test_cp_offsets_to_js_multiple_supplementary_chars() -> None:
+    # Two supplementary chars followed by BMP text.
+    emoji = "\U0001F600\U0001F4A1"  # 2 code points, 4 UTF-16 units
+    text = emoji + "AB"  # cp len=4, js len=6
+    assert _cp_offsets_to_js(text, [0, 1, 2, 3, 4]) == [0, 2, 4, 5, 6]
+
+
+def test_cp_offsets_to_js_end_of_string_offset() -> None:
+    # The last page's 'end' is exactly len(text) in code points.
+    text = "A\U0001F600B"  # cp len=3, js len=4
+    cp_len = len(text)  # 3
+    assert _cp_offsets_to_js(text, [cp_len]) == [4]
+
+
+def test_cp_offsets_to_js_matches_javascript_surrogate_pair_behaviour() -> None:
+    # Simulate the real bug: Python offset is 5 (after 4 BMP chars + 1 supp char),
+    # JavaScript UTF-16 index for the same position must be 6.
+    text = "abcd\U0001D400xy"  # 𝐀 is U+1D400 (math bold capital A)
+    # cp offsets: 0=a 1=b 2=c 3=d 4=𝐀 5=x 6=y 7=end
+    # js offsets: 0=a 1=b 2=c 3=d 4=𝐀hi 6=x 7=y 8=end
+    assert _cp_offsets_to_js(text, [5, 7]) == [6, 8]

@@ -257,6 +257,39 @@ def _split_article_piece(text: str, offset: int = 0) -> list[ArticlePiece]:
     return pieces
 
 
+def _cp_offsets_to_js(text: str, cp_offsets: list[int]) -> list[int]:
+    """Convert Python Unicode code-point offsets to JavaScript UTF-16 code-unit offsets.
+
+    Python's len() and string indexing count Unicode code points; JavaScript's
+    String.length and slice() count UTF-16 code units.  For characters above U+FFFF
+    (e.g. mathematical bold/italic symbols common in AI papers) Python counts 1 while
+    JavaScript counts 2 (a surrogate pair).  Page start/end offsets computed in Python
+    must be mapped to UTF-16 units before being sent to the frontend.
+    """
+    if not cp_offsets:
+        return []
+    # Fast path: no supplementary characters in the text.
+    if not any(ord(c) > 0xFFFF for c in text):
+        return list(cp_offsets)
+
+    targets = sorted(set(cp_offsets))
+    mapping: dict[int, int] = {}
+    target_idx = 0
+    utf16 = 0
+    for cp_pos, c in enumerate(text):
+        while target_idx < len(targets) and targets[target_idx] == cp_pos:
+            mapping[targets[target_idx]] = utf16
+            target_idx += 1
+        utf16 += 2 if ord(c) > 0xFFFF else 1
+
+    # Handle offsets equal to len(text) (end-of-string).
+    while target_idx < len(targets):
+        mapping[targets[target_idx]] = utf16
+        target_idx += 1
+
+    return [mapping[off] for off in cp_offsets]
+
+
 def _build_article_pages(
     display_text: str, pieces: list[ArticlePiece] | None = None
 ) -> list[CanvasArticlePage]:
@@ -809,13 +842,18 @@ def get_canvas_article(
         submission.get("results", {}).get("topic_temperatures") or {}
     )
     insights: list[dict] = submission.get("results", {}).get("insights") or []
+    display_text = article_text.display_text
+    cp_starts = [p.start for p in article_text.pages]
+    cp_ends = [p.end for p in article_text.pages]
+    js_starts = _cp_offsets_to_js(display_text, cp_starts)
+    js_ends = _cp_offsets_to_js(display_text, cp_ends)
     pages = [
         {
             "page_number": p.page_number,
-            "start": p.start,
-            "end": p.end,
+            "start": js_starts[i],
+            "end": js_ends[i],
         }
-        for p in article_text.pages
+        for i, p in enumerate(article_text.pages)
     ]
     return {
         "article_id": article_id,

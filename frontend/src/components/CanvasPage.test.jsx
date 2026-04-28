@@ -754,6 +754,124 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("renders interleaved sub-level topic cards in article order", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Tech opens. Media covers. Tech returns.",
+            sentences: ["Tech opens.", "Media covers.", "Tech returns."],
+            topics: [
+              { name: "Technology>Evaluation>AgentPerf", sentences: [1] },
+              { name: "Media>News>Article", sentences: [2] },
+              { name: "Technology>Evaluation>DeepSeek", sentences: [3] },
+            ],
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    render(<CanvasPage />);
+
+    await screen.findByText("Tech opens.");
+
+    // 24 getBoundingClientRect calls total:
+    // - 6 for the initial L0 render when the hierarchy panel opens
+    // - 18 for the L2 render after clicking "L2" (3 levels × 3 rows × 2 calls)
+    Range.prototype.getBoundingClientRect = vi
+      .fn()
+      // ── Initial L0 render: 3 rows × 2 calls ─────────────────────────────
+      // Technology(s1), Media(s2), Technology(s3) — positions consumed but
+      // not asserted; just need valid rects so cards don't silently drop
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      // ── L2 full render: 3 levels × 3 rows × 2 calls ─────────────────────
+      // L0 Technology row 1 (s1)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      // L0 Media (s2)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      // L0 Technology row 2 (s3)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      // L1 Technology>Evaluation row 1 (s1)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      // L1 Media>News (s2)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      // L1 Technology>Evaluation row 2 (s3)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      // L2 AgentPerf (s1)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      // L2 Article (s2)
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      // L2 DeepSeek (s3) — previously absent due to the page-offset/rangeAtOffset bug
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }));
+
+    fireEvent.click(screen.getByTitle("Show topic hierarchy"));
+    fireEvent.click(await screen.findByRole("button", { name: "L2" }));
+
+    await screen.findByRole("button", { name: /AgentPerf/ });
+
+    await waitFor(() => {
+      const evalCards = screen.getAllByRole("button", { name: /Evaluation/ });
+      const newsCard = screen.getByRole("button", { name: /News/ });
+      const agentPerfCard = screen.getByRole("button", { name: /AgentPerf/ });
+      const articleCard = screen.getByRole("button", { name: /Article/ });
+      const deepSeekCard = screen.getByRole("button", { name: /DeepSeek/ });
+
+      // Both Technology>Evaluation rows must render (interleaved with Media>News)
+      expect(evalCards).toHaveLength(2);
+
+      // DeepSeek at sentence 3 must be present
+      expect(deepSeekCard).toBeInTheDocument();
+
+      const agentPerfTop = parseFloat(
+        agentPerfCard.style.getPropertyValue("--topic-card-top"),
+      );
+      const articleTop = parseFloat(
+        articleCard.style.getPropertyValue("--topic-card-top"),
+      );
+      const deepSeekTop = parseFloat(
+        deepSeekCard.style.getPropertyValue("--topic-card-top"),
+      );
+
+      // Order: AgentPerf (s1) < Article (s2) < DeepSeek (s3)
+      expect(agentPerfTop).toBeCloseTo(100, 3);
+      expect(articleTop).toBeCloseTo(112, 3);
+      expect(deepSeekTop).toBeCloseTo(124, 3);
+      expect(agentPerfTop).toBeLessThan(articleTop);
+      expect(articleTop).toBeLessThan(deepSeekTop);
+    });
+  });
+
   it("polls for a delayed chat response", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url, options) => {
