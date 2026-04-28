@@ -839,6 +839,90 @@
   color: #e2e8f0;
 }
 
+/* ── Insights rail (left side) ── */
+.canvas-article-with-summaries.has-insights {
+  padding-left: 360px;
+}
+
+.canvas-insights-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.canvas-insights-connector {
+  fill: none;
+  stroke: rgba(180, 120, 230, 0.45);
+  stroke-width: 1;
+  transition:
+    stroke 0.15s,
+    stroke-width 0.15s;
+}
+
+.canvas-insights-connector.is-active {
+  stroke: #c97bff;
+  stroke-width: 1.5;
+}
+
+.canvas-insights-anchor {
+  fill: rgba(180, 120, 230, 0.6);
+  stroke: rgba(180, 120, 230, 0.85);
+  stroke-width: 1;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
+}
+
+.canvas-insights-anchor.is-active {
+  fill: #c97bff;
+  stroke: #ffffff;
+}
+
+.canvas-insights-bulb {
+  fill: transparent;
+  stroke: rgba(180, 120, 230, 0.6);
+  stroke-width: 1.5;
+  transition:
+    stroke 0.15s,
+    fill 0.15s;
+}
+
+.canvas-insights-bulb.is-active {
+  stroke: #c97bff;
+  fill: rgba(201, 123, 255, 0.25);
+}
+
+.canvas-insights-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.canvas-insights-rail .canvas-summary-card {
+  right: auto;
+  left: 0;
+  border-color: rgba(180, 120, 230, 0.35);
+  cursor: pointer;
+}
+
+.canvas-insights-rail .canvas-summary-card:hover,
+.canvas-insights-rail .canvas-summary-card.is-active {
+  border-color: #c97bff;
+  box-shadow:
+    0 0 0 1px rgba(201, 123, 255, 0.4),
+    0 4px 18px rgba(0, 0, 0, 0.6);
+}
+
+.canvas-insights-rail .canvas-summary-card-topic {
+  color: #c97bff;
+}
+
 .canvas-chat-header {
   padding: 14px 16px;
   font-size: 14px;

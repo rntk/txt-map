@@ -33,12 +33,14 @@ import CanvasSummaryView from "./CanvasPage/CanvasSummaryView";
 import CanvasArticleTooltip from "./CanvasPage/CanvasArticleTooltip";
 import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
 import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
+import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
 import { useTooltip } from "../hooks/useTooltip";
 import { useArticleData } from "./CanvasPage/useArticleData";
 import { useTopicReadStatus } from "./CanvasPage/useTopicReadStatus";
 import { useTopicTemperature } from "./CanvasPage/useTopicTemperature";
 import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
+import { useInsightsLayout } from "./CanvasPage/useInsightsLayout";
 import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 
 const TOOLTIP_WIDTH = 260;
@@ -122,6 +124,7 @@ export default function CanvasPage() {
     readTopics,
     setReadTopics,
     topicTemperatures,
+    insights,
   } = useArticleData(articleId);
 
   // Events / timeline
@@ -149,6 +152,8 @@ export default function CanvasPage() {
   const [showSummaries, setShowSummaries] = useState(false);
   const [showTopicHierarchy, setShowTopicHierarchy] = useState(false);
   const [showReadStatus, setShowReadStatus] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [activeInsightKey, setActiveInsightKey] = useState(null);
 
   // Topic interaction state
   const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
@@ -756,6 +761,21 @@ export default function CanvasPage() {
     scaleRef,
   });
 
+  const insightsLayout = useInsightsLayout({
+    showInsights,
+    articleLoading,
+    articleError,
+    insights,
+    sentenceOffsets,
+    submissionSentences,
+    articleText,
+    articlePages,
+    articleImages,
+    articleTextRef,
+    summaryWrapRef,
+    scaleRef,
+  });
+
   const topicHierarchyLayout = useTopicHierarchyLayout({
     showTopicHierarchy,
     showSummaryMode,
@@ -827,6 +847,21 @@ export default function CanvasPage() {
         });
       });
     }
+    if (showInsights && activeInsightKey !== null) {
+      const card = insightsLayout.cards.find((c) => c.key === activeInsightKey);
+      if (card) {
+        card.sentenceIndices.forEach((idx) => {
+          const i = idx - 1;
+          if (i >= 0 && i < submissionSentences.length) {
+            base.push({
+              start: sentenceOffsets[i],
+              end: sentenceOffsets[i] + submissionSentences[i].length,
+              label: card.name,
+            });
+          }
+        });
+      }
+    }
     return base;
   }, [
     currentHighlights,
@@ -839,6 +874,9 @@ export default function CanvasPage() {
     submissionSentences,
     highlightedTopicNames,
     submissionTopics,
+    showInsights,
+    activeInsightKey,
+    insightsLayout.cards,
   ]);
 
   const temperatureHighlights = useMemo(() => {
@@ -980,6 +1018,41 @@ export default function CanvasPage() {
     ],
   );
 
+  const zoomToInsight = useCallback(
+    (insightKey) => {
+      const card = insightsLayout.cards.find((c) => c.key === insightKey);
+      if (!card) return;
+      const articleEl = articleTextRef.current;
+      const wrap = canvasWrapRef.current;
+      const viewport = canvasViewportRef.current;
+      if (!articleEl || !wrap || !viewport) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const currentScale = scaleRef.current || 1;
+      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
+      const startRange = rangeAtOffset(articleEl, card.charStart);
+      if (!startRange) return;
+      const startRect = startRange.getBoundingClientRect();
+      const localTargetX =
+        (startRect.left + startRect.width / 2 - viewportRect.left) /
+        currentScale;
+      const localTargetY =
+        (startRect.top + startRect.height / 2 - viewportRect.top) /
+        currentScale;
+      setIsFocusingHighlight(true);
+      setCanvasTransformNow(nextScale, {
+        x: wrapRect.width / 2 - localTargetX * nextScale,
+        y: wrapRect.height / 2 - localTargetY * nextScale,
+      });
+      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+      smoothZoomTimerRef.current = setTimeout(
+        () => setIsFocusingHighlight(false),
+        380,
+      );
+    },
+    [insightsLayout.cards, setCanvasTransformNow],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -1022,7 +1095,7 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                 }}
@@ -1060,6 +1133,21 @@ export default function CanvasPage() {
                     onCardLeave={(key) =>
                       setHoveredSummaryKey((k) => (k === key ? null : k))
                     }
+                    translate={translate}
+                    scale={scale}
+                    isAnimating={isFocusingHighlight}
+                  />
+                )}
+
+                {!showSummaryMode && showInsights && (
+                  <CanvasInsightsRail
+                    insightsLayout={insightsLayout}
+                    activeInsightKey={activeInsightKey}
+                    onCardEnter={setActiveInsightKey}
+                    onCardLeave={(key) =>
+                      setActiveInsightKey((k) => (k === key ? null : k))
+                    }
+                    onCardClick={zoomToInsight}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}
@@ -1124,6 +1212,8 @@ export default function CanvasPage() {
           showTemperature={showTemperature}
           onToggleTemperature={toggleTemperature}
           temperatureAvailable={temperatureAvailable}
+          showInsights={showInsights}
+          onToggleInsights={() => setShowInsights((v) => !v)}
           showChat={showChat}
           onToggleChat={() => setShowChat((v) => !v)}
           tooltipEnabled={tooltipEnabled}

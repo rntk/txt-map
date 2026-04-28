@@ -808,6 +808,7 @@ def get_canvas_article(
     topic_temperatures: dict = (
         submission.get("results", {}).get("topic_temperatures") or {}
     )
+    insights: list[dict] = submission.get("results", {}).get("insights") or []
     pages = [
         {
             "page_number": p.page_number,
@@ -826,6 +827,7 @@ def get_canvas_article(
         "topic_summaries": topic_summaries,
         "topic_summary_index": topic_summary_index,
         "topic_temperatures": topic_temperatures,
+        "insights": insights,
         "pages": pages,
     }
 
