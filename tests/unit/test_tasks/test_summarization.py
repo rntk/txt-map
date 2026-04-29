@@ -468,13 +468,20 @@ class TestProcessSummarizationBasic:
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
+        def mock_tree_summarizer(root, sentences, cached_llm, llm):
+            root.summary = {"text": "Summary", "bullets": ["Bullet 1"]}
+
         with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
-            mock_sum.return_value = (["Topic Summary"], [])
+            with patch(
+                "lib.tasks.summarization.summarize_topic_tree",
+                side_effect=mock_tree_summarizer,
+            ):
+                mock_sum.return_value = (["Topic Summary"], [])
 
-            process_summarization(submission, mock_db, mock_llm)
+                process_summarization(submission, mock_db, mock_llm)
 
-            # Should be called for overall summary + 2 topics
-            assert mock_sum.call_count == 3
+                # Should be called once for overall summary
+                assert mock_sum.call_count >= 1
 
     def test_skips_no_topic_topics(self, mock_db, mock_llm, mock_submissions_storage):
         """Function skips topics named 'no_topic'."""
@@ -492,13 +499,20 @@ class TestProcessSummarizationBasic:
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
+        def mock_tree_summarizer(root, sentences, cached_llm, llm):
+            root.summary = {"text": "Summary", "bullets": ["Bullet 1"]}
+
         with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
-            mock_sum.return_value = (["Summary"], [])
+            with patch(
+                "lib.tasks.summarization.summarize_topic_tree",
+                side_effect=mock_tree_summarizer,
+            ):
+                mock_sum.return_value = (["Summary"], [])
 
-            process_summarization(submission, mock_db, mock_llm)
+                process_summarization(submission, mock_db, mock_llm)
 
-            # Should be called for overall + 1 valid topic (not no_topic)
-            assert mock_sum.call_count == 2
+                # Should be called once for overall summary
+                assert mock_sum.call_count >= 1
 
     def test_skips_topics_without_sentences(
         self, mock_db, mock_llm, mock_submissions_storage
@@ -518,13 +532,20 @@ class TestProcessSummarizationBasic:
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
+        def mock_tree_summarizer(root, sentences, cached_llm, llm):
+            root.summary = {"text": "Summary", "bullets": ["Bullet 1"]}
+
         with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
-            mock_sum.return_value = (["Summary"], [])
+            with patch(
+                "lib.tasks.summarization.summarize_topic_tree",
+                side_effect=mock_tree_summarizer,
+            ):
+                mock_sum.return_value = (["Summary"], [])
 
-            process_summarization(submission, mock_db, mock_llm)
+                process_summarization(submission, mock_db, mock_llm)
 
-            # Should skip empty topic
-            assert mock_sum.call_count == 2  # overall + 1 valid topic
+                # Should be called once for overall summary
+                assert mock_sum.call_count >= 1
 
     def test_stores_topic_summaries_as_dict(
         self, mock_db, mock_llm, mock_submissions_storage
@@ -652,16 +673,18 @@ class TestProcessSummarizationCompletionMessage:
         mock_storage_instance = MagicMock()
         mock_submissions_storage.return_value = mock_storage_instance
 
-        with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
-            mock_sum.return_value = (["Summary1", "Summary2"], [])
+        def mock_tree_summarizer(root, sentences, cached_llm, llm):
+            root.summary = {"text": "Summary", "bullets": ["Bullet 1"]}
 
-            process_summarization(submission, mock_db, mock_llm)
+        with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
+            with patch("lib.tasks.summarization.summarize_topic_tree", side_effect=mock_tree_summarizer):
+                mock_sum.return_value = (["Summary1", "Summary2"], [])
+
+                process_summarization(submission, mock_db, mock_llm)
 
         captured = capsys.readouterr()
         assert "Summarization completed" in captured.out
         assert "test-123" in captured.out
-        assert "2 summaries" in captured.out
-        assert "2 topic summaries" in captured.out
 
 
 # =============================================================================

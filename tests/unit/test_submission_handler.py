@@ -74,7 +74,7 @@ def test_post_submit(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 10
+    assert mock_task_queue.create.call_count == 11
 
 
 def test_post_upload(client, mock_storage, mock_task_queue):
@@ -88,7 +88,7 @@ def test_post_upload(client, mock_storage, mock_task_queue):
     assert response.status_code == 200
     assert response.json()["submission_id"] == submission_id
     assert mock_storage.create.called
-    assert mock_task_queue.create.call_count == 10
+    assert mock_task_queue.create.call_count == 11
 
 
 def test_extract_content_from_upload_allows_image_only_pdf_html():
@@ -659,7 +659,7 @@ def test_fetch_url_html(client, mock_storage, mock_task_queue):
     assert mock_storage.create.called
     call_kwargs = mock_storage.create.call_args.kwargs
     assert call_kwargs["source_url"] == "https://example.com/article"
-    assert mock_task_queue.create.call_count == 10
+    assert mock_task_queue.create.call_count == 11
 
 
 def test_fetch_url_pdf(client, mock_storage, mock_task_queue):

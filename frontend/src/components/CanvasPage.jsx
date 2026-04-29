@@ -1132,7 +1132,7 @@ export default function CanvasPage() {
   const handleManualSelectEvent = useCallback(
     (idx) => {
       handleSelectEvent(idx);
-      
+
       const raf = window.requestAnimationFrame(() => {
         const el = activeHighlightRef.current;
         if (!el) return;
@@ -1155,7 +1155,8 @@ export default function CanvasPage() {
           x: wrapRect.width / 2 - localTargetX * nextScale,
           y: wrapRect.height / 2 - localTargetY * nextScale,
         });
-        if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+        if (smoothZoomTimerRef.current)
+          clearTimeout(smoothZoomTimerRef.current);
         smoothZoomTimerRef.current = setTimeout(
           () => setIsFocusingHighlight(false),
           380,

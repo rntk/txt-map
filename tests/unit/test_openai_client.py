@@ -61,9 +61,11 @@ def test_complete_uses_responses_api_with_tools_and_history(monkeypatch) -> None
     assert kwargs["temperature"] == 0.2
     assert kwargs["tools"][0]["name"] == "lookup"
     assert kwargs["input"][0]["role"] == "assistant"
-    assert kwargs["input"][0]["output"][0]["type"] == "function_call"
-    assert kwargs["input"][1]["type"] == "function_call_output"
-    assert kwargs["input"][2] == {"role": "user", "content": "final question"}
+    # Function calls are separate items, not in an "output" key
+    assert kwargs["input"][1]["type"] == "function_call"
+    assert kwargs["input"][1]["name"] == "lookup"
+    assert kwargs["input"][2]["type"] == "function_call_output"
+    assert kwargs["input"][3] == {"role": "user", "content": "final question"}
 
 
 def test_complete_parses_function_tool_calls(monkeypatch) -> None:

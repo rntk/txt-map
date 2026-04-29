@@ -545,6 +545,34 @@
   z-index: 10;
 }
 
+.canvas-controls.is-horizontal {
+  flex-direction: row;
+}
+
+.canvas-controls-header {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.canvas-controls.is-horizontal .canvas-controls-header {
+  flex-direction: column;
+}
+
+.canvas-controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas-controls.is-horizontal .canvas-controls-body {
+  flex-direction: row;
+}
+
+.canvas-controls.is-folded .canvas-controls-body {
+  display: none;
+}
+
 .canvas-zoom-btn {
   width: 32px;
   height: 32px;
@@ -586,6 +614,11 @@
 
 .canvas-spacer {
   height: 4px;
+}
+
+.canvas-controls.is-horizontal .canvas-spacer {
+  width: 4px;
+  height: auto;
 }
 
 .canvas-read-toggle.is-active {
