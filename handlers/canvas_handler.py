@@ -5,7 +5,7 @@ import threading
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, Protocol
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from handlers.dependencies import get_db
 from lib.llm import create_llm_client
 from lib.llm.base import LLMMessage, ToolDefinition
+from lib.storage.canvas_chats import CanvasChatsStorage
 from lib.storage.canvas_events import CanvasEventsStorage
 from lib.storage.submissions import SubmissionsStorage
 
@@ -91,6 +92,10 @@ def _get_canvas_events_storage(request: Request) -> CanvasEventsStorage:
     return request.app.state.canvas_events_storage
 
 
+def _get_canvas_chats_storage(request: Request) -> CanvasChatsStorage:
+    return request.app.state.canvas_chats_storage
+
+
 def _get_submissions_storage(request: Request) -> SubmissionsStorage:
     return request.app.state.submissions_storage
 
@@ -137,8 +142,39 @@ class CanvasChatJob:
     status: CanvasChatJobStatus
     created_at: datetime
     updated_at: datetime
+    chat_id: str | None = None
     reply: str | None = None
     error: str | None = None
+
+
+class _EventSinkProtocol(Protocol):
+    """Protocol for event sink implementations."""
+
+    def add_event(
+        self, article_id: str, event_type: str, data: dict[str, Any]
+    ) -> Optional[dict[str, Any]]:
+        """Add an event to storage."""
+        ...
+
+
+class _ChatEventSink:
+    """Adapter that exposes the legacy ``add_event(article_id, event_type, data)``
+    contract while persisting events into a specific chat document.
+    """
+
+    def __init__(self, storage: CanvasChatsStorage, chat_id: str) -> None:
+        self._storage: CanvasChatsStorage = storage
+        self._chat_id: str = chat_id
+
+    def add_event(
+        self, article_id: str, event_type: str, data: dict[str, Any]
+    ) -> Optional[dict[str, Any]]:
+        return self._storage.add_event(
+            article_id=article_id,
+            chat_id=self._chat_id,
+            event_type=event_type,
+            data=data,
+        )
 
 
 _canvas_chat_jobs: dict[str, CanvasChatJob] = {}
@@ -156,13 +192,14 @@ def _cleanup_canvas_chat_jobs(now: datetime) -> None:
         del _canvas_chat_jobs[request_id]
 
 
-def _create_canvas_chat_job(article_id: str) -> str:
+def _create_canvas_chat_job(article_id: str, chat_id: str | None = None) -> str:
     now = datetime.now(UTC)
     request_id = uuid.uuid4().hex
     with _canvas_chat_jobs_lock:
         _cleanup_canvas_chat_jobs(now)
         _canvas_chat_jobs[request_id] = CanvasChatJob(
             article_id=article_id,
+            chat_id=chat_id,
             status="pending",
             created_at=now,
             updated_at=now,
@@ -199,9 +236,11 @@ def _run_canvas_chat_job(
     submission: dict[str, Any],
     user_message: str,
     history: list[dict[str, str]],
-    canvas_storage: CanvasEventsStorage,
+    canvas_storage: CanvasEventsStorage | _ChatEventSink,
     db: Any,
     selected_pages: list[int] | None = None,
+    chats_storage: CanvasChatsStorage | None = None,
+    chat_id: str | None = None,
 ) -> None:
     _update_canvas_chat_job(request_id, status="processing")
     try:
@@ -218,6 +257,22 @@ def _run_canvas_chat_job(
         log.exception("Canvas chat job error for article %s", article_id)
         _update_canvas_chat_job(request_id, status="failed", error=str(exc))
         return
+
+    if chats_storage is not None and chat_id:
+        try:
+            chats_storage.add_message(
+                article_id=article_id,
+                chat_id=chat_id,
+                role="assistant",
+                content=reply or "",
+            )
+        except (OSError, ValueError) as exc:
+            log.exception(
+                "Canvas chat assistant message persist failed | article=%s chat=%s: %s",
+                article_id,
+                chat_id,
+                exc,
+            )
 
     _update_canvas_chat_job(request_id, status="completed", reply=reply)
 
@@ -788,6 +843,17 @@ class ChatRequest(BaseModel):
     pages: Optional[List[int]] = (
         None  # If provided, only these pages are used as context
     )
+    chat_id: Optional[str] = (
+        None  # Existing chat session id; if omitted a new one is created
+    )
+
+
+class CreateChatRequest(BaseModel):
+    title: Optional[str] = None
+
+
+class UpdateChatRequest(BaseModel):
+    title: Optional[str] = None
 
 
 @router.get("/canvas/{article_id}/events")
@@ -876,6 +942,7 @@ def post_canvas_chat(
     body: ChatRequest,
     background_tasks: BackgroundTasks,
     canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
     db: Any = Depends(get_db),
 ) -> dict[str, str | None]:
@@ -883,8 +950,37 @@ def post_canvas_chat(
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
+    chat_id: str | None = body.chat_id
+    chat: dict[str, Any] | None = None
+    if chat_id:
+        chat = chats_storage.get_chat(article_id, chat_id)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+    else:
+        chat = chats_storage.create_chat(article_id=article_id)
+        chat_id = chat["chat_id"]
+
     history = [{"role": m.role, "content": m.content} for m in (body.history or [])]
-    request_id = _create_canvas_chat_job(article_id)
+    try:
+        chats_storage.add_message(
+            article_id=article_id,
+            chat_id=chat_id,
+            role="user",
+            content=body.message,
+        )
+    except (OSError, ValueError) as exc:
+        log.exception(
+            "Canvas chat user message persist failed | article=%s chat=%s: %s",
+            article_id,
+            chat_id,
+            exc,
+        )
+
+    event_sink: Any = (
+        _ChatEventSink(chats_storage, chat_id) if chat_id else canvas_storage
+    )
+
+    request_id = _create_canvas_chat_job(article_id, chat_id=chat_id)
     background_tasks.add_task(
         _run_canvas_chat_job,
         request_id=request_id,
@@ -892,12 +988,182 @@ def post_canvas_chat(
         submission=submission,
         user_message=body.message,
         history=history,
-        canvas_storage=canvas_storage,
+        canvas_storage=event_sink,
         db=db,
         selected_pages=body.pages,
+        chats_storage=chats_storage,
+        chat_id=chat_id,
     )
 
-    return {"request_id": request_id, "status": "pending", "reply": None}
+    return {
+        "request_id": request_id,
+        "status": "pending",
+        "reply": None,
+        "chat_id": chat_id,
+    }
+
+
+# ── Chat sessions API ──────────────────────────────────────────────────────
+
+
+def _serialize_chat_summary(doc: dict[str, Any]) -> dict[str, Any]:
+    def _iso(value: Any) -> str:
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value or "")
+
+    return {
+        "chat_id": doc.get("chat_id"),
+        "article_id": doc.get("article_id"),
+        "title": doc.get("title") or "New chat",
+        "created_at": _iso(doc.get("created_at")),
+        "updated_at": _iso(doc.get("updated_at")),
+        "message_count": int(doc.get("message_count") or 0),
+        "event_count": int(doc.get("event_count") or 0),
+    }
+
+
+def _serialize_event(ev: dict[str, Any]) -> dict[str, Any]:
+    created_at = ev.get("created_at")
+    return {
+        "seq": ev["seq"],
+        "event_type": ev["event_type"],
+        "data": ev.get("data") or {},
+        "created_at": created_at.isoformat()
+        if hasattr(created_at, "isoformat")
+        else str(created_at or ""),
+    }
+
+
+@router.get("/canvas/{article_id}/chats")
+def list_canvas_chats(
+    article_id: str,
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    chats = [_serialize_chat_summary(c) for c in chats_storage.list_chats(article_id)]
+    return {"chats": chats}
+
+
+@router.post("/canvas/{article_id}/chats")
+def create_canvas_chat(
+    article_id: str,
+    body: CreateChatRequest,
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    chat = chats_storage.create_chat(article_id=article_id, title=body.title)
+    return {
+        "chat": _serialize_chat_summary({**chat, "message_count": 0, "event_count": 0})
+    }
+
+
+@router.get("/canvas/{article_id}/chats/{chat_id}")
+def get_canvas_chat(
+    article_id: str,
+    chat_id: str,
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    chat = chats_storage.get_chat(article_id, chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    messages_out: list[dict[str, Any]] = []
+    for msg in chat.get("messages") or []:
+        ts = msg.get("ts")
+        messages_out.append(
+            {
+                "role": msg.get("role", ""),
+                "content": msg.get("content", ""),
+                "ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
+            }
+        )
+
+    summary = _serialize_chat_summary(
+        {
+            **chat,
+            "message_count": len(chat.get("messages") or []),
+            "event_count": len(chat.get("events") or []),
+        }
+    )
+    return {**summary, "messages": messages_out}
+
+
+@router.delete("/canvas/{article_id}/chats/{chat_id}")
+def delete_canvas_chat(
+    article_id: str,
+    chat_id: str,
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    deleted = chats_storage.delete_chat(article_id, chat_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"deleted": True}
+
+
+@router.get("/canvas/{article_id}/chats/{chat_id}/events")
+def get_canvas_chat_events(
+    article_id: str,
+    chat_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    if not chats_storage.get_chat(article_id, chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    events = chats_storage.get_events(article_id, chat_id, offset=offset, limit=limit)
+    serialized = [_serialize_event(ev) for ev in events]
+    return {
+        "events": serialized,
+        "offset": offset,
+        "limit": limit,
+        "chat_id": chat_id,
+    }
+
+
+@router.delete("/canvas/{article_id}/chats/{chat_id}/events/{seq}")
+def delete_canvas_chat_event(
+    article_id: str,
+    chat_id: str,
+    seq: int,
+    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+) -> dict[str, Any]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    if not chats_storage.get_chat(article_id, chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    deleted = chats_storage.delete_event(article_id, chat_id, seq)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"deleted": True}
 
 
 @router.delete("/canvas/{article_id}/events/{seq}")

@@ -3,17 +3,29 @@ import CanvasChatPanel from "./CanvasChatPanel";
 import CanvasEventsPanel from "./CanvasEventsPanel";
 
 /**
+ * @typedef {import("./useCanvasChats").CanvasChatSummary} CanvasChatSummary
+ */
+
+/**
  * Right-side tabbed panel with Chat and Events tabs.
  * @param {{
  *   show: boolean,
  *   newIndices: Set<number>,
  *   articleId: string,
+ *   chatId: string|null,
+ *   chats: CanvasChatSummary[],
+ *   isChatsLoading: boolean,
+ *   chatsError: string|null,
+ *   onSelectChat: (chatId: string) => void,
+ *   onDeleteChat: (chatId: string) => void,
+ *   onNewChat: () => void,
+ *   onChatPersisted: (chatId: string, lastMessage: string) => void,
  *   messages: Array<unknown>,
  *   setMessages: React.Dispatch<React.SetStateAction<Array<unknown>>>,
  *   isChatLoading: boolean,
  *   setIsChatLoading: React.Dispatch<React.SetStateAction<boolean>>,
- *   contextPages: unknown,
- *   setContextPages: React.Dispatch<React.SetStateAction<unknown>>,
+ *   contextPages: string,
+ *   setContextPages: React.Dispatch<React.SetStateAction<string>>,
  *   articlePages: Array<unknown>,
  *   fetchEvents: () => void,
  *   events: Array<unknown>,
@@ -29,6 +41,14 @@ export default function CanvasRightPanel({
   show,
   newIndices,
   articleId,
+  chatId,
+  chats,
+  isChatsLoading,
+  chatsError,
+  onSelectChat,
+  onDeleteChat,
+  onNewChat,
+  onChatPersisted,
   messages,
   setMessages,
   isChatLoading,
@@ -72,6 +92,14 @@ export default function CanvasRightPanel({
       {activeTab === "chat" && (
         <CanvasChatPanel
           articleId={articleId}
+          chatId={chatId}
+          chats={chats}
+          isChatsLoading={isChatsLoading}
+          chatsError={chatsError}
+          onSelectChat={onSelectChat}
+          onDeleteChat={onDeleteChat}
+          onNewChat={onNewChat}
+          onChatPersisted={onChatPersisted}
           messages={messages}
           setMessages={setMessages}
           isChatLoading={isChatLoading}

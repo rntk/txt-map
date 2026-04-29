@@ -7,9 +7,17 @@ import {
 import { readJsonSafe } from "./utils";
 
 /**
- * Hook that manages canvas events polling, timeline selection, and deletion.
+ * Hook that manages canvas events polling, timeline selection, and deletion
+ * for a single chat session.
+ *
+ * Events are scoped per chat: changing `chatId` resets internal state and
+ * starts polling the new chat's events endpoint. Background polling only runs
+ * for the currently active chat.
+ *
+ * @param {string} articleId
+ * @param {string|null|undefined} chatId
  */
-export function useCanvasEvents(articleId) {
+export function useCanvasEvents(articleId, chatId) {
   const [events, setEvents] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isLive, setIsLive] = useState(true);
@@ -22,10 +30,25 @@ export function useCanvasEvents(articleId) {
   const isLiveRef = useRef(true);
   const fetchInFlightRef = useRef(false);
   const fetchGenerationRef = useRef(0);
+  const chatIdRef = useRef(chatId);
 
   useEffect(() => {
     isLiveRef.current = isLive;
   }, [isLive]);
+
+  // Reset state when the active chat changes so events are scoped per chat.
+  useEffect(() => {
+    chatIdRef.current = chatId;
+    fetchGenerationRef.current += 1;
+    offsetRef.current = 0;
+    pendingEventsRef.current = [];
+    fetchInFlightRef.current = false;
+    setEvents([]);
+    setSelectedIndex(-1);
+    setIsLive(true);
+    setNewIndices(new Set());
+    setDeleteError(null);
+  }, [chatId]);
 
   const applyNextEvent = useCallback(() => {
     if (applyingRef.current) return;
@@ -58,14 +81,16 @@ export function useCanvasEvents(articleId) {
   }, []);
 
   const fetchEvents = useCallback(() => {
-    if (!articleId || fetchInFlightRef.current) return;
+    if (!articleId || !chatId) return;
+    if (fetchInFlightRef.current) return;
     fetchInFlightRef.current = true;
     const generation = fetchGenerationRef.current;
-    const url = `/api/canvas/${articleId}/events?offset=${offsetRef.current}&limit=${EVENTS_LIMIT}`;
+    const url = `/api/canvas/${articleId}/chats/${chatId}/events?offset=${offsetRef.current}&limit=${EVENTS_LIMIT}`;
     fetch(url, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (generation !== fetchGenerationRef.current) return;
+        if (chatIdRef.current !== chatId) return;
         if (!data || !data.events || data.events.length === 0) return;
         offsetRef.current += data.events.length;
         pendingEventsRef.current.push(...data.events);
@@ -77,13 +102,14 @@ export function useCanvasEvents(articleId) {
           fetchInFlightRef.current = false;
         }
       });
-  }, [articleId, applyNextEvent]);
+  }, [articleId, chatId, applyNextEvent]);
 
   useEffect(() => {
+    if (!articleId || !chatId) return undefined;
     fetchEvents();
     const timer = setInterval(fetchEvents, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [fetchEvents]);
+  }, [articleId, chatId, fetchEvents]);
 
   const handleSelectEvent = useCallback((idx) => {
     setSelectedIndex(idx);
@@ -114,15 +140,18 @@ export function useCanvasEvents(articleId) {
 
   const handleDeleteEvent = useCallback(
     async (seq) => {
-      if (!articleId) return;
+      if (!articleId || !chatId) return;
       if (!window.confirm("Delete this event?")) return;
       setDeleteError(null);
 
       try {
-        const response = await fetch(`/api/canvas/${articleId}/events/${seq}`, {
-          method: "DELETE",
-          credentials: "include",
-        });
+        const response = await fetch(
+          `/api/canvas/${articleId}/chats/${chatId}/events/${seq}`,
+          {
+            method: "DELETE",
+            credentials: "include",
+          },
+        );
         if (!response.ok) {
           const data = await readJsonSafe(response);
           throw new Error(data.detail || `HTTP ${response.status}`);
@@ -141,7 +170,7 @@ export function useCanvasEvents(articleId) {
         setDeleteError(err.message || "Failed to delete event");
       }
     },
-    [articleId, fetchEvents],
+    [articleId, chatId, fetchEvents],
   );
 
   const currentHighlights = events[selectedIndex]

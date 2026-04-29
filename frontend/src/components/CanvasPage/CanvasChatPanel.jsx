@@ -1,21 +1,42 @@
 import React, { useCallback, useState } from "react";
 import ChatHistory from "./ChatHistory";
+import CanvasChatHistoryPanel from "./CanvasChatHistoryPanel";
+
+/**
+ * @typedef {import("./useCanvasChats").CanvasChatSummary} CanvasChatSummary
+ */
 
 /**
  * @param {{
  *   articleId: string,
+ *   chatId: string|null,
+ *   chats: CanvasChatSummary[],
+ *   isChatsLoading: boolean,
+ *   chatsError: string|null,
+ *   onSelectChat: (chatId: string) => void,
+ *   onDeleteChat: (chatId: string) => void,
+ *   onNewChat: () => void,
+ *   onChatPersisted: (chatId: string, lastMessage: string) => void,
  *   messages: {role: string, content: string}[],
  *   setMessages: React.Dispatch<React.SetStateAction<{role: string, content: string}[]>>,
  *   isChatLoading: boolean,
  *   setIsChatLoading: (loading: boolean) => void,
  *   contextPages: string,
  *   setContextPages: (pages: string) => void,
- *   articlePages: Array<any>,
+ *   articlePages: Array<unknown>,
  *   fetchEvents: () => void,
  * }} props
  */
 export default function CanvasChatPanel({
   articleId,
+  chatId,
+  chats,
+  isChatsLoading,
+  chatsError,
+  onSelectChat,
+  onDeleteChat,
+  onNewChat,
+  onChatPersisted,
   messages,
   setMessages,
   isChatLoading,
@@ -26,6 +47,7 @@ export default function CanvasChatPanel({
   fetchEvents,
 }) {
   const [inputValue, setInputValue] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleSend = useCallback(async () => {
     const msg = inputValue.trim();
@@ -37,6 +59,7 @@ export default function CanvasChatPanel({
     setMessages(newHistory);
     setIsChatLoading(true);
 
+    /** @type {number[] | null} */
     let parsedPages = null;
     if (contextPages.trim()) {
       const maxPage = articlePages.length;
@@ -63,11 +86,17 @@ export default function CanvasChatPanel({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history, pages: parsedPages }),
+        body: JSON.stringify({
+          message: msg,
+          history,
+          pages: parsedPages,
+          chat_id: chatId || null,
+        }),
         signal: controller.signal,
       });
 
       const text = await r.text();
+      /** @type {{request_id?: string, reply?: string, detail?: string, chat_id?: string}} */
       let data = {};
       if (text) {
         try {
@@ -79,6 +108,10 @@ export default function CanvasChatPanel({
 
       if (!r.ok) {
         throw new Error(data.detail || `HTTP ${r.status}`);
+      }
+
+      if (data.chat_id) {
+        onChatPersisted(data.chat_id, msg);
       }
 
       const reply = data.request_id
@@ -104,6 +137,7 @@ export default function CanvasChatPanel({
     }
   }, [
     articleId,
+    chatId,
     inputValue,
     isChatLoading,
     messages,
@@ -112,14 +146,19 @@ export default function CanvasChatPanel({
     articlePages,
     setMessages,
     setIsChatLoading,
+    onChatPersisted,
   ]);
 
   const handleNewChat = useCallback(() => {
     if (isChatLoading) return;
-    setMessages([]);
+    onNewChat();
     setInputValue("");
-  }, [isChatLoading, setMessages]);
+    setShowHistory(false);
+  }, [isChatLoading, onNewChat]);
 
+  /**
+   * @param {React.KeyboardEvent<HTMLTextAreaElement>} e
+   */
   const handleKeyDown = useCallback(
     (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -130,20 +169,54 @@ export default function CanvasChatPanel({
     [handleSend],
   );
 
+  /**
+   * @param {string} selectedChatId
+   */
+  const handleSelectFromHistory = useCallback(
+    (selectedChatId) => {
+      onSelectChat(selectedChatId);
+      setShowHistory(false);
+    },
+    [onSelectChat],
+  );
+
   return (
     <div className="canvas-tab-content is-active">
       <div className="canvas-chat-header">
         <span>Article Assistant</span>
-        <button
-          type="button"
-          className="canvas-chat-new"
-          onClick={handleNewChat}
-          disabled={isChatLoading || messages.length === 0}
-          title="Start a new chat"
-        >
-          New Chat
-        </button>
+        <div className="canvas-chat-header-actions">
+          <button
+            type="button"
+            className={`canvas-chat-history-toggle${showHistory ? " is-active" : ""}`}
+            onClick={() => setShowHistory((v) => !v)}
+            title="Show chat history"
+            aria-pressed={showHistory}
+          >
+            History
+          </button>
+          <button
+            type="button"
+            className="canvas-chat-new"
+            onClick={handleNewChat}
+            disabled={isChatLoading}
+            title="Start a new chat"
+          >
+            New Chat
+          </button>
+        </div>
       </div>
+      {showHistory && (
+        <CanvasChatHistoryPanel
+          chats={chats}
+          activeChatId={chatId}
+          isLoading={isChatsLoading}
+          error={chatsError}
+          onSelectChat={handleSelectFromHistory}
+          onDeleteChat={onDeleteChat}
+          onNewChat={handleNewChat}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
       <div className="canvas-chat-context-limiter">
         <label htmlFor="context-pages-input">Context pages:</label>
         <input

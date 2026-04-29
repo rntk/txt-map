@@ -35,6 +35,7 @@ import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
 import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
+import { useCanvasChats } from "./CanvasPage/useCanvasChats";
 import { useTooltip } from "../hooks/useTooltip";
 import { useArticleData } from "./CanvasPage/useArticleData";
 import { useTopicReadStatus } from "./CanvasPage/useTopicReadStatus";
@@ -127,7 +128,20 @@ export default function CanvasPage() {
     insights,
   } = useArticleData(articleId);
 
-  // Events / timeline
+  // Chat sessions (history)
+  const {
+    chats,
+    activeChatId,
+    isLoading: isChatsLoading,
+    error: chatsError,
+    selectChat,
+    createChat,
+    deleteChat,
+    touchChatPreview,
+    setActiveChatId,
+  } = useCanvasChats(articleId);
+
+  // Events / timeline (scoped to current chat)
   const {
     events,
     selectedIndex,
@@ -139,13 +153,75 @@ export default function CanvasPage() {
     handleGoLive,
     handleDeleteEvent,
     fetchEvents,
-  } = useCanvasEvents(articleId);
+  } = useCanvasEvents(articleId, activeChatId);
 
   // Chat
   const [messages, setMessages] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [contextPages, setContextPages] = useState("");
+
+  // Reload persisted messages whenever the active chat changes.
+  const lastLoadedChatRef = useRef(null);
+  useEffect(() => {
+    if (!activeChatId) {
+      setMessages([]);
+      lastLoadedChatRef.current = null;
+      return;
+    }
+    if (lastLoadedChatRef.current === activeChatId) return;
+    lastLoadedChatRef.current = activeChatId;
+    let cancelled = false;
+    (async () => {
+      const persisted = await selectChat(activeChatId);
+      if (cancelled) return;
+      if (lastLoadedChatRef.current !== activeChatId) return;
+      setMessages(persisted.map((m) => ({ role: m.role, content: m.content })));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChatId, selectChat]);
+
+  /**
+   * @param {string} chatId
+   */
+  const handleSelectChat = useCallback(
+    (chatId) => {
+      if (!chatId || chatId === activeChatId) return;
+      setActiveChatId(chatId);
+    },
+    [activeChatId, setActiveChatId],
+  );
+
+  const handleNewChat = useCallback(() => {
+    createChat();
+  }, [createChat]);
+
+  /**
+   * @param {string} chatId
+   */
+  const handleDeleteChat = useCallback(
+    async (chatId) => {
+      await deleteChat(chatId);
+    },
+    [deleteChat],
+  );
+
+  /**
+   * @param {string} chatId
+   * @param {string} lastMessage
+   * @returns {void}
+   */
+  const handleChatPersisted = useCallback(
+    (chatId, lastMessage) => {
+      if (chatId !== activeChatId) {
+        setActiveChatId(chatId);
+      }
+      touchChatPreview(chatId, lastMessage);
+    },
+    [activeChatId, setActiveChatId, touchChatPreview],
+  );
 
   // View modes
   const [showSummaryMode, setShowSummaryMode] = useState(false);
@@ -1053,6 +1129,43 @@ export default function CanvasPage() {
     [insightsLayout.cards, setCanvasTransformNow],
   );
 
+  const handleManualSelectEvent = useCallback(
+    (idx) => {
+      handleSelectEvent(idx);
+      
+      const raf = window.requestAnimationFrame(() => {
+        const el = activeHighlightRef.current;
+        if (!el) return;
+        const wrap = canvasWrapRef.current;
+        const viewport = canvasViewportRef.current;
+        if (!wrap || !viewport) return;
+        const wrapRect = wrap.getBoundingClientRect();
+        const viewportRect = viewport.getBoundingClientRect();
+        const targetRect = el.getBoundingClientRect();
+        const currentScale = scaleRef.current || 1;
+        const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
+        const localTargetX =
+          (targetRect.left + targetRect.width / 2 - viewportRect.left) /
+          currentScale;
+        const localTargetY =
+          (targetRect.top + targetRect.height / 2 - viewportRect.top) /
+          currentScale;
+        setIsFocusingHighlight(true);
+        setCanvasTransformNow(nextScale, {
+          x: wrapRect.width / 2 - localTargetX * nextScale,
+          y: wrapRect.height / 2 - localTargetY * nextScale,
+        });
+        if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+        smoothZoomTimerRef.current = setTimeout(
+          () => setIsFocusingHighlight(false),
+          380,
+        );
+      });
+      return () => window.cancelAnimationFrame(raf);
+    },
+    [handleSelectEvent, setCanvasTransformNow],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -1236,6 +1349,14 @@ export default function CanvasPage() {
         show={showChat}
         newIndices={newIndices}
         articleId={articleId}
+        chatId={activeChatId}
+        chats={chats}
+        isChatsLoading={isChatsLoading}
+        chatsError={chatsError}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onNewChat={handleNewChat}
+        onChatPersisted={handleChatPersisted}
         messages={messages}
         setMessages={setMessages}
         isChatLoading={isChatLoading}
@@ -1248,7 +1369,7 @@ export default function CanvasPage() {
         selectedIndex={selectedIndex}
         isLive={isLive}
         deleteError={deleteError}
-        onSelectEvent={handleSelectEvent}
+        onSelectEvent={handleManualSelectEvent}
         onGoLive={handleGoLive}
         onDeleteEvent={handleDeleteEvent}
       />

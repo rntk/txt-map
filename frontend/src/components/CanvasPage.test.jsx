@@ -75,7 +75,7 @@ describe("CanvasPage highlight focusing", () => {
     let eventsFetched = false;
 
     HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.fetch = vi.fn(async (url) => {
+    global.fetch = vi.fn(async (url, options) => {
       if (url === "/api/canvas/article-1/article") {
         return {
           ok: true,
@@ -83,7 +83,21 @@ describe("CanvasPage highlight focusing", () => {
         };
       }
 
-      if (String(url).startsWith("/api/canvas/article-1/events")) {
+      if (url === "/api/canvas/article-1/chats" && options?.method === "POST") {
+        return {
+          ok: true,
+          json: async () => ({ chat: { chat_id: "chat-1" } }),
+        };
+      }
+
+      if (url === "/api/canvas/article-1/chats") {
+        return {
+          ok: true,
+          json: async () => ({ chats: [] }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/chats/chat-1/events")) {
         if (eventsFetched) {
           return { ok: true, json: async () => ({ events: [] }) };
         }
@@ -800,40 +814,88 @@ describe("CanvasPage highlight focusing", () => {
       // ── Initial L0 render: 3 rows × 2 calls ─────────────────────────────
       // Technology(s1), Media(s2), Technology(s3) — positions consumed but
       // not asserted; just need valid rects so cards don't silently drop
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
       // ── L2 full render: 3 levels × 3 rows × 2 calls ─────────────────────
       // L0 Technology row 1 (s1)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
       // L0 Media (s2)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
       // L0 Technology row 2 (s3)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
       // L1 Technology>Evaluation row 1 (s1)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
       // L1 Media>News (s2)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
       // L1 Technology>Evaluation row 2 (s3)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
       // L2 AgentPerf (s1)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 100, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 100, width: 300, height: 8 }),
+      )
       // L2 Article (s2)
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 112, width: 300, height: 8 }))
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 112, width: 300, height: 8 }),
+      )
       // L2 DeepSeek (s3) — previously absent due to the page-offset/rangeAtOffset bug
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }))
-      .mockReturnValueOnce(makeRect({ left: 40, top: 124, width: 300, height: 8 }));
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      )
+      .mockReturnValueOnce(
+        makeRect({ left: 40, top: 124, width: 300, height: 8 }),
+      );
 
     fireEvent.click(screen.getByTitle("Show topic hierarchy"));
     fireEvent.click(await screen.findByRole("button", { name: "L2" }));
