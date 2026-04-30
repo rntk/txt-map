@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildRadialFlowLabelParts,
   buildOrderedTopicEntries,
   buildRadialFlowLayoutItems,
 } from "./RadialFlowChart";
@@ -64,6 +65,21 @@ describe("RadialFlowChart layout", () => {
     expect(items).toHaveLength(2);
     expect(items[0].entryId).not.toBe(items[1].entryId);
     expect(items[0].fullPath).toBe(items[1].fullPath);
+  });
+});
+
+describe("RadialFlowChart labels", () => {
+  it("keeps parent topic labels separate from the center-aligned title", () => {
+    expect(
+      buildRadialFlowLabelParts({
+        fullPath: "Technology>AI>Agents",
+        groupPath: "Technology>AI>Agents",
+        displayName: "Agents",
+      }),
+    ).toEqual({
+      leaf: "Agents",
+      ancestors: ["Technology", "AI"],
+    });
   });
 });
 

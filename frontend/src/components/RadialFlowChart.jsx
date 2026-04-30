@@ -266,6 +266,32 @@ function buildRadialFlowLayoutItems(topLevelData, containerWidth, topics) {
 export { buildRadialFlowLayoutItems };
 
 /**
+ * @typedef {Object} RadialFlowLabelParts
+ * @property {string} leaf
+ * @property {string[]} ancestors
+ */
+
+/**
+ * @param {{ fullPath?: string, groupPath?: string, displayName?: string }} topic
+ * @returns {RadialFlowLabelParts}
+ */
+function buildRadialFlowLabelParts(topic) {
+  const pathLabel =
+    topic.fullPath || topic.groupPath || topic.displayName || "";
+  const pathParts = getTopicParts(pathLabel);
+  const fallbackLeaf = topic.displayName || topic.groupPath || pathLabel;
+  const leaf =
+    topic.displayName || pathParts[pathParts.length - 1] || fallbackLeaf;
+
+  return {
+    leaf,
+    ancestors: pathParts.slice(0, -1),
+  };
+}
+
+export { buildRadialFlowLabelParts };
+
+/**
  * @typedef {Object} RadialFlowChartProps
  * @property {Array<{ name?: string, fullPath?: string, displayName?: string, sentenceCount?: number, sentenceIndices?: number[], ranges?: Array<unknown> }>} topics
  * @property {string[]} [sentences]
@@ -522,11 +548,8 @@ function RadialFlowChart({
               const labelX = item.side === "right" ? -10 : 10;
               const labelAnchor = item.side === "right" ? "end" : "start";
 
-              const labelPath = item.displayName || item.groupPath;
-              const labelParts = getTopicParts(labelPath);
-              const labelLeaf =
-                labelParts[labelParts.length - 1] || item.displayName;
-              const labelAncestors = labelParts.slice(0, -1);
+              const { leaf: labelLeaf, ancestors: labelAncestors } =
+                buildRadialFlowLabelParts(item);
               const fullPathLabel = getTopicParts(item.fullPath).join(" > ");
               const shouldRenderLeafFirst = labelAnchor === "start";
               const isLabelLink = Boolean(onShowInArticle);
