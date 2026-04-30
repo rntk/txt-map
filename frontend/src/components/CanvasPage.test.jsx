@@ -75,7 +75,7 @@ describe("CanvasPage highlight focusing", () => {
     let eventsFetched = false;
 
     HTMLElement.prototype.scrollIntoView = vi.fn();
-    global.fetch = vi.fn(async (url, options) => {
+    global.fetch = vi.fn(async (url) => {
       if (url === "/api/canvas/article-1/article") {
         return {
           ok: true,
@@ -83,17 +83,22 @@ describe("CanvasPage highlight focusing", () => {
         };
       }
 
-      if (url === "/api/canvas/article-1/chats" && options?.method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({ chat: { chat_id: "chat-1" } }),
-        };
-      }
-
       if (url === "/api/canvas/article-1/chats") {
         return {
           ok: true,
-          json: async () => ({ chats: [] }),
+          json: async () => ({
+            chats: [
+              {
+                chat_id: "chat-1",
+                article_id: "article-1",
+                title: "Existing chat",
+                created_at: "2026-04-30T00:00:00Z",
+                updated_at: "2026-04-30T00:00:00Z",
+                message_count: 1,
+                event_count: 2,
+              },
+            ],
+          }),
         };
       }
 

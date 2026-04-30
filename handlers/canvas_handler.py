@@ -848,10 +848,6 @@ class ChatRequest(BaseModel):
     )
 
 
-class CreateChatRequest(BaseModel):
-    title: Optional[str] = None
-
-
 class UpdateChatRequest(BaseModel):
     title: Optional[str] = None
 
@@ -950,31 +946,53 @@ def post_canvas_chat(
     if not submission:
         raise HTTPException(status_code=404, detail="Article not found")
 
+    message = body.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
     chat_id: str | None = body.chat_id
     chat: dict[str, Any] | None = None
     if chat_id:
         chat = chats_storage.get_chat(article_id, chat_id)
         if not chat:
             raise HTTPException(status_code=404, detail="Chat not found")
+        try:
+            if not chats_storage.add_message(
+                article_id=article_id,
+                chat_id=chat_id,
+                role="user",
+                content=message,
+            ):
+                raise ValueError("chat message was not persisted")
+        except (OSError, ValueError) as exc:
+            log.exception(
+                "Canvas chat user message persist failed | article=%s chat=%s: %s",
+                article_id,
+                chat_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=500, detail="Failed to persist chat"
+            ) from exc
     else:
-        chat = chats_storage.create_chat(article_id=article_id)
+        try:
+            chat = chats_storage.create_chat_with_message(
+                article_id=article_id,
+                role="user",
+                content=message,
+            )
+        except (OSError, ValueError) as exc:
+            log.exception(
+                "Canvas chat create failed | article=%s: %s",
+                article_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=500, detail="Failed to persist chat"
+            ) from exc
         chat_id = chat["chat_id"]
 
     history = [{"role": m.role, "content": m.content} for m in (body.history or [])]
-    try:
-        chats_storage.add_message(
-            article_id=article_id,
-            chat_id=chat_id,
-            role="user",
-            content=body.message,
-        )
-    except (OSError, ValueError) as exc:
-        log.exception(
-            "Canvas chat user message persist failed | article=%s chat=%s: %s",
-            article_id,
-            chat_id,
-            exc,
-        )
 
     event_sink: Any = (
         _ChatEventSink(chats_storage, chat_id) if chat_id else canvas_storage
@@ -986,7 +1004,7 @@ def post_canvas_chat(
         request_id=request_id,
         article_id=article_id,
         submission=submission,
-        user_message=body.message,
+        user_message=message,
         history=history,
         canvas_storage=event_sink,
         db=db,
@@ -1047,23 +1065,6 @@ def list_canvas_chats(
 
     chats = [_serialize_chat_summary(c) for c in chats_storage.list_chats(article_id)]
     return {"chats": chats}
-
-
-@router.post("/canvas/{article_id}/chats")
-def create_canvas_chat(
-    article_id: str,
-    body: CreateChatRequest,
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
-    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
-) -> dict[str, Any]:
-    submission = submissions_storage.get_by_id(article_id)
-    if not submission:
-        raise HTTPException(status_code=404, detail="Article not found")
-
-    chat = chats_storage.create_chat(article_id=article_id, title=body.title)
-    return {
-        "chat": _serialize_chat_summary({**chat, "message_count": 0, "event_count": 0})
-    }
 
 
 @router.get("/canvas/{article_id}/chats/{chat_id}")

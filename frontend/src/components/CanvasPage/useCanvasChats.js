@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Hook that manages canvas chat sessions for a given article.
- * Provides chat list/create/delete and tracks the active chat id.
+ * Provides chat list/delete and tracks the active chat id.
  *
  * @param {string} articleId
  * @returns {{
@@ -30,7 +30,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *   error: string|null,
  *   refreshChats: () => Promise<void>,
  *   selectChat: (chatId: string|null) => Promise<CanvasChatMessage[]>,
- *   createChat: () => Promise<string|null>,
  *   deleteChat: (chatId: string) => Promise<boolean>,
  *   setActiveChatId: (chatId: string|null) => void,
  *   touchChatPreview: (chatId: string, lastMessage: string) => void,
@@ -42,6 +41,7 @@ export function useCanvasChats(articleId) {
   /** @type {[string|null, React.Dispatch<React.SetStateAction<string|null>>]} */
   const [activeChatId, setActiveChatId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedChats, setHasLoadedChats] = useState(false);
   /** @type {[string|null, React.Dispatch<React.SetStateAction<string|null>>]} */
   const [error, setError] = useState(null);
 
@@ -65,45 +65,10 @@ export function useCanvasChats(articleId) {
       console.error("Failed to load chats", err);
       setError(err?.message || "Failed to load chats");
     } finally {
+      setHasLoadedChats(true);
       setIsLoading(false);
     }
   }, [articleId]);
-
-  /**
-   * @param {string} title
-   * @returns {Promise<string|null>}
-   */
-  const createChat = useCallback(
-    async (title) => {
-      if (!articleId) return null;
-      setError(null);
-      try {
-        const response = await fetch(`/api/canvas/${articleId}/chats`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: title || null }),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const data = await response.json();
-        const chat = data?.chat;
-        if (!chat || !chat.chat_id) return null;
-        setChats((prev) => [
-          chat,
-          ...prev.filter((c) => c.chat_id !== chat.chat_id),
-        ]);
-        setActiveChatId(chat.chat_id);
-        return chat.chat_id;
-      } catch (err) {
-        console.error("Failed to create chat", err);
-        setError(err?.message || "Failed to create chat");
-        return null;
-      }
-    },
-    [articleId],
-  );
 
   /**
    * @param {string} chatId
@@ -173,46 +138,64 @@ export function useCanvasChats(articleId) {
 
   // Update chat list metadata locally without an extra round-trip when a new
   // user message is sent (keeps the History list ordering responsive).
-  const touchChatPreview = useCallback((chatId, lastMessage) => {
-    if (!chatId) return;
-    setChats((prev) => {
-      const idx = prev.findIndex((c) => c.chat_id === chatId);
-      const now = new Date().toISOString();
-      if (idx === -1) return prev;
-      const updated = {
-        ...prev[idx],
-        title:
-          prev[idx].title && prev[idx].title !== "New chat"
-            ? prev[idx].title
-            : (lastMessage || prev[idx].title || "New chat").slice(0, 60),
-        updated_at: now,
-        message_count: (prev[idx].message_count || 0) + 1,
-      };
-      const next = [updated, ...prev.filter((_, i) => i !== idx)];
-      return next;
-    });
-  }, []);
+  const touchChatPreview = useCallback(
+    (chatId, lastMessage) => {
+      if (!chatId) return;
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => c.chat_id === chatId);
+        const now = new Date().toISOString();
+        const title = (lastMessage || "New chat").slice(0, 60);
+        if (idx === -1) {
+          return [
+            {
+              chat_id: chatId,
+              article_id: articleId,
+              title,
+              created_at: now,
+              updated_at: now,
+              message_count: 1,
+              event_count: 0,
+            },
+            ...prev,
+          ];
+        }
+        const updated = {
+          ...prev[idx],
+          title:
+            prev[idx].title && prev[idx].title !== "New chat"
+              ? prev[idx].title
+              : title,
+          updated_at: now,
+          message_count: (prev[idx].message_count || 0) + 1,
+        };
+        const next = [updated, ...prev.filter((_, i) => i !== idx)];
+        return next;
+      });
+    },
+    [articleId],
+  );
 
-  // Initial load: fetch chats and ensure we have an active chat to start with.
+  // Initial load: fetch chats when article changes
   useEffect(() => {
     if (!articleId) return;
     ensuredInitialRef.current = false;
+    setHasLoadedChats(false);
     refreshChats();
   }, [articleId, refreshChats]);
 
+  // Set active chat to the most recent one if available
   useEffect(() => {
     if (!articleId) return;
+    if (!hasLoadedChats) return;
     if (isLoading) return;
     if (activeChatId) return;
     if (ensuredInitialRef.current) return;
     ensuredInitialRef.current = true;
     if (chats.length > 0) {
       setActiveChatId(chats[0].chat_id);
-    } else {
-      // Auto-create first chat for this article so events have a place to go.
-      createChat();
     }
-  }, [articleId, isLoading, activeChatId, chats, createChat]);
+    // No longer auto-create empty chat; let user send first message to create one
+  }, [articleId, hasLoadedChats, isLoading, activeChatId, chats]);
 
   return {
     chats,
@@ -221,7 +204,6 @@ export function useCanvasChats(articleId) {
     error,
     refreshChats,
     selectChat,
-    createChat,
     deleteChat,
     setActiveChatId,
     touchChatPreview,

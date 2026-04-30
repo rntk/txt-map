@@ -3,6 +3,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import BackgroundTasks, HTTPException
 from fastapi.testclient import TestClient
 
 from handlers.canvas_handler import (
@@ -10,6 +11,7 @@ from handlers.canvas_handler import (
     ArticlePiece,
     CanvasArticlePage,
     CanvasArticleText,
+    ChatRequest,
     _build_article_text_with_lines,
     _build_canvas_chunks,
     _cp_offsets_to_js,
@@ -17,8 +19,10 @@ from handlers.canvas_handler import (
     _merge_chunk_replies,
     _run_canvas_chat,
     _run_canvas_chunk_tool_loop,
+    post_canvas_chat,
 )
 from lib.llm.base import LLMResponse, ToolCall
+from lib.storage.canvas_chats import CanvasChatsStorage
 
 
 class _StubLLM:
@@ -445,6 +449,92 @@ def test_canvas_events_storage_delete_event_not_found() -> None:
     result = storage.delete_event("article-1", 1)
 
     assert result is False
+
+
+def test_canvas_chats_storage_create_chat_with_message_persists_first_message() -> None:
+    mock_db = MagicMock()
+    storage = CanvasChatsStorage(mock_db)
+
+    def _insert_one(doc: dict[str, Any]) -> MagicMock:
+        doc["_id"] = "generated-id"
+        return MagicMock(inserted_id="generated-id")
+
+    mock_db.canvas_chats.insert_one.side_effect = _insert_one
+
+    chat = storage.create_chat_with_message(
+        article_id="article-1",
+        role="user",
+        content="Explain the article",
+    )
+
+    inserted = mock_db.canvas_chats.insert_one.call_args.args[0]
+    assert chat["chat_id"] == inserted["chat_id"]
+    assert inserted["article_id"] == "article-1"
+    assert inserted["title"] == "Explain the article"
+    assert inserted["messages"][0]["role"] == "user"
+    assert inserted["messages"][0]["content"] == "Explain the article"
+
+
+def test_canvas_chats_storage_list_chats_filters_empty_sessions() -> None:
+    mock_db = MagicMock()
+    storage = CanvasChatsStorage(mock_db)
+
+    storage.list_chats("article-1")
+
+    mock_db.canvas_chats.find.assert_called_once()
+    assert mock_db.canvas_chats.find.call_args.args[0] == {
+        "article_id": "article-1",
+        "messages.0": {"$exists": True},
+    }
+
+
+def test_post_canvas_chat_creates_new_chat_with_first_message() -> None:
+    background_tasks = BackgroundTasks()
+    chats_storage = MagicMock()
+    chats_storage.create_chat_with_message.return_value = {"chat_id": "chat-1"}
+    submissions_storage = MagicMock()
+    submissions_storage.get_by_id.return_value = {"submission_id": "article-1"}
+
+    response = post_canvas_chat(
+        article_id="article-1",
+        body=ChatRequest(message=" Explain this "),
+        background_tasks=background_tasks,
+        canvas_storage=MagicMock(),
+        chats_storage=chats_storage,
+        submissions_storage=submissions_storage,
+        db=None,
+    )
+
+    chats_storage.create_chat.assert_not_called()
+    chats_storage.create_chat_with_message.assert_called_once_with(
+        article_id="article-1",
+        role="user",
+        content="Explain this",
+    )
+    chats_storage.add_message.assert_not_called()
+    assert response["chat_id"] == "chat-1"
+
+
+def test_post_canvas_chat_rejects_blank_message_without_creating_chat() -> None:
+    chats_storage = MagicMock()
+    submissions_storage = MagicMock()
+    submissions_storage.get_by_id.return_value = {"submission_id": "article-1"}
+
+    with pytest.raises(HTTPException) as exc_info:
+        post_canvas_chat(
+            article_id="article-1",
+            body=ChatRequest(message="   "),
+            background_tasks=BackgroundTasks(),
+            canvas_storage=MagicMock(),
+            chats_storage=chats_storage,
+            submissions_storage=submissions_storage,
+            db=None,
+        )
+
+    assert exc_info.value.status_code == 400
+    chats_storage.create_chat.assert_not_called()
+    chats_storage.create_chat_with_message.assert_not_called()
+    chats_storage.add_message.assert_not_called()
 
 
 def test_canvas_events_storage_add_event_uses_atomic_counter() -> None:

@@ -677,7 +677,10 @@ class TestProcessSummarizationCompletionMessage:
             root.summary = {"text": "Summary", "bullets": ["Bullet 1"]}
 
         with patch("lib.tasks.summarization.summarize_by_sentence_groups") as mock_sum:
-            with patch("lib.tasks.summarization.summarize_topic_tree", side_effect=mock_tree_summarizer):
+            with patch(
+                "lib.tasks.summarization.summarize_topic_tree",
+                side_effect=mock_tree_summarizer,
+            ):
                 mock_sum.return_value = (["Summary1", "Summary2"], [])
 
                 process_summarization(submission, mock_db, mock_llm)

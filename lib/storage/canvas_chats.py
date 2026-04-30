@@ -76,9 +76,31 @@ class CanvasChatsStorage:
         chat["_id"] = str(chat["_id"])
         return chat
 
+    def create_chat_with_message(
+        self, article_id: str, role: str, content: str
+    ) -> dict[str, Any]:
+        now = datetime.now(UTC)
+        title = content.strip()
+        if len(title) > 60:
+            title = title[:57].rstrip() + "..."
+        message = {"role": role, "content": content, "ts": now}
+        chat: dict[str, Any] = {
+            "chat_id": uuid.uuid4().hex,
+            "article_id": article_id,
+            "title": title or "New chat",
+            "created_at": now,
+            "updated_at": now,
+            "messages": [message],
+            "events": [],
+            "event_seq": 0,
+        }
+        self._db.canvas_chats.insert_one(chat)
+        chat["_id"] = str(chat["_id"])
+        return chat
+
     def list_chats(self, article_id: str) -> List[dict[str, Any]]:
         cursor = self._db.canvas_chats.find(
-            {"article_id": article_id},
+            {"article_id": article_id, "messages.0": {"$exists": True}},
             projection={
                 "chat_id": 1,
                 "article_id": 1,

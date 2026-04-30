@@ -135,7 +135,6 @@ export default function CanvasPage() {
     isLoading: isChatsLoading,
     error: chatsError,
     selectChat,
-    createChat,
     deleteChat,
     touchChatPreview,
     setActiveChatId,
@@ -195,8 +194,11 @@ export default function CanvasPage() {
   );
 
   const handleNewChat = useCallback(() => {
-    createChat();
-  }, [createChat]);
+    // Clear messages and reset active chat to null
+    // Next message will trigger creation of a new chat session
+    setMessages([]);
+    setActiveChatId(null);
+  }, [setMessages, setActiveChatId]);
 
   /**
    * @param {string} chatId
