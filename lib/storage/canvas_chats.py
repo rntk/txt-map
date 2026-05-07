@@ -77,13 +77,16 @@ class CanvasChatsStorage:
         return chat
 
     def create_chat_with_message(
-        self, article_id: str, role: str, content: str
+        self,
+        article_id: str,
+        role: str,
+        content: str,
     ) -> dict[str, Any]:
         now = datetime.now(UTC)
         title = content.strip()
         if len(title) > 60:
             title = title[:57].rstrip() + "..."
-        message = {"role": role, "content": content, "ts": now}
+        message: dict[str, Any] = {"role": role, "content": content, "ts": now}
         chat: dict[str, Any] = {
             "chat_id": uuid.uuid4().hex,
             "article_id": article_id,
@@ -115,7 +118,9 @@ class CanvasChatsStorage:
         result: List[dict[str, Any]] = []
         for doc in cursor:
             doc["_id"] = str(doc["_id"])
-            doc["message_count"] = len(doc.get("messages") or [])
+            doc["message_count"] = len(
+                [msg for msg in (doc.get("messages") or []) if not msg.get("hidden")]
+            )
             doc["event_count"] = len(doc.get("events") or [])
             # Drop heavy fields from the listing payload.
             doc.pop("messages", None)
@@ -149,10 +154,26 @@ class CanvasChatsStorage:
     # ── Messages ──────────────────────────────────────────────────────────
 
     def add_message(
-        self, article_id: str, chat_id: str, role: str, content: str
+        self,
+        article_id: str,
+        chat_id: str,
+        role: str,
+        content: str,
+        hidden: bool = False,
+        reasoning: str | None = None,
+        tool_call_id: str | None = None,
+        tool_calls: list[dict[str, Any]] | None = None,
     ) -> bool:
         now = datetime.now(UTC)
-        message = {"role": role, "content": content, "ts": now}
+        message: dict[str, Any] = {"role": role, "content": content, "ts": now}
+        if hidden:
+            message["hidden"] = True
+        if reasoning:
+            message["reasoning"] = reasoning
+        if tool_call_id:
+            message["tool_call_id"] = tool_call_id
+        if tool_calls:
+            message["tool_calls"] = tool_calls
         update: dict[str, Any] = {
             "$push": {"messages": message},
             "$set": {"updated_at": now},

@@ -38,6 +38,7 @@ class LLMMessage:
     content: str | None = None
     tool_calls: Sequence[ToolCall] = field(default_factory=tuple)
     tool_call_id: str | None = None
+    reasoning: str | None = None
 
 
 @dataclass(frozen=True)

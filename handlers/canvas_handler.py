@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from handlers.dependencies import get_db
 from lib.llm import create_llm_client
-from lib.llm.base import LLMMessage, ToolDefinition
+from lib.llm.base import LLMMessage, ToolCall, ToolDefinition
 from lib.storage.canvas_chats import CanvasChatsStorage
 from lib.storage.canvas_events import CanvasEventsStorage
 from lib.storage.submissions import SubmissionsStorage
@@ -133,6 +133,12 @@ class CanvasArticleText:
     pages: list[CanvasArticlePage]
 
 
+@dataclass(frozen=True)
+class CanvasChatResult:
+    reply: str
+    transcript: tuple[LLMMessage, ...] = ()
+
+
 CanvasChatJobStatus = Literal["pending", "processing", "completed", "failed"]
 
 
@@ -230,12 +236,65 @@ def _get_canvas_chat_job(request_id: str) -> CanvasChatJob | None:
         return _canvas_chat_jobs.get(request_id)
 
 
+def _tool_call_to_chat_dict(tool_call: ToolCall) -> dict[str, Any]:
+    return {
+        "id": tool_call.id,
+        "name": tool_call.name,
+        "arguments": dict(tool_call.arguments),
+    }
+
+
+def _chat_dict_to_tool_call(value: Any) -> ToolCall | None:
+    if not isinstance(value, dict):
+        return None
+    name = value.get("name")
+    if not isinstance(name, str):
+        return None
+    arguments = value.get("arguments")
+    if not isinstance(arguments, dict):
+        arguments = {}
+    call_id = value.get("id")
+    return ToolCall(
+        id=call_id if isinstance(call_id, str) else None,
+        name=name,
+        arguments=arguments,
+    )
+
+
+def _chat_messages_to_llm_history(messages: list[dict[str, Any]]) -> list[LLMMessage]:
+    history: list[LLMMessage] = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role not in ("user", "assistant", "tool"):
+            continue
+
+        tool_calls: list[ToolCall] = []
+        for raw_tool_call in msg.get("tool_calls") or ():
+            tool_call = _chat_dict_to_tool_call(raw_tool_call)
+            if tool_call is not None:
+                tool_calls.append(tool_call)
+
+        tool_call_id = msg.get("tool_call_id")
+        reasoning = msg.get("reasoning")
+        history.append(
+            LLMMessage(
+                role=role,
+                content=content if isinstance(content, str) else "",
+                tool_calls=tuple(tool_calls),
+                tool_call_id=tool_call_id if isinstance(tool_call_id, str) else None,
+                reasoning=reasoning if isinstance(reasoning, str) else None,
+            )
+        )
+    return history
+
+
 def _run_canvas_chat_job(
     request_id: str,
     article_id: str,
     submission: dict[str, Any],
     user_message: str,
-    history: list[dict[str, str]],
+    history: list[dict[str, Any]],
     canvas_storage: CanvasEventsStorage | _ChatEventSink,
     db: Any,
     selected_pages: list[int] | None = None,
@@ -244,7 +303,7 @@ def _run_canvas_chat_job(
 ) -> None:
     _update_canvas_chat_job(request_id, status="processing")
     try:
-        reply = _run_canvas_chat(
+        result = _run_canvas_chat(
             article_id=article_id,
             submission=submission,
             user_message=user_message,
@@ -252,14 +311,33 @@ def _run_canvas_chat_job(
             canvas_storage=canvas_storage,
             db=db,
             selected_pages=selected_pages,
+            collect_transcript=True,
         )
     except Exception as exc:
         log.exception("Canvas chat job error for article %s", article_id)
         _update_canvas_chat_job(request_id, status="failed", error=str(exc))
         return
 
+    reply = result.reply if isinstance(result, CanvasChatResult) else str(result)
+
     if chats_storage is not None and chat_id:
         try:
+            for transcript_message in (
+                result.transcript if isinstance(result, CanvasChatResult) else ()
+            ):
+                chats_storage.add_message(
+                    article_id=article_id,
+                    chat_id=chat_id,
+                    role=transcript_message.role,
+                    content=transcript_message.content or "",
+                    hidden=True,
+                    reasoning=transcript_message.reasoning,
+                    tool_call_id=transcript_message.tool_call_id,
+                    tool_calls=[
+                        _tool_call_to_chat_dict(tool_call)
+                        for tool_call in transcript_message.tool_calls
+                    ],
+                )
             chats_storage.add_message(
                 article_id=article_id,
                 chat_id=chat_id,
@@ -439,6 +517,8 @@ def _estimate_messages_tokens(llm: Any, messages: list[LLMMessage]) -> int:
     for msg in messages:
         if msg.content:
             total += _estimate_tokens(llm, msg.content)
+        if msg.reasoning:
+            total += _estimate_tokens(llm, msg.reasoning)
         for tc in msg.tool_calls or ():
             total += _estimate_tokens(llm, tc.name or "")
             if tc.arguments:
@@ -569,6 +649,7 @@ def _run_canvas_chunk_tool_loop(
     client: Any,
     canvas_storage: CanvasEventsStorage,
     max_tool_rounds: int = 10,
+    transcript_messages: list[LLMMessage] | None = None,
 ) -> str:
     """Run a single tool-loop session for one article chunk."""
     messages: list[LLMMessage] = list(base_messages)
@@ -639,8 +720,11 @@ def _run_canvas_chunk_tool_loop(
             role="assistant",
             content=response.content,
             tool_calls=tuple(response.tool_calls),
+            reasoning=response.reasoning,
         )
         messages.append(assistant_msg)
+        if transcript_messages is not None:
+            transcript_messages.append(assistant_msg)
 
         tool_results: list[LLMMessage] = []
         for tool_call in response.tool_calls:
@@ -716,6 +800,8 @@ def _run_canvas_chunk_tool_loop(
             )
 
         messages.extend(tool_results)
+        if transcript_messages is not None:
+            transcript_messages.extend(tool_results)
 
     return "I've finished highlighting the relevant passages."
 
@@ -724,11 +810,12 @@ def _run_canvas_chat(
     article_id: str,
     submission: dict[str, Any],
     user_message: str,
-    history: list[dict[str, str]],
+    history: list[dict[str, Any]],
     canvas_storage: CanvasEventsStorage,
     db: Any,
     selected_pages: list[int] | None = None,
-) -> str:
+    collect_transcript: bool = False,
+) -> str | CanvasChatResult:
     """Run the canvas chat, splitting long articles into chunks if needed."""
     article_text: CanvasArticleText = _build_article_text_with_lines(submission)
 
@@ -769,12 +856,7 @@ def _run_canvas_chat(
 
     client = create_llm_client(db=db)
 
-    base_messages: list[LLMMessage] = []
-    for msg in history:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if role in ("user", "assistant"):
-            base_messages.append(LLMMessage(role=role, content=content))
+    base_messages: list[LLMMessage] = _chat_messages_to_llm_history(history)
 
     # Static overhead: system prompt + history + user question envelope + tool defs.
     question_envelope = (
@@ -806,6 +888,7 @@ def _run_canvas_chat(
     )
 
     replies: list[str] = []
+    transcript_messages: list[LLMMessage] = []
     for chunk_index, chunk_text in enumerate(chunks):
         reply = _run_canvas_chunk_tool_loop(
             article_id=article_id,
@@ -817,6 +900,7 @@ def _run_canvas_chat(
             user_message=user_message,
             client=client,
             canvas_storage=canvas_storage,
+            transcript_messages=transcript_messages if collect_transcript else None,
         )
         replies.append(reply)
 
@@ -827,9 +911,15 @@ def _run_canvas_chat(
     )
 
     if len(chunks) == 1:
-        return replies[0]
+        final_reply = replies[0]
+    else:
+        final_reply = _merge_chunk_replies(replies)
 
-    return _merge_chunk_replies(replies)
+    if collect_transcript:
+        return CanvasChatResult(
+            reply=final_reply, transcript=tuple(transcript_messages)
+        )
+    return final_reply
 
 
 class ChatMessage(BaseModel):
@@ -992,7 +1082,10 @@ def post_canvas_chat(
             ) from exc
         chat_id = chat["chat_id"]
 
-    history = [{"role": m.role, "content": m.content} for m in (body.history or [])]
+    history = []
+    if body.chat_id and chat is not None:
+        stored_messages = chat.get("messages") if isinstance(chat, dict) else []
+        history = stored_messages if isinstance(stored_messages, list) else []
 
     event_sink: Any = (
         _ChatEventSink(chats_storage, chat_id) if chat_id else canvas_storage
@@ -1084,6 +1177,8 @@ def get_canvas_chat(
 
     messages_out: list[dict[str, Any]] = []
     for msg in chat.get("messages") or []:
+        if msg.get("hidden"):
+            continue
         ts = msg.get("ts")
         messages_out.append(
             {
@@ -1096,7 +1191,9 @@ def get_canvas_chat(
     summary = _serialize_chat_summary(
         {
             **chat,
-            "message_count": len(chat.get("messages") or []),
+            "message_count": len(
+                [msg for msg in (chat.get("messages") or []) if not msg.get("hidden")]
+            ),
             "event_count": len(chat.get("events") or []),
         }
     )

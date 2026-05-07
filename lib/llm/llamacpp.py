@@ -138,6 +138,8 @@ class LLamaCPP(LLMClient):
         output: dict[str, Any] = {"role": message.role, "content": message.content}
         if message.role == "tool":
             output["tool_call_id"] = message.tool_call_id
+        if message.reasoning:
+            output["reasoning_content"] = message.reasoning
         if message.tool_calls:
             output["tool_calls"] = [
                 {

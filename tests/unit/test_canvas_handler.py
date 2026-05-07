@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from handlers.canvas_handler import (
     CANVAS_SYSTEM_PROMPT,
     ArticlePiece,
+    CanvasChatResult,
     CanvasArticlePage,
     CanvasArticleText,
     ChatRequest,
@@ -18,10 +19,11 @@ from handlers.canvas_handler import (
     _line_range_to_offsets,
     _merge_chunk_replies,
     _run_canvas_chat,
+    _run_canvas_chat_job,
     _run_canvas_chunk_tool_loop,
     post_canvas_chat,
 )
-from lib.llm.base import LLMResponse, ToolCall
+from lib.llm.base import LLMMessage, LLMResponse, ToolCall
 from lib.storage.canvas_chats import CanvasChatsStorage
 
 
@@ -352,6 +354,55 @@ def test_canvas_chunk_stops_after_tool_result_then_no_tool_response() -> None:
     assert len(canvas_storage.events) == 1
 
 
+def test_canvas_chunk_passes_reasoning_back_with_tool_calls() -> None:
+    article_text = CanvasArticleText(
+        display_text="Alpha. Beta.",
+        numbered_text="1: Alpha.\n2: Beta.",
+        pieces=[
+            ArticlePiece(text="Alpha.", start=0, end=6),
+            ArticlePiece(text="Beta.", start=7, end=12),
+        ],
+        pages=[CanvasArticlePage(page_number=1, start=0, end=12)],
+    )
+    client = _CompleteClient(
+        [
+            LLMResponse(
+                content="Let me highlight.",
+                reasoning="I should highlight line 1.",
+                tool_calls=(
+                    ToolCall(
+                        name="highlight_span",
+                        arguments={"start_line": 1, "end_line": 1},
+                        id="call-1",
+                    ),
+                ),
+            ),
+            LLMResponse(content="Done highlighting."),
+        ]
+    )
+    canvas_storage = _CanvasStorage()
+
+    reply = _run_canvas_chunk_tool_loop(
+        article_id="article-1",
+        article_text=article_text,
+        chunk_numbered_text="1: Alpha.\n2: Beta.",
+        chunk_index=0,
+        chunk_total=1,
+        base_messages=[],
+        user_message="Show me Alpha.",
+        client=client,
+        canvas_storage=canvas_storage,
+    )
+
+    assert reply == "Done highlighting."
+    assert len(client.calls) == 2
+    # The second call should include the assistant reasoning from the first response.
+    second_call_messages = client.calls[1]["messages"]
+    assistant_msgs = [m for m in second_call_messages if m.role == "assistant"]
+    assert len(assistant_msgs) == 1
+    assert assistant_msgs[0].reasoning == "I should highlight line 1."
+
+
 def test_canvas_chat_stops_after_all_chunks_return_without_tool_calls(caplog) -> None:
     submission: dict[str, object] = {
         "results": {
@@ -513,6 +564,107 @@ def test_post_canvas_chat_creates_new_chat_with_first_message() -> None:
     )
     chats_storage.add_message.assert_not_called()
     assert response["chat_id"] == "chat-1"
+
+
+def test_post_canvas_chat_uses_server_history_not_client_reasoning() -> None:
+    background_tasks = MagicMock()
+    chats_storage = MagicMock()
+    stored_messages: list[dict[str, Any]] = [
+        {"role": "user", "content": "Previous question"},
+        {
+            "role": "assistant",
+            "content": "Calling tool",
+            "hidden": True,
+            "reasoning": "server reasoning",
+            "tool_calls": [
+                {
+                    "id": "call-1",
+                    "name": "highlight_span",
+                    "arguments": {"start_line": 1, "end_line": 1},
+                }
+            ],
+        },
+    ]
+    chats_storage.get_chat.return_value = {
+        "chat_id": "chat-1",
+        "messages": stored_messages,
+    }
+    submissions_storage = MagicMock()
+    submissions_storage.get_by_id.return_value = {"submission_id": "article-1"}
+
+    response = post_canvas_chat(
+        article_id="article-1",
+        body=ChatRequest(
+            message="Follow up",
+            chat_id="chat-1",
+            history=[
+                {
+                    "role": "assistant",
+                    "content": "client supplied",
+                    "reasoning": "untrusted",
+                }
+            ],
+        ),
+        background_tasks=background_tasks,
+        canvas_storage=MagicMock(),
+        chats_storage=chats_storage,
+        submissions_storage=submissions_storage,
+        db=None,
+    )
+
+    assert response["chat_id"] == "chat-1"
+    background_tasks.add_task.assert_called_once()
+    assert background_tasks.add_task.call_args.kwargs["history"] == stored_messages
+
+
+def test_canvas_chat_job_persists_hidden_tool_transcript() -> None:
+    chats_storage = MagicMock()
+    transcript = (
+        LLMMessage(
+            role="assistant",
+            content="Let me highlight.",
+            reasoning="server reasoning",
+            tool_calls=(
+                ToolCall(
+                    name="highlight_span",
+                    arguments={"start_line": 1, "end_line": 1},
+                    id="call-1",
+                ),
+            ),
+        ),
+        LLMMessage(
+            role="tool", content="Highlighted lines 1-1.", tool_call_id="call-1"
+        ),
+    )
+
+    with patch(
+        "handlers.canvas_handler._run_canvas_chat",
+        return_value=CanvasChatResult(reply="Done.", transcript=transcript),
+    ):
+        _run_canvas_chat_job(
+            request_id="request-1",
+            article_id="article-1",
+            submission={"submission_id": "article-1"},
+            user_message="Show me Alpha.",
+            history=[],
+            canvas_storage=MagicMock(),
+            db=None,
+            chats_storage=chats_storage,
+            chat_id="chat-1",
+        )
+
+    assert chats_storage.add_message.call_count == 3
+    first_call = chats_storage.add_message.call_args_list[0].kwargs
+    second_call = chats_storage.add_message.call_args_list[1].kwargs
+    third_call = chats_storage.add_message.call_args_list[2].kwargs
+    assert first_call["hidden"] is True
+    assert first_call["reasoning"] == "server reasoning"
+    assert first_call["tool_calls"][0]["name"] == "highlight_span"
+    assert second_call["hidden"] is True
+    assert second_call["role"] == "tool"
+    assert second_call["tool_call_id"] == "call-1"
+    assert third_call["role"] == "assistant"
+    assert third_call["content"] == "Done."
 
 
 def test_post_canvas_chat_rejects_blank_message_without_creating_chat() -> None:

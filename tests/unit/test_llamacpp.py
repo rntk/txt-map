@@ -1569,6 +1569,37 @@ class TestIntegrationScenarios:
         assert body["tool_choice"] == "required"
         assert body["parallel_tool_calls"] is True
 
+    def test_complete_sends_reasoning_content_in_history(self):
+        """Assistant messages with reasoning include reasoning_content."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "done"}}]}
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+
+        self.llm.complete(
+            user_prompt="final question",
+            system_prompt="system text",
+            messages=(
+                LLMMessage(
+                    role="assistant",
+                    content="thinking",
+                    reasoning="internal reasoning trace",
+                    tool_calls=(
+                        ToolCall(name="lookup", arguments={"id": 1}, id="call-1"),
+                    ),
+                ),
+                LLMMessage(role="tool", content='{"id":1}', tool_call_id="call-1"),
+            ),
+        )
+
+        body = json.loads(self.mock_conn_instance.request.call_args[0][2])
+        assistant_msg = body["messages"][1]
+        assert assistant_msg["role"] == "assistant"
+        assert assistant_msg["reasoning_content"] == "internal reasoning trace"
+        assert assistant_msg["tool_calls"][0]["function"]["name"] == "lookup"
+
     def test_complete_combines_system_prompt_and_system_messages(self):
         """System prompt content is sent as a single leading system message."""
         mock_response = MagicMock()
