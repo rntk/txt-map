@@ -20,14 +20,14 @@ import { readJsonSafe } from "./utils";
 export function useCanvasEvents(articleId, chatId) {
   const [events, setEvents] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isLive, setIsLive] = useState(true);
+  const [isLive, setIsLive] = useState(false);
   const [newIndices, setNewIndices] = useState(() => new Set());
   const [deleteError, setDeleteError] = useState(null);
 
   const offsetRef = useRef(0);
   const pendingEventsRef = useRef([]);
   const applyingRef = useRef(false);
-  const isLiveRef = useRef(true);
+  const isLiveRef = useRef(false);
   const fetchInFlightRef = useRef(false);
   const fetchGenerationRef = useRef(0);
   const chatIdRef = useRef(chatId);
@@ -45,7 +45,7 @@ export function useCanvasEvents(articleId, chatId) {
     fetchInFlightRef.current = false;
     setEvents([]);
     setSelectedIndex(-1);
-    setIsLive(true);
+    setIsLive(false);
     setNewIndices(new Set());
     setDeleteError(null);
   }, [chatId]);

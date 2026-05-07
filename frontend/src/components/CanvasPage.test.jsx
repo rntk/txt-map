@@ -157,10 +157,7 @@ describe("CanvasPage highlight focusing", () => {
 
     const viewport = container.querySelector(".canvas-viewport");
     await waitFor(() => {
-      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.4");
-      expect(viewport.style.getPropertyValue("--canvas-translate-x")).not.toBe(
-        "40px",
-      );
+      expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "1. first" }));
