@@ -63,10 +63,6 @@ class TaskMutationResponse(BaseModel):
     request_id: str
 
 
-def _get_lease_seconds() -> int:
-    return DEFAULT_REMOTE_LEASE_SECONDS
-
-
 def _serialize_claimed_task(task: dict[str, Any]) -> ClaimedTask:
     lease_expires_at = task.get("lease_expires_at")
     if lease_expires_at is None:
@@ -160,7 +156,7 @@ def claim_llm_task(
     task = llm_queue_store.claim(
         body.worker_id,
         worker_kind="remote",
-        lease_seconds=_get_lease_seconds(),
+        lease_seconds=DEFAULT_REMOTE_LEASE_SECONDS,
         supported_model_ids=body.supported_model_ids,
         include_legacy_model_ids=False,
     )
@@ -181,7 +177,7 @@ def heartbeat_llm_task(
         request_id,
         body.worker_id,
         body.lease_id,
-        lease_seconds=_get_lease_seconds(),
+        lease_seconds=DEFAULT_REMOTE_LEASE_SECONDS,
     )
     if updated_task is None:
         raise HTTPException(status_code=409, detail="LLM task lease is no longer valid")
