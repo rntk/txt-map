@@ -21,11 +21,11 @@ _CUSTOM_PREFIX = "custom:"
 
 
 def _provider_available(provider: ProviderDefinition) -> bool:
-    if provider.display_name == "LlamaCPP":
+    if provider.key == "llamacpp":
         return bool(os.getenv("LLAMACPP_URL"))
-    if provider.display_name == "OpenAI":
+    if provider.key == "openai":
         return bool(os.getenv("OPENAI_API_KEY"))
-    if provider.display_name == "Anthropic":
+    if provider.key == "anthropic":
         return bool(os.getenv("ANTHROPIC_API_KEY"))
     return False
 
@@ -39,9 +39,9 @@ def get_available_provider_definitions() -> list[ProviderDefinition]:
 
 
 def _get_env_model(provider: ProviderDefinition) -> str:
-    if provider.display_name == "OpenAI":
+    if provider.key == "openai":
         return os.getenv("OPENAI_MODEL", provider.default_model)
-    if provider.display_name == "Anthropic":
+    if provider.key == "anthropic":
         return os.getenv("ANTHROPIC_MODEL", provider.default_model)
     return provider.default_model
 
@@ -228,7 +228,7 @@ def create_llm_client_from_config(
             f"Model {model!r} is not supported for provider {provider.display_name}"
         )
 
-    if provider.display_name == "LlamaCPP":
+    if provider.key == "llamacpp":
         token = os.getenv("TOKEN")
         llamacpp_url = os.getenv("LLAMACPP_URL")
         return LLamaCPP(
@@ -239,11 +239,11 @@ def create_llm_client_from_config(
             retry_delay=2.0,
         )
 
-    if provider.display_name == "OpenAI":
+    if provider.key == "openai":
         openai_key = os.getenv("OPENAI_API_KEY")
         return OpenAIClient(api_key=openai_key, model=model)
 
-    if provider.display_name == "Anthropic":
+    if provider.key == "anthropic":
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         return AnthropicClient(api_key=anthropic_key, model=model)
 
