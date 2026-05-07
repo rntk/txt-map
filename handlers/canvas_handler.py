@@ -10,7 +10,11 @@ from typing import Any, List, Literal, Optional, Protocol
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from handlers.dependencies import get_db
+from handlers.dependencies import (
+    get_canvas_chats_storage,
+    get_canvas_events_storage,
+    get_db,
+)
 from lib.llm import create_llm_client
 from lib.llm.base import LLMMessage, ToolCall, ToolDefinition
 from lib.storage.canvas_chats import CanvasChatsStorage
@@ -86,14 +90,6 @@ Highlighting rules (highlight_span tool):
 - When you have finished highlighting all relevant passages, stop calling tools and produce
   a normal text reply. Do not keep calling highlight_span in a loop.
 """
-
-
-def _get_canvas_events_storage(request: Request) -> CanvasEventsStorage:
-    return request.app.state.canvas_events_storage
-
-
-def _get_canvas_chats_storage(request: Request) -> CanvasChatsStorage:
-    return request.app.state.canvas_chats_storage
 
 
 def _get_submissions_storage(request: Request) -> SubmissionsStorage:
@@ -947,7 +943,7 @@ def get_canvas_events(
     article_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
+    canvas_storage: CanvasEventsStorage = Depends(get_canvas_events_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1027,8 +1023,8 @@ def post_canvas_chat(
     article_id: str,
     body: ChatRequest,
     background_tasks: BackgroundTasks,
-    canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    canvas_storage: CanvasEventsStorage = Depends(get_canvas_events_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
     db: Any = Depends(get_db),
 ) -> dict[str, str | None]:
@@ -1149,7 +1145,7 @@ def _serialize_event(ev: dict[str, Any]) -> dict[str, Any]:
 @router.get("/canvas/{article_id}/chats")
 def list_canvas_chats(
     article_id: str,
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1164,7 +1160,7 @@ def list_canvas_chats(
 def get_canvas_chat(
     article_id: str,
     chat_id: str,
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1204,7 +1200,7 @@ def get_canvas_chat(
 def delete_canvas_chat(
     article_id: str,
     chat_id: str,
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1223,7 +1219,7 @@ def get_canvas_chat_events(
     chat_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1248,7 +1244,7 @@ def delete_canvas_chat_event(
     article_id: str,
     chat_id: str,
     seq: int,
-    chats_storage: CanvasChatsStorage = Depends(_get_canvas_chats_storage),
+    chats_storage: CanvasChatsStorage = Depends(get_canvas_chats_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)
@@ -1268,7 +1264,7 @@ def delete_canvas_chat_event(
 def delete_canvas_event(
     article_id: str,
     seq: int,
-    canvas_storage: CanvasEventsStorage = Depends(_get_canvas_events_storage),
+    canvas_storage: CanvasEventsStorage = Depends(get_canvas_events_storage),
     submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
 ) -> dict[str, Any]:
     submission = submissions_storage.get_by_id(article_id)

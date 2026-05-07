@@ -91,16 +91,14 @@ def client():
         with patch("lifespan.MongoClient"):
             from main import app
             from handlers.canvas_handler import (
-                _get_canvas_events_storage,
                 _get_submissions_storage,
             )
+            from handlers.dependencies import get_canvas_events_storage
 
             canvas_storage = _CanvasStorage()
             submissions_storage = MagicMock()
 
-            app.dependency_overrides[_get_canvas_events_storage] = lambda: (
-                canvas_storage
-            )
+            app.dependency_overrides[get_canvas_events_storage] = lambda: canvas_storage
             app.dependency_overrides[_get_submissions_storage] = lambda: (
                 submissions_storage
             )
@@ -108,7 +106,7 @@ def client():
             with TestClient(app) as test_client:
                 yield test_client, canvas_storage, submissions_storage
 
-            app.dependency_overrides.pop(_get_canvas_events_storage, None)
+            app.dependency_overrides.pop(get_canvas_events_storage, None)
             app.dependency_overrides.pop(_get_submissions_storage, None)
 
 

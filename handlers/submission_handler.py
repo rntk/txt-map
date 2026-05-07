@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple, Set
+import hashlib
 import re
 import requests as http_requests
 
@@ -77,8 +78,6 @@ def _word_storage_key(word: str) -> str:
     (dots, dollar signs) and collisions from normalisation (e.g. "a.b" vs "a_b")
     are never an issue.
     """
-    import hashlib
-
     return hashlib.sha1(word.lower().encode()).hexdigest()[:20]
 
 

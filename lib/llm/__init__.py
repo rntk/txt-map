@@ -2,13 +2,18 @@ import logging
 import os
 from typing import Any
 
+from lib.crypto import decrypt_token, is_encryption_available
 from lib.llm.base import (
     LLMClient,
     PROVIDER_DEFINITION_BY_KEY,
     PROVIDER_DEFINITION_BY_NAME,
     ProviderDefinition,
 )
+from lib.llm.llamacpp import LLamaCPP
+from lib.llm.openai_client import OpenAIClient
+from lib.llm.anthropic_client import AnthropicClient
 from lib.storage.app_settings import AppSettingsStorage
+from lib.storage.llm_providers import LlmProvidersStorage
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +48,9 @@ def _get_env_model(provider: ProviderDefinition) -> str:
 
 def _get_custom_providers(db: Any) -> list[dict[str, Any]]:
     """Load custom providers from DB. Returns empty list on any failure."""
-    from lib.crypto import is_encryption_available
-
     if not is_encryption_available():
         return []
     try:
-        from lib.storage.llm_providers import LlmProvidersStorage
-
         storage = LlmProvidersStorage(db)
         return storage.list_providers()
     except Exception:
@@ -159,9 +160,6 @@ def get_active_provider_name(db: Any = None) -> str:
 
 def _create_custom_llm_client(provider_id: str, model: str, db: Any) -> LLMClient:
     """Create an LLM client from a custom provider stored in the database."""
-    from lib.crypto import decrypt_token
-    from lib.storage.llm_providers import LlmProvidersStorage
-
     storage = LlmProvidersStorage(db)
     provider_doc = storage.get_provider(provider_id)
     if provider_doc is None:
@@ -175,8 +173,6 @@ def _create_custom_llm_client(provider_id: str, model: str, db: Any) -> LLMClien
     url = provider_doc.get("url") or None
 
     if provider_type == "openai_comp":
-        from lib.llm.llamacpp import LLamaCPP
-
         return LLamaCPP(
             host=url or "",
             token=token,
@@ -188,8 +184,6 @@ def _create_custom_llm_client(provider_id: str, model: str, db: Any) -> LLMClien
         )
 
     if provider_type == "openai":
-        from lib.llm.openai_client import OpenAIClient
-
         return OpenAIClient(
             api_key=token,
             model=model,
@@ -198,8 +192,6 @@ def _create_custom_llm_client(provider_id: str, model: str, db: Any) -> LLMClien
         )
 
     if provider_type == "anthropic":
-        from lib.llm.anthropic_client import AnthropicClient
-
         return AnthropicClient(
             api_key=token,
             model=model,
@@ -237,8 +229,6 @@ def create_llm_client_from_config(
         )
 
     if provider.display_name == "LlamaCPP":
-        from lib.llm.llamacpp import LLamaCPP
-
         token = os.getenv("TOKEN")
         llamacpp_url = os.getenv("LLAMACPP_URL")
         return LLamaCPP(
@@ -250,14 +240,10 @@ def create_llm_client_from_config(
         )
 
     if provider.display_name == "OpenAI":
-        from lib.llm.openai_client import OpenAIClient
-
         openai_key = os.getenv("OPENAI_API_KEY")
         return OpenAIClient(api_key=openai_key, model=model)
 
     if provider.display_name == "Anthropic":
-        from lib.llm.anthropic_client import AnthropicClient
-
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         return AnthropicClient(api_key=anthropic_key, model=model)
 

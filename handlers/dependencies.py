@@ -1,22 +1,33 @@
+from typing import Any, Dict
+
 from fastapi import Depends, HTTPException, Request
-from typing import Dict, Any
 
-from lib.storage.app_settings import AppSettingsStorage
-from lib.storage.submissions import SubmissionsStorage
-from lib.storage.semantic_diffs import SemanticDiffsStorage
-from lib.storage.task_queue import TaskQueueStorage
-from lib.storage.llm_cache import MongoLLMCacheStore
-from lib.storage.tokens import TokenStorage
-from lib.storage.llm_providers import LlmProvidersStorage
 from lib.llm_queue.store import LLMQueueStore
+from lib.storage.app_settings import AppSettingsStorage
+from lib.storage.canvas_chats import CanvasChatsStorage
+from lib.storage.canvas_events import CanvasEventsStorage
+from lib.storage.llm_cache import MongoLLMCacheStore
+from lib.storage.llm_providers import LlmProvidersStorage
+from lib.storage.semantic_diffs import SemanticDiffsStorage
+from lib.storage.submissions import SubmissionsStorage
+from lib.storage.task_queue import TaskQueueStorage
+from lib.storage.tokens import TokenStorage
 
 
-def get_db(request: Request):
+def get_db(request: Request) -> Any:
     return request.app.state.db
 
 
 def get_submissions_storage(request: Request) -> SubmissionsStorage:
     return request.app.state.submissions_storage
+
+
+def get_canvas_events_storage(request: Request) -> CanvasEventsStorage:
+    return request.app.state.canvas_events_storage
+
+
+def get_canvas_chats_storage(request: Request) -> CanvasChatsStorage:
+    return request.app.state.canvas_chats_storage
 
 
 def get_task_queue_storage(request: Request) -> TaskQueueStorage:

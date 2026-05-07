@@ -1,7 +1,9 @@
 """Authentication handler for token-based access."""
 
+import base64
 import hashlib
 import hmac
+import json
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -51,9 +53,6 @@ def _constant_time_compare(a: str, b: str) -> bool:
 
 def _create_session_token(is_superuser: bool, alias: str | None = None) -> str:
     """Create a signed session token."""
-    import json
-    import base64
-
     now = datetime.now(UTC)
     expires = now + timedelta(seconds=SESSION_MAX_AGE)
 
@@ -77,9 +76,6 @@ def _create_session_token(is_superuser: bool, alias: str | None = None) -> str:
 
 def _verify_session_token(token: str) -> dict[str, Any] | None:
     """Verify a session token and return payload if valid."""
-    import json
-    import base64
-
     try:
         if "." not in token:
             return None
