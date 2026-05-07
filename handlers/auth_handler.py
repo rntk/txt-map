@@ -168,9 +168,17 @@ def require_auth(
     return session
 
 
-def require_superuser(request: Request) -> dict[str, Any]:
+def require_superuser(
+    request: Request,
+    storage: TokenStorage = Depends(get_token_storage),
+) -> dict[str, Any]:
     """Dependency that requires superuser authentication."""
-    session = require_auth(request)
+    if not SUPER_TOKEN:
+        return {"type": "anonymous", "alias": None}
+
+    session = get_current_session(request, storage)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     if session.get("type") != "superuser":
         raise HTTPException(status_code=403, detail="Superuser access required")

@@ -5,14 +5,15 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from handlers.auth_handler import (
+    SESSION_COOKIE_NAME,
+    _create_session_token,
     get_current_session,
     require_auth,
-    _create_session_token,
-    SESSION_COOKIE_NAME,
+    require_superuser,
 )
 
 
@@ -234,6 +235,75 @@ class TestRequireAuth:
 
         assert session["type"] == "anonymous"
         assert session["alias"] is None
+
+
+class TestRequireSuperuser:
+    """Tests for the require_superuser dependency."""
+
+    def test_require_superuser_rejects_user_token(
+        self, mock_token_storage: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test require_superuser raises 403 for valid non-superuser token."""
+        from handlers import auth_handler
+
+        test_super_token: str = "test-super-token-secret"
+        monkeypatch.setattr(auth_handler, "SUPER_TOKEN", test_super_token)
+
+        user_token: str = "test-user-token-123"
+        token_hash: str = hashlib.sha256(user_token.encode()).hexdigest()
+
+        mock_token_storage.find_by_hash.return_value = {
+            "_id": "token123",
+            "token_hash": token_hash,
+            "alias": "Test User",
+            "notes": "",
+            "created_at": datetime.now(UTC),
+            "created_by": "superuser",
+        }
+
+        request: MagicMock = MagicMock()
+        request.cookies = {}
+        request.headers = {"Authorization": f"Bearer {user_token}"}
+
+        with pytest.raises(HTTPException) as exc_info:
+            require_superuser(request, mock_token_storage)
+
+        assert exc_info.value.status_code == 403
+        assert "Superuser access required" in str(exc_info.value.detail)
+        mock_token_storage.find_by_hash.assert_called_once_with(token_hash)
+
+    def test_superuser_route_rejects_user_bearer_token(
+        self,
+        client: TestClient,
+        mock_token_storage: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test superuser-only routes check Bearer user tokens via DI storage."""
+        from handlers import auth_handler
+
+        test_super_token: str = "test-super-token-secret"
+        monkeypatch.setattr(auth_handler, "SUPER_TOKEN", test_super_token)
+
+        user_token: str = "test-user-token-456"
+        token_hash: str = hashlib.sha256(user_token.encode()).hexdigest()
+
+        mock_token_storage.find_by_hash.return_value = {
+            "_id": "token456",
+            "token_hash": token_hash,
+            "alias": "API User",
+            "notes": "",
+            "created_at": datetime.now(UTC),
+            "created_by": "superuser",
+        }
+
+        response = client.get(
+            "/api/tokens",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+
+        assert response.status_code == 403
+        assert "Superuser access required" in response.json()["detail"]
+        mock_token_storage.find_by_hash.assert_any_call(token_hash)
 
 
 class TestLoginEndpoint:
