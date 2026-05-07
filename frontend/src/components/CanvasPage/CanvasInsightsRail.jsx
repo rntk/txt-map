@@ -1,20 +1,5 @@
 import React from "react";
-
-/** Screen-pixel margin from the viewport top when a card is sticky. */
-const STICKY_MARGIN_SCREEN_PX = 20;
-
-/**
- * @param {{ cardY: number, cardHeight: number, startY: number, endY: number }} card
- * @param {number} viewportTop
- * @param {number} scale
- * @returns {number}
- */
-function getStickyTop(card, viewportTop, scale) {
-  const marginInArticle = STICKY_MARGIN_SCREEN_PX / scale;
-  const desired = viewportTop + marginInArticle;
-  const maxTop = Math.max(card.cardY, card.endY - card.cardHeight);
-  return Math.min(Math.max(card.cardY, desired), maxTop);
-}
+import { getStickyCardTop } from "./stickyCards";
 
 /**
  * Renders SVG connector lines and floating insight cards on the LEFT side of
@@ -69,7 +54,7 @@ export default function CanvasInsightsRail({
     <>
       <svg className="canvas-insights-connectors" style={{ height: svgHeight }}>
         {cards.map((card) => {
-          const effectiveTop = getStickyTop(card, viewportTop, scale);
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           const connectorY = effectiveTop + card.cardHeight / 2;
           const x1 = articleLeft;
           const x2 = articleLeft - 80;
@@ -101,7 +86,7 @@ export default function CanvasInsightsRail({
       </svg>
       <div className="canvas-insights-rail">
         {cards.map((card) => {
-          const effectiveTop = getStickyTop(card, viewportTop, scale);
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           const isActive = activeInsightKey === card.key;
           const preview =
             card.sourceSentences[0] ||

@@ -1,26 +1,5 @@
 import React from "react";
-
-/** Screen-pixel margin from the viewport top when a card is sticky. */
-const STICKY_MARGIN_SCREEN_PX = 20;
-
-/**
- * Computes the effective top position for a card, applying sticky-within-bounds
- * behaviour: the card follows the viewport top while the panned view is inside
- * the card's sentence range, so it stays on screen during long-text navigation.
- *
- * @param {{ cardY: number, cardHeight: number, startY: number, endY: number }} card
- * @param {number} viewportTop - Viewport top in article coordinates (-translateY / scale).
- * @param {number} scale - Current canvas scale.
- * @returns {number}
- */
-function getStickyTop(card, viewportTop, scale) {
-  const marginInArticle = STICKY_MARGIN_SCREEN_PX / scale;
-  const desired = viewportTop + marginInArticle;
-  // Upper bound: the card must not slide past the bottom of its sentence range.
-  const maxTop = Math.max(card.cardY, card.endY - card.cardHeight);
-  // Lower bound: never float higher than the card's natural layout position.
-  return Math.min(Math.max(card.cardY, desired), maxTop);
-}
+import { getStickyCardTop } from "./stickyCards";
 
 /**
  * Renders the SVG connector lines and floating summary cards for the summary rail.
@@ -62,7 +41,7 @@ export default function CanvasSummaryRail({
     <>
       <svg className="canvas-summary-connectors" style={{ height: svgHeight }}>
         {cards.map((card) => {
-          const effectiveTop = getStickyTop(card, viewportTop, scale);
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           const connectorY = effectiveTop + card.cardHeight / 2;
           const x1 = articleRight;
           const x2 = articleRight + 80;
@@ -94,7 +73,7 @@ export default function CanvasSummaryRail({
       </svg>
       <div className="canvas-summary-rail">
         {cards.map((card) => {
-          const effectiveTop = getStickyTop(card, viewportTop, scale);
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           return (
             <div
               key={card.key}
