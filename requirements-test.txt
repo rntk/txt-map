@@ -12,3 +12,6 @@ httpx>=0.26.0
 
 # Linting and formatting
 ruff>=0.4.0
+
+# Mutation testing
+mutmut>=3.5.0,<4

@@ -18,6 +18,9 @@
 
 # Run strict frontend quality checks
 ./frontend-quality.sh
+
+# Run strict backend quality checks for main.py
+./backend-quality.sh
 ```
 
 The helper runs `pytest` directly when executed inside a container with local dependencies available. On host environments it falls back to the Docker Compose test stack.
@@ -34,6 +37,19 @@ Use `./frontend-quality.sh` for an improvement loop that combines strict ESLint 
 ```
 
 The strict lint profile includes complexity and size rules, treats warnings as failures, and escalates React hook dependency warnings. Mutation testing uses Stryker with the Vitest runner.
+
+## Backend Quality Mode
+
+Use `./backend-quality.sh` for a focused `main.py` improvement loop that combines strict Ruff checks with mutmut mutation testing:
+
+```bash
+./backend-quality.sh
+./backend-quality.sh --lint-only
+./backend-quality.sh --mutation-only
+./backend-quality.sh --rebuild
+```
+
+The strict lint profile includes annotations, complexity, branch, argument, return, and statement-count checks. Mutation testing is scoped to `main.py` and the direct route-handler tests.
 
 ## Test Dependencies
 

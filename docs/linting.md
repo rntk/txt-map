@@ -11,6 +11,9 @@
 
 # Run strict frontend quality lint plus mutation checks
 ./frontend-quality.sh
+
+# Run strict backend quality lint plus mutation checks
+./backend-quality.sh
 ```
 
 ## Usage
@@ -28,6 +31,8 @@
 | `./lint.sh format` | Format both backend and frontend |
 | `./frontend-quality.sh --lint-only` | Strict frontend ESLint quality profile |
 | `./frontend-quality.sh --mutation-only` | Frontend Stryker mutation testing |
+| `./backend-quality.sh --lint-only` | Strict backend Ruff quality profile for `main.py` |
+| `./backend-quality.sh --mutation-only` | Backend mutmut mutation testing for `main.py` |
 
 ## Running Tools Directly
 
@@ -37,6 +42,8 @@ If dependencies are installed locally:
 ```bash
 ruff check .
 ruff format .
+./backend-quality.sh --lint-only
+./backend-quality.sh --mutation-only
 ```
 
 **Frontend (JavaScript/JSX):**

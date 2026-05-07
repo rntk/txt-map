@@ -1,7 +1,7 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from handlers import (
@@ -19,7 +19,7 @@ from handlers.auth_handler import require_auth
 from handlers import auth_handler, tokens_handler, llm_providers_handler
 from lifespan import lifespan
 
-app = FastAPI(
+app: FastAPI = FastAPI(
     title="My FastAPI App",
     description="A simple FastAPI application with separate handlers",
     lifespan=lifespan,
@@ -37,9 +37,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-frontend_build_dir = Path("frontend/build")
-legacy_static_dir = frontend_build_dir / "static"
-vite_assets_dir = frontend_build_dir / "assets"
+frontend_build_dir: Path = Path("frontend/build")
+legacy_static_dir: Path = frontend_build_dir / "static"
+vite_assets_dir: Path = frontend_build_dir / "assets"
 
 # Support both legacy CRA output (`build/static`) and Vite output (`build/assets`).
 if legacy_static_dir.is_dir():
@@ -112,7 +112,13 @@ app.include_router(
 )
 
 
-FRONTEND_INDEX = "frontend/build/index.html"
+FRONTEND_INDEX: str = "frontend/build/index.html"
+
+
+def get_frontend_index_response() -> FileResponse:
+    if not Path(FRONTEND_INDEX).is_file():
+        raise HTTPException(status_code=404, detail="Frontend build not found")
+    return FileResponse(FRONTEND_INDEX)
 
 
 @app.get("/")
@@ -131,8 +137,8 @@ FRONTEND_INDEX = "frontend/build/index.html"
 @app.get("/page/login")
 @app.get("/page/tokens")
 @app.get("/page/llm-providers")
-def serve_frontend_page():
-    return FileResponse(FRONTEND_INDEX)
+def serve_frontend_page() -> FileResponse:
+    return get_frontend_index_response()
 
 
 if __name__ == "__main__":
