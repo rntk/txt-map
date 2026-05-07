@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any, Tuple, Set
+from typing import Any
 import hashlib
 import re
 import requests as http_requests
@@ -32,7 +32,7 @@ from handlers.dependencies import (
 
 class SubmitRequest(BaseModel):
     html: str
-    source_url: Optional[str] = ""
+    source_url: str | None = ""
 
 
 class FetchUrlRequest(BaseModel):
@@ -41,11 +41,11 @@ class FetchUrlRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    tasks: Optional[List[str]] = None
+    tasks: list[str] | None = None
 
 
 class ReadTopicsRequest(BaseModel):
-    read_topics: List[str]
+    read_topics: list[str]
 
 
 class TagFrequencyTopicLink(BaseModel):
@@ -57,13 +57,13 @@ class TagFrequencyTopicLink(BaseModel):
 class TagFrequencyRow(BaseModel):
     word: str
     frequency: int
-    topics: List[TagFrequencyTopicLink]
+    topics: list[TagFrequencyTopicLink]
 
 
 class TagFrequencyResponse(BaseModel):
-    scope_path: List[str]
+    scope_path: list[str]
     sentence_count: int
-    rows: List[TagFrequencyRow]
+    rows: list[TagFrequencyRow]
 
 
 class WordContextHighlightsRequest(BaseModel):
@@ -82,8 +82,8 @@ def _word_storage_key(word: str) -> str:
 
 
 def _count_matching_topics(
-    all_topics: List[Dict[str, Any]],
-    all_sentences: List[str],
+    all_topics: list[dict[str, Any]],
+    all_sentences: list[str],
     pattern: re.Pattern,
 ) -> int:
     """Count topics that contain at least one sentence matching the word pattern."""
@@ -114,8 +114,8 @@ def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -
 
 
 def _topic_sentence_texts(
-    submission: Dict[str, Any], topic_name: str
-) -> Tuple[Dict[str, Any], List[str], List[str]]:
+    submission: dict[str, Any], topic_name: str
+) -> tuple[dict[str, Any], list[str], list[str]]:
     """Resolve a topic by name and return topic and non-topic sentence texts."""
     results = submission.get("results") or {}
     topics = results.get("topics") or []
@@ -125,16 +125,16 @@ def _topic_sentence_texts(
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    sentence_indices: List[int] = topic.get("sentences") or []
-    topic_sentence_index_set: Set[int] = {
+    sentence_indices: list[int] = topic.get("sentences") or []
+    topic_sentence_index_set: set[int] = {
         index
         for index in sentence_indices
         if isinstance(index, int) and 1 <= index <= len(sentences)
     }
-    topic_sentences: List[str] = [
+    topic_sentences: list[str] = [
         sentences[index - 1] for index in sorted(topic_sentence_index_set)
     ]
-    background_sentences: List[str] = [
+    background_sentences: list[str] = [
         sentence
         for index, sentence in enumerate(sentences, start=1)
         if index not in topic_sentence_index_set
@@ -142,7 +142,7 @@ def _topic_sentence_texts(
     return topic, topic_sentences, background_sentences
 
 
-def _article_sentence_texts(submission: Dict[str, Any]) -> List[str]:
+def _article_sentence_texts(submission: dict[str, Any]) -> list[str]:
     """Return all non-empty sentence texts for a submission."""
     results = submission.get("results") or {}
     sentences = results.get("sentences") or []
@@ -151,12 +151,12 @@ def _article_sentence_texts(submission: Dict[str, Any]) -> List[str]:
     ]
 
 
-def _topic_name_parts(topic_name: str) -> List[str]:
+def _topic_name_parts(topic_name: str) -> list[str]:
     """Split a hierarchical topic name into trimmed path segments."""
     return [part.strip() for part in str(topic_name or "").split(">") if part.strip()]
 
 
-def _is_within_scope(topic_parts: List[str], scope_path: List[str]) -> bool:
+def _is_within_scope(topic_parts: list[str], scope_path: list[str]) -> bool:
     """Return True when the topic path lies inside the requested scope."""
     if len(scope_path) == 0:
         return True
@@ -166,15 +166,15 @@ def _is_within_scope(topic_parts: List[str], scope_path: List[str]) -> bool:
 
 
 def _build_tag_frequency_rows(
-    submission: Dict[str, Any], scope_path: List[str], limit: Optional[int]
+    submission: dict[str, Any], scope_path: list[str], limit: int | None
 ) -> TagFrequencyResponse:
     """Aggregate lemmatized word frequencies and scoped topic associations."""
-    results: Dict[str, Any] = submission.get("results") or {}
-    topics: List[Dict[str, Any]] = results.get("topics") or []
-    sentences: List[str] = results.get("sentences") or []
+    results: dict[str, Any] = submission.get("results") or {}
+    topics: list[dict[str, Any]] = results.get("topics") or []
+    sentences: list[str] = results.get("sentences") or []
 
-    scoped_sentence_indices: Set[int] = set()
-    child_topic_sentence_sets: Dict[str, Set[int]] = {}
+    scoped_sentence_indices: set[int] = set()
+    child_topic_sentence_sets: dict[str, set[int]] = {}
 
     for topic in topics:
         topic_name = topic.get("name")
@@ -203,12 +203,12 @@ def _build_tag_frequency_rows(
             )
 
     if len(scope_path) == 0:
-        selected_sentence_indices: List[int] = list(range(1, len(sentences) + 1))
+        selected_sentence_indices: list[int] = list(range(1, len(sentences) + 1))
     else:
         selected_sentence_indices = sorted(scoped_sentence_indices)
 
-    sentence_word_counts: Dict[int, Dict[str, int]] = {}
-    total_counts: Dict[str, int] = {}
+    sentence_word_counts: dict[int, dict[str, int]] = {}
+    total_counts: dict[str, int] = {}
 
     for sentence_index in selected_sentence_indices:
         sentence_text = sentences[sentence_index - 1]
@@ -216,7 +216,7 @@ def _build_tag_frequency_rows(
             continue
 
         normalized_tokens = normalize_text_tokens(sentence_text)
-        token_counts: Dict[str, int] = {}
+        token_counts: dict[str, int] = {}
         for token in normalized_tokens:
             token_counts[token] = token_counts.get(token, 0) + 1
             total_counts[token] = total_counts.get(token, 0) + 1
@@ -224,11 +224,11 @@ def _build_tag_frequency_rows(
         if token_counts:
             sentence_word_counts[sentence_index] = token_counts
 
-    rows: List[TagFrequencyRow] = []
+    rows: list[TagFrequencyRow] = []
     sorted_words = sorted(total_counts.items(), key=lambda item: (-item[1], item[0]))
     limited_words = sorted_words if limit is None else sorted_words[:limit]
     for word, frequency in limited_words:
-        topic_links: List[TagFrequencyTopicLink] = []
+        topic_links: list[TagFrequencyTopicLink] = []
         for (
             child_full_path,
             child_sentence_indices,
@@ -266,7 +266,7 @@ def post_submit(
     request: SubmitRequest,
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Accept HTML content, save to DB, queue tasks, and return submission ID
     """
@@ -287,6 +287,9 @@ def post_submit(
 
 ALLOWED_UPLOAD_EXTENSIONS = {".html", ".htm", ".txt", ".md", ".pdf", ".fb2", ".epub"}
 
+# 50 MB upload size cap to prevent unbounded memory consumption
+MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024
+
 
 def _html_contains_embedded_pdf_images(html_content: str) -> bool:
     """Return True when converted PDF HTML contains at least one embedded raster image."""
@@ -295,7 +298,7 @@ def _html_contains_embedded_pdf_images(html_content: str) -> bool:
 
 def _extract_content_from_upload(
     filename: str, data: bytes, embed_images: bool = False
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Extract (html_content, text_content) from uploaded file bytes.
     Returns (html_content, text_content) — for plain text types both are the same.
@@ -380,7 +383,7 @@ async def post_upload(
     embed_images: bool = Form(False),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Accept an uploaded file (html, htm, txt, md, pdf, fb2, epub), extract its text/html
     content, and process it the same way as a browser-extension submission.
@@ -391,6 +394,12 @@ async def post_upload(
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported file type. Allowed extensions: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}",
+        )
+
+    if file.size is not None and file.size > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB.",
         )
 
     data = await file.read()
@@ -417,7 +426,7 @@ def post_fetch_url(
     request: FetchUrlRequest,
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Fetch a URL, detect its content type, extract content (HTML, PDF, etc.),
     and create a submission just like a file upload.
@@ -490,7 +499,7 @@ def post_fetch_url(
 def get_submission_status(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Return current task statuses for polling
     """
@@ -507,7 +516,7 @@ def get_submission_status(
 def get_submission(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Return all available results from DB
     """
@@ -533,7 +542,7 @@ def put_read_topics(
     body: ReadTopicsRequest,
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Persist the list of read topic names for a submission
     """
@@ -548,7 +557,7 @@ def delete_submission(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Delete a submission and any queued tasks
     """
@@ -568,7 +577,7 @@ def post_refresh(
     submission: dict = Depends(require_submission),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
     task_queue_storage: TaskQueueStorage = Depends(get_task_queue_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Clear results and re-queue tasks for recalculation
     """
@@ -603,10 +612,10 @@ def post_refresh(
 
 @router.get("/submission/{submission_id}/tag-frequency")
 def get_tag_frequency(
-    path: List[str] = Query(default=[]),
-    limit: Optional[int] = Query(default=None, ge=1, le=5000),
-    submission: Dict[str, Any] = Depends(require_submission),
-) -> Dict[str, Any]:
+    path: list[str] = Query(default=[]),
+    limit: int | None = Query(default=None, ge=1, le=5000),
+    submission: dict[str, Any] = Depends(require_submission),
+) -> dict[str, Any]:
     """Return lemmatized word frequencies for the article or a scoped topic branch."""
     response = _build_tag_frequency_rows(submission, path, limit)
     return response.model_dump()
@@ -616,7 +625,7 @@ def get_tag_frequency(
 def get_similar_words(
     word: str = Query(...),
     submission: dict = Depends(require_submission),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Return top 10 similar words from the article using a multi-stage approach.
     1. Lemma matches, 2. Fuzzy matches, 3. Topic-based keywords, 4. Frequent words.
@@ -702,12 +711,12 @@ def get_similar_words(
 @router.post("/submission/{submission_id}/word-context-highlights")
 def start_word_context_highlights(
     body: WordContextHighlightsRequest,
-    submission: Dict[str, Any] = Depends(require_submission),
+    submission: dict[str, Any] = Depends(require_submission),
     storage: SubmissionsStorage = Depends(get_submissions_storage),
     db: Any = Depends(get_db),
     llm_queue_store: LLMQueueStore = Depends(get_llm_queue_store),
     cache_store: MongoLLMCacheStore = Depends(get_cache_store),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Submit word-context highlight requests (one LLM call per topic) to the queue.
 
     Returns immediately with current progress. Poll GET to track completion.
@@ -717,9 +726,9 @@ def start_word_context_highlights(
         raise HTTPException(status_code=422, detail="word must not be empty")
 
     submission_id: str = submission["submission_id"]
-    results: Dict[str, Any] = submission.get("results") or {}
-    all_sentences: List[str] = results.get("sentences") or []
-    all_topics: List[Dict[str, Any]] = results.get("topics") or []
+    results: dict[str, Any] = submission.get("results") or {}
+    all_sentences: list[str] = results.get("sentences") or []
+    all_topics: list[dict[str, Any]] = results.get("topics") or []
 
     if not all_sentences or not all_topics:
         return {
@@ -756,14 +765,14 @@ def start_word_context_highlights(
     namespace = _cache_namespace(llm_meta, word)
     job_signature = build_word_context_job_signature(llm_meta, word)
     word_key = _word_storage_key(word)
-    stored_job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
+    stored_job: dict[str, Any] = (results.get("word_context_highlights") or {}).get(
         word_key
     ) or {}
-    existing_job: Dict[str, Any] = {}
+    existing_job: dict[str, Any] = {}
     if not body.refresh and stored_job.get("signature") == job_signature:
         existing_job = stored_job
-    existing_pending: Dict[str, Any] = existing_job.get("pending") or {}
-    existing_highlights: Dict[str, Any] = existing_job.get("highlights") or {}
+    existing_pending: dict[str, Any] = existing_job.get("pending") or {}
+    existing_highlights: dict[str, Any] = existing_job.get("highlights") or {}
 
     queued_llm = QueuedLLMClient(
         store=llm_queue_store,
@@ -785,15 +794,15 @@ def start_word_context_highlights(
         and t.get("name") not in existing_pending
     ]
 
-    new_pending: Dict[str, Any] = {}
-    new_resolved_highlights: Dict[str, Any] = {}
+    new_pending: dict[str, Any] = {}
+    new_resolved_highlights: dict[str, Any] = {}
     if topics_to_submit:
         new_pending, new_resolved_highlights = submit_topic_requests(
             word, topics_to_submit, all_sentences, queued_llm
         )
 
     # Merge queue entries with any pre-existing pending
-    still_pending: Dict[str, Any] = {**existing_pending, **new_pending}
+    still_pending: dict[str, Any] = {**existing_pending, **new_pending}
 
     merged_highlights = {**existing_highlights, **new_resolved_highlights}
 
@@ -828,30 +837,30 @@ def start_word_context_highlights(
 @router.get("/submission/{submission_id}/word-context-highlights")
 def get_word_context_highlights(
     word: str = Query(...),
-    submission: Dict[str, Any] = Depends(require_submission),
+    submission: dict[str, Any] = Depends(require_submission),
     storage: SubmissionsStorage = Depends(get_submissions_storage),
     llm_queue_store: LLMQueueStore = Depends(get_llm_queue_store),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Poll word-context highlight progress and return available results."""
     word = word.strip()
     if not word:
         raise HTTPException(status_code=422, detail="word must not be empty")
 
     submission_id: str = submission["submission_id"]
-    results: Dict[str, Any] = submission.get("results") or {}
-    all_sentences: List[str] = results.get("sentences") or []
-    all_topics: List[Dict[str, Any]] = results.get("topics") or []
+    results: dict[str, Any] = submission.get("results") or {}
+    all_sentences: list[str] = results.get("sentences") or []
+    all_topics: list[dict[str, Any]] = results.get("topics") or []
 
     word_key = _word_storage_key(word)
-    job: Dict[str, Any] = (results.get("word_context_highlights") or {}).get(
+    job: dict[str, Any] = (results.get("word_context_highlights") or {}).get(
         word_key
     ) or {}
 
     if not job:
         return {"status": "not_found", "total": 0, "completed": 0, "highlights": {}}
 
-    pending: Dict[str, Any] = job.get("pending") or {}
-    highlights: Dict[str, Any] = job.get("highlights") or {}
+    pending: dict[str, Any] = job.get("pending") or {}
+    highlights: dict[str, Any] = job.get("highlights") or {}
 
     if pending:
         topics_by_name = {t.get("name", ""): t for t in all_topics}
@@ -892,7 +901,7 @@ def get_word_context_highlights(
 @router.get("/global-topics")
 def get_global_topics(
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Return aggregated topic tree across all completed submissions.
     """
@@ -901,10 +910,10 @@ def get_global_topics(
 
 @router.get("/global-topics/sentences")
 def get_global_topics_sentences(
-    topic_name: List[str] = Query(default=[]),
+    topic_name: list[str] = Query(default=[]),
     include_context: bool = Query(default=False),
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """
     Return sentence texts for selected topics across all submissions.
     """
@@ -956,7 +965,7 @@ def get_global_topics_sentences(
     return {"groups": groups}
 
 
-def _is_topic_read(topic_name: str, read_topics: Set[str]) -> bool:
+def _is_topic_read(topic_name: str, read_topics: set[str]) -> bool:
     """Return True when the exact topic or one of its parent paths is marked read."""
     if not topic_name:
         return False
@@ -972,9 +981,11 @@ def _is_topic_read(topic_name: str, read_topics: Set[str]) -> bool:
     return False
 
 
-def _calculate_read_indices(topics: List[Dict], read_topics: Set[str]) -> Set[int]:
+def _calculate_read_indices(
+    topics: list[dict[str, Any]], read_topics: set[str]
+) -> set[int]:
     """Helper to get unique sentence indices for read topics."""
-    indices = set()
+    indices: set[int] = set()
     for topic in topics:
         if _is_topic_read(topic.get("name") or "", read_topics):
             indices.update(topic.get("sentences") or [])
@@ -984,7 +995,7 @@ def _calculate_read_indices(topics: List[Dict], read_topics: Set[str]) -> Set[in
 @router.get("/submissions/read-progress")
 def get_global_read_progress(
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, int]:
+) -> dict[str, int]:
     submissions = submissions_storage.list_with_projection(
         {},
         {
@@ -1016,7 +1027,7 @@ def get_global_read_progress(
 @router.get("/submission/{submission_id}/read-progress")
 def get_submission_read_progress(
     submission: dict = Depends(require_submission),
-) -> Dict[str, int]:
+) -> dict[str, int]:
     results = submission.get("results") or {}
     sentences = results.get("sentences") or []
     total_sentences = len(sentences)
@@ -1033,7 +1044,7 @@ def get_submission_read_progress(
 @router.get("/submission/{submission_id}/topic-analysis")
 def get_topic_analysis(
     submission: dict = Depends(require_submission),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     results = submission.get("results") or {}
     tasks = submission.get("tasks") or {}
     return {
@@ -1061,12 +1072,12 @@ def get_topic_analysis(
 
 @router.get("/submission/{submission_id}/topic-analysis/heatmap")
 def get_topic_analysis_heatmap(
-    topic_name: Optional[str] = Query(default=None, min_length=1),
+    topic_name: str | None = Query(default=None, min_length=1),
     scope: str = Query(default="topic", pattern="^(topic|article)$"),
     submission: dict = Depends(require_submission),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a normalized co-occurrence heatmap for a topic or whole article."""
-    resolved_topic_name: Optional[str] = None
+    resolved_topic_name: str | None = None
 
     if scope == "article":
         topic_sentences = _article_sentence_texts(submission)
@@ -1104,15 +1115,15 @@ def get_topic_analysis_heatmap(
 def get_topic_word_heatmap(
     top_words: int = Query(default=80, ge=1, le=500),
     submission: dict = Depends(require_submission),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a matrix of word frequencies per topic (rows=words, cols=topics)."""
     import collections
 
     results = submission.get("results") or {}
-    topics: List[Dict[str, Any]] = results.get("topics") or []
-    sentences: List[str] = results.get("sentences") or []
+    topics: list[dict[str, Any]] = results.get("topics") or []
+    sentences: list[str] = results.get("sentences") or []
 
-    topic_entries: List[Tuple[str, collections.Counter]] = []
+    topic_entries: list[tuple[str, collections.Counter]] = []
     word_totals: collections.Counter[str] = collections.Counter()
 
     for topic in topics:
@@ -1143,7 +1154,7 @@ def get_topic_word_heatmap(
     selected_words = [word for word, _ in word_totals.most_common(top_words)]
     word_index = {word: i for i, word in enumerate(selected_words)}
 
-    matrix: List[List[int]] = [
+    matrix: list[list[int]] = [
         [0 for _ in range(len(topic_entries))] for _ in selected_words
     ]
     for col, (_topic_name, word_counts) in enumerate(topic_entries):
@@ -1189,11 +1200,11 @@ def get_topic_word_heatmap(
 
 @router.get("/submissions")
 def list_submissions(
-    submission_id: Optional[str] = None,
-    status: Optional[str] = None,
+    submission_id: str | None = None,
+    status: str | None = None,
     limit: int = 100,
     submissions_storage: SubmissionsStorage = Depends(get_submissions_storage),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     List submissions with optional filters.
     """
