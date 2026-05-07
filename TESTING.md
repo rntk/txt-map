@@ -15,9 +15,25 @@
 
 # Rebuild the backend test image first
 ./test.sh --rebuild
+
+# Run strict frontend quality checks
+./frontend-quality.sh
 ```
 
 The helper runs `pytest` directly when executed inside a container with local dependencies available. On host environments it falls back to the Docker Compose test stack.
+
+## Frontend Quality Mode
+
+Use `./frontend-quality.sh` for an improvement loop that combines strict ESLint checks with Stryker mutation testing:
+
+```bash
+./frontend-quality.sh
+./frontend-quality.sh --lint-only
+./frontend-quality.sh --mutation-only
+./frontend-quality.sh --rebuild
+```
+
+The strict lint profile includes complexity and size rules, treats warnings as failures, and escalates React hook dependency warnings. Mutation testing uses Stryker with the Vitest runner.
 
 ## Test Dependencies
 

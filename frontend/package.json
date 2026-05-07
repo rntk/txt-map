@@ -15,10 +15,15 @@
     "test:coverage": "node ./scripts/test.mjs --watchAll=false --coverage",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
+    "quality:lint": "eslint --config eslint.quality.config.mjs src/ --max-warnings=0",
+    "quality:mutation": "stryker run",
+    "quality": "npm run quality:lint && npm run quality:mutation",
     "format": "prettier --write src/"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.1",

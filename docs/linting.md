@@ -8,6 +8,9 @@
 
 # Format backend and frontend code
 ./lint.sh format
+
+# Run strict frontend quality lint plus mutation checks
+./frontend-quality.sh
 ```
 
 ## Usage
@@ -23,6 +26,8 @@
 | `./lint.sh check frontend` | Frontend lint checks only |
 | `./lint.sh fix frontend` | Auto-fix frontend lint issues |
 | `./lint.sh format` | Format both backend and frontend |
+| `./frontend-quality.sh --lint-only` | Strict frontend ESLint quality profile |
+| `./frontend-quality.sh --mutation-only` | Frontend Stryker mutation testing |
 
 ## Running Tools Directly
 
@@ -38,6 +43,8 @@ ruff format .
 ```bash
 cd /app/frontend && npm run lint
 cd /app/frontend && npm run format
+cd /app/frontend && npm run quality:lint
+cd /app/frontend && npm run quality:mutation
 ```
 
 ## Environment

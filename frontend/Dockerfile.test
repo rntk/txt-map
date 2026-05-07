@@ -4,6 +4,8 @@ WORKDIR /app/frontend
 
 ENV CI=true
 
+RUN apk add --no-cache procps
+
 # This image is intended to be driven by /app/frontend-test.sh, which mounts the
 # frontend source and reuses a named node_modules volume for dependency caching.
 CMD ["sh", "-lc", "echo 'Use ./frontend-test.sh to run frontend tests in Docker.'"]

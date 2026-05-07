@@ -1,18 +1,19 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig, configDefaults } from "vitest/config";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'build'
+    outDir: "build",
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: './src/setupTests.js',
+    setupFiles: "./src/setupTests.js",
+    exclude: [...configDefaults.exclude, "**/.stryker-tmp/**"],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov']
-    }
-  }
+      provider: "v8",
+      reporter: ["text", "lcov"],
+    },
+  },
 });
