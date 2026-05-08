@@ -10,6 +10,24 @@ export function useTopicNavigation({
   topicSummaryParaMap,
   setHighlightedGroupedTopic,
 }) {
+  /**
+   * @param {string} topicName
+   * @returns {Element | null}
+   */
+  const getMarkupTopicElement = (topicName) =>
+    Array.from(document.querySelectorAll("[data-topic-name]")).find(
+      (el) => el.dataset.topicName === topicName,
+    ) || null;
+
+  /**
+   * @param {string} topicName
+   * @returns {Element | null}
+   */
+  const getArticleTopicElement = (topicName) =>
+    Array.from(document.querySelectorAll("[data-topic-names]")).find((el) =>
+      (el.dataset.topicNames || "").split("\n").includes(topicName),
+    ) || null;
+
   const getSentenceElement = (articleIndex, sentenceIndex) => {
     const byId = document.getElementById(
       `sentence-${articleIndex}-${sentenceIndex}`,
@@ -212,6 +230,15 @@ export function useTopicNavigation({
       const margin = 8;
 
       const resolveElement = (target) => {
+        // Tab-specific element lookup
+        if (activeTab === "markup" && topic?.name) {
+          const el = getMarkupTopicElement(topic.name);
+          if (el) return el;
+        }
+        if (activeTab === "article" && topic?.name) {
+          const el = getArticleTopicElement(topic.name);
+          if (el) return el;
+        }
         if (Number.isFinite(target.charStart)) {
           return getCharElement(0, target.charStart);
         }

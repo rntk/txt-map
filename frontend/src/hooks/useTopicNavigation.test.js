@@ -9,7 +9,7 @@ describe("useTopicNavigation", () => {
   });
 
   it("scrolls to markup topic blocks by canonical topic name on the markup tab", () => {
-    const topicName = "Technology>Microsoft>AI Copilot";
+    const topicName = 'Technology>"Microsoft">AI Copilot';
     const block = document.createElement("div");
     block.className = "markup-topic-block";
     block.setAttribute("data-topic-name", topicName);
@@ -43,7 +43,7 @@ describe("useTopicNavigation", () => {
   });
 
   it("scrolls to article tokens by canonical topic name on the article tab", () => {
-    const topicName = "Technology>Microsoft>AI Copilot";
+    const topicName = 'Technology>"Microsoft">AI Copilot';
     const token = document.createElement("span");
     token.setAttribute("data-topic-names", `${topicName}\nOtherTopic`);
     document.body.appendChild(token);
