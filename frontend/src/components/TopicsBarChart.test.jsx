@@ -28,9 +28,9 @@ describe("TopicsBarChart", () => {
     render(<TopicsBarChart topics={topics} sentences={sentences} />);
 
     expect(screen.getByText("Topics Overview")).toBeInTheDocument();
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toHaveClass("active");
     expect(screen.getByRole("button", { name: "All Topics" })).toBeDisabled();
     expect(
@@ -45,14 +45,14 @@ describe("TopicsBarChart", () => {
     render(<TopicsBarChart topics={topics} sentences={sentences} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
 
     expect(
       screen.getByText("Showing all topics at relative level 1 (Subtopics)."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toHaveClass("active");
     expect(screen.getAllByText("Physics")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Biology")[0]).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe("TopicsBarChart", () => {
     render(<TopicsBarChart topics={topics} sentences={sentences} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
     fireEvent.click(screen.getByTestId("topics-bar-chart-row-science-physics"));
 
@@ -77,7 +77,7 @@ describe("TopicsBarChart", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Physics" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toHaveClass("active");
     expect(screen.getAllByText("Quantum")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Relativity")[0]).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe("TopicsBarChart", () => {
 
     fireEvent.click(screen.getByTestId("topics-bar-chart-row-science"));
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "All Topics" }));
 
@@ -97,7 +97,7 @@ describe("TopicsBarChart", () => {
       screen.getByText("Showing all topics at relative level 1 (Subtopics)."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toHaveClass("active");
     expect(screen.getAllByText("Music")[0]).toBeInTheDocument();
   });

@@ -37,7 +37,7 @@ describe("RadarChart", () => {
   it("renders the shared level switcher and updates the active level", () => {
     render(<RadarChart topics={topics} sentences={sentences} />);
 
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
     ).toHaveClass("active");

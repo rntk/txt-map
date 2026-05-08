@@ -74,12 +74,12 @@ describe("TreemapChart component", () => {
   it("renders the level selector and default subtitle", () => {
     render(<TreemapChart topics={topics} />);
 
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -92,7 +92,7 @@ describe("TreemapChart component", () => {
     render(<TreemapChart topics={topics} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
 
     expect(

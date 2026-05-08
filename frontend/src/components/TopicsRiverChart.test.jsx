@@ -21,17 +21,17 @@ describe("TopicsRiverChart", () => {
   it("renders the shared level switcher and updates selection", () => {
     render(<TopicsRiverChart topics={topics} sentences={sentences} />);
 
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toHaveClass("active");
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
 
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toHaveClass("active");
   });
 });

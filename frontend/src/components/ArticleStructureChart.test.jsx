@@ -92,12 +92,12 @@ describe("ArticleStructureChart component", () => {
   it("renders root scope controls and root-level topics", () => {
     render(<ArticleStructureChart topics={topics} sentences={sentences} />);
 
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Showing all topics at relative level 0 (Main Topics)."),
@@ -111,7 +111,7 @@ describe("ArticleStructureChart component", () => {
     render(<ArticleStructureChart topics={topics} sentences={sentences} />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
     fireEvent.click(
       screen.getByTestId("article-structure-block-science-physics"),
@@ -122,7 +122,7 @@ describe("ArticleStructureChart component", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Physics" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toHaveClass("active");
     expect(screen.getAllByText("Quantum").length).toBeGreaterThan(0);
     expect(
@@ -135,7 +135,7 @@ describe("ArticleStructureChart component", () => {
 
     fireEvent.click(screen.getByTestId("article-structure-block-science"));
     fireEvent.click(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "All Topics" }));
 
@@ -143,7 +143,7 @@ describe("ArticleStructureChart component", () => {
       screen.getByText("Showing all topics at relative level 1 (Subtopics)."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toHaveClass("active");
     expect(screen.getAllByText("Music").length).toBeGreaterThan(0);
   });

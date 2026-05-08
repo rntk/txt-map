@@ -11,18 +11,18 @@ describe("TopicLevelSwitcher", () => {
       <TopicLevelSwitcher selectedLevel={1} maxLevel={2} onChange={onChange} />,
     );
 
-    expect(screen.getByText("Topic Level:")).toBeInTheDocument();
+    expect(screen.getByText("Level:")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 0 (Main Topics)" }),
+      screen.getByRole("button", { name: "L0" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Level 1 (Subtopics)" }),
+      screen.getByRole("button", { name: "L1" }),
     ).toHaveClass("active");
     expect(
-      screen.getByRole("button", { name: "Level 2 (Depth 2)" }),
+      screen.getByRole("button", { name: "L2" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Level 2 (Depth 2)" }));
+    fireEvent.click(screen.getByRole("button", { name: "L2" }));
     expect(onChange).toHaveBeenCalledWith(2);
   });
 });
