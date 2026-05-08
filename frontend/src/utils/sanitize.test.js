@@ -1,4 +1,4 @@
-import { sanitizeHTML } from "./sanitize";
+import { sanitizeHTML, decodeHtmlEntities } from "./sanitize";
 
 // Helper: extract the style attribute from the first matching element in sanitized HTML
 function getStyle(html, selector = "[style]") {
@@ -283,6 +283,198 @@ describe("sanitizeHTML", () => {
     it("keeps list-style-type disc", () => {
       const style = getStyle('<ul style="list-style-type: disc">text</ul>');
       expect(style).toBe("list-style-type: disc");
+    });
+  });
+
+  describe("line-height clamping", () => {
+    it("clamps unitless line-height above 3.0", () => {
+      const style = getStyle('<p style="line-height: 5">text</p>');
+      expect(style).toBe("line-height: 3");
+    });
+
+    it("clamps unitless line-height below 1.0", () => {
+      const style = getStyle('<p style="line-height: 0.5">text</p>');
+      expect(style).toBe("line-height: 1");
+    });
+
+    it("passes through in-range unitless line-height", () => {
+      const style = getStyle('<p style="line-height: 1.5">text</p>');
+      expect(style).toBe("line-height: 1.5");
+    });
+
+    it("clamps px line-height", () => {
+      const style = getStyle('<p style="line-height: 60px">text</p>');
+      expect(style).toBe("line-height: 48px");
+    });
+
+    it("passes through valid px line-height", () => {
+      const style = getStyle('<p style="line-height: 20px">text</p>');
+      expect(style).toBe("line-height: 20px");
+    });
+  });
+
+  describe("text-indent and padding clamping", () => {
+    it("clamps text-indent to 80px max", () => {
+      const style = getStyle('<p style="text-indent: 100px">text</p>');
+      expect(style).toBe("text-indent: 80px");
+    });
+
+    it("strips negative text-indent", () => {
+      const style = getStyle('<p style="text-indent: -20px">text</p>');
+      expect(style).toBeNull();
+    });
+
+    it("clamps padding-left to 40px max", () => {
+      const style = getStyle('<p style="padding-left: 80px">text</p>');
+      expect(style).toBe("padding-left: 40px");
+    });
+
+    it("clamps padding-top to 24px max", () => {
+      const style = getStyle('<p style="padding-top: 50px">text</p>');
+      expect(style).toBe("padding-top: 24px");
+    });
+
+    it("strips negative padding-bottom", () => {
+      const style = getStyle('<p style="padding-bottom: -5px">text</p>');
+      expect(style).toBeNull();
+    });
+  });
+
+  describe("CSS injection protection", () => {
+    it("strips expression() in style values", () => {
+      const style = getStyle(
+        '<div style="width: expression(alert(1))">text</div>',
+      );
+      expect(style).toBeNull();
+    });
+
+    it("strips url() in style values", () => {
+      const style = getStyle(
+        '<div style="background: url(javascript:alert(1))">text</div>',
+      );
+      expect(style).toBeNull();
+    });
+
+    it("strips @import in style values", () => {
+      const style = getStyle(
+        '<div style="width: @import url(evil)">text</div>',
+      );
+      expect(style).toBeNull();
+    });
+  });
+
+  describe("target=_blank rel enrichment", () => {
+    it("adds noopener and noreferrer to links with target=_blank", () => {
+      const input = '<a href="https://example.com" target="_blank">Link</a>';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      const link = root.querySelector("a");
+      expect(link).not.toBeNull();
+      expect(link.getAttribute("rel")).toContain("noopener");
+      expect(link.getAttribute("rel")).toContain("noreferrer");
+    });
+  });
+
+  describe("data-* attributes", () => {
+    it("preserves data-* attributes", () => {
+      const input = '<span data-custom="hello">text</span>';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      expect(root.querySelector("span").getAttribute("data-custom")).toBe(
+        "hello",
+      );
+    });
+  });
+
+  describe("vbscript: URL blocking", () => {
+    it("removes vbscript: URLs from href", () => {
+      const input = '<a href="vbscript:alert(1)">Link</a>';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      expect(root.querySelector("a").getAttribute("href")).toBeNull();
+    });
+  });
+
+  describe("empty/null input", () => {
+    it("returns empty string for null input", () => {
+      expect(sanitizeHTML(null)).toBe("");
+    });
+
+    it("returns empty string for empty string input", () => {
+      expect(sanitizeHTML("")).toBe("");
+    });
+  });
+
+  describe("allowed attributes", () => {
+    it("preserves href on anchor for safe URLs", () => {
+      const input = '<a href="https://example.com">Link</a>';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      expect(root.querySelector("a").getAttribute("href")).toBe(
+        "https://example.com",
+      );
+    });
+
+    it("preserves alt and title attributes", () => {
+      const input = '<img alt="photo" title="A photo">';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      const img = root.querySelector("img");
+      expect(img.getAttribute("alt")).toBe("photo");
+      expect(img.getAttribute("title")).toBe("A photo");
+    });
+
+    it("removes disallowed attributes", () => {
+      const input = '<div tabindex="0" class="foo">text</div>';
+      const output = sanitizeHTML(input);
+      const root = document.createElement("div");
+      root.innerHTML = output;
+      const div = root.querySelector("div");
+      expect(div.getAttribute("tabindex")).toBeNull();
+      expect(div.getAttribute("class")).toBe("foo");
+    });
+  });
+
+  describe("decodeHtmlEntities", () => {
+    it("returns input unchanged if it has no &", () => {
+      expect(decodeHtmlEntities("hello world")).toBe("hello world");
+    });
+
+    it("returns input unchanged for non-string", () => {
+      expect(decodeHtmlEntities(42)).toBe(42);
+      expect(decodeHtmlEntities(null)).toBe(null);
+    });
+
+    it("decodes common named entities", () => {
+      expect(decodeHtmlEntities("&nbsp;")).toBe(" ");
+      expect(decodeHtmlEntities("&amp;")).toBe("&");
+      expect(decodeHtmlEntities("&lt;")).toBe("<");
+      expect(decodeHtmlEntities("&gt;")).toBe(">");
+      expect(decodeHtmlEntities("&quot;")).toBe('"');
+      expect(decodeHtmlEntities("&apos;")).toBe("'");
+    });
+
+    it("decodes decimal numeric entities", () => {
+      expect(decodeHtmlEntities("&#65;")).toBe("A");
+      expect(decodeHtmlEntities("&#169;")).toBe("\u00A9");
+    });
+
+    it("decodes hex numeric entities", () => {
+      expect(decodeHtmlEntities("&#x41;")).toBe("A");
+      expect(decodeHtmlEntities("&#xa9;")).toBe("\u00A9");
+    });
+
+    it("handles mixed text with entities", () => {
+      expect(decodeHtmlEntities("a &amp; b &lt; c")).toBe("a & b < c");
+    });
+
+    it("leaves unknown entities unchanged", () => {
+      expect(decodeHtmlEntities("&unknown;")).toBe("&unknown;");
     });
   });
 });
