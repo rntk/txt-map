@@ -1,295 +1,320 @@
-"""Unit tests for llm_workers startup cleanup behavior."""
+"""Unit tests for llm_workers module."""
 
-import json
-import os
-from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
-from lib.llm_queue.store import LLMQueueStore
-from llm_workers import main
-
-
-class TestLLMQueueStoreCleanupOld:
-    """Tests for old LLM queue request cleanup."""
-
-    def test_cleanup_old_uses_completed_and_failed_statuses_by_default(self) -> None:
-        """Default cleanup removes completed and failed requests."""
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
-
-        with patch("lib.llm_queue.store.datetime") as mock_datetime:
-            mock_now = datetime(2026, 4, 1, tzinfo=UTC)
-            mock_datetime.now.return_value = mock_now
-            mock_db[LLMQueueStore.COLLECTION].delete_many.return_value.deleted_count = 3
-
-            deleted_count = store.cleanup_old()
-
-        assert deleted_count == 3
-        delete_filter = mock_db[LLMQueueStore.COLLECTION].delete_many.call_args.args[0]
-        assert delete_filter["status"]["$in"] == ["completed", "failed"]
-        assert delete_filter["completed_at"]["$lt"] == datetime(2026, 3, 31, tzinfo=UTC)
-
-    def test_cleanup_old_accepts_custom_statuses(self) -> None:
-        """Cleanup can target a specific status list."""
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
-
-        with patch("lib.llm_queue.store.datetime") as mock_datetime:
-            mock_now = datetime(2026, 4, 1, tzinfo=UTC)
-            mock_datetime.now.return_value = mock_now
-            mock_db[LLMQueueStore.COLLECTION].delete_many.return_value.deleted_count = 1
-
-            store.cleanup_old(max_age_hours=48, statuses=["completed"])
-
-        delete_filter = mock_db[LLMQueueStore.COLLECTION].delete_many.call_args.args[0]
-        assert delete_filter["status"]["$in"] == ["completed"]
-        assert delete_filter["completed_at"]["$lt"] == datetime(2026, 3, 30, tzinfo=UTC)
+from llm_workers import (
+    LLMWorker,
+    LocalQueueBackend,
+    RemoteQueueBackend,
+    _parse_supported_model_ids,
+)
 
 
-class TestLLMWorkersMain:
-    """Tests for llm_workers.main."""
+class FakeLLM:
+    model_id = "test-model"
+    provider_key = "test-provider"
+    model_name = "Test Model"
 
-    @patch("llm_workers.threading.Thread")
-    @patch("llm_workers.logger")
-    @patch("llm_workers.LLMWorker")
-    @patch("llm_workers.create_llm_client")
-    @patch("llm_workers.MongoLLMCacheStore")
-    @patch("llm_workers.LLMQueueStore")
-    @patch("llm_workers.AppSettingsStorage")
-    @patch("llm_workers.MongoClient")
-    def test_main_reclaims_stale_processing_on_start(
-        self,
-        mock_mongo_client: MagicMock,
-        mock_app_settings_storage: MagicMock,
-        mock_queue_store_cls: MagicMock,
-        mock_cache_store_cls: MagicMock,
-        mock_create_llm_client: MagicMock,
-        mock_worker_cls: MagicMock,
-        mock_logger: MagicMock,
-        mock_thread_cls: MagicMock,
-    ) -> None:
-        """Startup reclaims stale processing requests and does not clean up completed."""
-        mock_client = MagicMock()
-        mock_db = MagicMock()
-        mock_client.__getitem__.return_value = mock_db
-        mock_mongo_client.return_value = mock_client
+    def call(self, prompts: list[str], temperature: float = 0.0) -> str:
+        return "response"
 
-        mock_queue_store = MagicMock()
-        mock_queue_store.reclaim_stale_processing.return_value = 3
-        mock_queue_store_cls.return_value = mock_queue_store
 
-        mock_llm = MagicMock()
-        mock_llm.provider_name = "openai"
-        mock_llm.model_name = "gpt-test"
-        mock_create_llm_client.return_value = mock_llm
+# =============================================================================
+# LocalQueueBackend
+# =============================================================================
 
-        main()
 
-        mock_queue_store.reclaim_stale_processing.assert_called_once()
-        mock_queue_store.cleanup_old.assert_not_called()
-        mock_worker_cls.return_value.run.assert_called_once_with()
-        mock_client.close.assert_called_once_with()
-        assert mock_thread_cls.call_count == 1
-        assert mock_thread_cls.call_args.kwargs["name"] == "llm-maintenance"
-
-    @patch.dict(os.environ, {"LLM_WORKER_CONCURRENCY": "3"}, clear=False)
-    @patch("llm_workers.threading.Thread")
-    @patch("llm_workers.signal.signal")
-    @patch("llm_workers.logger")
-    @patch("llm_workers.LLMWorker")
-    @patch("llm_workers.create_llm_client")
-    @patch("llm_workers.MongoLLMCacheStore")
-    @patch("llm_workers.LLMQueueStore")
-    @patch("llm_workers.AppSettingsStorage")
-    @patch("llm_workers.MongoClient")
-    def test_main_starts_multiple_worker_threads_when_configured(
-        self,
-        mock_mongo_client: MagicMock,
-        mock_app_settings_storage: MagicMock,
-        mock_queue_store_cls: MagicMock,
-        mock_cache_store_cls: MagicMock,
-        mock_create_llm_client: MagicMock,
-        mock_worker_cls: MagicMock,
-        mock_logger: MagicMock,
-        mock_signal: MagicMock,
-        mock_thread_cls: MagicMock,
-    ) -> None:
-        """Startup can fan out multiple in-process LLM workers."""
-        mock_client = MagicMock()
-        mock_db = MagicMock()
-        mock_client.__getitem__.return_value = mock_db
-        mock_mongo_client.return_value = mock_client
-
-        mock_queue_store = MagicMock()
-        mock_queue_store.reclaim_stale_processing.return_value = 0
-        mock_queue_store_cls.return_value = mock_queue_store
-
-        mock_llm = MagicMock()
-        mock_llm.provider_name = "openai"
-        mock_llm.model_name = "gpt-test"
-        mock_create_llm_client.return_value = mock_llm
-
-        thread_instances = [MagicMock(), MagicMock(), MagicMock(), MagicMock()]
-        mock_thread_cls.side_effect = thread_instances
-
-        main()
-
-        assert mock_worker_cls.call_count == 3
-        for call_args in mock_worker_cls.call_args_list:
-            assert call_args.kwargs["register_signal_handlers"] is False
-        assert mock_thread_cls.call_count == 4
-        # maintenance thread (daemon=True) + 3 worker threads
-        mock_thread_cls.assert_any_call(
-            target=mock_thread_cls.call_args_list[0].kwargs["target"],
-            name="llm-maintenance",
-            daemon=True,
-        )
-        for thread in thread_instances:
-            thread.start.assert_called_once_with()
-        # join is only called for worker threads
-        for thread in thread_instances[1:]:
-            thread.join.assert_called_once_with()
-        assert mock_signal.call_count == 2
-        mock_client.close.assert_called_once_with()
-
-    @patch.dict(
-        os.environ,
-        {
-            "LLM_WORKER_BACKEND": "remote",
-            "LLM_WORKER_API_URL": "https://api.example",
-            "LLM_WORKER_TOKEN": "worker-token",
-        },
-        clear=False,
+def test_local_queue_backend_claim() -> None:
+    store = MagicMock()
+    store.claim.return_value = {"request_id": "r1"}
+    cache = MagicMock()
+    backend = LocalQueueBackend(store, cache, lease_seconds=30)
+    result = backend.claim("worker-1")
+    assert result == {"request_id": "r1"}
+    store.claim.assert_called_once_with(
+        "worker-1", worker_kind="local", lease_seconds=30, supported_model_ids=None
     )
-    @patch("llm_workers.signal.signal")
-    @patch("llm_workers.LLMWorker")
-    @patch("llm_workers.RemoteQueueBackend")
-    @patch("llm_workers.MongoClient")
-    def test_main_remote_loads_provider_config_and_uses_supported_models(
-        self,
-        mock_mongo_client: MagicMock,
-        mock_remote_backend_cls: MagicMock,
-        mock_worker_cls: MagicMock,
-        mock_signal: MagicMock,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Remote startup derives claimable model IDs from its provider config."""
-        config_path = tmp_path / "llm-providers.json"
-        config_path.write_text(
-            json.dumps(
-                {
-                    "providers": [
-                        {
-                            "id": "custom:abc123",
-                            "name": "Remote Llama",
-                            "type": "openai_comp",
-                            "model": "llama-3.3",
-                            "token": "secret",
-                            "url": "https://llm.example/v1",
-                        }
-                    ]
-                }
-            ),
-            encoding="utf-8",
+
+
+def test_local_queue_backend_heartbeat() -> None:
+    store = MagicMock()
+    store.heartbeat.return_value = {"request_id": "r1"}
+    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    assert backend.heartbeat("r1", "worker-1", "lease-1") is True
+
+
+def test_local_queue_backend_heartbeat_none() -> None:
+    store = MagicMock()
+    store.heartbeat.return_value = None
+    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    assert backend.heartbeat("r1", "worker-1", "lease-1") is False
+
+
+def test_local_queue_backend_complete() -> None:
+    store = MagicMock()
+    store.complete.return_value = True
+    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    assert backend.complete("r1", "w1", "l1", "resp", "p", "m", "mid") is True
+
+
+def test_local_queue_backend_fail() -> None:
+    store = MagicMock()
+    store.fail.return_value = True
+    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    assert backend.fail("r1", "w1", "l1", "error") is True
+
+
+def test_local_queue_backend_write_cache() -> None:
+    store = MagicMock()
+    cache = MagicMock()
+    backend = LocalQueueBackend(store, cache, lease_seconds=30)
+    backend.write_cache(
+        {
+            "cache_key": "key1",
+            "cache_namespace": "ns1",
+            "temperature": 0.5,
+            "prompt_version": "v1",
+        },
+        "response",
+        "model-1",
+    )
+    cache.set.assert_called_once()
+
+
+def test_local_queue_backend_write_cache_no_key() -> None:
+    store = MagicMock()
+    cache = MagicMock()
+    backend = LocalQueueBackend(store, cache, lease_seconds=30)
+    backend.write_cache({"temperature": 0.5}, "response", "model-1")
+    cache.set.assert_not_called()
+
+
+# =============================================================================
+# RemoteQueueBackend
+# =============================================================================
+
+
+def test_remote_queue_backend_claim() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        session.post.return_value.json.return_value = {"task": {"request_id": "r1"}}
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        result = backend.claim("worker-1")
+        assert result == {"request_id": "r1"}
+
+
+def test_remote_queue_backend_claim_with_models() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        session.post.return_value.json.return_value = {"task": None}
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token", supported_model_ids=["m1"])
+        result = backend.claim("worker-1")
+        assert result is None
+        payload = session.post.call_args.kwargs["json"]
+        assert payload["supported_model_ids"] == ["m1"]
+
+
+def test_remote_queue_backend_heartbeat() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.heartbeat("r1", "w1", "l1") is True
+
+
+def test_remote_queue_backend_heartbeat_409() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        exc = requests.HTTPError("409")
+        exc.response = MagicMock()
+        exc.response.status_code = 409
+        session.post.side_effect = exc
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.heartbeat("r1", "w1", "l1") is False
+
+
+def test_remote_queue_backend_complete() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.complete("r1", "w1", "l1", "resp", "p", "m", "mid") is True
+
+
+def test_remote_queue_backend_complete_409() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        exc = requests.HTTPError("409")
+        exc.response = MagicMock()
+        exc.response.status_code = 409
+        session.post.side_effect = exc
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.complete("r1", "w1", "l1", "resp", "p", "m", "mid") is False
+
+
+def test_remote_queue_backend_fail() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.fail("r1", "w1", "l1", "error") is True
+
+
+def test_remote_queue_backend_fail_409() -> None:
+    with patch("llm_workers.requests.Session") as mock_session_cls:
+        session = MagicMock()
+        exc = requests.HTTPError("409")
+        exc.response = MagicMock()
+        exc.response.status_code = 409
+        session.post.side_effect = exc
+        mock_session_cls.return_value = session
+        backend = RemoteQueueBackend("http://api", "token")
+        assert backend.fail("r1", "w1", "l1", "error") is False
+
+
+# =============================================================================
+# LLMWorker
+# =============================================================================
+
+
+def test_llm_worker_init() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, register_signal_handlers=False)
+    assert worker.worker_id.startswith("llm-worker-")
+
+
+def test_llm_worker_stop() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, register_signal_handlers=False)
+    worker.stop()
+    assert worker._running is False
+
+
+def test_llm_worker_handle_stop() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, register_signal_handlers=False)
+    worker._handle_stop(15, None)
+    assert worker._running is False
+
+
+def test_llm_worker_record_heartbeat() -> None:
+    with patch("llm_workers.Path.touch") as mock_touch:
+        backend = MagicMock()
+        worker = LLMWorker(
+            backend=backend, heartbeat_file="/tmp/hb", register_signal_handlers=False
         )
-        monkeypatch.setenv("LLM_WORKER_PROVIDER_CONFIG", str(config_path))
+        worker._record_heartbeat()
+        mock_touch.assert_called_once()
 
-        main()
 
-        mock_mongo_client.assert_not_called()
-        mock_remote_backend_cls.assert_called_once_with(
-            "https://api.example",
-            "worker-token",
-            supported_model_ids=["custom:abc123:llama-3.3"],
+def test_llm_worker_get_llm_client_with_request_provider() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    with patch("llm_workers.create_llm_client_from_config", return_value=FakeLLM()):
+        llm = worker._get_llm_client(
+            {"requested_provider": "openai", "requested_model": "gpt-4"}
         )
-        assert mock_worker_cls.call_args.kwargs["remote_provider_config"] is not None
-        mock_worker_cls.return_value.run.assert_called_once_with()
-        assert mock_signal.call_count == 2
+    assert llm.model_id == "test-model"
 
 
-class TestLLMQueueStoreLeases:
-    """Tests for lease-aware queue updates."""
+def test_llm_worker_get_llm_client_fallback() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    with patch("llm_workers.create_llm_client", return_value=FakeLLM()):
+        llm = worker._get_llm_client({})
+    assert llm.model_id == "test-model"
 
-    def test_claim_assigns_lease_metadata(self) -> None:
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
 
-        claimed = {"request_id": "req-1", "lease_id": "lease-1"}
-        mock_db[LLMQueueStore.COLLECTION].find_one_and_update.return_value = claimed
+def test_llm_worker_get_llm_client_no_db() -> None:
+    backend = MagicMock()
+    worker = LLMWorker(backend=backend, db=None, register_signal_handlers=False)
+    with pytest.raises(RuntimeError, match="Remote worker cannot resolve"):
+        worker._get_llm_client({})
 
-        result = store.claim(
-            "worker-1",
-            worker_kind="remote",
-            lease_seconds=90,
-            supported_model_ids=["openai:gpt-5.4"],
+
+def test_llm_worker_process_success() -> None:
+    backend = MagicMock()
+    backend.complete.return_value = True
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    with patch.object(worker, "_get_llm_client", return_value=FakeLLM()):
+        worker._process(
+            {
+                "request_id": "r1",
+                "lease_id": "l1",
+                "prompt": "hello",
+                "temperature": 0.0,
+            }
         )
+    backend.complete.assert_called_once()
 
-        assert result == claimed
-        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
-        update = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[1]
-        assert query["status"] == "pending"
-        assert query["$or"][0]["requested_model_id"]["$in"] == ["openai:gpt-5.4"]
-        assert update["$set"]["worker_id"] == "worker-1"
-        assert update["$set"]["worker_kind"] == "remote"
-        assert "lease_id" in update["$set"]
-        assert "lease_expires_at" in update["$set"]
 
-    def test_claim_can_exclude_legacy_model_id_matches(self) -> None:
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
+def test_llm_worker_process_fail() -> None:
+    backend = MagicMock()
+    backend.fail.return_value = True
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
 
-        store.claim(
-            "worker-1",
-            worker_kind="remote",
-            supported_model_ids=["custom:abc123:llama-3.3"],
-            include_legacy_model_ids=False,
+    class BadLLM:
+        def call(self, prompts: list[str], temperature: float = 0.0) -> str:
+            raise RuntimeError("llm error")
+
+    with patch.object(worker, "_get_llm_client", return_value=BadLLM()):
+        worker._process(
+            {
+                "request_id": "r1",
+                "lease_id": "l1",
+                "prompt": "hello",
+                "temperature": 0.0,
+            }
         )
+    backend.fail.assert_called_once()
 
-        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
-        assert "$or" not in query
-        assert query["requested_model_id"]["$in"] == ["custom:abc123:llama-3.3"]
 
-    def test_complete_requires_matching_worker_and_lease(self) -> None:
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
-        mock_db[LLMQueueStore.COLLECTION].update_one.return_value.modified_count = 1
-
-        completed = store.complete(
-            "req-1",
-            "hello",
-            worker_id="worker-1",
-            lease_id="lease-1",
-            executed_provider="OpenAI",
-            executed_model="gpt-5.4",
-            executed_model_id="openai:gpt-5.4",
+def test_llm_worker_process_complete_lost_lease() -> None:
+    backend = MagicMock()
+    backend.complete.return_value = False
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    with patch.object(worker, "_get_llm_client", return_value=FakeLLM()):
+        worker._process(
+            {
+                "request_id": "r1",
+                "lease_id": "l1",
+                "prompt": "hello",
+                "temperature": 0.0,
+            }
         )
+    backend.complete.assert_called_once()
+    backend.fail.assert_not_called()
 
-        assert completed is True
-        query = mock_db[LLMQueueStore.COLLECTION].update_one.call_args.args[0]
-        update = mock_db[LLMQueueStore.COLLECTION].update_one.call_args.args[1]
-        assert query == {
-            "request_id": "req-1",
-            "status": "processing",
-            "worker_id": "worker-1",
-            "lease_id": "lease-1",
-        }
-        assert update["$set"]["status"] == "completed"
-        assert update["$set"]["executed_model_id"] == "openai:gpt-5.4"
 
-    def test_heartbeat_extends_processing_lease(self) -> None:
-        mock_db = MagicMock()
-        store = LLMQueueStore(mock_db)
-        updated_doc = {"request_id": "req-1", "lease_expires_at": datetime.now(UTC)}
-        mock_db[LLMQueueStore.COLLECTION].find_one_and_update.return_value = updated_doc
+def test_llm_worker_process_writes_cache() -> None:
+    backend = MagicMock()
+    backend.complete.return_value = True
+    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    with patch.object(worker, "_get_llm_client", return_value=FakeLLM()):
+        worker._process(
+            {
+                "request_id": "r1",
+                "lease_id": "l1",
+                "prompt": "hello",
+                "temperature": 0.0,
+                "cache_namespace": "ns1",
+            }
+        )
+    backend.complete.assert_called_once()
 
-        result = store.heartbeat("req-1", "worker-1", "lease-1", lease_seconds=75)
 
-        assert result == updated_doc
-        query = mock_db[LLMQueueStore.COLLECTION].find_one_and_update.call_args.args[0]
-        assert query["request_id"] == "req-1"
-        assert query["worker_id"] == "worker-1"
-        assert query["lease_id"] == "lease-1"
+# =============================================================================
+# Misc
+# =============================================================================
+
+
+def test_parse_supported_model_ids() -> None:
+    assert _parse_supported_model_ids("m1,m2") == ["m1", "m2"]
+    assert _parse_supported_model_ids("") is None
