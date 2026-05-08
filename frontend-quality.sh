@@ -4,24 +4,30 @@
 # Usage:
 #   ./frontend-quality.sh
 #   ./frontend-quality.sh --lint-only
+#   ./frontend-quality.sh --coverage-only
 #   ./frontend-quality.sh --mutation-only
+#   ./frontend-quality.sh --no-coverage
 #   ./frontend-quality.sh --rebuild
 
 set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ./frontend-quality.sh [--lint-only|--mutation-only] [--rebuild]
+Usage: ./frontend-quality.sh [--lint-only|--coverage-only|--mutation-only] [--no-coverage] [--rebuild]
 
 Options:
   --lint-only      Run the strict frontend ESLint quality profile only.
+  --coverage-only  Run frontend tests with coverage and print the total metrics only.
   --mutation-only  Run Stryker mutation testing only.
+  --no-coverage    Skip the frontend coverage metric during the full quality run.
   --rebuild        Rebuild the frontend test image and refresh cached dependencies.
 
 Examples:
   ./frontend-quality.sh
   ./frontend-quality.sh --lint-only
+  ./frontend-quality.sh --coverage-only
   ./frontend-quality.sh --mutation-only
+  ./frontend-quality.sh --no-coverage
   ./frontend-quality.sh --rebuild
 EOF
 }
@@ -36,6 +42,7 @@ export npm_config_cache="${npm_config_cache:-/tmp/frontend-quality-npm-cache}"
 
 REBUILD=false
 RUN_LINT=true
+RUN_COVERAGE=true
 RUN_MUTATION=true
 
 for arg in "$@"; do
@@ -44,10 +51,19 @@ for arg in "$@"; do
             REBUILD=true
             ;;
         --lint-only)
+            RUN_COVERAGE=false
+            RUN_MUTATION=false
+            ;;
+        --coverage-only)
+            RUN_LINT=false
             RUN_MUTATION=false
             ;;
         --mutation-only)
             RUN_LINT=false
+            RUN_COVERAGE=false
+            ;;
+        --no-coverage)
+            RUN_COVERAGE=false
             ;;
         -h|--help)
             usage
@@ -75,12 +91,54 @@ run_quality() {
         npm run quality:lint
     fi
 
+    if $RUN_COVERAGE; then
+        COVERAGE_LOG="$(mktemp)"
+        COVERAGE_DIR="$(mktemp -d)"
+        if ! npm test -- --watchAll=false --coverage --coverage.reporter=json-summary --coverage.reportsDirectory="$COVERAGE_DIR" >"$COVERAGE_LOG" 2>&1; then
+            echo "Frontend coverage tests failed. Relevant output:" >&2
+            grep -E "FAIL|ERROR|failed|error|Test Files|Tests" "$COVERAGE_LOG" >&2 || true
+            tail -n 40 "$COVERAGE_LOG" >&2
+            rm -rf "$COVERAGE_DIR"
+            rm -f "$COVERAGE_LOG"
+            exit 1
+        fi
+        node - "$COVERAGE_DIR/coverage-summary.json" <<'JS'
+const fs = require("node:fs");
+
+const summaryPath = process.argv[2];
+const summary = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+const total = summary.total;
+const lines = total.lines;
+const statements = total.statements;
+const branches = total.branches;
+const functions = total.functions;
+
+console.log(
+  `Frontend coverage: ${lines.pct.toFixed(2)}% lines (${lines.covered}/${lines.total}), ` +
+    `${statements.pct.toFixed(2)}% statements, ` +
+    `${branches.pct.toFixed(2)}% branches, ` +
+    `${functions.pct.toFixed(2)}% functions`,
+);
+JS
+        rm -rf "$COVERAGE_DIR"
+        rm -f "$COVERAGE_LOG"
+    fi
+
     if $RUN_MUTATION; then
         if ! command -v ps >/dev/null 2>&1; then
             echo "Stryker requires the ps command. Install procps or run with Docker via --rebuild." >&2
             exit 1
         fi
-        npm run quality:mutation
+        MUTATION_LOG="$(mktemp)"
+        if ! npm run quality:mutation >"$MUTATION_LOG" 2>&1; then
+            echo "Frontend mutation testing failed. Relevant output:" >&2
+            grep -E "failed|error|survived|timeout|mutation score|Mutation testing" "$MUTATION_LOG" >&2 || true
+            tail -n 40 "$MUTATION_LOG" >&2
+            rm -f "$MUTATION_LOG"
+            exit 1
+        fi
+        rm -f "$MUTATION_LOG"
+        echo "Frontend mutation: passed"
     fi
 }
 
@@ -126,4 +184,4 @@ docker run --rm \
     -v "$NODE_MODULES_VOLUME:/app/frontend/node_modules" \
     -w /app/frontend \
     "$IMAGE_NAME" \
-    sh -lc "$(declare -f run_quality); RUN_LINT=$RUN_LINT RUN_MUTATION=$RUN_MUTATION run_quality"
+    sh -lc "$(declare -f run_quality); RUN_LINT=$RUN_LINT RUN_COVERAGE=$RUN_COVERAGE RUN_MUTATION=$RUN_MUTATION run_quality"
