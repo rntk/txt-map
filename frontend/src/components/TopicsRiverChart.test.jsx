@@ -22,16 +22,10 @@ describe("TopicsRiverChart", () => {
     render(<TopicsRiverChart topics={topics} sentences={sentences} />);
 
     expect(screen.getByText("Level:")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L0" }),
-    ).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "L0" })).toHaveClass("active");
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "L1" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "L1" }));
 
-    expect(
-      screen.getByRole("button", { name: "L1" }),
-    ).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "L1" })).toHaveClass("active");
   });
 });

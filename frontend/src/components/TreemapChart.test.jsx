@@ -75,12 +75,8 @@ describe("TreemapChart component", () => {
     render(<TreemapChart topics={topics} />);
 
     expect(screen.getByText("Level:")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L0" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L1" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L1" })).toBeInTheDocument();
     expect(
       screen.getByText(
         "Showing all topics at relative level 0 (Main Topics). Rectangle size reflects sentence count.",
@@ -91,9 +87,7 @@ describe("TreemapChart component", () => {
   it("updates the subtitle when the selected level changes", () => {
     render(<TreemapChart topics={topics} />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "L1" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "L1" }));
 
     expect(
       screen.getByText(

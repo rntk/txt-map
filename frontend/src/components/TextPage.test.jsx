@@ -84,6 +84,13 @@ describe("TextPage raw text navigation", () => {
       ],
       markup: {
         Topic1: {
+          ranges: [
+            {
+              sentence_start: 1,
+              sentence_end: 1,
+              html: '<mark data-topic="Topic1">Alpha Beta Gamma</mark>',
+            },
+          ],
           positions: [
             {
               index: 1,
@@ -280,7 +287,9 @@ describe("TextPage raw text navigation", () => {
 
     await screen.findByText("Source:");
 
-    expect(window.location.search).toBe("");
+    await waitFor(() => {
+      expect(window.location.search).toBe("");
+    });
   });
 
   it("applies faded styling in raw text for read topics that are not selected", async () => {
@@ -622,11 +631,6 @@ describe("TextPage raw text navigation", () => {
     expect(
       screen.getByRole("button", { name: /Show all 3 words/i }),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Show all 3 words/i }));
-
-    const gammaLinks = await screen.findAllByRole("link", { name: "gamma" });
-    expect(gammaLinks).toHaveLength(2);
     expect(
       screen.getByRole("link", { name: /Highlight alpha beta in article/i }),
     ).toHaveAttribute(
@@ -634,6 +638,17 @@ describe("TextPage raw text navigation", () => {
       "/page/text/test-submission-id?words=alpha%2Cbeta",
     );
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /Show all 3 words/i }));
+
+    expect(screen.getByText("Rows 1-2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Columns 1-2 of 3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next rows" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next columns" }));
+
+    const gammaLinks = await screen.findAllByRole("link", { name: "gamma" });
+    expect(gammaLinks).toHaveLength(2);
   });
 
   it("renders the sidebar insights tab and highlights insight sentences when clicked", async () => {
@@ -969,6 +984,13 @@ describe("TextPage raw text navigation", () => {
             ],
             markup: {
               Topic1: {
+                ranges: [
+                  {
+                    sentence_start: 2,
+                    sentence_end: 2,
+                    html: '<blockquote class="markup-quote"><p>Beta one.</p></blockquote><p>Beta two.</p>',
+                  },
+                ],
                 positions: [
                   {
                     index: 1,
@@ -1024,7 +1046,7 @@ describe("TextPage raw text navigation", () => {
       screen.queryByLabelText("Grouped by topics"),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Show tooltips")).toBeInTheDocument();
-    expect(container.querySelector(".markup-quote")).toBeInTheDocument();
+    expect(container.querySelector(".markup-topic-block")).toBeInTheDocument();
   });
 
   it("shows a topic tooltip when markup text is clicked", async () => {

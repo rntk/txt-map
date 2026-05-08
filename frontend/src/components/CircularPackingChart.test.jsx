@@ -77,12 +77,8 @@ describe("CircularPackingChart component", () => {
     render(<CircularPackingChart topics={topics} />);
 
     expect(screen.getByText("Level:")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L0" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L1" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L1" })).toBeInTheDocument();
     expect(
       screen.getByText(
         "Showing all topics at relative level 0 (Main Topics). Circle size reflects sentence count.",
@@ -93,9 +89,7 @@ describe("CircularPackingChart component", () => {
   it("updates the subtitle when the selected level changes", () => {
     render(<CircularPackingChart topics={topics} />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "L1" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "L1" }));
 
     expect(
       screen.getByText(

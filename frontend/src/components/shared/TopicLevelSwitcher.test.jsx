@@ -12,15 +12,9 @@ describe("TopicLevelSwitcher", () => {
     );
 
     expect(screen.getByText("Level:")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L0" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "L1" }),
-    ).toHaveClass("active");
-    expect(
-      screen.getByRole("button", { name: "L2" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L1" })).toHaveClass("active");
+    expect(screen.getByRole("button", { name: "L2" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "L2" }));
     expect(onChange).toHaveBeenCalledWith(2);
