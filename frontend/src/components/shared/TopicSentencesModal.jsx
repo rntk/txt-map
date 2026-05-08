@@ -2,8 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./TopicSentencesModal.css";
 import ArticleMinimap from "../grid/ArticleMinimap";
 import MarkupRenderer from "../markup/MarkupRenderer";
+import QuoteMarkup from "../markup/QuoteMarkup";
+import DataTrendMarkup from "../markup/DataTrendMarkup";
 import {
   getTopicMarkupRanges,
+  getEnrichedSegmentRanges,
+  hasEnrichedSegments,
   resolveTopicMarkup,
 } from "../markup/topicMarkupUtils";
 import { getTopicHighlightColor } from "../../utils/topicColorUtils";
@@ -152,7 +156,93 @@ function TopicSentencesModal({
   const indicesList = normalizedTopic?.sentenceIndices || [];
   const topicMarkup = resolveTopicMarkup(markup, normalizedTopic);
   const markupRanges = getTopicMarkupRanges(topicMarkup);
-  const hasEnrichedMarkup = markupRanges.length > 0;
+  let enrichedSegmentRanges = getEnrichedSegmentRanges(topicMarkup);
+  // Fallback: if positions lack source_sentence_index, use topic ranges to group
+  if (
+    enrichedSegmentRanges.length === 0 &&
+    hasEnrichedSegments(topicMarkup) &&
+    Array.isArray(normalizedTopic?.ranges) &&
+    normalizedTopic.ranges.length > 0
+  ) {
+    const positions = topicMarkup?.positions || [];
+    const segments = topicMarkup?.segments || [];
+    const sentenceIndices = normalizedTopic.sentenceIndices || [];
+    // Map position index -> sentence index: positions use 1-based index into sentenceIndices
+    const positionToSentence = new Map();
+    for (const pos of positions) {
+      if (
+        pos &&
+        typeof pos === "object" &&
+        Number.isInteger(pos.index) &&
+        pos.index > 0
+      ) {
+        const sentenceIdx = sentenceIndices[pos.index - 1];
+        if (sentenceIdx !== undefined) {
+          positionToSentence.set(pos.index, sentenceIdx);
+        }
+      }
+    }
+    enrichedSegmentRanges = normalizedTopic.ranges
+      .map((range, rangeIdx) => {
+        const rangeStart = range.sentence_start;
+        const rangeEnd = range.sentence_end;
+        // Find positions that fall within this range
+        const rangePositions = positions.filter((p) => {
+          const sent = positionToSentence.get(p?.index);
+          return sent !== undefined && sent >= rangeStart && sent <= rangeEnd;
+        });
+        const rangePositionIndices = rangePositions.map((p) => p.index);
+        // Map position index -> 0-based sentence index for the fallback
+        const fallbackPosToSentenceIdx = new Map();
+        for (const pos of rangePositions) {
+          const sent = positionToSentence.get(pos?.index);
+          if (sent !== undefined) {
+            fallbackPosToSentenceIdx.set(pos.index, sent - 1);
+          }
+        }
+        // Filter segments to only those with position_indices in this range
+        const rangeSegments = segments
+          .map((seg) => {
+            if (!seg || !Array.isArray(seg.position_indices)) return null;
+            const matchedIndices = seg.position_indices.filter((pi) =>
+              rangePositionIndices.includes(pi),
+            );
+            if (matchedIndices.length === 0) return null;
+            const sentenceIndices = matchedIndices
+              .map((pi) => fallbackPosToSentenceIdx.get(pi))
+              .filter((si) => si !== undefined)
+              .map((si) => si + 1); // Convert 0-based to 1-based for getTextByIndex
+            return {
+              type: seg.type,
+              position_indices: matchedIndices,
+              sentence_indices: sentenceIndices,
+              data: {
+                // Only include sentence_indices in data so QuoteMarkup uses correct indices
+                ...Object.fromEntries(
+                  Object.entries(seg.data || {}).filter(
+                    ([k]) => k !== "position_indices",
+                  ),
+                ),
+                sentence_indices: sentenceIndices,
+              },
+              positions: rangePositions.filter((p) =>
+                matchedIndices.includes(p.index),
+              ),
+            };
+          })
+          .filter(Boolean);
+        return {
+          sentence_start: rangeStart,
+          sentence_end: rangeEnd,
+          range_index: rangeIdx + 1,
+          positions: rangePositions,
+          segments: rangeSegments,
+        };
+      })
+      .filter((r) => r.segments.length > 0 || r.positions.length > 0);
+  }
+  const hasEnrichedMarkup =
+    markupRanges.length > 0 || hasEnrichedSegments(topicMarkup);
   const canToggleRead =
     Boolean(onToggleRead) &&
     Array.isArray(normalizedTopic?.canonicalTopicNames) &&
@@ -400,30 +490,114 @@ function TopicSentencesModal({
                 </div>
               ) : activeTab === "enriched" && hasEnrichedMarkup ? (
                 <div className="topic-sentences-modal__enriched-groups">
-                  {markupRanges.map((range) => (
-                    <section
-                      key={`${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
-                      className="topic-sentences-modal__enriched-range"
-                    >
-                      <header className="topic-sentences-modal__enriched-range-header">
-                        <span className="topic-sentences-modal__enriched-range-badge">
-                          Range {range.range_index ?? 1}
-                        </span>
-                        <span className="topic-sentences-modal__enriched-range-title">
-                          {formatSentenceSpan(
-                            range.sentence_start,
-                            range.sentence_end,
-                          )}
-                        </span>
-                      </header>
-                      <div className="topic-sentences-modal__enriched-range-body">
-                        <MarkupRenderer
-                          html={range.html}
-                          highlightWords={highlightWords}
-                        />
-                      </div>
-                    </section>
-                  ))}
+                  {markupRanges.length > 0
+                    ? markupRanges.map((range) => (
+                        <section
+                          key={`${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
+                          className="topic-sentences-modal__enriched-range"
+                        >
+                          <header className="topic-sentences-modal__enriched-range-header">
+                            <span className="topic-sentences-modal__enriched-range-badge">
+                              Range {range.range_index ?? 1}
+                            </span>
+                            <span className="topic-sentences-modal__enriched-range-title">
+                              {formatSentenceSpan(
+                                range.sentence_start,
+                                range.sentence_end,
+                              )}
+                            </span>
+                          </header>
+                          <div className="topic-sentences-modal__enriched-range-body">
+                            <MarkupRenderer
+                              html={range.html}
+                              highlightWords={highlightWords}
+                            />
+                          </div>
+                        </section>
+                      ))
+                    : (() => {
+                        // Track which segment types have been rendered (for atomic types like data_trend)
+                        const renderedAtomicTypes = new Set();
+                        return enrichedSegmentRanges.map((range) => (
+                          <section
+                            key={`${range.range_index ?? 0}-${range.sentence_start}-${range.sentence_end}`}
+                            className="topic-sentences-modal__enriched-range"
+                          >
+                            <header className="topic-sentences-modal__enriched-range-header">
+                              <span className="topic-sentences-modal__enriched-range-badge">
+                                Range {range.range_index ?? 1}
+                              </span>
+                              <span className="topic-sentences-modal__enriched-range-title">
+                                {formatSentenceSpan(
+                                  range.sentence_start,
+                                  range.sentence_end,
+                                )}
+                              </span>
+                            </header>
+                            <div className="topic-sentences-modal__enriched-range-body">
+                              {range.segments.map((seg, segIdx) => {
+                                if (seg.type === "data_trend") {
+                                  // data_trend is atomic — only render once in first range
+                                  if (renderedAtomicTypes.has("data_trend")) {
+                                    // Fallback: render plain text from positions
+                                    if (
+                                      seg.positions &&
+                                      seg.positions.length > 0
+                                    ) {
+                                      const text = seg.positions
+                                        .map((p) => p.text)
+                                        .filter(Boolean)
+                                        .join(" ");
+                                      return (
+                                        <div
+                                          key={segIdx}
+                                          className="markup-segment"
+                                        >
+                                          <HighlightedText text={text} />
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }
+                                  renderedAtomicTypes.add("data_trend");
+                                  return (
+                                    <DataTrendMarkup
+                                      key={segIdx}
+                                      segment={seg}
+                                      sentences={modalSentences}
+                                    />
+                                  );
+                                }
+                                if (seg.type === "quote") {
+                                  return (
+                                    <QuoteMarkup
+                                      key={segIdx}
+                                      segment={seg}
+                                      sentences={modalSentences}
+                                    />
+                                  );
+                                }
+                                // Fallback: render plain text from positions
+                                if (seg.positions && seg.positions.length > 0) {
+                                  const text = seg.positions
+                                    .map((p) => p.text)
+                                    .filter(Boolean)
+                                    .join(" ");
+                                  return (
+                                    <div
+                                      key={segIdx}
+                                      className="markup-segment"
+                                    >
+                                      <HighlightedText text={text} />
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </div>
+                          </section>
+                        ));
+                      })()}
                 </div>
               ) : activeTab === "raw" && hasEnrichedMarkup ? (
                 <pre className="topic-sentences-modal__raw-json">

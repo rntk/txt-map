@@ -84,6 +84,48 @@ describe("TopicSentencesModal markup resolution", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("renders enriched segments when optional segment data is omitted", () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: "Physics",
+          fullPath: "Science>Physics",
+          sentenceIndices: [1],
+        }}
+        sentences={["Quantum mechanics changed physics."]}
+        onClose={vi.fn()}
+        markup={{
+          "Science>Physics": {
+            positions: [
+              {
+                index: 1,
+                text: "Quantum mechanics changed physics.",
+                source_sentence_index: 1,
+              },
+            ],
+            segments: [
+              {
+                type: "quote",
+                position_indices: [1],
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Enriched" })).toHaveClass(
+      "topic-sentences-modal__tab--active",
+    );
+    expect(
+      screen.getAllByText((content, element) =>
+        element
+          ?.closest(".markup-quote__text")
+          ?.textContent?.includes("Quantum mechanics changed physics."),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("keeps enriched disabled when markup only contains plain segments", () => {
     render(
       <TopicSentencesModal
@@ -418,6 +460,48 @@ describe("TopicSentencesModal markup resolution", () => {
       container.querySelectorAll(".markup-data-trend__chart-wrapper"),
     ).toHaveLength(1);
     expect(screen.getByText("Late reading.")).toBeInTheDocument();
+  });
+
+  it("renders fallback enriched ranges when optional segment data is omitted", () => {
+    render(
+      <TopicSentencesModal
+        topic={{
+          displayName: "Physics",
+          fullPath: "Science>Physics",
+          sentenceIndices: [1],
+          ranges: [{ sentence_start: 1, sentence_end: 1 }],
+        }}
+        sentences={["Quantum mechanics changed physics."]}
+        onClose={vi.fn()}
+        markup={{
+          "Science>Physics": {
+            positions: [
+              {
+                index: 1,
+                text: "Quantum mechanics changed physics.",
+              },
+            ],
+            segments: [
+              {
+                type: "quote",
+                position_indices: [1],
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Enriched" })).toHaveClass(
+      "topic-sentences-modal__tab--active",
+    );
+    expect(
+      screen.getAllByText((content, element) =>
+        element
+          ?.closest(".markup-quote__text")
+          ?.textContent?.includes("Quantum mechanics changed physics."),
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it("scrolls to an already rendered sentence when the modal minimap is clicked", async () => {
