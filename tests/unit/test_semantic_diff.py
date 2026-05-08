@@ -1837,3 +1837,31 @@ class TestDependencyMocks:
             )
 
             mock_np.argsort.assert_called()
+
+
+class TestParseSentenceIndicesNonInteger:
+    """Tests for non-integer start/end values in range dicts."""
+
+    def test_non_integer_start_end_ignored(self):
+        """Non-integer start and end values are ignored."""
+        topic = {
+            "name": "Test",
+            "ranges": [
+                {"sentence_start": "1", "sentence_end": "3"},
+                {"sentence_start": 1, "sentence_end": 3},
+            ],
+        }
+        result = _parse_sentence_indices_from_topic(topic)
+        assert result == [0, 1, 2]
+
+    def test_float_start_end_ignored(self):
+        """Float start and end values are ignored."""
+        topic = {
+            "name": "Test",
+            "ranges": [
+                {"sentence_start": 1.5, "sentence_end": 3.5},
+                {"sentence_start": 5, "sentence_end": 5},
+            ],
+        }
+        result = _parse_sentence_indices_from_topic(topic)
+        assert result == [4]

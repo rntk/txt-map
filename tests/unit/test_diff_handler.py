@@ -1974,3 +1974,182 @@ class TestResponseStructures:
         assert "submission_a_id" in result
         assert "submission_b_id" in result
         assert "force_recalculate" in result
+
+
+class TestPostDiffCalculate:
+    """Tests for post_diff_calculate endpoint."""
+
+    def test_force_recalculate_sets_flag_on_existing_job(
+        self,
+        mock_submissions_storage,
+        mock_semantic_diffs_storage,
+        sample_submission_a,
+        sample_submission_b,
+    ):
+        mock_submissions_storage.get_by_id.side_effect = [
+            sample_submission_a,
+            sample_submission_b,
+        ]
+        existing_job = {
+            "_id": "job-1",
+            "job_id": "job-uuid-001",
+            "status": "pending",
+            "force_recalculate": False,
+        }
+        mock_semantic_diffs_storage.create_or_get_active_job.return_value = (
+            existing_job,
+            False,
+        )
+
+        from handlers.diff_handler import post_diff_calculate
+
+        result = post_diff_calculate(
+            DiffCalculateRequest(
+                left_submission_id="sub-a-001",
+                right_submission_id="sub-b-002",
+                force=True,
+            ),
+            submissions_storage=mock_submissions_storage,
+            semantic_diffs_storage=mock_semantic_diffs_storage,
+        )
+
+        mock_semantic_diffs_storage.set_job_force_recalculate.assert_called_once_with(
+            "job-1", True
+        )
+        assert result["force_recalculate"] is True
+
+    def test_active_job_exists_force_sets_flag(
+        self,
+        mock_submissions_storage,
+        mock_semantic_diffs_storage,
+        sample_submission_a,
+        sample_submission_b,
+    ):
+        """When active_job exists and force=True, set force_recalculate flag."""
+        mock_submissions_storage.get_by_id.side_effect = [
+            sample_submission_a,
+            sample_submission_b,
+        ]
+        active_job = {
+            "_id": "active-1",
+            "job_id": "job-uuid-active",
+            "status": "pending",
+            "force_recalculate": False,
+        }
+        mock_semantic_diffs_storage.get_active_job.return_value = active_job
+
+        from handlers.diff_handler import post_diff_calculate
+
+        result = post_diff_calculate(
+            DiffCalculateRequest(
+                left_submission_id="sub-a-001",
+                right_submission_id="sub-b-002",
+                force=True,
+            ),
+            submissions_storage=mock_submissions_storage,
+            semantic_diffs_storage=mock_semantic_diffs_storage,
+        )
+
+        mock_semantic_diffs_storage.set_job_force_recalculate.assert_called_once_with(
+            "active-1", True
+        )
+        assert result["force_recalculate"] is True
+
+    def test_prerequisites_not_ready_raises_409(
+        self,
+        mock_submissions_storage,
+        mock_semantic_diffs_storage,
+        sample_submission_a,
+        sample_submission_b,
+    ):
+        """When topic prerequisites are not ready, raise HTTPException 409."""
+        mock_submissions_storage.get_by_id.side_effect = [
+            sample_submission_a,
+            sample_submission_b,
+        ]
+        with patch(
+            "handlers.diff_handler.check_submission_topic_readiness"
+        ) as mock_ready:
+            mock_ready.return_value = {
+                "ready": False,
+                "missing": ["split_topic_generation"],
+                "unit_count": 0,
+            }
+
+            from handlers.diff_handler import post_diff_calculate
+
+            with pytest.raises(HTTPException) as exc_info:
+                post_diff_calculate(
+                    DiffCalculateRequest(
+                        left_submission_id="sub-a-001",
+                        right_submission_id="sub-b-002",
+                        force=False,
+                    ),
+                    submissions_storage=mock_submissions_storage,
+                    semantic_diffs_storage=mock_semantic_diffs_storage,
+                )
+            assert exc_info.value.status_code == 409
+
+    def test_diff_up_to_date_no_stale_reasons(
+        self,
+        mock_submissions_storage,
+        mock_semantic_diffs_storage,
+        sample_submission_a,
+        sample_submission_b,
+    ):
+        """When diff exists and stale_reasons is empty, return up_to_date."""
+        mock_submissions_storage.get_by_id.side_effect = [
+            sample_submission_a,
+            sample_submission_b,
+        ]
+        mock_semantic_diffs_storage.get_active_job.return_value = None
+        mock_semantic_diffs_storage.get_diff_by_pair_key.return_value = {
+            "_id": "diff-1",
+            "pair_key": "pk-1",
+        }
+        with patch("handlers.diff_handler.stale_reasons") as mock_stale:
+            mock_stale.return_value = []
+
+            from handlers.diff_handler import post_diff_calculate
+
+            result = post_diff_calculate(
+                DiffCalculateRequest(
+                    left_submission_id="sub-a-001",
+                    right_submission_id="sub-b-002",
+                    force=False,
+                ),
+                submissions_storage=mock_submissions_storage,
+                semantic_diffs_storage=mock_semantic_diffs_storage,
+            )
+
+        assert result["status"] == "up_to_date"
+        assert result["force_recalculate"] is False
+
+
+class TestDeleteDiffData:
+    """Tests for delete_diff_data endpoint."""
+
+    def test_same_submission_ids_raises_400(self, mock_semantic_diffs_storage):
+        from handlers.diff_handler import delete_diff_data
+
+        with pytest.raises(HTTPException, match="two different submissions"):
+            delete_diff_data(
+                left_submission_id="sub-001",
+                right_submission_id="sub-001",
+                semantic_diffs_storage=mock_semantic_diffs_storage,
+            )
+
+    def test_deletes_diff_and_jobs(self, mock_semantic_diffs_storage):
+        mock_semantic_diffs_storage.delete_by_pair_key.return_value = (1, 2)
+
+        from handlers.diff_handler import delete_diff_data
+
+        result = delete_diff_data(
+            left_submission_id="sub-a-001",
+            right_submission_id="sub-b-002",
+            semantic_diffs_storage=mock_semantic_diffs_storage,
+        )
+
+        assert result["deleted"] is True
+        assert result["deleted_diff_count"] == 1
+        assert result["deleted_job_count"] == 2

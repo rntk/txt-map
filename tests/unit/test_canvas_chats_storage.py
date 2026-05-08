@@ -260,3 +260,53 @@ def test_delete_event(mock_db: MagicMock) -> None:
     storage = CanvasChatsStorage(mock_db)
     mock_db.canvas_chats.update_one.return_value.modified_count = 1
     assert storage.delete_event("a1", "c1", 1) is True
+
+
+def test_maybe_set_title_skips_if_doc_not_found(mock_db: MagicMock) -> None:
+    storage = CanvasChatsStorage(mock_db)
+    mock_db.canvas_chats.find_one.return_value = None
+    storage._maybe_set_title_from_first_message("a1", "c1")
+    assert mock_db.canvas_chats.update_one.call_count == 0
+
+
+def test_maybe_set_title_skips_if_no_messages(mock_db: MagicMock) -> None:
+    storage = CanvasChatsStorage(mock_db)
+    mock_db.canvas_chats.find_one.return_value = {
+        "title": "New chat",
+        "messages": None,
+    }
+    storage._maybe_set_title_from_first_message("a1", "c1")
+    assert mock_db.canvas_chats.update_one.call_count == 0
+
+
+def test_maybe_set_title_skips_if_no_user_message(mock_db: MagicMock) -> None:
+    storage = CanvasChatsStorage(mock_db)
+    mock_db.canvas_chats.find_one.return_value = {
+        "title": "New chat",
+        "messages": [{"role": "assistant", "content": "hello"}],
+    }
+    storage._maybe_set_title_from_first_message("a1", "c1")
+    assert mock_db.canvas_chats.update_one.call_count == 0
+
+
+def test_maybe_set_title_skips_if_empty_content(mock_db: MagicMock) -> None:
+    storage = CanvasChatsStorage(mock_db)
+    mock_db.canvas_chats.find_one.return_value = {
+        "title": "New chat",
+        "messages": [{"role": "user", "content": "   "}],
+    }
+    storage._maybe_set_title_from_first_message("a1", "c1")
+    assert mock_db.canvas_chats.update_one.call_count == 0
+
+
+def test_maybe_set_title_truncates_long_content(mock_db: MagicMock) -> None:
+    storage = CanvasChatsStorage(mock_db)
+    mock_db.canvas_chats.find_one.return_value = {
+        "title": "New chat",
+        "messages": [{"role": "user", "content": "x" * 100}],
+    }
+    storage._maybe_set_title_from_first_message("a1", "c1")
+    mock_db.canvas_chats.update_one.assert_called_once()
+    call_args = mock_db.canvas_chats.update_one.call_args
+    assert call_args[0][1]["$set"]["title"].endswith("...")
+    assert len(call_args[0][1]["$set"]["title"]) == 60

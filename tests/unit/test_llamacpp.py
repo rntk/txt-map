@@ -1689,3 +1689,69 @@ class TestIntegrationScenarios:
 
         with pytest.raises(RuntimeError, match="empty text response"):
             self.llm.call(["weather?"])
+
+
+class TestParseArguments:
+    """Tests for LLamaCPP._parse_arguments."""
+
+    def setup_method(self) -> None:
+        with patch("lib.llm.llamacpp.urlparse") as mock_parse:
+            mock_parsed = MagicMock()
+            mock_parsed.netloc = "localhost:8989"
+            mock_parsed.scheme = "http"
+            mock_parse.return_value = mock_parsed
+            self.llm = LLamaCPP("http://localhost:8989")
+
+    def test_none_returns_empty_dict(self) -> None:
+        assert self.llm._parse_arguments(None) == {}
+
+    def test_valid_json_string_returns_dict(self) -> None:
+        assert self.llm._parse_arguments('{"key": "value"}') == {"key": "value"}
+
+    def test_json_array_raises(self) -> None:
+        with pytest.raises(ValueError, match="JSON object"):
+            self.llm._parse_arguments("[1, 2, 3]")
+
+    def test_mapping_returns_as_is(self) -> None:
+        assert self.llm._parse_arguments({"key": "value"}) == {"key": "value"}
+
+    def test_invalid_type_raises(self) -> None:
+        with pytest.raises(ValueError, match="JSON object string or mapping"):
+            self.llm._parse_arguments(123)
+
+
+class TestReasoningLogging:
+    """Tests for reasoning logging in complete()."""
+
+    def test_reasoning_logged_when_present(self, mock_logging) -> None:
+        with (
+            patch("lib.llm.llamacpp.urlparse") as mock_parse,
+            patch("lib.llm.llamacpp.HTTPConnection") as mock_http,
+        ):
+            mock_parsed = MagicMock()
+            mock_parsed.netloc = "localhost:8989"
+            mock_parsed.scheme = "http"
+            mock_parse.return_value = mock_parsed
+            mock_conn = MagicMock()
+            mock_http.return_value = mock_conn
+
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.read.return_value = json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "answer",
+                                "reasoning_content": "step-by-step reasoning",
+                            }
+                        }
+                    ]
+                }
+            )
+            mock_conn.getresponse.return_value = mock_response
+
+            llm = LLamaCPP("http://localhost:8989")
+            llm.call(["prompt"])
+
+            mock_logging.info.assert_any_call("LLM reasoning: step-by-step reasoning")

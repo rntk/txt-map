@@ -381,3 +381,13 @@ def test_queue_store_cleanup_old_with_statuses(mock_db: MagicMock) -> None:
     store = LLMQueueStore(mock_db)
     mock_db.llm_queue.delete_many.return_value.deleted_count = 2
     assert store.cleanup_old(12, statuses=["completed"]) == 2
+
+
+def test_queue_store_fail_with_lease(mock_db: MagicMock) -> None:
+    store = LLMQueueStore(mock_db)
+    mock_db.llm_queue.update_one.return_value.modified_count = 1
+    assert store.fail("r1", "error", worker_id="w1", lease_id="l1") is True
+    query = mock_db.llm_queue.update_one.call_args.args[0]
+    assert query["worker_id"] == "w1"
+    assert query["lease_id"] == "l1"
+    assert query["status"] == "processing"

@@ -36,3 +36,34 @@ def test_decrypt_token_without_secret_raises() -> None:
     with patch.dict("os.environ", {}, clear=True):
         with pytest.raises(RuntimeError, match="LLM_PROVIDERS_SECRET"):
             decrypt_token("encrypted")
+
+
+import builtins
+import sys
+
+
+_real_import = builtins.__import__
+
+
+def _mock_import_no_cryptography(name, *args, **kwargs):
+    if name == "cryptography" or name.startswith("cryptography."):
+        raise ImportError("No module named 'cryptography'")
+    return _real_import(name, *args, **kwargs)
+
+
+def test_get_fernet_raises_when_cryptography_missing() -> None:
+    with patch.object(builtins, "__import__", side_effect=_mock_import_no_cryptography):
+        with pytest.raises(RuntimeError, match="cryptography package is required"):
+            from lib.crypto import _get_fernet
+
+            _get_fernet()
+
+
+def test_is_encryption_available_false_when_cryptography_missing() -> None:
+    with patch.dict("os.environ", {"LLM_PROVIDERS_SECRET": "test-secret-key-123"}):
+        with patch.object(
+            builtins, "__import__", side_effect=_mock_import_no_cryptography
+        ):
+            from lib.crypto import is_encryption_available
+
+            assert is_encryption_available() is False

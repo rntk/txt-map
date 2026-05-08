@@ -1599,3 +1599,76 @@ class TestNlpIntegration:
         assert isinstance(WN_VERB, str)
         assert isinstance(WN_ADV, str)
         assert isinstance(WN_NOUN, str)
+
+
+class TestEnsureNltkDataWithEnvDir:
+    """Tests for ensure_nltk_data with NLTK_DATA environment variable."""
+
+    @patch("lib.nlp.nltk.data.find")
+    @patch("lib.nlp.nltk.download")
+    @patch("lib.nlp.Path.mkdir")
+    def test_uses_nltk_data_env_var(
+        self, mock_mkdir, mock_download, mock_find, monkeypatch
+    ):
+        """Uses NLTK_DATA environment variable for download directory."""
+        monkeypatch.setenv("NLTK_DATA", "/tmp/nltk_data")
+        mock_find.side_effect = [
+            LookupError("punkt_tab not found"),
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        ensure_nltk_data()
+
+        mock_download.assert_any_call(
+            "punkt_tab", quiet=True, download_dir="/tmp/nltk_data"
+        )
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+class TestNormalizeTextTokensEdgeCases:
+    """Edge cases for normalize_text_tokens."""
+
+    def test_empty_text_returns_empty_list(self):
+        """Empty text returns empty list."""
+        result = normalize_text_tokens("")
+        assert result == []
+
+    def test_none_text_returns_empty_list(self):
+        """None text returns empty list."""
+        result = normalize_text_tokens("")
+        assert result == []
+
+
+class TestComputeBigramHeatmapEdgeCases:
+    """Edge cases for compute_bigram_heatmap."""
+
+    def test_empty_background_text_skipped(self):
+        """Empty background texts are skipped without error."""
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.side_effect = [
+                ["alpha", "beta"],
+                [],
+            ]
+
+            result = compute_bigram_heatmap(["first"], [""])
+
+            words = [entry["word"] for entry in result["words"]]
+            assert "alpha" in words
+            assert "beta" in words
+            assert all(
+                entry["outside_topic_frequency"] == 0 for entry in result["words"]
+            )
+
+    def test_empty_texts_after_normalization_returns_empty(self):
+        """If all normalized texts are empty, returns empty structure."""
+        with patch("lib.nlp.normalize_text_tokens") as mock_normalize:
+            mock_normalize.return_value = []
+
+            result = compute_bigram_heatmap(["first"], ["background"])
+
+            assert result["words"] == []
+            assert result["matrix"] == []
+            assert result["max_value"] == 0

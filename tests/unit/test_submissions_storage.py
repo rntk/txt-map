@@ -1280,3 +1280,265 @@ class TestEdgeCases:
 
         # Unknown status is not failed, completed, or processing, so falls to pending
         assert result == "pending"
+
+
+# =============================================================================
+# Test: delete_by_id
+# =============================================================================
+
+
+class TestDeleteById:
+    """Tests for SubmissionsStorage.delete_by_id."""
+
+    def test_deletes_submission(self, mock_db):
+        """Deletes a submission by submission_id."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.delete_one.return_value.deleted_count = 1
+
+        result = storage.delete_by_id("sub-123")
+
+        assert result is True
+        mock_db.submissions.delete_one.assert_called_once_with(
+            {"submission_id": "sub-123"}
+        )
+
+    def test_returns_false_when_not_found(self, mock_db):
+        """Returns False when submission not found."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.delete_one.return_value.deleted_count = 0
+
+        result = storage.delete_by_id("non-existent")
+
+        assert result is False
+
+
+# =============================================================================
+# Test: list
+# =============================================================================
+
+
+class TestList:
+    """Tests for SubmissionsStorage.list."""
+
+    def test_list_all(self, mock_db):
+        """Lists all submissions sorted by created_at desc."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.find.return_value.sort.return_value.limit.return_value = [
+            {"submission_id": "sub-1"},
+            {"submission_id": "sub-2"},
+        ]
+
+        result = storage.list()
+
+        assert len(result) == 2
+        mock_db.submissions.find.assert_called_once_with({})
+
+    def test_list_with_filters(self, mock_db):
+        """Lists submissions with filters."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.find.return_value.sort.return_value.limit.return_value = []
+
+        storage.list(filters={"tasks.split_topic_generation.status": "completed"})
+
+        mock_db.submissions.find.assert_called_once_with(
+            {"tasks.split_topic_generation.status": "completed"}
+        )
+
+    def test_list_with_limit(self, mock_db):
+        """Lists submissions with custom limit."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.find.return_value.sort.return_value.limit.return_value = []
+
+        storage.list(limit=10)
+
+        mock_db.submissions.find.return_value.sort.return_value.limit.assert_called_once_with(
+            10
+        )
+
+
+# =============================================================================
+# Test: list_with_projection
+# =============================================================================
+
+
+class TestListWithProjection:
+    """Tests for SubmissionsStorage.list_with_projection."""
+
+    def test_list_with_projection(self, mock_db):
+        """Lists submissions applying a projection."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.find.return_value = [
+            {"submission_id": "sub-1"},
+        ]
+
+        result = storage.list_with_projection(
+            {"owner": "user-1"}, {"submission_id": 1, "created_at": 1}
+        )
+
+        assert len(result) == 1
+        mock_db.submissions.find.assert_called_once_with(
+            {"owner": "user-1"}, {"submission_id": 1, "created_at": 1}
+        )
+
+
+# =============================================================================
+# Test: get_known_tasks
+# =============================================================================
+
+
+class TestGetKnownTasks:
+    """Tests for SubmissionsStorage.get_known_tasks."""
+
+    def test_get_known_tasks_filters_to_canonical(self, mock_db):
+        """get_known_tasks returns only canonical tasks."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "extra_unknown_task": {"status": "pending"},
+            }
+        }
+
+        result = storage.get_known_tasks(submission)
+
+        assert "split_topic_generation" in result
+        assert "extra_unknown_task" not in result
+
+    def test_get_known_tasks_empty_tasks(self, mock_db):
+        """get_known_tasks with empty tasks dict."""
+        storage = SubmissionsStorage(mock_db)
+        result = storage.get_known_tasks({"tasks": {}})
+        assert result == {}
+
+    def test_get_known_tasks_no_tasks_key(self, mock_db):
+        """get_known_tasks when submission has no tasks key."""
+        storage = SubmissionsStorage(mock_db)
+        result = storage.get_known_tasks({})
+        assert result == {}
+
+
+# =============================================================================
+# Test: aggregate_global_topics
+# =============================================================================
+
+
+class TestAggregateGlobalTopics:
+    """Tests for SubmissionsStorage.aggregate_global_topics."""
+
+    def test_aggregate_global_topics(self, mock_db):
+        """Returns aggregated topic tree."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.aggregate.return_value = [
+            {
+                "name": "topic-1",
+                "total_sentences": 10,
+                "source_count": 2,
+                "sources": [
+                    {
+                        "submission_id": "sub-1",
+                        "source_url": "http://a.com",
+                        "sentence_count": 5,
+                    },
+                ],
+            },
+        ]
+
+        result = storage.aggregate_global_topics()
+
+        assert len(result) == 1
+        assert result[0]["name"] == "topic-1"
+        assert result[0]["total_sentences"] == 10
+        mock_db.submissions.aggregate.assert_called_once()
+
+
+# =============================================================================
+# Test: get_overall_status edge cases
+# =============================================================================
+
+
+class TestGetOverallStatusEdgeCases:
+    """Tests for SubmissionsStorage.get_overall_status edge cases."""
+
+    def test_get_overall_status_no_tasks(self, mock_db):
+        """get_overall_status with no tasks returns pending."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {"tasks": {}}
+        result = storage.get_overall_status(submission)
+        assert result == "pending"
+
+    def test_get_overall_status_failed(self, mock_db):
+        """get_overall_status returns failed if any task failed."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "subtopics_generation": {"status": "failed"},
+            }
+        }
+        result = storage.get_overall_status(submission)
+        assert result == "failed"
+
+    def test_get_overall_status_completed(self, mock_db):
+        """get_overall_status returns completed if all tasks completed."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "subtopics_generation": {"status": "completed"},
+            }
+        }
+        result = storage.get_overall_status(submission)
+        assert result == "completed"
+
+    def test_get_overall_status_processing(self, mock_db):
+        """get_overall_status returns processing if any task processing."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "completed"},
+                "subtopics_generation": {"status": "processing"},
+            }
+        }
+        result = storage.get_overall_status(submission)
+        assert result == "processing"
+
+    def test_get_overall_status_pending(self, mock_db):
+        """get_overall_status returns pending for mixed pending/unknown."""
+        storage = SubmissionsStorage(mock_db)
+        submission = {
+            "tasks": {
+                "split_topic_generation": {"status": "pending"},
+                "subtopics_generation": {"status": "pending"},
+            }
+        }
+        result = storage.get_overall_status(submission)
+        assert result == "pending"
+
+
+# =============================================================================
+# Test: update_read_topics
+# =============================================================================
+
+
+class TestUpdateReadTopics:
+    """Tests for SubmissionsStorage.update_read_topics."""
+
+    def test_update_read_topics(self, mock_db):
+        """Updates read topics for a submission."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.update_one.return_value.modified_count = 1
+
+        result = storage.update_read_topics("sub-123", ["topic1", "topic2"])
+
+        assert result is True
+        update_doc = mock_db.submissions.update_one.call_args[0][1]
+        assert update_doc["$set"]["read_topics"] == ["topic1", "topic2"]
+
+    def test_update_read_topics_not_found(self, mock_db):
+        """Returns False when submission not found."""
+        storage = SubmissionsStorage(mock_db)
+        mock_db.submissions.update_one.return_value.modified_count = 0
+
+        result = storage.update_read_topics("non-existent", ["topic1"])
+
+        assert result is False

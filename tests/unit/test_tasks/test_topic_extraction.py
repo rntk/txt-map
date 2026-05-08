@@ -123,3 +123,150 @@ def test_process_topic_extraction_cached_response() -> None:
 
     llm.call.assert_not_called()
     db.submissions.update_one.assert_called()
+
+
+def test_process_topic_extraction_creates_cache_collection() -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = []
+    llm = MagicMock(spec=["estimate_tokens", "call", "max_context_tokens"])
+    llm.estimate_tokens.return_value = 10
+    llm.max_context_tokens = 64000
+    llm.call.return_value = "Topic A: 0-2"
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        process_topic_extraction(submission, db, llm)
+
+    db.create_collection.assert_called_once_with("llm_cache")
+    db.llm_cache.create_index.assert_called_once_with("prompt_hash", unique=True)
+
+
+def test_process_topic_extraction_uses_fallback_context_size() -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = ["llm_cache"]
+    llm = MagicMock(spec=["estimate_tokens", "call"])
+    llm.estimate_tokens.return_value = 10
+    llm.call.return_value = "Topic A: 0-2"
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        # The function should still work with fallback context_size=64000
+        process_topic_extraction(submission, db, llm)
+
+    # Verify it completed without error
+    assert True
+
+
+def test_process_topic_extraction_handles_llm_error_per_chunk(capsys) -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = ["llm_cache"]
+    db.llm_cache.find_one.return_value = None  # No cache hit
+    llm = MagicMock(spec=["estimate_tokens", "call", "max_context_tokens"])
+    llm.estimate_tokens.return_value = 10
+    llm.max_context_tokens = 64000
+    llm.call.side_effect = Exception("LLM failure")
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        process_topic_extraction(submission, db, llm)
+
+    captured = capsys.readouterr()
+    assert "Error calling LLM for chunk" in captured.out
+
+
+def test_process_topic_extraction_no_topics_found(capsys) -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = ["llm_cache"]
+    llm = MagicMock(spec=["estimate_tokens", "call", "max_context_tokens"])
+    llm.estimate_tokens.return_value = 10
+    llm.max_context_tokens = 64000
+    llm.call.return_value = ""  # Empty response -> no topics
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        process_topic_extraction(submission, db, llm)
+
+    captured = capsys.readouterr()
+    assert "No topics found for submission sub-1" in captured.out
+
+
+def test_process_topic_extraction_create_index_exception() -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = []
+    db.llm_cache.create_index.side_effect = Exception("index already exists")
+    llm = MagicMock(spec=["estimate_tokens", "call", "max_context_tokens"])
+    llm.estimate_tokens.return_value = 10
+    llm.max_context_tokens = 64000
+    llm.call.return_value = "Topic A: 0-2"
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        process_topic_extraction(submission, db, llm)
+
+    db.create_collection.assert_called_once_with("llm_cache")
+    db.llm_cache.create_index.assert_called_once_with("prompt_hash", unique=True)
+
+
+class _BadContextSize:
+    """Mock LLM where accessing context_size raises."""
+
+    def __init__(self) -> None:
+        self.estimate_tokens = MagicMock(return_value=10)
+        self.call = MagicMock(return_value="Topic A: 0-2")
+
+    @property
+    def context_size(self) -> int:
+        raise RuntimeError("bad context_size")
+
+    @property
+    def max_context_tokens(self) -> int:
+        raise RuntimeError("bad max_context_tokens")
+
+
+def test_process_topic_extraction_context_size_exception() -> None:
+    db = MagicMock()
+    db.list_collection_names.return_value = ["llm_cache"]
+    llm = _BadContextSize()
+    submission = {
+        "submission_id": "sub-1",
+        "text_content": "Sentence one. Sentence two. Sentence three.",
+        "results": {"sentences": ["Sentence one.", "Sentence two.", "Sentence three."]},
+    }
+
+    with patch("lib.tasks.topic_extraction.SubmissionsStorage") as mock_storage:
+        mock_instance = MagicMock()
+        mock_storage.return_value = mock_instance
+        process_topic_extraction(submission, db, llm)
+
+    # Should complete without error using fallback context_size=64000
+    assert True

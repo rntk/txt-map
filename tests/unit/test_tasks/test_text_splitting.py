@@ -134,7 +134,9 @@ def test_process_text_splitting_missing_text_content_key() -> None:
     )
 
 
-def test_process_text_splitting_print_output(capsys: pytest.CaptureFixture[str]) -> None:
+def test_process_text_splitting_print_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     submission: dict[str, Any] = {
         "submission_id": "sub-6",
         "html_content": "<p>Hello</p>",

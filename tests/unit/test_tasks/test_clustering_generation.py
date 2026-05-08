@@ -207,7 +207,9 @@ def test_process_clustering_generation_overlapping_topics() -> None:
 
 def test_process_clustering_generation_thirty_sentences() -> None:
     db = MagicMock()
-    sentences = [f"Sentence number {i} about machine learning and data." for i in range(30)]
+    sentences = [
+        f"Sentence number {i} about machine learning and data." for i in range(30)
+    ]
     submission: dict[str, Any] = {
         "submission_id": "sub-7",
         "results": {"sentences": sentences, "topics": []},
@@ -240,11 +242,13 @@ def test_process_clustering_generation_mocked_sklearn(
 
     mock_vec = MagicMock()
     # 7 features so [:5] vs [:6] produces different keywords
-    dense = np.array([
-        [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0],
-        [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
-        [0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-    ])
+    dense = np.array(
+        [
+            [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        ]
+    )
     mock_vec.fit_transform.return_value = csr_matrix(dense)
     mock_vec.get_feature_names_out.return_value = np.array(
         ["f1", "f2", "f3", "f4", "f5", "f6", "f7"]
@@ -252,11 +256,13 @@ def test_process_clustering_generation_mocked_sklearn(
     mock_vectorizer_cls.return_value = mock_vec
 
     # Include negative values to kill np.clip mutants
-    raw_dist = np.array([
-        [0.0, -0.1, 1.0],
-        [-0.1, 0.0, 0.5],
-        [1.0, 0.5, 0.0],
-    ])
+    raw_dist = np.array(
+        [
+            [0.0, -0.1, 1.0],
+            [-0.1, 0.0, 0.5],
+            [1.0, 0.5, 0.0],
+        ]
+    )
     mock_cosine.return_value = raw_dist
 
     mock_model = MagicMock()
@@ -281,11 +287,13 @@ def test_process_clustering_generation_mocked_sklearn(
         linkage="average",
     )
     # Assert exact clipped distance matrix passed to fit_predict
-    expected_clipped = np.array([
-        [0.0, 0.0, 1.0],
-        [0.0, 0.0, 0.5],
-        [1.0, 0.5, 0.0],
-    ])
+    expected_clipped = np.array(
+        [
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.5],
+            [1.0, 0.5, 0.0],
+        ]
+    )
     np.testing.assert_array_equal(
         mock_clustering_cls.return_value.fit_predict.call_args.args[0],
         expected_clipped,

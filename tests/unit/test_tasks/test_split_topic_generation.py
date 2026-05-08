@@ -779,3 +779,24 @@ class TestProcessSplitTopicGenerationLLMUnavailable:
 
         with pytest.raises(TimeoutError):
             process_split_topic_generation(submission, mock_db, mock_llm, max_retries=0)
+
+
+class TestTruncateForLog:
+    """Tests for the _truncate_for_log helper."""
+
+    def test_short_text_returned_unchanged(self):
+        from lib.tasks.split_topic_generation import _truncate_for_log
+
+        assert _truncate_for_log("short", limit=100) == "short"
+
+    def test_long_text_truncated(self):
+        from lib.tasks.split_topic_generation import _truncate_for_log
+
+        text = "a" * 600
+        result = _truncate_for_log(text, limit=500)
+        assert result == "a" * 500 + "..."
+
+    def test_none_returns_empty_string(self):
+        from lib.tasks.split_topic_generation import _truncate_for_log
+
+        assert _truncate_for_log(None, limit=100) == ""

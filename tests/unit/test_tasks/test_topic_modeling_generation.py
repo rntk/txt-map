@@ -220,7 +220,7 @@ def test_process_topic_modeling_generation_mocked_sklearn(
     topics = [
         {"name": "TopicA", "sentences": [1, 2]},
         {"name": "TopicB", "sentences": [99]},  # no valid indices -> continue
-        {"name": "TopicC", "sentences": [1]},   # tests idx - 1 boundary
+        {"name": "TopicC", "sentences": [1]},  # tests idx - 1 boundary
     ]
     submission: dict[str, Any] = {
         "submission_id": "sub-mock",
@@ -230,26 +230,32 @@ def test_process_topic_modeling_generation_mocked_sklearn(
     mock_vec = MagicMock()
     # 9 features to kill [:8] vs [:9]
     mock_vec.fit_transform.return_value = csr_matrix(np.eye(2, 9))
-    mock_vec.get_feature_names_out.return_value = np.array([f"f{i}" for i in range(1, 10)])
+    mock_vec.get_feature_names_out.return_value = np.array(
+        [f"f{i}" for i in range(1, 10)]
+    )
     mock_vectorizer_cls.return_value = mock_vec
 
     mock_nmf = MagicMock()
     # W shape (2, 3)
     # Component 0 sums to 1.0, component 1 sums to 2.0, component 2 sums to 0.0
     # weights = [1/3, 2/3, 0.0] -> kills round(..., 4) vs round(..., 5)
-    mock_nmf.fit_transform.return_value = np.array([
-        [1.0, 0.0, 0.0],
-        [0.0, 2.0, 0.0],
-    ])
+    mock_nmf.fit_transform.return_value = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+        ]
+    )
     # H shape (3, 9)
     # H[0] has zeros to kill >= 0 vs > 0
     # H[1] has non-zero values
     # H[2] all zeros (weight 0.0)
-    mock_nmf.components_ = np.array([
-        [1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    ])
+    mock_nmf.components_ = np.array(
+        [
+            [1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        ]
+    )
     mock_nmf_cls.return_value = mock_nmf
 
     process_topic_modeling_generation(submission, db, None)
@@ -384,10 +390,12 @@ def test_process_topic_modeling_generation_mocked_sklearn_small_total(
     # Original normalizes: [1.0, 0.0]
     # Mutant total_s > 1: skips normalization -> [0.25, 0.0]
     # Mutant * total_s: multiplies -> [0.0625, 0.0]
-    mock_nmf.fit_transform.return_value = np.array([
-        [0.2, 0.1],
-        [0.1, 0.1],
-    ])
+    mock_nmf.fit_transform.return_value = np.array(
+        [
+            [0.2, 0.1],
+            [0.1, 0.1],
+        ]
+    )
     mock_nmf.components_ = np.eye(2, 2)
     mock_nmf_cls.return_value = mock_nmf
 
@@ -430,10 +438,12 @@ def test_process_topic_modeling_generation_mocked_sklearn_threshold(
     mock_nmf = MagicMock()
     # W shape (2, 2)
     # TopicA uses sentence 1 -> W[0] = [0.1, 0.9]
-    mock_nmf.fit_transform.return_value = np.array([
-        [0.1, 0.9],
-        [0.0, 0.0],
-    ])
+    mock_nmf.fit_transform.return_value = np.array(
+        [
+            [0.1, 0.9],
+            [0.0, 0.0],
+        ]
+    )
     mock_nmf.components_ = np.eye(2, 2)
     mock_nmf_cls.return_value = mock_nmf
 

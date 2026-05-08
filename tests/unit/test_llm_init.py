@@ -145,3 +145,93 @@ def test_parse_supported_model_ids() -> None:
     assert _parse_supported_model_ids("  m1 , m2  ") == ["m1", "m2"]
     assert _parse_supported_model_ids("") is None
     assert _parse_supported_model_ids("   ") is None
+
+
+def test_provider_available_unknown_key_returns_false() -> None:
+    from lib.llm.base import ProviderDefinition
+
+    fake = ProviderDefinition(
+        key="unknown",
+        display_name="Unknown",
+        models=frozenset({"model-a"}),
+        default_model="model-a",
+    )
+    assert _provider_available(fake) is False
+
+
+def test_get_env_model_anthropic_env_var() -> None:
+    with patch.dict("os.environ", {"ANTHROPIC_MODEL": "claude-opus-4"}):
+        provider = PROVIDER_DEFINITION_BY_KEY["anthropic"]
+        assert _get_env_model(provider) == "claude-opus-4"
+
+
+def test_get_custom_providers_exception_returns_empty() -> None:
+    from lib.llm import _get_custom_providers
+
+    db = MagicMock()
+    with (
+        patch("lib.llm.is_encryption_available", return_value=True),
+        patch("lib.llm.LlmProvidersStorage") as mock_storage_cls,
+    ):
+        mock_storage_cls.side_effect = RuntimeError("DB failure")
+        result = _get_custom_providers(db)
+        assert result == []
+
+
+def test_get_active_llm_settings_runtime_config_by_key() -> None:
+    """Runtime config stored by provider key instead of display name falls back correctly."""
+    with patch.dict("os.environ", {"LLAMACPP_URL": "http://localhost:8080"}):
+        db = MagicMock()
+        db.app_settings.find_one.return_value = {
+            "provider": "llamacpp",
+            "model": "moonshotai/Kimi-K2.5",
+        }
+        result = get_active_llm_settings(db=db)
+        assert result["provider_key"] == "llamacpp"
+        assert result["model"] == "moonshotai/Kimi-K2.5"
+
+
+def test_get_active_llm_settings_fallback_env_model_not_in_models() -> None:
+    """When env model is not in provider models, fallback to default_model."""
+    with patch.dict(
+        "os.environ",
+        {"LLAMACPP_URL": "http://localhost:8080", "OPENAI_API_KEY": "sk-test"},
+    ):
+        db = MagicMock()
+        db.app_settings.find_one.return_value = None
+        with patch("lib.llm._get_env_model", return_value="unsupported-model"):
+            result = get_active_llm_settings(db=db)
+            # Since _get_env_model returns unsupported, it should fall back to default_model
+            provider = PROVIDER_DEFINITION_BY_KEY[result["provider_key"]]
+            assert result["model"] == provider.default_model
+
+
+def test_get_active_llm_settings_only_custom_providers() -> None:
+    """When only custom providers exist, fallback to first custom provider."""
+    with (
+        patch.dict("os.environ", {}, clear=True),
+        patch("lib.llm.is_encryption_available", return_value=True),
+    ):
+        db = MagicMock()
+        db.app_settings.find_one.return_value = None
+        db.llm_providers.find.return_value.sort.return_value = [
+            {
+                "_id": "custom1",
+                "name": "MyCustom",
+                "model": "custom-model",
+                "type": "openai_comp",
+                "created_at": "now",
+                "url": "http://example.com",
+                "token_encrypted": "enc",
+            }
+        ]
+        result = get_active_llm_settings(db=db)
+        assert result["provider_key"] == "custom:custom1"
+        assert result["provider"] == "MyCustom"
+        assert result["model"] == "custom-model"
+
+
+def test_create_llm_client_success() -> None:
+    with patch.dict("os.environ", {"LLAMACPP_URL": "http://localhost:8080"}):
+        llm = create_llm_client()
+        assert llm.provider_key == "llamacpp"

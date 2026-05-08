@@ -1725,3 +1725,40 @@ class TestIntegrationScenarios:
         assert update_doc["$set"]["status"] == "failed"
         assert update_doc["$set"]["error"] == error_msg
         assert update_doc["$set"]["completed_at"] == fixed_now
+
+
+# =============================================================================
+# Test: delete_by_pair_key
+# =============================================================================
+
+
+class TestDeleteByPairKey:
+    """Tests for SemanticDiffsStorage.delete_by_pair_key."""
+
+    def test_deletes_diffs_and_jobs(self, mock_db):
+        """Deletes both diffs and jobs for a pair key."""
+        storage = SemanticDiffsStorage(mock_db)
+        mock_db.semantic_diffs.delete_many.return_value.deleted_count = 5
+        mock_db.semantic_diff_jobs.delete_many.return_value.deleted_count = 3
+
+        diff_count, job_count = storage.delete_by_pair_key("sub-a::sub-b")
+
+        assert diff_count == 5
+        assert job_count == 3
+        mock_db.semantic_diffs.delete_many.assert_called_once_with(
+            {"pair_key": "sub-a::sub-b"}
+        )
+        mock_db.semantic_diff_jobs.delete_many.assert_called_once_with(
+            {"pair_key": "sub-a::sub-b"}
+        )
+
+    def test_returns_zero_counts_when_nothing_deleted(self, mock_db):
+        """Returns zero counts when nothing deleted."""
+        storage = SemanticDiffsStorage(mock_db)
+        mock_db.semantic_diffs.delete_many.return_value.deleted_count = 0
+        mock_db.semantic_diff_jobs.delete_many.return_value.deleted_count = 0
+
+        diff_count, job_count = storage.delete_by_pair_key("non-existent")
+
+        assert diff_count == 0
+        assert job_count == 0

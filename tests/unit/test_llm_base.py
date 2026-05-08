@@ -1,3 +1,5 @@
+import pytest
+
 from lib.llm.base import (
     LLMClient,
     LLMMessage,
@@ -92,3 +94,45 @@ def test_complete_builds_request_with_tools_and_messages() -> None:
     assert request.messages == history
     assert request.tool_choice == "required"
     assert request.parallel_tool_calls is True
+
+
+def test_call_raises_with_empty_user_messages() -> None:
+    client = DummyLLMClient([LLMResponse(content="ok")])
+    with pytest.raises(RuntimeError, match="at least one user message"):
+        client.call([])
+
+
+def test_get_provider_definition_by_key_unknown_raises() -> None:
+    from lib.llm.base import get_provider_definition_by_key
+
+    with pytest.raises(KeyError, match="Unknown LLM provider key"):
+        get_provider_definition_by_key("unknown-key")
+
+
+def test_get_provider_definition_by_name_unknown_raises() -> None:
+    from lib.llm.base import get_provider_definition_by_name
+
+    with pytest.raises(KeyError, match="Unknown LLM provider name"):
+        get_provider_definition_by_name("Unknown Provider")
+
+
+def test_get_provider_definition_by_key_success() -> None:
+    from lib.llm.base import (
+        get_provider_definition_by_key,
+        PROVIDER_DEFINITION_BY_KEY,
+    )
+
+    for key, expected in PROVIDER_DEFINITION_BY_KEY.items():
+        result = get_provider_definition_by_key(key)
+        assert result == expected
+
+
+def test_get_provider_definition_by_name_success() -> None:
+    from lib.llm.base import (
+        get_provider_definition_by_name,
+        PROVIDER_DEFINITION_BY_NAME,
+    )
+
+    for name, expected in PROVIDER_DEFINITION_BY_NAME.items():
+        result = get_provider_definition_by_name(name)
+        assert result == expected

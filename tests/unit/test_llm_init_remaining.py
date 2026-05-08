@@ -114,3 +114,19 @@ def test_create_custom_llm_client_unknown_type() -> None:
     with patch("lib.llm.LlmProvidersStorage", return_value=storage):
         with pytest.raises(RuntimeError, match="Unknown custom provider type"):
             _create_custom_llm_client("abc", "model", db)
+
+
+def test_create_llm_client_from_config_custom_with_db() -> None:
+    db = MagicMock()
+    storage = MagicMock()
+    storage.get_provider.return_value = {
+        "_id": "abc",
+        "name": "Custom",
+        "type": "openai_comp",
+        "model": "custom-model",
+        "url": "http://custom",
+        "token_encrypted": None,
+    }
+    with patch("lib.llm.LlmProvidersStorage", return_value=storage):
+        llm = create_llm_client_from_config("custom:abc", "custom-model", db=db)
+        assert llm.provider_key == "custom:abc"

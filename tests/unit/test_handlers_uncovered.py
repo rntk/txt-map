@@ -346,3 +346,52 @@ def test_delete_provider_not_found() -> None:
     storage.delete_provider.return_value = False
     with pytest.raises(HTTPException, match="Provider not found"):
         delete_provider("p1", session={}, storage=storage)
+
+
+def test_list_llm_queue_with_status_filter() -> None:
+    store = MagicMock()
+    store.list.return_value = [
+        {"request_id": "r1", "status": "completed", "response": "big text"}
+    ]
+    result = list_llm_queue(status="completed", llm_queue_store=store)
+    assert len(result["tasks"]) == 1
+    store.list.assert_called_once_with({"status": "completed"}, 100)
+
+
+def test_repeat_task_queue_entry_unsupported_task_type() -> None:
+    task_storage = MagicMock()
+    task_storage.get_by_id.return_value = {
+        "_id": "t1",
+        "task_type": "unsupported_task",
+        "submission_id": "sub-1",
+    }
+    with pytest.raises(HTTPException, match="Unsupported task type"):
+        repeat_task_queue_entry(
+            "t1", task_queue_storage=task_storage, submissions_storage=MagicMock()
+        )
+
+
+def test_repeat_task_queue_entry_submission_not_found() -> None:
+    task_storage = MagicMock()
+    task_storage.get_by_id.return_value = {
+        "_id": "t1",
+        "task_type": "summarization",
+        "submission_id": "sub-1",
+    }
+    sub_storage = MagicMock()
+    sub_storage.get_by_id.return_value = None
+    with pytest.raises(HTTPException, match="Submission not found"):
+        repeat_task_queue_entry(
+            "t1", task_queue_storage=task_storage, submissions_storage=sub_storage
+        )
+
+
+def test_add_task_queue_entry_submission_not_found() -> None:
+    sub_storage = MagicMock()
+    sub_storage.get_by_id.return_value = None
+    with pytest.raises(HTTPException, match="Submission not found"):
+        add_task_queue_entry(
+            AddTaskRequest(submission_id="sub-1", task_type="summarization"),
+            task_queue_storage=MagicMock(),
+            submissions_storage=sub_storage,
+        )
