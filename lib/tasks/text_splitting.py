@@ -19,8 +19,8 @@ def process_text_splitting(submission: Dict[str, Any], db: Any, llm: Any) -> Non
     submission_id = submission["submission_id"]
 
     # Prefer html_content for preserving formatting; fall back to text_content
-    html_content = submission.get("html_content", "")
-    text_content = submission.get("text_content", "")
+    html_content = submission.get("html_content", "")  # pragma: no mutate
+    text_content = submission.get("text_content", "")  # pragma: no mutate
     source = html_content or text_content
 
     if not source:

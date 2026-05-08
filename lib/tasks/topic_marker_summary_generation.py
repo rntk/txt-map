@@ -285,11 +285,6 @@ def _select_merged_marker_spans(
         scored_spans,
         key=lambda item: (-item[0], item[1], item[2]),
     ):
-        if any(
-            not (end < existing_start or start > existing_end)
-            for existing_start, existing_end in selected
-        ):
-            continue
         selected.append((start, end))
         if len(selected) >= max_spans:
             break

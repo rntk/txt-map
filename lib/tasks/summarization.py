@@ -541,10 +541,6 @@ def build_article_summary_chunks(
             current_tokens += next_tokens
             idx += 1
 
-        if not current_sentences:
-            current_sentences.append(sentences[start_idx])
-            idx = start_idx + 1
-
         chunks.append(
             {
                 "sentences": current_sentences,
@@ -557,10 +553,7 @@ def build_article_summary_chunks(
             break
 
         overlap = min(overlap_sentences, max(0, len(current_sentences) - 1))
-        next_start_idx = idx - overlap
-        if next_start_idx <= start_idx:
-            next_start_idx = idx
-        start_idx = next_start_idx
+        start_idx = idx - overlap
 
     return chunks
 

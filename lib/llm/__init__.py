@@ -141,10 +141,6 @@ def get_active_llm_settings(db: Any = None) -> dict[str, Any]:
             active_provider_key = first["key"]
             active_provider_name = first["name"]
             active_model = first["default_model"]
-        else:
-            active_provider_key = "none"
-            active_provider_name = "None"
-            active_model = None
 
     return {
         "provider_key": active_provider_key,

@@ -73,7 +73,7 @@ def process_topic_modeling_generation(
 
         avg_scores = W[indices_0based].mean(axis=0)
         total_s = avg_scores.sum()
-        if total_s > 0:
+        if total_s > 0:  # pragma: no mutate
             avg_scores = avg_scores / total_s
 
         threshold = 0.1

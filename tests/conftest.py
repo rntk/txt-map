@@ -69,6 +69,17 @@ def mock_db():
     db = MagicMock()
     db.submissions = MagicMock()
     db.task_queue = MagicMock()
+    db.app_settings = MagicMock()
+    db.tokens = MagicMock()
+    db.canvas_chats = MagicMock()
+    db.canvas_events = MagicMock()
+    db.canvas_events_counters = MagicMock()
+    db.llm_cache = MagicMock()
+    db.llm_providers = MagicMock()
+    db.posts = MagicMock()
+    db.tags = MagicMock()
+    db.semantic_diffs = MagicMock()
+    db.semantic_diff_jobs = MagicMock()
     return db
 
 

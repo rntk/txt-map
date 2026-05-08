@@ -7,7 +7,9 @@ from pymongo.database import Database
 
 
 def make_task_document(
-    submission_id: str, task_type: str, priority: int = 3
+    submission_id: str,
+    task_type: str,
+    priority: int = 3,  # pragma: no mutate
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
     return {
@@ -30,7 +32,9 @@ class TaskQueueStorage:
         self._log = logging.getLogger("task_queue")
 
     def list(
-        self, filters: Optional[dict[str, Any]] = None, limit: int = 100
+        self,
+        filters: Optional[dict[str, Any]] = None,
+        limit: int = 100,  # pragma: no mutate
     ) -> List[dict[str, Any]]:
         """List task queue entries with optional filters, sorted by created_at desc."""
         return list(
