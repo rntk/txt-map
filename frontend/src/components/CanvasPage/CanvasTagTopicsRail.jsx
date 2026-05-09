@@ -1,0 +1,130 @@
+import React from "react";
+import { getStickyCardTop } from "./stickyCards";
+
+/**
+ * Renders topic cards for sentences containing the selected tag.
+ * @param {{
+ *   tagTopicsLayout: {
+ *     cards: Array<{
+ *       key: string,
+ *       topicName: string,
+ *       fullPath: string,
+ *       sentences: number[],
+ *       preview: string,
+ *       cardY: number,
+ *       cardHeight: number,
+ *     }>,
+ *     articleRight?: number,
+ *     articleHeight?: number,
+ *   },
+ *   activeTopicKey: string | null,
+ *   onCardEnter: (key: string) => void,
+ *   onCardLeave: (key: string) => void,
+ *   onCardClick: (key: string) => void,
+ *   translate: {x: number, y: number},
+ *   scale: number,
+ *   isAnimating: boolean,
+ * }} props
+ */
+export default function CanvasTagTopicsRail({
+  tagTopicsLayout,
+  activeTopicKey,
+  onCardEnter,
+  onCardLeave,
+  onCardClick,
+  translate,
+  scale,
+  isAnimating,
+}) {
+  const { cards, articleRight = 0, articleHeight = 0 } = tagTopicsLayout;
+
+  if (!cards || cards.length === 0) return null;
+
+  const svgHeight = Math.max(
+    articleHeight,
+    cards.length > 0 ? cards[cards.length - 1].cardY + 100 : 0,
+  );
+  const viewportTop = -translate.y / scale;
+
+  return (
+    <>
+      <svg
+        className="canvas-tag-topics-connectors"
+        style={{ height: svgHeight }}
+      >
+        {cards.map((card) => {
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+          const connectorY = effectiveTop + card.cardHeight / 2;
+          const x1 = articleRight;
+          const x2 = articleRight + 80;
+          const isActive = activeTopicKey === card.key;
+
+          return (
+            <g key={card.key}>
+              <circle
+                cx={x1}
+                cy={connectorY}
+                r={3}
+                className={`canvas-tag-topics-anchor${isActive ? " is-active" : ""}`}
+              />
+              <line
+                x1={x1}
+                y1={connectorY}
+                x2={x2}
+                y2={connectorY}
+                className={`canvas-tag-topics-connector${isActive ? " is-active" : ""}`}
+              />
+              <circle
+                cx={x2}
+                cy={connectorY}
+                r={4}
+                className={`canvas-tag-topics-bulb${isActive ? " is-active" : ""}`}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <div
+        className="canvas-tag-topics-rail"
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+      >
+        {cards.map((card) => {
+          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+          const isActive = activeTopicKey === card.key;
+          const sentenceLabel =
+            card.sentences.length === 1
+              ? `Sentence ${card.sentences[0]}`
+              : `${card.sentences.length} matching sentences`;
+
+          return (
+            <button
+              key={card.key}
+              type="button"
+              className={`canvas-tag-topic-card${isActive ? " is-active" : ""}`}
+              style={{
+                top: `${effectiveTop}px`,
+                height: `${card.cardHeight}px`,
+                transition: isAnimating ? "top 320ms ease" : undefined,
+              }}
+              onMouseEnter={() => onCardEnter(card.key)}
+              onMouseLeave={() => onCardLeave(card.key)}
+              onClick={() => onCardClick(card.key)}
+              title={`${card.fullPath}: ${sentenceLabel}`}
+            >
+              <span className="canvas-tag-topic-card__name">
+                {card.topicName}
+              </span>
+              <span className="canvas-tag-topic-card__meta">
+                {sentenceLabel}
+              </span>
+              <span className="canvas-tag-topic-card__preview">
+                {card.preview}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}

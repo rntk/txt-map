@@ -88,8 +88,10 @@ function buildCloudLayout(items, maxHeight) {
  *   articleHeight: number,
  *   scale: number,
  *   onWordHoverChange: (lemma: string | null) => void,
+ *   onWordSelect?: (lemma: string) => void,
  *   onWordsComputed: (lemmaToRanges: Map<string, Array<{start: number, end: number}>>) => void,
  *   onSizeChange?: (size: {width: number, height: number}) => void,
+ *   selectedLemma?: string | null,
  * }} props
  */
 export default function CanvasTagsCloud({
@@ -97,8 +99,10 @@ export default function CanvasTagsCloud({
   articleHeight,
   scale,
   onWordHoverChange,
+  onWordSelect,
   onWordsComputed,
   onSizeChange,
+  selectedLemma,
 }) {
   const { words, ranges } = useMemo(
     () => buildArticleWordCloud(articleText || ""),
@@ -176,11 +180,31 @@ export default function CanvasTagsCloud({
     if (el) onWordHoverChange?.(el.getAttribute("data-cloud-lemma"));
   };
 
+  const handleWordSelect = (e) => {
+    const el = e.target.closest?.("[data-cloud-lemma]");
+    const lemma = el?.getAttribute("data-cloud-lemma");
+    if (!lemma) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onWordSelect?.(lemma);
+  };
+
+  const handleWordKeyDown = (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    handleWordSelect(e);
+  };
+
+  const stopCanvasDrag = (e) => {
+    e.stopPropagation();
+  };
+
   return (
     <div
       className="canvas-tags-cloud"
       onMouseOver={handleMouseOver}
       onMouseLeave={() => onWordHoverChange?.(null)}
+      onMouseDown={stopCanvasDrag}
+      onTouchStart={stopCanvasDrag}
       style={{
         "--canvas-tags-cloud-width": `${outerWidth}px`,
         width: `${outerWidth}px`,
@@ -197,11 +221,21 @@ export default function CanvasTagsCloud({
         }}
       >
         {layout.items.map((item) => (
-          <span
+          <button
             key={item.lemma}
+            type="button"
             data-cloud-lemma={item.lemma}
             title={`${item.word}: ${item.frequency}`}
-            className={`canvas-tags-cloud__word${item.isTile ? " is-tile" : ""}`}
+            aria-pressed={selectedLemma === item.lemma}
+            className={[
+              "canvas-tags-cloud__word",
+              item.isTile ? "is-tile" : "",
+              selectedLemma === item.lemma ? "is-selected" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={handleWordSelect}
+            onKeyDown={handleWordKeyDown}
             style={{
               left: `${item.x}px`,
               top: `${item.y}px`,
@@ -213,7 +247,7 @@ export default function CanvasTagsCloud({
             }}
           >
             {item.word}
-          </span>
+          </button>
         ))}
       </div>
     </div>

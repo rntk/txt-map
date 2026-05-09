@@ -35,6 +35,7 @@ import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
 import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
 import CanvasTagsCloud from "./CanvasPage/CanvasTagsCloud";
+import CanvasTagTopicsRail from "./CanvasPage/CanvasTagTopicsRail";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
 import { useCanvasChats } from "./CanvasPage/useCanvasChats";
 import { useTooltip } from "../hooks/useTooltip";
@@ -44,6 +45,7 @@ import { useTopicTemperature } from "./CanvasPage/useTopicTemperature";
 import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
 import { useInsightsLayout } from "./CanvasPage/useInsightsLayout";
 import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
+import { useTagTopicsLayout } from "./CanvasPage/useTagTopicsLayout";
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
@@ -235,7 +237,10 @@ export default function CanvasPage() {
   const [activeInsightKey, setActiveInsightKey] = useState(null);
   const [showTagsCloud, setShowTagsCloud] = useState(false);
   const [hoveredCloudLemma, setHoveredCloudLemma] = useState(null);
+  const [selectedCloudLemma, setSelectedCloudLemma] = useState(null);
+  const [activeTagTopicKey, setActiveTagTopicKey] = useState(null);
   const cloudRangesRef = useRef(new Map());
+  const [cloudRangesMap, setCloudRangesMap] = useState(() => new Map());
   const [articleHeight, setArticleHeight] = useState(0);
   const [cloudSize, setCloudSize] = useState({ width: 0, height: 0 });
 
@@ -333,8 +338,14 @@ export default function CanvasPage() {
   }, [articleText, articleLoading, articleError, showSummaryMode]);
 
   const handleCloudWordsComputed = useCallback((rangesMap) => {
-    cloudRangesRef.current = rangesMap || new Map();
+    const nextRangesMap = rangesMap || new Map();
+    cloudRangesRef.current = nextRangesMap;
+    setCloudRangesMap(nextRangesMap);
   }, []);
+
+  useEffect(() => {
+    setActiveTagTopicKey(null);
+  }, [selectedCloudLemma]);
 
   const cancelPendingCanvasTransform = useCallback(() => {
     if (transformFrameRef.current) {
@@ -353,6 +364,58 @@ export default function CanvasPage() {
       setTranslate(nextTranslate);
     },
     [cancelPendingCanvasTransform],
+  );
+
+  const focusArticleOffset = useCallback(
+    (charOffset) => {
+      const articleEl = articleTextRef.current;
+      const wrap = canvasWrapRef.current;
+      const viewport = canvasViewportRef.current;
+      if (!articleEl || !wrap || !viewport) return;
+
+      const startRange = rangeAtOffset(articleEl, charOffset);
+      if (!startRange) return;
+
+      const wrapRect = wrap.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const startRect = startRange.getBoundingClientRect();
+      const currentScale = scaleRef.current || 1;
+      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
+      const localTargetX =
+        (startRect.left + startRect.width / 2 - viewportRect.left) /
+        currentScale;
+      const localTargetY =
+        (startRect.top + startRect.height / 2 - viewportRect.top) /
+        currentScale;
+
+      setIsFocusingHighlight(true);
+      setCanvasTransformNow(nextScale, {
+        x: wrapRect.width / 2 - localTargetX * nextScale,
+        y: wrapRect.height / 2 - localTargetY * nextScale,
+      });
+      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+      smoothZoomTimerRef.current = setTimeout(
+        () => setIsFocusingHighlight(false),
+        380,
+      );
+    },
+    [setCanvasTransformNow],
+  );
+
+  const handleCloudWordSelect = useCallback(
+    (lemma) => {
+      if (!lemma) return;
+      setSelectedCloudLemma(lemma);
+      setHoveredCloudLemma(lemma);
+
+      const firstRange = cloudRangesRef.current.get(lemma)?.[0];
+      if (!firstRange) return;
+
+      window.requestAnimationFrame(() => {
+        focusArticleOffset(firstRange.start);
+      });
+    },
+    [focusArticleOffset],
   );
 
   const scheduleCanvasTransform = useCallback((nextScale, nextTranslate) => {
@@ -732,6 +795,80 @@ export default function CanvasPage() {
     return arr;
   }, [submissionSentences]);
 
+  const selectedTagTopicEntries = useMemo(() => {
+    if (!selectedCloudLemma) return [];
+    const ranges = cloudRangesMap.get(selectedCloudLemma) || [];
+    if (ranges.length === 0 || sentenceOffsets.length === 0) return [];
+
+    const matchingSentenceNumbers = new Set();
+    ranges.forEach((range) => {
+      for (let index = 0; index < sentenceOffsets.length; index += 1) {
+        const sentenceStart = sentenceOffsets[index];
+        const sentenceEnd =
+          sentenceStart + (submissionSentences[index] || "").length;
+        if (range.start < sentenceEnd && range.end > sentenceStart) {
+          matchingSentenceNumbers.add(index + 1);
+          break;
+        }
+      }
+    });
+
+    if (matchingSentenceNumbers.size === 0) return [];
+
+    return (submissionTopics || [])
+      .flatMap((topic) => {
+        const topicSentences = getTopicSentenceNumbers(topic);
+        const sentences = topicSentences
+          .filter((sentenceNumber) =>
+            matchingSentenceNumbers.has(sentenceNumber),
+          )
+          .sort((left, right) => left - right);
+        if (sentences.length === 0) return [];
+
+        const fullPath = topic.fullPath || topic.name || "";
+        const topicName = getTopicDisplayName(topic);
+
+        return sentences.map((sentenceNumber) => {
+          const charStart = sentenceOffsets[sentenceNumber - 1] ?? 0;
+          const sentenceText = submissionSentences[sentenceNumber - 1] || "";
+          const charEnd = charStart + sentenceText.length;
+
+          return {
+            key: `${fullPath || topicName}:${sentenceNumber}`,
+            topicName,
+            fullPath,
+            sentences: [sentenceNumber],
+            preview: sentenceText,
+            charStart,
+            charEnd,
+          };
+        });
+      })
+      .sort((left, right) => {
+        if (left.charStart !== right.charStart) {
+          return left.charStart - right.charStart;
+        }
+        return left.topicName.localeCompare(right.topicName);
+      });
+  }, [
+    cloudRangesMap,
+    selectedCloudLemma,
+    sentenceOffsets,
+    submissionSentences,
+    submissionTopics,
+  ]);
+
+  const zoomToTagTopic = useCallback(
+    (cardKey) => {
+      const card = selectedTagTopicEntries.find(
+        (entry) => entry.key === cardKey,
+      );
+      if (!card) return;
+      focusArticleOffset(card.charStart);
+    },
+    [focusArticleOffset, selectedTagTopicEntries],
+  );
+
   const summaryEntries = useMemo(() => {
     if (!topicSummaries || submissionSentences.length === 0) return [];
     const entries = [];
@@ -877,6 +1014,19 @@ export default function CanvasPage() {
     scaleRef,
   });
 
+  const tagTopicsLayout = useTagTopicsLayout({
+    show: showTagsCloud && Boolean(selectedCloudLemma),
+    entries: selectedTagTopicEntries,
+    articleLoading,
+    articleError,
+    articleText,
+    articlePages,
+    articleImages,
+    articleTextRef,
+    summaryWrapRef,
+    scaleRef,
+  });
+
   const topicHierarchyLayout = useTopicHierarchyLayout({
     showTopicHierarchy,
     showSummaryMode,
@@ -963,10 +1113,29 @@ export default function CanvasPage() {
         });
       }
     }
-    if (showTagsCloud && hoveredCloudLemma) {
-      const ranges = cloudRangesRef.current.get(hoveredCloudLemma) || [];
-      ranges.forEach((r) => {
-        base.push({ start: r.start, end: r.end, label: hoveredCloudLemma });
+    if (showTagsCloud) {
+      const activeCloudLemmas = [selectedCloudLemma, hoveredCloudLemma].filter(
+        (lemma, index, lemmas) => lemma && lemmas.indexOf(lemma) === index,
+      );
+      activeCloudLemmas.forEach((lemma) => {
+        const ranges = cloudRangesMap.get(lemma) || [];
+        ranges.forEach((r) => {
+          base.push({ start: r.start, end: r.end, label: lemma });
+        });
+      });
+    }
+    if (showTagsCloud && activeTagTopicKey) {
+      const activeCard = selectedTagTopicEntries.find(
+        (card) => card.key === activeTagTopicKey,
+      );
+      activeCard?.sentences.forEach((sentenceNumber) => {
+        const index = sentenceNumber - 1;
+        if (index < 0 || index >= submissionSentences.length) return;
+        base.push({
+          start: sentenceOffsets[index],
+          end: sentenceOffsets[index] + submissionSentences[index].length,
+          label: activeCard.topicName,
+        });
       });
     }
     return base;
@@ -986,6 +1155,10 @@ export default function CanvasPage() {
     insightsLayout.cards,
     showTagsCloud,
     hoveredCloudLemma,
+    selectedCloudLemma,
+    cloudRangesMap,
+    activeTagTopicKey,
+    selectedTagTopicEntries,
   ]);
 
   const temperatureHighlights = useMemo(() => {
@@ -1242,7 +1415,7 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${tagTopicsLayout.cards.length > 0 && !showSummaryMode ? " has-tag-topics" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                   "--canvas-tags-cloud-width": `${cloudSize.width}px`,
@@ -1254,8 +1427,10 @@ export default function CanvasPage() {
                     articleHeight={articleHeight}
                     scale={scale}
                     onWordHoverChange={setHoveredCloudLemma}
+                    onWordSelect={handleCloudWordSelect}
                     onWordsComputed={handleCloudWordsComputed}
                     onSizeChange={setCloudSize}
+                    selectedLemma={selectedCloudLemma}
                   />
                 )}
 
@@ -1307,6 +1482,23 @@ export default function CanvasPage() {
                       setActiveInsightKey((k) => (k === key ? null : k))
                     }
                     onCardClick={zoomToInsight}
+                    translate={translate}
+                    scale={scale}
+                    isAnimating={isFocusingHighlight}
+                  />
+                )}
+
+                {!showSummaryMode && tagTopicsLayout.cards.length > 0 && (
+                  <CanvasTagTopicsRail
+                    tagTopicsLayout={tagTopicsLayout}
+                    activeTopicKey={activeTagTopicKey}
+                    onCardEnter={setActiveTagTopicKey}
+                    onCardLeave={(key) =>
+                      setActiveTagTopicKey((current) =>
+                        current === key ? null : current,
+                      )
+                    }
+                    onCardClick={zoomToTagTopic}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}
