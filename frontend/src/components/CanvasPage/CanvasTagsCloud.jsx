@@ -77,7 +77,6 @@ function buildCloudLayout(items, maxHeight) {
  * @param {{
  *   articleText: string,
  *   articleHeight: number,
- *   scale: number,
  *   onWordHoverChange: (lemma: string | null) => void,
  *   onWordSelect?: (lemma: string) => void,
  *   onWordsComputed: (lemmaToRanges: Map<string, Array<{start: number, end: number}>>) => void,
@@ -89,7 +88,6 @@ function buildCloudLayout(items, maxHeight) {
 export default function CanvasTagsCloud({
   articleText,
   articleHeight,
-  scale,
   onWordHoverChange,
   onWordSelect,
   onWordsComputed,
@@ -112,16 +110,15 @@ export default function CanvasTagsCloud({
   }, [ranges]);
 
   const layout = useMemo(() => {
-    const top = words.slice(0, 140);
-    if (top.length === 0) return { items: [], totalW: 0, totalH: 0 };
+    if (words.length === 0) return { items: [], totalW: 0, totalH: 0 };
 
-    const maxFreq = Math.max(...top.map((w) => w.frequency));
-    const minFreq = Math.min(...top.map((w) => w.frequency));
+    const maxFreq = Math.max(...words.map((w) => w.frequency));
+    const minFreq = Math.min(...words.map((w) => w.frequency));
     const norm = (freq) =>
       maxFreq === minFreq ? 0.5 : (freq - minFreq) / (maxFreq - minFreq);
     const getSize = (freq) => 18 + norm(freq) * 78;
 
-    const items = top.map(({ word, frequency, lemma }) => {
+    const items = words.map(({ word, frequency, lemma }) => {
       const h = wordHash(lemma);
       const n = norm(frequency);
       const rotationDeg = ((h % 7) - 3) * 1.6;
@@ -142,7 +139,6 @@ export default function CanvasTagsCloud({
     return buildCloudLayout(items, articleHeight || 600);
   }, [words, articleHeight]);
 
-  const zoomFactor = Math.max(1, 1 / (scale || 1));
   const outerWidth = layout.totalW + 32;
   const outerHeight = layout.totalH + 32;
 
@@ -193,8 +189,6 @@ export default function CanvasTagsCloud({
         style={{
           width: `${layout.totalW}px`,
           height: `${layout.totalH}px`,
-          transform: `scale(${zoomFactor})`,
-          transformOrigin: "top right",
         }}
       >
         {layout.items.map((item) => (

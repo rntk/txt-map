@@ -18,6 +18,7 @@ import { extractArticleImages } from "./articleImages";
  *   setReadTopics: React.Dispatch<React.SetStateAction<string[]>>,
  *   topicTemperatures: Object,
  *   insights: Array<Object>,
+ *   markup: Object,
  * }}
  */
 export function useArticleData(articleId) {
@@ -33,6 +34,7 @@ export function useArticleData(articleId) {
   const [readTopics, setReadTopics] = useState([]);
   const [topicTemperatures, setTopicTemperatures] = useState({});
   const [insights, setInsights] = useState([]);
+  const [markup, setMarkup] = useState({});
 
   useEffect(() => {
     if (!articleId) return;
@@ -61,6 +63,7 @@ export function useArticleData(articleId) {
         setTopicSummaryIndex(data.topic_summary_index || {});
         setTopicTemperatures(data.topic_temperatures || {});
         setInsights(data.insights || []);
+        setMarkup(data.markup || {});
         setArticleLoading(false);
 
         let images = [];
@@ -124,5 +127,6 @@ export function useArticleData(articleId) {
     setReadTopics,
     topicTemperatures,
     insights,
+    markup,
   };
 }

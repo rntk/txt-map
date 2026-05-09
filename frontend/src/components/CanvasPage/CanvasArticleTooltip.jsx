@@ -11,6 +11,7 @@ import { isTopicRead } from "../../utils/topicReadUtils";
  *   selectedTopicKey: string | null,
  *   onToggleHighlight?: (topicName: string) => void,
  *   onToggleRead?: (topicName: string) => void,
+ *   onShowSentences?: (topic: Object) => void,
  *   onHide: () => void,
  *   submissionId?: string,
  * }} props
@@ -22,6 +23,7 @@ export default function CanvasArticleTooltip({
   highlightedTopicNames,
   onToggleHighlight,
   onToggleRead,
+  onShowSentences,
   onHide,
   submissionId,
 }) {
@@ -75,6 +77,17 @@ export default function CanvasArticleTooltip({
                     }}
                   >
                     {isRead ? "Mark Unread" : "Mark Read"}
+                  </button>
+                )}
+                {onShowSentences && (
+                  <button
+                    className="text-topic-tooltip-btn"
+                    onClick={() => {
+                      onShowSentences(topic);
+                      onHide();
+                    }}
+                  >
+                    Show sentences
                   </button>
                 )}
               </div>

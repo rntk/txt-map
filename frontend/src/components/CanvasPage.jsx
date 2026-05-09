@@ -36,6 +36,11 @@ import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
 import CanvasTagsCloud from "./CanvasPage/CanvasTagsCloud";
 import CanvasTagTopicsRail from "./CanvasPage/CanvasTagTopicsRail";
+import TopicSentencesModal from "./shared/TopicSentencesModal";
+import {
+  buildModalSelectionFromTopic,
+  buildTopicModalSelection,
+} from "../utils/topicModalSelection";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
 import { useCanvasChats } from "./CanvasPage/useCanvasChats";
 import { useTooltip } from "../hooks/useTooltip";
@@ -129,6 +134,7 @@ export default function CanvasPage() {
     setReadTopics,
     topicTemperatures,
     insights,
+    markup,
   } = useArticleData(articleId);
 
   // Chat sessions (history)
@@ -252,6 +258,9 @@ export default function CanvasPage() {
   const [highlightedTopicNames, setHighlightedTopicNames] = useState(
     () => new Set(),
   );
+
+  // Sentences modal (opened from tooltip)
+  const [summaryModalTopic, setSummaryModalTopic] = useState(null);
 
   // Tooltip
   const [tooltipEnabled, setTooltipEnabled] = useState(true);
@@ -843,6 +852,42 @@ export default function CanvasPage() {
       return next;
     });
   }, []);
+
+  // ── Topic sentences modal ────────────────────────────────────────────────
+
+  const handleShowTopicSentences = useCallback(
+    (topic) => {
+      if (!topic) return;
+      const fullTopic =
+        (submissionTopics || []).find((t) => t.name === topic.name) || topic;
+      const summaryText =
+        (topicSummaries && topicSummaries[fullTopic.name]) ||
+        (topicSummaries && topicSummaries[fullTopic.fullPath]) ||
+        "";
+      setSummaryModalTopic(
+        buildModalSelectionFromTopic({
+          ...fullTopic,
+          _sentences: submissionSentences,
+          _summarySentence: summaryText || undefined,
+        }),
+      );
+    },
+    [submissionTopics, submissionSentences, topicSummaries],
+  );
+
+  const closeSummaryModal = useCallback(() => {
+    setSummaryModalTopic(null);
+  }, []);
+
+  const handleModalToggleRead = useCallback(
+    (modalTopic) => {
+      const names = Array.isArray(modalTopic?.canonicalTopicNames)
+        ? modalTopic.canonicalTopicNames
+        : [modalTopic?.primaryTopicName || modalTopic?.name].filter(Boolean);
+      names.forEach((name) => toggleTopicRead(name));
+    },
+    [toggleTopicRead],
+  );
 
   // ── data Derived ────────────────
 
@@ -1491,7 +1536,6 @@ export default function CanvasPage() {
                     cloudRef={tagsCloudRef}
                     articleText={articleText}
                     articleHeight={articleHeight}
-                    scale={scale}
                     onWordHoverChange={setHoveredCloudLemma}
                     onWordSelect={handleCloudWordSelect}
                     onWordsComputed={handleCloudWordsComputed}
@@ -1648,9 +1692,40 @@ export default function CanvasPage() {
         highlightedTopicNames={highlightedTopicNames}
         onToggleHighlight={toggleTopicHighlight}
         onToggleRead={toggleTopicRead}
+        onShowSentences={handleShowTopicSentences}
         onHide={hideTooltip}
         submissionId={articleId}
       />
+
+      {summaryModalTopic && (
+        <TopicSentencesModal
+          topic={summaryModalTopic}
+          sentences={summaryModalTopic._sentences || submissionSentences}
+          onClose={closeSummaryModal}
+          onShowInArticle={(modalTopic) => {
+            const normalized = buildTopicModalSelection(
+              modalTopic,
+              submissionTopics,
+            );
+            const topicName =
+              normalized?.primaryTopicName ||
+              normalized?.fullPath ||
+              normalized?.displayName;
+            setSummaryModalTopic(null);
+            if (!topicName) return;
+            setHighlightedTopicNames((prev) => {
+              const next = new Set(prev);
+              next.add(topicName);
+              return next;
+            });
+            zoomToSummaryCard(topicName);
+          }}
+          markup={markup}
+          allTopics={submissionTopics}
+          readTopics={readTopics}
+          onToggleRead={handleModalToggleRead}
+        />
+      )}
 
       <CanvasRightPanel
         show={showChat}
