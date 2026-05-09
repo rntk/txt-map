@@ -74,7 +74,14 @@ export function useTagTopicsLayout({
 
       const articleRect = articleEl.getBoundingClientRect();
       const wrapRect = wrapEl.getBoundingClientRect();
-      const s = scaleRef.current || 1;
+      // Derive the actually-rendered transform scale from the DOM rather than
+      // scaleRef. While the canvas viewport's CSS transform is mid-transition
+      // (e.g. focus zoom on tag select), the rendered scale lags behind the
+      // ref's final value, so dividing by scaleRef would produce coordinates
+      // that don't match what the browser is currently painting.
+      const offsetH = articleEl.offsetHeight;
+      const s =
+        offsetH > 0 ? articleRect.height / offsetH : scaleRef.current || 1;
 
       const positioned = entries
         .map((entry) => {
@@ -104,11 +111,9 @@ export function useTagTopicsLayout({
       const GAP = 10;
       let lastBottom = 0;
       for (const card of positioned) {
-        const desired = card.startY;
+        const desired = card.midY - CARD_HEIGHT / 2;
         card.cardY = Math.max(desired, lastBottom + GAP);
         card.cardHeight = CARD_HEIGHT;
-        card.startY = card.cardY;
-        card.endY = Math.max(card.endY, card.cardY + CARD_HEIGHT + 180);
         lastBottom = card.cardY + CARD_HEIGHT;
       }
 
@@ -119,15 +124,25 @@ export function useTagTopicsLayout({
       });
     };
 
-    raf = window.requestAnimationFrame(compute);
-    const onResize = () => {
+    const schedule = () => {
       window.cancelAnimationFrame(raf);
       raf = window.requestAnimationFrame(compute);
     };
-    window.addEventListener("resize", onResize);
+
+    schedule();
+    window.addEventListener("resize", schedule);
+
+    let resizeObserver = null;
+    if (typeof window.ResizeObserver !== "undefined") {
+      resizeObserver = new window.ResizeObserver(schedule);
+      if (articleTextRef.current) resizeObserver.observe(articleTextRef.current);
+      if (summaryWrapRef.current) resizeObserver.observe(summaryWrapRef.current);
+    }
+
     return () => {
       window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", schedule);
+      if (resizeObserver) resizeObserver.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
