@@ -1,15 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { buildArticleWordCloud } from "../../utils/wordCloud";
 
-const TILE_COLORS = [
-  { bg: "#ffd740", fg: "#333" },
-  { bg: "#69f0ae", fg: "#1b5e20" },
-  { bg: "#40c4ff", fg: "#01579b" },
-  { bg: "#ff6e40", fg: "#fff" },
-  { bg: "#e040fb", fg: "#fff" },
-  { bg: "#b2ff59", fg: "#33691e" },
-];
-
 function wordHash(word) {
   let hash = 0;
   for (let i = 0; i < word.length; i += 1) {
@@ -131,29 +122,18 @@ export default function CanvasTagsCloud({
     const items = top.map(({ word, frequency, lemma }) => {
       const h = wordHash(lemma);
       const n = norm(frequency);
-      const isTile = n > 0.55 && h % 3 === 0;
       const rotationDeg = ((h % 7) - 3) * 1.6;
       const fontSize = getSize(frequency);
-
-      const base = { word, lemma, frequency, fontSize, rotationDeg };
-
-      if (isTile) {
-        const tile = TILE_COLORS[h % TILE_COLORS.length];
-        return {
-          ...base,
-          background: tile.bg,
-          color: tile.fg,
-          fontWeight: 700,
-          isTile: true,
-        };
-      }
       const hue = (h % 260) + 20;
+
       return {
-        ...base,
-        background: "transparent",
+        word,
+        lemma,
+        frequency,
+        fontSize,
+        rotationDeg,
         color: `hsl(${hue}, 65%, ${n > 0.5 ? 75 : 60}%)`,
         fontWeight: n > 0.65 ? 700 : n > 0.3 ? 500 : 400,
-        isTile: false,
       };
     });
 
@@ -194,17 +174,11 @@ export default function CanvasTagsCloud({
     handleWordSelect(e);
   };
 
-  const stopCanvasDrag = (e) => {
-    e.stopPropagation();
-  };
-
   return (
     <div
       className="canvas-tags-cloud"
       onMouseOver={handleMouseOver}
       onMouseLeave={() => onWordHoverChange?.(null)}
-      onMouseDown={stopCanvasDrag}
-      onTouchStart={stopCanvasDrag}
       style={{
         "--canvas-tags-cloud-width": `${outerWidth}px`,
         width: `${outerWidth}px`,
@@ -229,7 +203,6 @@ export default function CanvasTagsCloud({
             aria-pressed={selectedLemma === item.lemma}
             className={[
               "canvas-tags-cloud__word",
-              item.isTile ? "is-tile" : "",
               selectedLemma === item.lemma ? "is-selected" : "",
             ]
               .filter(Boolean)
@@ -242,7 +215,6 @@ export default function CanvasTagsCloud({
               fontSize: `${item.fontSize}px`,
               fontWeight: item.fontWeight,
               transform: `rotate(${item.rotationDeg}deg)`,
-              background: item.background,
               color: item.color,
             }}
           >
