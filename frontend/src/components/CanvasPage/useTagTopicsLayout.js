@@ -2,6 +2,17 @@ import { useEffect, useState } from "react";
 import { rangeAtOffset } from "./utils";
 
 /**
+ * Estimates the rendered height needed for a tag topic card.
+ * @param {{summaryText?: string, preview?: string}} entry
+ * @returns {number}
+ */
+function getTagTopicCardHeight(entry) {
+  const text = entry.summaryText || entry.preview || "";
+  const estimatedLines = Math.max(1, Math.ceil(text.length / 48));
+  return Math.max(92, 50 + estimatedLines * 16);
+}
+
+/**
  * Computes right-side card positions for topics assigned to selected tag hits.
  * @param {{
  *   show: boolean,
@@ -11,6 +22,7 @@ import { rangeAtOffset } from "./utils";
  *     fullPath: string,
  *     sentences: number[],
  *     preview: string,
+ *     summaryText?: string,
  *     charStart: number,
  *     charEnd: number,
  *   }>,
@@ -30,6 +42,7 @@ import { rangeAtOffset } from "./utils";
  *     fullPath: string,
  *     sentences: number[],
  *     preview: string,
+ *     summaryText?: string,
  *     charStart: number,
  *     charEnd: number,
  *     midY: number,
@@ -107,14 +120,14 @@ export function useTagTopicsLayout({
 
       positioned.sort((a, b) => a.midY - b.midY);
 
-      const CARD_HEIGHT = 92;
       const GAP = 10;
       let lastBottom = 0;
       for (const card of positioned) {
-        const desired = card.midY - CARD_HEIGHT / 2;
+        const cardHeight = getTagTopicCardHeight(card);
+        const desired = card.midY - cardHeight / 2;
         card.cardY = Math.max(desired, lastBottom + GAP);
-        card.cardHeight = CARD_HEIGHT;
-        lastBottom = card.cardY + CARD_HEIGHT;
+        card.cardHeight = cardHeight;
+        lastBottom = card.cardY + cardHeight;
       }
 
       setTagTopicsLayout({
@@ -135,8 +148,10 @@ export function useTagTopicsLayout({
     let resizeObserver = null;
     if (typeof window.ResizeObserver !== "undefined") {
       resizeObserver = new window.ResizeObserver(schedule);
-      if (articleTextRef.current) resizeObserver.observe(articleTextRef.current);
-      if (summaryWrapRef.current) resizeObserver.observe(summaryWrapRef.current);
+      if (articleTextRef.current)
+        resizeObserver.observe(articleTextRef.current);
+      if (summaryWrapRef.current)
+        resizeObserver.observe(summaryWrapRef.current);
     }
 
     return () => {

@@ -832,6 +832,8 @@ export default function CanvasPage() {
           const charStart = sentenceOffsets[sentenceNumber - 1] ?? 0;
           const sentenceText = submissionSentences[sentenceNumber - 1] || "";
           const charEnd = charStart + sentenceText.length;
+          const summaryText =
+            topicSummaries?.[topic.name] || topicSummaries?.[fullPath] || "";
 
           return {
             key: `${fullPath || topicName}:${sentenceNumber}`,
@@ -839,6 +841,7 @@ export default function CanvasPage() {
             fullPath,
             sentences: [sentenceNumber],
             preview: sentenceText,
+            summaryText,
             charStart,
             charEnd,
           };
@@ -856,6 +859,7 @@ export default function CanvasPage() {
     sentenceOffsets,
     submissionSentences,
     submissionTopics,
+    topicSummaries,
   ]);
 
   const zoomToTagTopic = useCallback(

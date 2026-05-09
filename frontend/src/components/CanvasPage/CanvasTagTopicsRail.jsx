@@ -11,6 +11,7 @@ import { getStickyCardTop } from "./stickyCards";
  *       fullPath: string,
  *       sentences: number[],
  *       preview: string,
+ *       summaryText?: string,
  *       cardY: number,
  *       cardHeight: number,
  *     }>,
@@ -96,6 +97,7 @@ export default function CanvasTagTopicsRail({
             card.sentences.length === 1
               ? `Sentence ${card.sentences[0]}`
               : `${card.sentences.length} matching sentences`;
+          const summaryText = card.summaryText || card.preview;
 
           return (
             <button
@@ -104,7 +106,7 @@ export default function CanvasTagTopicsRail({
               className={`canvas-tag-topic-card${isActive ? " is-active" : ""}`}
               style={{
                 top: `${effectiveTop}px`,
-                height: `${card.cardHeight}px`,
+                minHeight: `${card.cardHeight}px`,
                 transition: isAnimating ? "top 320ms ease" : undefined,
               }}
               onMouseEnter={() => onCardEnter(card.key)}
@@ -119,7 +121,7 @@ export default function CanvasTagTopicsRail({
                 {sentenceLabel}
               </span>
               <span className="canvas-tag-topic-card__preview">
-                {card.preview}
+                {summaryText}
               </span>
             </button>
           );
