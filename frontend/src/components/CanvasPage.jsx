@@ -34,6 +34,7 @@ import CanvasArticleTooltip from "./CanvasPage/CanvasArticleTooltip";
 import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
 import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
+import CanvasTagsCloud from "./CanvasPage/CanvasTagsCloud";
 import { useCanvasEvents } from "./CanvasPage/useCanvasEvents";
 import { useCanvasChats } from "./CanvasPage/useCanvasChats";
 import { useTooltip } from "../hooks/useTooltip";
@@ -232,6 +233,10 @@ export default function CanvasPage() {
   const [showReadStatus, setShowReadStatus] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [activeInsightKey, setActiveInsightKey] = useState(null);
+  const [showTagsCloud, setShowTagsCloud] = useState(false);
+  const [hoveredCloudLemma, setHoveredCloudLemma] = useState(null);
+  const cloudRangesRef = useRef(new Map());
+  const [articleHeight, setArticleHeight] = useState(0);
 
   // Topic interaction state
   const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
@@ -311,6 +316,23 @@ export default function CanvasPage() {
     const ro = new ResizeObserver(update);
     ro.observe(wrap);
     return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = articleTextRef.current;
+    if (!el) {
+      setArticleHeight(0);
+      return undefined;
+    }
+    const update = () => setArticleHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [articleText, articleLoading, articleError, showSummaryMode]);
+
+  const handleCloudWordsComputed = useCallback((rangesMap) => {
+    cloudRangesRef.current = rangesMap || new Map();
   }, []);
 
   const cancelPendingCanvasTransform = useCallback(() => {
@@ -940,6 +962,12 @@ export default function CanvasPage() {
         });
       }
     }
+    if (showTagsCloud && hoveredCloudLemma) {
+      const ranges = cloudRangesRef.current.get(hoveredCloudLemma) || [];
+      ranges.forEach((r) => {
+        base.push({ start: r.start, end: r.end, label: hoveredCloudLemma });
+      });
+    }
     return base;
   }, [
     currentHighlights,
@@ -955,6 +983,8 @@ export default function CanvasPage() {
     showInsights,
     activeInsightKey,
     insightsLayout.cards,
+    showTagsCloud,
+    hoveredCloudLemma,
   ]);
 
   const temperatureHighlights = useMemo(() => {
@@ -1216,6 +1246,16 @@ export default function CanvasPage() {
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                 }}
               >
+                {!showSummaryMode && showTagsCloud && (
+                  <CanvasTagsCloud
+                    articleText={articleText}
+                    articleHeight={articleHeight}
+                    scale={scale}
+                    onWordHoverChange={setHoveredCloudLemma}
+                    onWordsComputed={handleCloudWordsComputed}
+                  />
+                )}
+
                 {showSummaryMode ? (
                   <CanvasSummaryView
                     summaryViewCards={summaryViewCards}
@@ -1334,6 +1374,8 @@ export default function CanvasPage() {
           onToggleChat={() => setShowChat((v) => !v)}
           tooltipEnabled={tooltipEnabled}
           onToggleTooltip={() => setTooltipEnabled((v) => !v)}
+          showTagsCloud={showTagsCloud}
+          onToggleTagsCloud={() => setShowTagsCloud((v) => !v)}
         />
       </div>
 

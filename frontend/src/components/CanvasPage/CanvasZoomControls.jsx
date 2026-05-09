@@ -47,6 +47,8 @@ export default function CanvasZoomControls({
   onToggleChat,
   tooltipEnabled,
   onToggleTooltip,
+  showTagsCloud,
+  onToggleTagsCloud,
 }) {
   const [isFolded, setIsFolded] = useState(false);
   const [isHorizontal, setIsHorizontal] = useState(false);
@@ -216,6 +218,14 @@ export default function CanvasZoomControls({
             title={showChat ? "Hide chat panel" : "Show chat panel"}
           >
             C
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showTagsCloud ? " is-active" : ""}`}
+            onClick={onToggleTagsCloud}
+            title={showTagsCloud ? "Hide tags cloud" : "Show tags cloud"}
+          >
+            W
           </button>
         </div>
       )}
