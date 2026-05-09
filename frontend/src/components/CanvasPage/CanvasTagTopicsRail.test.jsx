@@ -5,7 +5,7 @@ import CanvasTagTopicsRail from "./CanvasTagTopicsRail";
 
 const noop = vi.fn();
 
-function renderRail(cardOverrides = {}) {
+function renderRail(cardOverrides = {}, layoutOverrides = {}) {
   return render(
     <CanvasTagTopicsRail
       tagTopicsLayout={{
@@ -24,11 +24,13 @@ function renderRail(cardOverrides = {}) {
             ...cardOverrides,
           },
         ],
+        ...layoutOverrides,
       }}
       activeTopicKey={null}
       onCardEnter={noop}
       onCardLeave={noop}
       onCardClick={noop}
+      onMoveToTagsCloud={noop}
       translate={{ x: 0, y: 0 }}
       scale={1}
       isAnimating={false}
@@ -56,5 +58,47 @@ describe("CanvasTagTopicsRail", () => {
     expect(
       screen.getByText("Original sentence text that matched the selected tag."),
     ).toBeInTheDocument();
+  });
+
+  it("shows the move to tags cloud button", () => {
+    renderRail();
+
+    expect(
+      screen.getByRole("button", { name: "move to tags cloud" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the move to tags cloud button without matching topic cards", () => {
+    renderRail({}, { cards: [] });
+
+    expect(
+      screen.getByRole("button", { name: "move to tags cloud" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the move to tags cloud button in the current viewport", () => {
+    render(
+      <CanvasTagTopicsRail
+        tagTopicsLayout={{
+          articleRight: 100,
+          articleHeight: 2000,
+          cards: [],
+        }}
+        activeTopicKey={null}
+        onCardEnter={noop}
+        onCardLeave={noop}
+        onCardClick={noop}
+        onMoveToTagsCloud={noop}
+        translate={{ x: 0, y: -900 }}
+        scale={1}
+        isAnimating={false}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: "move to tags cloud" })
+        .style.getPropertyValue("top"),
+    ).toBe("912px");
   });
 });

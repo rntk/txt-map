@@ -83,6 +83,7 @@ function buildCloudLayout(items, maxHeight) {
  *   onWordsComputed: (lemmaToRanges: Map<string, Array<{start: number, end: number}>>) => void,
  *   onSizeChange?: (size: {width: number, height: number}) => void,
  *   selectedLemma?: string | null,
+ *   cloudRef?: React.RefObject<HTMLDivElement>,
  * }} props
  */
 export default function CanvasTagsCloud({
@@ -94,6 +95,7 @@ export default function CanvasTagsCloud({
   onWordsComputed,
   onSizeChange,
   selectedLemma,
+  cloudRef,
 }) {
   const { words, ranges } = useMemo(
     () => buildArticleWordCloud(articleText || ""),
@@ -176,6 +178,7 @@ export default function CanvasTagsCloud({
 
   return (
     <div
+      ref={cloudRef}
       className="canvas-tags-cloud"
       onMouseOver={handleMouseOver}
       onMouseLeave={() => onWordHoverChange?.(null)}

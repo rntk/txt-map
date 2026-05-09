@@ -1136,6 +1136,30 @@
   pointer-events: none;
 }
 
+.canvas-tag-topics-return {
+  position: absolute;
+  right: 0;
+  z-index: 3;
+  width: 280px;
+  border: 1px solid rgba(255, 215, 64, 0.42);
+  border-radius: 4px;
+  background: rgba(20, 28, 40, 0.94);
+  color: #fef3c7;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  pointer-events: auto;
+  text-transform: uppercase;
+}
+
+.canvas-tag-topics-return:hover {
+  border-color: #ffd740;
+  color: #ffd740;
+}
+
 .canvas-tag-topic-card {
   position: absolute;
   right: 0;

@@ -240,6 +240,7 @@ export default function CanvasPage() {
   const [selectedCloudLemma, setSelectedCloudLemma] = useState(null);
   const [activeTagTopicKey, setActiveTagTopicKey] = useState(null);
   const cloudRangesRef = useRef(new Map());
+  const tagsCloudRef = useRef(null);
   const [cloudRangesMap, setCloudRangesMap] = useState(() => new Map());
   const [articleHeight, setArticleHeight] = useState(0);
   const [cloudSize, setCloudSize] = useState({ width: 0, height: 0 });
@@ -417,6 +418,41 @@ export default function CanvasPage() {
     },
     [focusArticleOffset],
   );
+
+  const moveToTagsCloud = useCallback(() => {
+    const cloudEl = tagsCloudRef.current;
+    const wrap = canvasWrapRef.current;
+    const viewport = canvasViewportRef.current;
+    if (!cloudEl || !wrap || !viewport) return;
+
+    const selectedTagEl = selectedCloudLemma
+      ? Array.from(cloudEl.querySelectorAll("[data-cloud-lemma]")).find(
+          (el) => el.getAttribute("data-cloud-lemma") === selectedCloudLemma,
+        )
+      : null;
+    const targetEl = selectedTagEl || cloudEl;
+    const targetRect = targetEl.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const viewportRect = viewport.getBoundingClientRect();
+    const currentScale = scaleRef.current || 1;
+    const localTargetX =
+      (targetRect.left + targetRect.width / 2 - viewportRect.left) /
+      currentScale;
+    const localTargetY =
+      (targetRect.top + targetRect.height / 2 - viewportRect.top) /
+      currentScale;
+
+    setIsFocusingHighlight(true);
+    setCanvasTransformNow(currentScale, {
+      x: wrapRect.width / 2 - localTargetX * currentScale,
+      y: wrapRect.height / 2 - localTargetY * currentScale,
+    });
+    if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
+    smoothZoomTimerRef.current = setTimeout(
+      () => setIsFocusingHighlight(false),
+      380,
+    );
+  }, [selectedCloudLemma, setCanvasTransformNow]);
 
   const scheduleCanvasTransform = useCallback((nextScale, nextTranslate) => {
     scaleRef.current = nextScale;
@@ -1444,7 +1480,7 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${tagTopicsLayout.cards.length > 0 && !showSummaryMode ? " has-tag-topics" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                   "--canvas-tags-cloud-width": `${cloudSize.width}px`,
@@ -1452,6 +1488,7 @@ export default function CanvasPage() {
               >
                 {!showSummaryMode && showTagsCloud && (
                   <CanvasTagsCloud
+                    cloudRef={tagsCloudRef}
                     articleText={articleText}
                     articleHeight={articleHeight}
                     scale={scale}
@@ -1517,7 +1554,7 @@ export default function CanvasPage() {
                   />
                 )}
 
-                {!showSummaryMode && tagTopicsLayout.cards.length > 0 && (
+                {!showSummaryMode && showTagsCloud && selectedCloudLemma && (
                   <CanvasTagTopicsRail
                     tagTopicsLayout={tagTopicsLayout}
                     activeTopicKey={activeTagTopicKey}
@@ -1528,6 +1565,7 @@ export default function CanvasPage() {
                       )
                     }
                     onCardClick={zoomToTagTopic}
+                    onMoveToTagsCloud={moveToTagsCloud}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}

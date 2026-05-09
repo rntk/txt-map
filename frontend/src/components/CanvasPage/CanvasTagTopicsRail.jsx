@@ -22,6 +22,7 @@ import { getStickyCardTop } from "./stickyCards";
  *   onCardEnter: (key: string) => void,
  *   onCardLeave: (key: string) => void,
  *   onCardClick: (key: string) => void,
+ *   onMoveToTagsCloud?: () => void,
  *   translate: {x: number, y: number},
  *   scale: number,
  *   isAnimating: boolean,
@@ -33,19 +34,21 @@ export default function CanvasTagTopicsRail({
   onCardEnter,
   onCardLeave,
   onCardClick,
+  onMoveToTagsCloud,
   translate,
   scale,
   isAnimating,
 }) {
-  const { cards, articleRight = 0, articleHeight = 0 } = tagTopicsLayout;
+  const { cards = [], articleRight = 0, articleHeight = 0 } = tagTopicsLayout;
 
-  if (!cards || cards.length === 0) return null;
+  if (cards.length === 0 && !onMoveToTagsCloud) return null;
 
   const svgHeight = Math.max(
     articleHeight,
     cards.length > 0 ? cards[cards.length - 1].cardY + 100 : 0,
   );
   const viewportTop = -translate.y / scale;
+  const returnButtonTop = Math.max(0, viewportTop + 12 / scale);
 
   return (
     <>
@@ -90,6 +93,19 @@ export default function CanvasTagTopicsRail({
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >
+        {onMoveToTagsCloud && (
+          <button
+            type="button"
+            className="canvas-tag-topics-return"
+            style={{
+              top: `${returnButtonTop}px`,
+              transition: isAnimating ? "top 320ms ease" : undefined,
+            }}
+            onClick={onMoveToTagsCloud}
+          >
+            move to tags cloud
+          </button>
+        )}
         {cards.map((card) => {
           const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           const isActive = activeTopicKey === card.key;

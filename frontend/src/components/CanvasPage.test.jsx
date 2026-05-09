@@ -187,6 +187,10 @@ describe("CanvasPage highlight focusing", () => {
         return { ok: true, json: async () => ({ events: [] }) };
       }
 
+      if (url === "/api/canvas/article-1/chats") {
+        return { ok: true, json: async () => ({ chats: [] }) };
+      }
+
       throw new Error(`Unexpected fetch URL: ${url}`);
     });
 
@@ -215,6 +219,109 @@ describe("CanvasPage highlight focusing", () => {
       expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
         "24px",
       );
+    });
+  });
+
+  it("shows a return button when tag navigation moves the cloud off screen", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Alpha beta alpha beta gamma.",
+            sentences: ["Alpha beta alpha beta gamma."],
+            topics: [{ name: "Topic", sentences: [1] }],
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const getTransformValue = (name, fallback) => {
+      const value = document
+        .querySelector(".canvas-viewport")
+        ?.style.getPropertyValue(name);
+      const parsed = Number.parseFloat(value || "");
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    HTMLElement.prototype.getBoundingClientRect =
+      function getBoundingClientRect() {
+        const translateX = getTransformValue("--canvas-translate-x", 40);
+        const translateY = getTransformValue("--canvas-translate-y", 40);
+        const currentScale = getTransformValue("--canvas-scale", 1);
+
+        if (this.classList.contains("canvas-area")) {
+          return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
+        }
+
+        if (this.classList.contains("canvas-viewport")) {
+          return makeRect({
+            left: translateX,
+            top: translateY,
+            width: 752 * currentScale,
+            height: 400 * currentScale,
+          });
+        }
+
+        if (this.classList.contains("canvas-tags-cloud")) {
+          return makeRect({
+            left: translateX,
+            top: translateY,
+            width: 260 * currentScale,
+            height: 220 * currentScale,
+          });
+        }
+
+        if (this.classList.contains("canvas-tags-cloud__word")) {
+          return makeRect({
+            left: translateX + 80,
+            top: translateY + 80,
+            width: 80,
+            height: 24,
+          });
+        }
+
+        return makeRect({ left: 0, top: 0, width: 0, height: 0 });
+      };
+
+    Range.prototype.getBoundingClientRect = vi.fn(() =>
+      makeRect({ left: 420, top: 900, width: 20, height: 20 }),
+    );
+
+    const { container } = render(<CanvasPage />);
+    await screen.findByText("Alpha beta alpha beta gamma.");
+
+    fireEvent.click(screen.getByTitle("Show tags cloud"));
+    fireEvent.click(await screen.findByRole("button", { name: "alpha" }));
+
+    const viewport = container.querySelector(".canvas-viewport");
+    const returnButton = await screen.findByRole("button", {
+      name: "move to tags cloud",
+    });
+    await waitFor(() => {
+      expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
+        "-818px",
+      );
+    });
+
+    fireEvent.click(returnButton);
+
+    await waitFor(() => {
+      expect(
+        Number.parseFloat(
+          viewport.style.getPropertyValue("--canvas-translate-y"),
+        ),
+      ).toBeGreaterThan(250);
+      expect(
+        screen.getByRole("button", { name: "move to tags cloud" }),
+      ).toBeInTheDocument();
     });
   });
 
