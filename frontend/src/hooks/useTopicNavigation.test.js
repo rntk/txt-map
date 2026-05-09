@@ -150,6 +150,25 @@ describe("useTopicNavigation", () => {
       result.current.navigateTopicSentence({ name: "TopicA" }, "next");
       expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
     });
+
+    it("navigates to previous grouped topic section", () => {
+      const section1 = document.createElement("div");
+      section1.id = "grouped-topic-TopicA";
+      const section2 = document.createElement("div");
+      section2.id = "grouped-topic-TopicB";
+      document.body.appendChild(section1);
+      document.body.appendChild(section2);
+
+      const setHighlight = vi.fn();
+      const { result } = makeHook({
+        groupedByTopics: true,
+        selectedTopics: [],
+        setHighlightedGroupedTopic: setHighlight,
+      });
+
+      result.current.navigateTopicSentence({ name: "TopicB" }, "prev");
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
   });
 
   describe("topic_summary_timeline mode", () => {
@@ -208,5 +227,327 @@ describe("useTopicNavigation", () => {
 
     result.current.navigateTopicSentence({ name: "TestTopic" }, "focus");
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("falls back to last candidate when charStart is beyond all candidates", () => {
+    const span1 = document.createElement("span");
+    span1.setAttribute("data-article-index", "0");
+    span1.setAttribute("data-char-start", "5");
+    span1.textContent = "world";
+    document.body.appendChild(span1);
+
+    const span2 = document.createElement("span");
+    span2.setAttribute("data-article-index", "0");
+    span2.setAttribute("data-char-start", "10");
+    span2.textContent = "test";
+    document.body.appendChild(span2);
+
+    const { result } = makeHook({
+      activeTab: "raw_text",
+      rawText: "Hello world test",
+      safeTopics: [
+        {
+          name: "TestTopic",
+          ranges: [{ start: 15, end: 20, sentence_start: 1 }],
+        },
+      ],
+    });
+
+    result.current.navigateTopicSentence({ name: "TestTopic" }, "focus");
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("does nothing when normalizedRange is null", () => {
+    const { result } = makeHook({
+      activeTab: "raw_text",
+      rawText: "Hello world",
+      safeTopics: [
+        {
+          name: "TestTopic",
+          ranges: [{ start: null, end: null, sentence_start: 1 }],
+        },
+      ],
+    });
+
+    result.current.navigateTopicSentence({ name: "TestTopic" }, "focus");
+    expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("navigates using sentence indices when ranges are empty but sentences exist", () => {
+    const span = document.createElement("span");
+    span.setAttribute("data-article-index", "0");
+    span.setAttribute("data-sentence-index", "2");
+    span.textContent = "content";
+    document.body.appendChild(span);
+
+    const { result } = makeHook({
+      activeTab: "raw_text",
+      safeTopics: [
+        {
+          name: "TestTopic",
+          ranges: [],
+          sentences: [3],
+        },
+      ],
+    });
+
+    result.current.navigateTopicSentence({ name: "TestTopic" }, "focus");
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  describe("prev/next navigation on raw_text tab", () => {
+    beforeEach(() => {
+      vi.spyOn(window, "scrollY", "get").mockReturnValue(0);
+      vi.spyOn(window, "innerHeight", "get").mockReturnValue(500);
+    });
+
+    it("navigates to next anchor when it is below viewport", () => {
+      const span1 = document.createElement("span");
+      span1.setAttribute("data-article-index", "0");
+      span1.setAttribute("data-char-start", "5");
+      span1.textContent = "world";
+      document.body.appendChild(span1);
+
+      const span2 = document.createElement("span");
+      span2.setAttribute("data-article-index", "0");
+      span2.setAttribute("data-char-start", "20");
+      span2.textContent = "test";
+      document.body.appendChild(span2);
+
+      vi.spyOn(span2, "getBoundingClientRect").mockReturnValue({
+        top: 600,
+        bottom: 620,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "raw_text",
+        rawText: "Hello world. This is a test.",
+        safeTopics: [
+          {
+            name: "TestTopic",
+            ranges: [
+              { start: 5, end: 10, sentence_start: 1 },
+              { start: 20, end: 24, sentence_start: 1 },
+            ],
+          },
+        ],
+      });
+
+      result.current.navigateTopicSentence({ name: "TestTopic" }, "next");
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("navigates to previous anchor when it is above viewport", () => {
+      const span1 = document.createElement("span");
+      span1.setAttribute("data-article-index", "0");
+      span1.setAttribute("data-char-start", "5");
+      span1.textContent = "world";
+      document.body.appendChild(span1);
+
+      const span2 = document.createElement("span");
+      span2.setAttribute("data-article-index", "0");
+      span2.setAttribute("data-char-start", "20");
+      span2.textContent = "test";
+      document.body.appendChild(span2);
+
+      vi.spyOn(span1, "getBoundingClientRect").mockReturnValue({
+        top: -100,
+        bottom: -80,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "raw_text",
+        rawText: "Hello world. This is a test.",
+        safeTopics: [
+          {
+            name: "TestTopic",
+            ranges: [
+              { start: 5, end: 10, sentence_start: 1 },
+              { start: 20, end: 24, sentence_start: 1 },
+            ],
+          },
+        ],
+      });
+
+      result.current.navigateTopicSentence({ name: "TestTopic" }, "prev");
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("does nothing when no next anchor is below viewport", () => {
+      const span = document.createElement("span");
+      span.setAttribute("data-article-index", "0");
+      span.setAttribute("data-char-start", "5");
+      span.textContent = "world";
+      document.body.appendChild(span);
+
+      vi.spyOn(span, "getBoundingClientRect").mockReturnValue({
+        top: 100,
+        bottom: 120,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "raw_text",
+        rawText: "Hello world",
+        safeTopics: [
+          {
+            name: "TestTopic",
+            ranges: [{ start: 5, end: 10, sentence_start: 1 }],
+          },
+        ],
+      });
+
+      result.current.navigateTopicSentence({ name: "TestTopic" }, "next");
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when no prev anchor is above viewport", () => {
+      const span = document.createElement("span");
+      span.setAttribute("data-article-index", "0");
+      span.setAttribute("data-char-start", "5");
+      span.textContent = "world";
+      document.body.appendChild(span);
+
+      vi.spyOn(span, "getBoundingClientRect").mockReturnValue({
+        top: 100,
+        bottom: 120,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "raw_text",
+        rawText: "Hello world",
+        safeTopics: [
+          {
+            name: "TestTopic",
+            ranges: [{ start: 5, end: 10, sentence_start: 1 }],
+          },
+        ],
+      });
+
+      result.current.navigateTopicSentence({ name: "TestTopic" }, "prev");
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("topic_summary_timeline prev/next navigation", () => {
+    beforeEach(() => {
+      vi.spyOn(window, "scrollY", "get").mockReturnValue(0);
+      vi.spyOn(window, "innerHeight", "get").mockReturnValue(500);
+    });
+
+    it("navigates to next summary paragraph below viewport", () => {
+      const para0 = document.createElement("div");
+      para0.id = "summary-para-0";
+      document.body.appendChild(para0);
+
+      const para3 = document.createElement("div");
+      para3.id = "summary-para-3";
+      document.body.appendChild(para3);
+
+      vi.spyOn(para3, "getBoundingClientRect").mockReturnValue({
+        top: 600,
+        bottom: 620,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "topic_summary_timeline",
+        topicSummaryParaMap: { TopicA: [0, 3] },
+      });
+
+      result.current.navigateTopicSentence({ name: "TopicA" }, "next");
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("navigates to previous summary paragraph above viewport", () => {
+      const para0 = document.createElement("div");
+      para0.id = "summary-para-0";
+      document.body.appendChild(para0);
+
+      const para3 = document.createElement("div");
+      para3.id = "summary-para-3";
+      document.body.appendChild(para3);
+
+      vi.spyOn(para0, "getBoundingClientRect").mockReturnValue({
+        top: -100,
+        bottom: -80,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "topic_summary_timeline",
+        topicSummaryParaMap: { TopicA: [0, 3] },
+      });
+
+      result.current.navigateTopicSentence({ name: "TopicA" }, "prev");
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("does nothing when no next summary paragraph is below viewport", () => {
+      const para0 = document.createElement("div");
+      para0.id = "summary-para-0";
+      document.body.appendChild(para0);
+
+      vi.spyOn(para0, "getBoundingClientRect").mockReturnValue({
+        top: 100,
+        bottom: 120,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "topic_summary_timeline",
+        topicSummaryParaMap: { TopicA: [0] },
+      });
+
+      result.current.navigateTopicSentence({ name: "TopicA" }, "next");
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when no prev summary paragraph is above viewport", () => {
+      const para0 = document.createElement("div");
+      para0.id = "summary-para-0";
+      document.body.appendChild(para0);
+
+      vi.spyOn(para0, "getBoundingClientRect").mockReturnValue({
+        top: 100,
+        bottom: 120,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 20,
+      });
+
+      const { result } = makeHook({
+        activeTab: "topic_summary_timeline",
+        topicSummaryParaMap: { TopicA: [0] },
+      });
+
+      result.current.navigateTopicSentence({ name: "TopicA" }, "prev");
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
   });
 });

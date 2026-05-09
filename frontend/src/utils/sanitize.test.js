@@ -477,4 +477,73 @@ describe("sanitizeHTML", () => {
       expect(decodeHtmlEntities("&unknown;")).toBe("&unknown;");
     });
   });
+
+  describe("edge cases", () => {
+    it("returns empty string when document is undefined", () => {
+      const originalDocument = global.document;
+      // @ts-ignore
+      global.document = undefined;
+      expect(sanitizeHTML("<p>hello</p>")).toBe("");
+      global.document = originalDocument;
+    });
+
+    it("passes through line-height with non-px, non-unitless value", () => {
+      const style = getStyle('<p style="line-height: 1.5em">text</p>');
+      expect(style).toBe("line-height: 1.5em");
+    });
+
+    it("keeps color that is not near-white", () => {
+      const style = getStyle('<p style="color: rgb(200, 200, 200)">text</p>');
+      expect(style).toBe("color: rgb(200, 200, 200)");
+    });
+
+    it("strips color that is not parseable as rgb", () => {
+      const style = getStyle('<p style="color: red">text</p>');
+      expect(style).toBe("color: red");
+    });
+
+    it("strips font-size with unparseable value", () => {
+      const style = getStyle('<p style="font-size: large">text</p>');
+      expect(style).toBe("font-size: large");
+    });
+  });
+
+  describe("additional safe style properties", () => {
+    it("keeps letter-spacing", () => {
+      const style = getStyle('<p style="letter-spacing: 2px">text</p>');
+      expect(style).toBe("letter-spacing: 2px");
+    });
+
+    it("keeps word-spacing", () => {
+      const style = getStyle('<p style="word-spacing: 4px">text</p>');
+      expect(style).toBe("word-spacing: 4px");
+    });
+
+    it("keeps border-collapse", () => {
+      const style = getStyle(
+        '<table style="border-collapse: collapse">text</table>',
+      );
+      expect(style).toBe("border-collapse: collapse");
+    });
+
+    it("keeps vertical-align", () => {
+      const style = getStyle('<span style="vertical-align: top">text</span>');
+      expect(style).toBe("vertical-align: top");
+    });
+
+    it("keeps border-radius", () => {
+      const style = getStyle('<div style="border-radius: 4px">text</div>');
+      expect(style).toBe("border-radius: 4px");
+    });
+
+    it("clamps padding-right to 40px max", () => {
+      const style = getStyle('<p style="padding-right: 80px">text</p>');
+      expect(style).toBe("padding-right: 40px");
+    });
+
+    it("strips negative padding-right", () => {
+      const style = getStyle('<p style="padding-right: -5px">text</p>');
+      expect(style).toBeNull();
+    });
+  });
 });
