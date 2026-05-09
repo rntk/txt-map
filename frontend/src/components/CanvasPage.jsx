@@ -237,6 +237,7 @@ export default function CanvasPage() {
   const [hoveredCloudLemma, setHoveredCloudLemma] = useState(null);
   const cloudRangesRef = useRef(new Map());
   const [articleHeight, setArticleHeight] = useState(0);
+  const [cloudSize, setCloudSize] = useState({ width: 0, height: 0 });
 
   // Topic interaction state
   const [hoveredSummaryKey, setHoveredSummaryKey] = useState(null);
@@ -1241,9 +1242,10 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
+                  "--canvas-tags-cloud-width": `${cloudSize.width}px`,
                 }}
               >
                 {!showSummaryMode && showTagsCloud && (
@@ -1253,6 +1255,7 @@ export default function CanvasPage() {
                     scale={scale}
                     onWordHoverChange={setHoveredCloudLemma}
                     onWordsComputed={handleCloudWordsComputed}
+                    onSizeChange={setCloudSize}
                   />
                 )}
 

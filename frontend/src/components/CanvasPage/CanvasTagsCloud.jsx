@@ -89,6 +89,7 @@ function buildCloudLayout(items, maxHeight) {
  *   scale: number,
  *   onWordHoverChange: (lemma: string | null) => void,
  *   onWordsComputed: (lemmaToRanges: Map<string, Array<{start: number, end: number}>>) => void,
+ *   onSizeChange?: (size: {width: number, height: number}) => void,
  * }} props
  */
 export default function CanvasTagsCloud({
@@ -97,6 +98,7 @@ export default function CanvasTagsCloud({
   scale,
   onWordHoverChange,
   onWordsComputed,
+  onSizeChange,
 }) {
   const { words, ranges } = useMemo(
     () => buildArticleWordCloud(articleText || ""),
@@ -154,6 +156,19 @@ export default function CanvasTagsCloud({
     return buildCloudLayout(items, articleHeight || 600);
   }, [words, articleHeight]);
 
+  const zoomFactor = Math.max(1, 1 / (scale || 1));
+  const outerWidth = layout.totalW + 32;
+  const outerHeight = layout.totalH + 32;
+
+  const onSizeChangeRef = useRef(onSizeChange);
+  useEffect(() => {
+    onSizeChangeRef.current = onSizeChange;
+  }, [onSizeChange]);
+
+  useEffect(() => {
+    onSizeChangeRef.current?.({ width: outerWidth, height: outerHeight });
+  }, [outerWidth, outerHeight]);
+
   if (layout.items.length === 0) return null;
 
   const handleMouseOver = (e) => {
@@ -161,17 +176,15 @@ export default function CanvasTagsCloud({
     if (el) onWordHoverChange?.(el.getAttribute("data-cloud-lemma"));
   };
 
-  const zoomFactor = Math.max(1, 1 / (scale || 1));
-
   return (
     <div
       className="canvas-tags-cloud"
       onMouseOver={handleMouseOver}
       onMouseLeave={() => onWordHoverChange?.(null)}
       style={{
-        "--canvas-tags-cloud-width": `${layout.totalW * zoomFactor + 32}px`,
-        width: `${layout.totalW * zoomFactor + 32}px`,
-        minHeight: `${layout.totalH * zoomFactor + 32}px`,
+        "--canvas-tags-cloud-width": `${outerWidth}px`,
+        width: `${outerWidth}px`,
+        minHeight: `${outerHeight}px`,
       }}
     >
       <div
@@ -180,7 +193,7 @@ export default function CanvasTagsCloud({
           width: `${layout.totalW}px`,
           height: `${layout.totalH}px`,
           transform: `scale(${zoomFactor})`,
-          transformOrigin: "top left",
+          transformOrigin: "top right",
         }}
       >
         {layout.items.map((item) => (

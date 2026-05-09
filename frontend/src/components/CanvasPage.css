@@ -873,10 +873,14 @@
 }
 
 /* ── Tags cloud rail (left side) ── */
+.canvas-article-with-summaries.has-tags-cloud {
+  padding-left: calc(var(--canvas-tags-cloud-width, 0px) + 32px);
+}
+
 .canvas-tags-cloud {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  margin-right: 32px;
+  position: absolute;
+  top: 0;
+  left: 0;
   max-width: var(--canvas-tags-cloud-width);
   background: rgba(20, 28, 40, 0.92);
   border: 1px solid rgba(120, 200, 230, 0.25);
@@ -885,8 +889,7 @@
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
   box-sizing: border-box;
-  order: -1;
-  overflow: hidden;
+  overflow: visible;
   animation: canvas-tags-cloud-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
