@@ -678,11 +678,36 @@ export default function CanvasPage() {
       } else if (e.key === "PageDown") {
         e.preventDefault();
         navigateCanvas("next");
+      } else if (
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight"
+      ) {
+        e.preventDefault();
+        const step = 80;
+        const currentScale = scaleRef.current || 1;
+        const currentTranslate = translateRef.current;
+        let nextX = currentTranslate.x;
+        let nextY = currentTranslate.y;
+        if (e.key === "ArrowUp") nextY += step;
+        if (e.key === "ArrowDown") nextY -= step;
+        if (e.key === "ArrowLeft") nextX += step;
+        if (e.key === "ArrowRight") nextX -= step;
+        userMovedCanvasRef.current = true;
+        setIsFocusingHighlight(true);
+        setCanvasTransformNow(currentScale, { x: nextX, y: nextY });
+        if (smoothZoomTimerRef.current)
+          clearTimeout(smoothZoomTimerRef.current);
+        smoothZoomTimerRef.current = setTimeout(
+          () => setIsFocusingHighlight(false),
+          380,
+        );
       }
     };
     window.addEventListener("keydown", handleKeyDownGlobal);
     return () => window.removeEventListener("keydown", handleKeyDownGlobal);
-  }, [navigateCanvas]);
+  }, [navigateCanvas, setCanvasTransformNow]);
 
   // ── Tooltip ──────────────────────────────────────────────────────────────
 
