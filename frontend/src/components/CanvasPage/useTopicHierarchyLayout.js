@@ -73,8 +73,11 @@ export function useTopicHierarchyLayout({
       const articleEl = articleTextRef.current;
       const wrapEl = summaryWrapRef.current;
       if (!articleEl || !wrapEl) return;
+      const articleRect = articleEl.getBoundingClientRect();
       const wrapRect = wrapEl.getBoundingClientRect();
-      const s = scaleRef.current || 1;
+      const offsetH = articleEl.offsetHeight;
+      const s =
+        offsetH > 0 ? articleRect.height / offsetH : scaleRef.current || 1;
 
       const summaryRectForRow = (row) => {
         const matching = getMatchingSummaryCardsForHierarchyRow(
@@ -166,15 +169,29 @@ export function useTopicHierarchyLayout({
       setTopicHierarchyLayout({ topicCards });
     };
 
-    raf = window.requestAnimationFrame(compute);
-    const onResize = () => {
+    const schedule = () => {
       window.cancelAnimationFrame(raf);
       raf = window.requestAnimationFrame(compute);
     };
-    window.addEventListener("resize", onResize);
+
+    schedule();
+    window.addEventListener("resize", schedule);
+
+    let resizeObserver = null;
+    if (typeof window.ResizeObserver !== "undefined") {
+      resizeObserver = new window.ResizeObserver(schedule);
+      if (articleTextRef.current) {
+        resizeObserver.observe(articleTextRef.current);
+      }
+      if (summaryWrapRef.current) {
+        resizeObserver.observe(summaryWrapRef.current);
+      }
+    }
+
     return () => {
       window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", schedule);
+      if (resizeObserver) resizeObserver.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
