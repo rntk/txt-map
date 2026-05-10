@@ -5,7 +5,7 @@ import hashlib
 import re
 import requests as http_requests
 
-from lib.constants import TASK_PRIORITIES
+from lib.constants import AUTO_TASKS, TASK_PRIORITIES
 from lib.nlp import compute_bigram_heatmap, normalize_text_tokens
 from lib.storage.submissions import SubmissionsStorage
 from lib.storage.task_queue import TaskQueueStorage, make_task_document
@@ -106,10 +106,12 @@ EMBEDDED_PDF_IMAGE_RE = re.compile(
 
 
 def _queue_all_tasks(task_queue_storage: TaskQueueStorage, submission_id: str) -> None:
-    """Insert task queue entries for a new submission."""
-    for task_type, priority in TASK_PRIORITIES.items():
+    """Queue the auto-run tasks for a new submission. Other tasks are manual-only."""
+    for task_type in AUTO_TASKS:
         task_queue_storage.create(
-            make_task_document(submission_id, task_type, priority)
+            make_task_document(
+                submission_id, task_type, TASK_PRIORITIES.get(task_type, 3)
+            )
         )
 
 

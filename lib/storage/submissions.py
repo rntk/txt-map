@@ -4,12 +4,13 @@ from typing import Optional, List, Any, Dict
 from datetime import datetime, UTC
 
 from pymongo.database import Database
-from lib.constants import TASK_NAMES, filter_known_tasks
+from lib.constants import AUTO_TASKS, TASK_NAMES, filter_known_tasks
 
 
 class SubmissionsStorage:
     indexes: List[str] = ["submission_id", "created_at"]
     task_names: List[str] = TASK_NAMES.copy()
+    auto_task_names: List[str] = AUTO_TASKS.copy()
     task_dependencies: Dict[str, List[str]] = {
         "split_topic_generation": [],
         "subtopics_generation": ["split_topic_generation"],
@@ -44,6 +45,18 @@ class SubmissionsStorage:
         submission_id = str(uuid.uuid4())
         now = datetime.now(UTC)
 
+        # Only auto-run tasks are tracked at submission time. Manual tasks are
+        # added to the document when they are first launched via /refresh.
+        initial_tasks: dict[str, Any] = {
+            task_name: {
+                "status": "pending",
+                "started_at": None,
+                "completed_at": None,
+                "error": None,
+            }
+            for task_name in self.auto_task_names
+        }
+
         submission = {
             "submission_id": submission_id,
             "html_content": html_content,
@@ -51,74 +64,7 @@ class SubmissionsStorage:
             "source_url": source_url,
             "created_at": now,
             "updated_at": now,
-            "tasks": {
-                "split_topic_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "subtopics_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "summarization": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "mindmap": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "prefix_tree": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "insights_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "markup_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "topic_marker_summary_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "topic_temperature_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "clustering_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-                "topic_modeling_generation": {
-                    "status": "pending",
-                    "started_at": None,
-                    "completed_at": None,
-                    "error": None,
-                },
-            },
+            "tasks": initial_tasks,
             "read_topics": [],
             "results": {
                 "sentences": [],
@@ -261,20 +207,29 @@ class SubmissionsStorage:
         self, task_names: Optional[List[str]] = None
     ) -> List[str]:
         """
-        Expand selected tasks with downstream dependent tasks.
-        Example: requesting split_topic_generation also includes dependent tasks.
+        Expand selected tasks with downstream dependent auto-run tasks.
+
+        - None / ["all"] expands to the auto-run set only. Manual tasks must be
+          listed by name.
+        - Explicit task names are kept (auto or manual).
+        - Dependency cascade only pulls in *auto* tasks, so refreshing topics
+          re-runs summarization but does not silently re-launch LLM-heavy
+          manual tasks the user did not ask for.
         """
         if task_names is None or "all" in task_names:
-            return self.task_names.copy()
+            return self.auto_task_names.copy()
 
         selected = {name for name in task_names if name in self.task_names}
         expanded = set(selected)
 
+        auto_set = set(self.auto_task_names)
         changed = True
         while changed:
             changed = False
             for task_name in self.task_names:
                 if task_name in expanded:
+                    continue
+                if task_name not in auto_set:
                     continue
                 deps = self.task_dependencies.get(task_name, [])
                 if any(dep in expanded for dep in deps):

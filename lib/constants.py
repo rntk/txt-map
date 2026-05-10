@@ -17,6 +17,13 @@ TASK_NAMES: List[str] = [
     "topic_modeling_generation",
 ]
 
+# Tasks queued automatically when a submission is created or refreshed with "all".
+# Every other task in TASK_NAMES is manual-only and must be requested by name.
+AUTO_TASKS: List[str] = [
+    "split_topic_generation",
+    "summarization",
+]
+
 # Task types allowed for queue operations.
 ALLOWED_TASKS: List[str] = TASK_NAMES.copy()
 

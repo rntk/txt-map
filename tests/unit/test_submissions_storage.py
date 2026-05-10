@@ -21,6 +21,7 @@ Also tests constants:
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 
+from lib.constants import AUTO_TASKS
 from lib.storage.submissions import SubmissionsStorage
 
 
@@ -252,30 +253,48 @@ class TestCreate:
         result = storage.create(html_content="<p>Test</p>")
         assert result["source_url"] == ""
 
-    def test_all_tasks_initialized_with_status_pending(self, mock_db):
-        """All tasks initialized with status='pending'."""
+    def test_only_auto_tasks_initialized(self, mock_db):
+        """Only auto-run tasks are pre-created at submission time."""
         storage = SubmissionsStorage(mock_db)
         result = storage.create(html_content="<p>Test</p>")
 
-        for task_name in SubmissionsStorage.task_names:
+        assert set(result["tasks"].keys()) == set(AUTO_TASKS)
+
+    def test_auto_tasks_initialized_with_status_pending(self, mock_db):
+        """Auto-run tasks initialized with status='pending'."""
+        storage = SubmissionsStorage(mock_db)
+        result = storage.create(html_content="<p>Test</p>")
+
+        for task_name in AUTO_TASKS:
             assert result["tasks"][task_name]["status"] == "pending"
 
-    def test_all_task_timestamps_initialized(self, mock_db):
-        """All task timestamps initialized (started_at=None, completed_at=None)."""
+    def test_auto_task_timestamps_initialized(self, mock_db):
+        """Auto-run task timestamps initialized (started_at=None, completed_at=None)."""
         storage = SubmissionsStorage(mock_db)
         result = storage.create(html_content="<p>Test</p>")
 
-        for task_name in SubmissionsStorage.task_names:
+        for task_name in AUTO_TASKS:
             assert result["tasks"][task_name]["started_at"] is None
             assert result["tasks"][task_name]["completed_at"] is None
 
-    def test_all_task_errors_initialized_to_none(self, mock_db):
-        """All task errors initialized to None."""
+    def test_auto_task_errors_initialized_to_none(self, mock_db):
+        """Auto-run task errors initialized to None."""
         storage = SubmissionsStorage(mock_db)
         result = storage.create(html_content="<p>Test</p>")
 
-        for task_name in SubmissionsStorage.task_names:
+        for task_name in AUTO_TASKS:
             assert result["tasks"][task_name]["error"] is None
+
+    def test_manual_tasks_not_initialized(self, mock_db):
+        """Manual-only tasks (LLM-heavy ones) are not pre-created at submission time."""
+        storage = SubmissionsStorage(mock_db)
+        result = storage.create(html_content="<p>Test</p>")
+
+        manual_tasks = [
+            name for name in SubmissionsStorage.task_names if name not in AUTO_TASKS
+        ]
+        for task_name in manual_tasks:
+            assert task_name not in result["tasks"]
 
     def test_results_structure_initialized_with_all_fields(self, mock_db):
         """results structure initialized with all fields."""
@@ -674,32 +693,39 @@ class TestUpdateResults:
 class TestClearResults:
     """Tests for SubmissionsStorage.clear_results."""
 
-    def test_task_names_none_clears_all_tasks(self, mock_db):
-        """task_names=None clears all tasks."""
+    def test_task_names_none_clears_auto_tasks(self, mock_db):
+        """task_names=None clears the auto-run tasks (manual tasks must be named explicitly)."""
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
         storage.clear_results("sub-123", task_names=None)
 
-        # Check all tasks are reset
         update_doc = mock_db.submissions.update_one.call_args[0][1]
-        for task_name in SubmissionsStorage.task_names:
+        for task_name in AUTO_TASKS:
             assert update_doc["$set"][f"tasks.{task_name}.status"] == "pending"
             assert update_doc["$set"][f"tasks.{task_name}.started_at"] is None
             assert update_doc["$set"][f"tasks.{task_name}.completed_at"] is None
             assert update_doc["$set"][f"tasks.{task_name}.error"] is None
 
-    def test_task_names_all_clears_all_tasks(self, mock_db):
-        """task_names=['all'] clears all tasks."""
+        for task_name in SubmissionsStorage.task_names:
+            if task_name in AUTO_TASKS:
+                continue
+            assert f"tasks.{task_name}.status" not in update_doc["$set"]
+
+    def test_task_names_all_clears_auto_tasks(self, mock_db):
+        """task_names=['all'] clears only auto-run tasks under the new policy."""
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
         storage.clear_results("sub-123", task_names=["all"])
 
-        # Check all tasks are reset
         update_doc = mock_db.submissions.update_one.call_args[0][1]
-        for task_name in SubmissionsStorage.task_names:
+        for task_name in AUTO_TASKS:
             assert update_doc["$set"][f"tasks.{task_name}.status"] == "pending"
+        for task_name in SubmissionsStorage.task_names:
+            if task_name in AUTO_TASKS:
+                continue
+            assert f"tasks.{task_name}.status" not in update_doc["$set"]
 
     def test_specific_task_names_clears_only_those_tasks(self, mock_db):
         """Specific task_names clear only those tasks."""
@@ -714,18 +740,21 @@ class TestClearResults:
         # Other tasks should not be in the update
         assert "tasks.split_topic_generation.status" not in update_doc["$set"]
 
-    def test_dependent_tasks_included_automatically(self, mock_db):
-        """Dependent tasks included automatically."""
+    def test_dependent_auto_tasks_included_automatically(self, mock_db):
+        """Refreshing split_topic_generation cascades into auto-run dependents only."""
         storage = SubmissionsStorage(mock_db)
         mock_db.submissions.update_one.return_value = MagicMock(modified_count=1)
 
-        # Clear split_topic_generation - should include all dependent tasks
         storage.clear_results("sub-123", task_names=["split_topic_generation"])
 
         update_doc = mock_db.submissions.update_one.call_args[0][1]
-        # All tasks should be reset since all depend on split_topic_generation
-        for task_name in SubmissionsStorage.task_names:
+        # Auto-run dependents must be reset; manual tasks must not be touched.
+        for task_name in AUTO_TASKS:
             assert update_doc["$set"][f"tasks.{task_name}.status"] == "pending"
+        for task_name in SubmissionsStorage.task_names:
+            if task_name in AUTO_TASKS:
+                continue
+            assert f"tasks.{task_name}.status" not in update_doc["$set"]
 
     def test_task_status_reset_to_pending(self, mock_db):
         """Task status set to 'pending'."""
@@ -882,46 +911,42 @@ class TestClearResults:
 class TestExpandRecalculationTasks:
     """Tests for SubmissionsStorage.expand_recalculation_tasks."""
 
-    def test_none_input_returns_all_tasks(self, mock_db):
-        """None input returns all tasks."""
+    def test_none_input_returns_auto_tasks(self, mock_db):
+        """None input returns the auto-run task set only."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(None)
 
-        assert result == SubmissionsStorage.task_names
+        assert result == list(AUTO_TASKS)
 
-    def test_all_input_returns_all_tasks(self, mock_db):
-        """['all'] returns all tasks."""
+    def test_all_input_returns_auto_tasks(self, mock_db):
+        """['all'] returns the auto-run task set only."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["all"])
 
-        assert result == SubmissionsStorage.task_names
+        assert result == list(AUTO_TASKS)
 
-    def test_split_topic_generation_returns_all_tasks(self, mock_db):
-        """['split_topic_generation'] returns all tasks (all depend on it)."""
+    def test_split_topic_generation_cascades_to_auto_dependents(self, mock_db):
+        """['split_topic_generation'] cascades only to auto-run dependents."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["split_topic_generation"])
 
-        assert len(result) == 11
-        assert set(result) == set(SubmissionsStorage.task_names)
+        # Both auto tasks (split_topic_generation + summarization) should appear,
+        # but no manual/LLM tasks even though they depend on split_topic_generation.
+        assert set(result) == set(AUTO_TASKS)
+        manual = [n for n in SubmissionsStorage.task_names if n not in AUTO_TASKS]
+        for task_name in manual:
+            assert task_name not in result
 
-    def test_subtopics_generation_returns_subtopics_and_mindmap(self, mock_db):
-        """['subtopics_generation'] returns subtopics_generation + mindmap."""
-        # Note: Based on task_dependencies, only mindmap depends on subtopics_generation
-        # But looking at the code, the expansion logic adds tasks whose deps are in expanded
-        # subtopics_generation has dep split_topic_generation
-        # summarization has dep split_topic_generation
-        # mindmap has dep split_topic_generation
-        # mindmap depends on subtopics_generation
-        # So if we start with subtopics_generation, we get both subtopics_generation and mindmap
+    def test_subtopics_generation_returns_only_subtopics(self, mock_db):
+        """['subtopics_generation'] returns only itself: cascade does not pull in manual tasks."""
         storage = SubmissionsStorage(mock_db)
 
         result = storage.expand_recalculation_tasks(["subtopics_generation"])
 
-        # Both subtopics_generation and mindmap should be returned
-        assert result == ["subtopics_generation", "mindmap"]
+        assert result == ["subtopics_generation"]
 
     def test_summarization_returns_only_summarization(self, mock_db):
         """['summarization'] returns only summarization."""
