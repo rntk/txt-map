@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 _PROMPT_VERSION = "topic_tag_ranking_v1"
 _TAGS_PER_CHUNK = 50
 _RANK_LINE_RE = re.compile(r"^\s*(\d+)\s*[.:)\-]?\s*(-?\d+(?:\.\d+)?)")
+TEMPERATURE = 0.8
 
 TOPIC_TAG_RANKING_PROMPT_TEMPLATE = """\
 <system>
@@ -100,7 +101,7 @@ def _call_llm_cached(
     llm: Any,
     cache_store: Any,
     namespace: str,
-    temperature: float = 0.0,
+    temperature: float = TEMPERATURE,
     skip_cache_read: bool = False,
 ) -> str:
     model_id: str = getattr(llm, "model_id", "unknown")
@@ -240,7 +241,7 @@ def _scores_from_response(
                 f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
                 f"{TOPIC_TAG_RANKING_CORRECTION_TEMPLATE}"
             )
-            response = llm.call([correction_prompt], temperature=0.0)
+            response = llm.call([correction_prompt], temperature=TEMPERATURE)
         except Exception as exc:
             logger.warning(
                 "Topic tag ranking correction failed on chunk %d (%d/%d): %s",
@@ -275,7 +276,7 @@ def _rank_chunk(
                     llm=llm,
                     cache_store=cache_store,
                     namespace=namespace,
-                    temperature=0.0,
+                    temperature=TEMPERATURE,
                     skip_cache_read=skip_cache,
                 )
             else:
@@ -284,7 +285,7 @@ def _rank_chunk(
                     f"<previous_attempt>\n{response}\n</previous_attempt>\n\n"
                     f"{TOPIC_TAG_RANKING_CORRECTION_TEMPLATE}"
                 )
-                response = llm.call([correction_prompt], temperature=0.0)
+                response = llm.call([correction_prompt], temperature=TEMPERATURE)
 
             parsed: List[int] | None = _parse_ranking_output(response, len(chunk.tags))
             if parsed is not None:
