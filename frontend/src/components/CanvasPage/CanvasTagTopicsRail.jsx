@@ -1,5 +1,6 @@
 import React from "react";
 import { getStickyCardTop } from "./stickyCards";
+import RailConnectors from "./RailConnectors";
 
 /**
  * Renders topic cards for sentences containing the selected tag.
@@ -47,51 +48,21 @@ export default function CanvasTagTopicsRail({
 
   if (cards.length === 0 && !onMoveToTagsCloud) return null;
 
-  const svgHeight = Math.max(
-    articleHeight,
-    cards.length > 0 ? cards[cards.length - 1].cardY + 100 : 0,
-  );
   const viewportTop = -translate.y / scale;
   const returnButtonTop = Math.max(0, viewportTop + 12 / scale);
 
   return (
     <>
-      <svg
-        className="canvas-tag-topics-connectors"
-        style={{ height: svgHeight }}
-      >
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
-          const connectorY = effectiveTop + card.cardHeight / 2;
-          const x1 = articleRight;
-          const x2 = articleRight + 80;
-          const isActive = activeTopicKey === card.key;
-
-          return (
-            <g key={card.key}>
-              <circle
-                cx={x1}
-                cy={connectorY}
-                r={3}
-                className={`canvas-tag-topics-anchor${isActive ? " is-active" : ""}`}
-              />
-              <line
-                x1={x1}
-                y1={connectorY}
-                x2={x2}
-                y2={connectorY}
-                className={`canvas-tag-topics-connector${isActive ? " is-active" : ""}`}
-              />
-              <circle
-                cx={x2}
-                cy={connectorY}
-                r={4}
-                className={`canvas-tag-topics-bulb${isActive ? " is-active" : ""}`}
-              />
-            </g>
-          );
-        })}
-      </svg>
+      <RailConnectors
+        name="tag-topics"
+        cards={cards}
+        articleHeight={articleHeight}
+        anchorX={articleRight}
+        bulbX={articleRight + 80}
+        viewportTop={viewportTop}
+        scale={scale}
+        activeKey={activeTopicKey}
+      />
       <div
         className="canvas-tag-topics-rail"
         onMouseDown={(event) => event.stopPropagation()}

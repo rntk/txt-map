@@ -301,6 +301,16 @@ export function useCanvasTransform({ contentRef } = {}) {
     }
   }, []);
 
+  const flashFocus = useCallback(() => {
+    setIsFocusingHighlight(true);
+    if (smoothZoomTimerRef.current) {
+      clearTimeout(smoothZoomTimerRef.current);
+    }
+    smoothZoomTimerRef.current = setTimeout(() => {
+      setIsFocusingHighlight(false);
+    }, 380);
+  }, []);
+
   const navigateCanvas = useCallback(
     (pos) => {
       const wrap = canvasWrapRef.current;
@@ -312,7 +322,6 @@ export function useCanvasTransform({ contentRef } = {}) {
       const pageStep = Math.max(120, viewportHeight * 0.8);
       const topY = 40;
 
-      setIsFocusingHighlight(false);
       userMovedCanvasRef.current = true;
       const currentTranslate = translateRef.current;
       let nextY = currentTranslate.y;
@@ -320,6 +329,10 @@ export function useCanvasTransform({ contentRef } = {}) {
         nextY = topY;
       } else if (pos === "bottom") {
         const viewport = canvasViewportRef.current;
+        // `contentRef` is expected to point at whichever element currently
+        // hosts the article body (the regular article view OR the summary
+        // view — both attach the same ref). Don't add a separate
+        // summaryWrapRef fallback here; that historical fallback was dead.
         const content = contentRef?.current;
         if (viewport && content) {
           const viewportRect = viewport.getBoundingClientRect();
@@ -336,11 +349,27 @@ export function useCanvasTransform({ contentRef } = {}) {
       }
 
       setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
+      flashFocus();
     },
-    [setCanvasTransformNow, contentRef],
+    [setCanvasTransformNow, contentRef, flashFocus],
+  );
+
+  const panByStep = useCallback(
+    (dx, dy) => {
+      const currentScale = scaleRef.current || 1;
+      const currentTranslate = translateRef.current;
+      userMovedCanvasRef.current = true;
+      setCanvasTransformNow(currentScale, {
+        x: currentTranslate.x + dx,
+        y: currentTranslate.y + dy,
+      });
+      flashFocus();
+    },
+    [setCanvasTransformNow, flashFocus],
   );
 
   useEffect(() => {
+    const ARROW_STEP = 80;
     const handleKeyDownGlobal = (e) => {
       const target = e.target;
       const tagName = target?.tagName;
@@ -363,17 +392,35 @@ export function useCanvasTransform({ contentRef } = {}) {
       } else if (e.key === "PageDown") {
         e.preventDefault();
         navigateCanvas("next");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        panByStep(0, ARROW_STEP);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        panByStep(0, -ARROW_STEP);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        panByStep(ARROW_STEP, 0);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        panByStep(-ARROW_STEP, 0);
       }
     };
     window.addEventListener("keydown", handleKeyDownGlobal);
     return () => window.removeEventListener("keydown", handleKeyDownGlobal);
-  }, [navigateCanvas]);
+  }, [navigateCanvas, panByStep]);
 
+  /**
+   * Centers the canvas viewport on `targetRect` (a DOM client rect) and
+   * optionally zooms in. Passing `zoomLevel <= currentScale` keeps the
+   * current scale; otherwise zooms to `zoomLevel` (clamped). Triggers
+   * `flashFocus` so the focus-highlight CSS plays.
+   */
   const zoomToTarget = useCallback(
     (targetRect, zoomLevel = 1.4) => {
       const wrap = canvasWrapRef.current;
       const viewport = canvasViewportRef.current;
-      if (!wrap || !viewport) return;
+      if (!wrap || !viewport || !targetRect) return;
 
       const wrapRect = wrap.getBoundingClientRect();
       const viewportRect = viewport.getBoundingClientRect();
@@ -387,20 +434,13 @@ export function useCanvasTransform({ contentRef } = {}) {
         (targetRect.top + targetRect.height / 2 - viewportRect.top) /
         currentScale;
 
-      setIsFocusingHighlight(true);
       setCanvasTransformNow(nextScale, {
         x: wrapRect.width / 2 - localTargetX * nextScale,
         y: wrapRect.height / 2 - localTargetY * nextScale,
       });
-
-      if (smoothZoomTimerRef.current) {
-        clearTimeout(smoothZoomTimerRef.current);
-      }
-      smoothZoomTimerRef.current = setTimeout(() => {
-        setIsFocusingHighlight(false);
-      }, 380);
+      flashFocus();
     },
-    [setCanvasTransformNow],
+    [setCanvasTransformNow, flashFocus],
   );
 
   return {
@@ -410,7 +450,6 @@ export function useCanvasTransform({ contentRef } = {}) {
     isCanvasDragging,
     isFocusingHighlight,
     userMovedCanvasRef,
-    smoothZoomTimerRef,
     // Refs
     canvasWrapRef,
     canvasViewportRef,
@@ -427,8 +466,9 @@ export function useCanvasTransform({ contentRef } = {}) {
     // Actions
     setCanvasTransformNow,
     scheduleCanvasTransform,
+    cancelPendingCanvasTransform,
     navigateCanvas,
     zoomToTarget,
-    setIsFocusingHighlight,
+    flashFocus,
   };
 }

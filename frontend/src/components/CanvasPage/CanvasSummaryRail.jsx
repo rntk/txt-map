@@ -1,5 +1,6 @@
 import React from "react";
 import { getStickyCardTop } from "./stickyCards";
+import RailConnectors from "./RailConnectors";
 
 /**
  * Renders the SVG connector lines and floating summary cards for the summary rail.
@@ -30,47 +31,20 @@ export default function CanvasSummaryRail({
 
   if (!cards || cards.length === 0) return null;
 
-  const svgHeight = Math.max(
-    articleHeight,
-    cards.length > 0 ? cards[cards.length - 1].cardY + 100 : 0,
-  );
-
   const viewportTop = -translate.y / scale;
 
   return (
     <>
-      <svg className="canvas-summary-connectors" style={{ height: svgHeight }}>
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
-          const connectorY = effectiveTop + card.cardHeight / 2;
-          const x1 = articleRight;
-          const x2 = articleRight + 80;
-          const isActive = activeSummaryKey === card.key;
-          return (
-            <g key={card.key}>
-              <circle
-                cx={x1}
-                cy={connectorY}
-                r={3}
-                className={`canvas-summary-anchor${isActive ? " is-active" : ""}`}
-              />
-              <line
-                x1={x1}
-                y1={connectorY}
-                x2={x2}
-                y2={connectorY}
-                className={`canvas-summary-connector${isActive ? " is-active" : ""}`}
-              />
-              <circle
-                cx={x2}
-                cy={connectorY}
-                r={4}
-                className={`canvas-summary-bulb${isActive ? " is-active" : ""}`}
-              />
-            </g>
-          );
-        })}
-      </svg>
+      <RailConnectors
+        name="summary"
+        cards={cards}
+        articleHeight={articleHeight}
+        anchorX={articleRight}
+        bulbX={articleRight + 80}
+        viewportTop={viewportTop}
+        scale={scale}
+        activeKey={activeSummaryKey}
+      />
       <div className="canvas-summary-rail">
         {cards.map((card) => {
           const effectiveTop = getStickyCardTop(card, viewportTop, scale);

@@ -6,8 +6,6 @@ import {
   getTopicSentenceNumbers,
   getTopicTextRange,
   rangeAtOffset,
-} from "./utils";
-import {
   splitTopicHierarchyRowsForArticleOrder,
   splitTopicHierarchyRowsForSummaryOrder,
   getMatchingSummaryCardsForHierarchyRow,

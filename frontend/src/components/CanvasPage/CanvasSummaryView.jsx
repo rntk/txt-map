@@ -13,7 +13,6 @@ import React from "react";
  *   summaryViewActivePath: string | null,
  *   summaryCardRefs: React.MutableRefObject<{[key: string]: HTMLElement | null}>,
  *   setHoveredTopicKey: React.Dispatch<React.SetStateAction<string | null>>,
- *   activeTopicKey: string | null,
  *   articleTextRef: React.RefObject<HTMLDivElement | null>,
  * }} props
  */
@@ -22,7 +21,6 @@ export default function CanvasSummaryView({
   summaryViewActivePath,
   summaryCardRefs,
   setHoveredTopicKey,
-  _activeTopicKey,
   articleTextRef,
 }) {
   if (summaryViewCards.length === 0) {

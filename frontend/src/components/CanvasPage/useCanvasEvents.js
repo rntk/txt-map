@@ -125,10 +125,6 @@ export function useCanvasEvents(articleId, chatId) {
   const handleGoLive = useCallback(() => {
     setIsLive(true);
     setNewIndices(new Set());
-    setSelectedIndex((prev) => {
-      // will be set to events.length - 1 via effect
-      return prev;
-    });
   }, []);
 
   // Keep selectedIndex in sync with live events

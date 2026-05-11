@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import ChatHistory from "./ChatHistory";
 import CanvasChatHistoryPanel from "./CanvasChatHistoryPanel";
+import { pollCanvasChatReply, readJsonSafe } from "./utils";
 
 /**
  * @typedef {import("./useCanvasChats").CanvasChatSummary} CanvasChatSummary
@@ -95,16 +96,8 @@ export default function CanvasChatPanel({
         signal: controller.signal,
       });
 
-      const text = await r.text();
       /** @type {{request_id?: string, reply?: string, detail?: string, chat_id?: string}} */
-      let data = {};
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = {};
-        }
-      }
+      const data = await readJsonSafe(r);
 
       if (!r.ok) {
         throw new Error(data.detail || `HTTP ${r.status}`);
@@ -251,31 +244,4 @@ export default function CanvasChatPanel({
       </div>
     </div>
   );
-}
-
-async function pollCanvasChatReply(articleId, requestId, signal) {
-  const POLL_INTERVAL_MS = 2000;
-  const CHAT_POLL_MAX_ATTEMPTS = 150;
-
-  for (let attempt = 0; attempt < CHAT_POLL_MAX_ATTEMPTS; attempt++) {
-    const response = await fetch(`/api/canvas/${articleId}/chat/${requestId}`, {
-      credentials: "include",
-      signal,
-    });
-    const text = await response.text();
-    const data = text ? JSON.parse(text || "{}") : {};
-
-    if (!response.ok) {
-      throw new Error(data.detail || `HTTP ${response.status}`);
-    }
-    if (data.status === "completed") {
-      return data.reply || "";
-    }
-    if (data.status === "failed") {
-      throw new Error(data.error || "Error");
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
-  throw new Error("Chat response timed out.");
 }

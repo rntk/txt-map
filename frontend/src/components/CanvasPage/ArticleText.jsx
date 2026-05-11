@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useMemo } from "react";
 import { buildSegmentsWithPages } from "./utils";
 
 /**
@@ -16,7 +16,7 @@ import { buildSegmentsWithPages } from "./utils";
  *   onTextClick?: (e: React.MouseEvent<HTMLDivElement>) => void,
  * }} props
  */
-export default function ArticleText({
+function ArticleText({
   text,
   highlights,
   activeHighlightRef,
@@ -29,28 +29,43 @@ export default function ArticleText({
   sentenceOffsets,
   onTextClick,
 }) {
-  const sortedImages = Array.isArray(images)
-    ? [...images]
-        .filter(
-          (image) =>
-            image?.src &&
-            Number.isFinite(Number(image.anchorOffset)) &&
-            Number(image.anchorOffset) >= 0,
-        )
-        .sort((left, right) => left.anchorOffset - right.anchorOffset)
-    : [];
-  const segmentBoundaries = [
-    ...(Array.isArray(sentenceOffsets) ? sentenceOffsets : []),
-    ...sortedImages.map((image) => Number(image.anchorOffset)),
-  ];
-  const segments = buildSegmentsWithPages(
+  const sortedImages = useMemo(
+    () =>
+      Array.isArray(images)
+        ? [...images]
+            .filter(
+              (image) =>
+                image?.src &&
+                Number.isFinite(Number(image.anchorOffset)) &&
+                Number(image.anchorOffset) >= 0,
+            )
+            .sort((left, right) => left.anchorOffset - right.anchorOffset)
+        : [],
+    [images],
+  );
+  const segments = useMemo(() => {
+    const segmentBoundaries = [
+      ...(Array.isArray(sentenceOffsets) ? sentenceOffsets : []),
+      ...sortedImages.map((image) => Number(image.anchorOffset)),
+    ];
+    return buildSegmentsWithPages(
+      text,
+      highlights,
+      showReadStatus ? readRanges : undefined,
+      temperatureHighlights,
+      pages,
+      segmentBoundaries,
+    );
+  }, [
     text,
     highlights,
-    showReadStatus ? readRanges : undefined,
+    showReadStatus,
+    readRanges,
     temperatureHighlights,
     pages,
-    segmentBoundaries,
-  );
+    sortedImages,
+    sentenceOffsets,
+  ]);
 
   const sentenceIndexFor = (start) => {
     if (
@@ -193,3 +208,5 @@ export default function ArticleText({
     </div>
   );
 }
+
+export default memo(ArticleText);

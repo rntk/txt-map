@@ -1,5 +1,6 @@
 import React from "react";
 import { getStickyCardTop } from "./stickyCards";
+import RailConnectors from "./RailConnectors";
 
 /**
  * Renders SVG connector lines and floating insight cards on the LEFT side of
@@ -43,47 +44,20 @@ export default function CanvasInsightsRail({
 
   if (!cards || cards.length === 0) return null;
 
-  const svgHeight = Math.max(
-    articleHeight,
-    cards.length > 0 ? cards[cards.length - 1].cardY + 100 : 0,
-  );
-
   const viewportTop = -translate.y / scale;
 
   return (
     <>
-      <svg className="canvas-insights-connectors" style={{ height: svgHeight }}>
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
-          const connectorY = effectiveTop + card.cardHeight / 2;
-          const x1 = articleLeft;
-          const x2 = articleLeft - 80;
-          const isActive = activeInsightKey === card.key;
-          return (
-            <g key={card.key}>
-              <circle
-                cx={x1}
-                cy={connectorY}
-                r={3}
-                className={`canvas-insights-anchor${isActive ? " is-active" : ""}`}
-              />
-              <line
-                x1={x1}
-                y1={connectorY}
-                x2={x2}
-                y2={connectorY}
-                className={`canvas-insights-connector${isActive ? " is-active" : ""}`}
-              />
-              <circle
-                cx={x2}
-                cy={connectorY}
-                r={4}
-                className={`canvas-insights-bulb${isActive ? " is-active" : ""}`}
-              />
-            </g>
-          );
-        })}
-      </svg>
+      <RailConnectors
+        name="insights"
+        cards={cards}
+        articleHeight={articleHeight}
+        anchorX={articleLeft}
+        bulbX={articleLeft - 80}
+        viewportTop={viewportTop}
+        scale={scale}
+        activeKey={activeInsightKey}
+      />
       <div className="canvas-insights-rail">
         {cards.map((card) => {
           const effectiveTop = getStickyCardTop(card, viewportTop, scale);

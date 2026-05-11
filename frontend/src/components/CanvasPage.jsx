@@ -19,7 +19,6 @@ import {
   clampCanvasScale,
   getTopicTitleFontSize,
   getZoomAdjustedTopicCardWidth,
-  getZoomAdjustedTopicTitleFontSize,
   getTopicDisplayName,
   getTopicSentenceNumbers,
   getTopicSentenceTextRanges,
@@ -51,6 +50,7 @@ import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
 import { useInsightsLayout } from "./CanvasPage/useInsightsLayout";
 import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 import { useTagTopicsLayout } from "./CanvasPage/useTagTopicsLayout";
+import { useCanvasTransform } from "./CanvasPage/useCanvasTransform";
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
@@ -92,32 +92,33 @@ function getHoverWord(rootEl, clientX, clientY) {
 export default function CanvasPage() {
   const articleId = window.location.pathname.split("/")[3];
 
-  // Refs
+  // Refs (non-transform)
   const articleTextRef = useRef(null);
   const summaryWrapRef = useRef(null);
   const activeHighlightRef = useRef(null);
-  const canvasWrapRef = useRef(null);
-  const canvasViewportRef = useRef(null);
-  const scaleRef = useRef(1);
-  const translateRef = useRef({ x: 40, y: 40 });
-  const transformFrameRef = useRef(0);
-  const pendingTransformRef = useRef(null);
-  const userMovedCanvasRef = useRef(false);
-  const smoothZoomTimerRef = useRef(null);
-  const isDragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-  const isTouchDragging = useRef(false);
-  const lastTouch = useRef({ x: 0, y: 0 });
-  const touchDragStart = useRef({ x: 0, y: 0 });
-  const touchHasMoved = useRef(false);
-  const pinchState = useRef(null);
   const summaryCardRefs = useRef({});
 
-  // Canvas transform state
-  const [translate, setTranslate] = useState({ x: 40, y: 40 });
-  const [scale, setScale] = useState(1);
-  const [isCanvasDragging, setIsCanvasDragging] = useState(false);
-  const [isFocusingHighlight, setIsFocusingHighlight] = useState(false);
+  // Canvas transform (state, refs, handlers, keyboard nav)
+  const {
+    translate,
+    scale,
+    isCanvasDragging,
+    isFocusingHighlight,
+    userMovedCanvasRef,
+    canvasWrapRef,
+    canvasViewportRef,
+    scaleRef,
+    translateRef,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    setCanvasTransformNow,
+    navigateCanvas,
+    zoomToTarget,
+  } = useCanvasTransform({ contentRef: articleTextRef });
 
   // Article data
   const {
@@ -289,52 +290,6 @@ export default function CanvasPage() {
     temperatureTopicColorMap,
   } = useTopicTemperature(topicTemperatures);
 
-  // ── Canvas transform helpers ──────
-
-  useEffect(() => {
-    return () => {
-      if (transformFrameRef.current) {
-        window.cancelAnimationFrame(transformFrameRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    scaleRef.current = scale;
-  }, [scale]);
-
-  useEffect(() => {
-    translateRef.current = translate;
-  }, [translate]);
-
-  useEffect(() => {
-    const viewport = canvasViewportRef.current;
-    if (!viewport) return;
-    viewport.style.setProperty("--canvas-translate-x", `${translate.x}px`);
-    viewport.style.setProperty("--canvas-translate-y", `${translate.y}px`);
-    viewport.style.setProperty("--canvas-scale", `${scale}`);
-    viewport.style.setProperty(
-      "--canvas-topic-title-font-size",
-      `${getZoomAdjustedTopicTitleFontSize(scale)}px`,
-    );
-  }, [scale, translate.x, translate.y]);
-
-  useEffect(() => {
-    const wrap = canvasWrapRef.current;
-    const viewport = canvasViewportRef.current;
-    if (!wrap || !viewport) return;
-    const update = () => {
-      viewport.style.setProperty(
-        "--canvas-area-height",
-        `${wrap.clientHeight}px`,
-      );
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(wrap);
-    return () => ro.disconnect();
-  }, []);
-
   useEffect(() => {
     const el = articleTextRef.current;
     if (!el) {
@@ -361,59 +316,15 @@ export default function CanvasPage() {
     tagTopicNavKeyRef.current = null;
   }, [selectedCloudLemma]);
 
-  const cancelPendingCanvasTransform = useCallback(() => {
-    if (transformFrameRef.current) {
-      window.cancelAnimationFrame(transformFrameRef.current);
-      transformFrameRef.current = 0;
-    }
-    pendingTransformRef.current = null;
-  }, []);
-
-  const setCanvasTransformNow = useCallback(
-    (nextScale, nextTranslate) => {
-      cancelPendingCanvasTransform();
-      scaleRef.current = nextScale;
-      translateRef.current = nextTranslate;
-      setScale(nextScale);
-      setTranslate(nextTranslate);
-    },
-    [cancelPendingCanvasTransform],
-  );
-
   const focusArticleOffset = useCallback(
     (charOffset) => {
       const articleEl = articleTextRef.current;
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      if (!articleEl || !wrap || !viewport) return;
-
+      if (!articleEl) return;
       const startRange = rangeAtOffset(articleEl, charOffset);
       if (!startRange) return;
-
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const startRect = startRange.getBoundingClientRect();
-      const currentScale = scaleRef.current || 1;
-      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
-      const localTargetX =
-        (startRect.left + startRect.width / 2 - viewportRect.left) /
-        currentScale;
-      const localTargetY =
-        (startRect.top + startRect.height / 2 - viewportRect.top) /
-        currentScale;
-
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-      smoothZoomTimerRef.current = setTimeout(
-        () => setIsFocusingHighlight(false),
-        380,
-      );
+      zoomToTarget(startRange.getBoundingClientRect());
     },
-    [setCanvasTransformNow],
+    [zoomToTarget],
   );
 
   const handleCloudWordSelect = useCallback(
@@ -434,9 +345,7 @@ export default function CanvasPage() {
 
   const moveToTagsCloud = useCallback(() => {
     const cloudEl = tagsCloudRef.current;
-    const wrap = canvasWrapRef.current;
-    const viewport = canvasViewportRef.current;
-    if (!cloudEl || !wrap || !viewport) return;
+    if (!cloudEl) return;
 
     const selectedTagEl = selectedCloudLemma
       ? Array.from(cloudEl.querySelectorAll("[data-cloud-lemma]")).find(
@@ -444,319 +353,9 @@ export default function CanvasPage() {
         )
       : null;
     const targetEl = selectedTagEl || cloudEl;
-    const targetRect = targetEl.getBoundingClientRect();
-    const wrapRect = wrap.getBoundingClientRect();
-    const viewportRect = viewport.getBoundingClientRect();
-    const currentScale = scaleRef.current || 1;
-    const localTargetX =
-      (targetRect.left + targetRect.width / 2 - viewportRect.left) /
-      currentScale;
-    const localTargetY =
-      (targetRect.top + targetRect.height / 2 - viewportRect.top) /
-      currentScale;
-
-    setIsFocusingHighlight(true);
-    setCanvasTransformNow(currentScale, {
-      x: wrapRect.width / 2 - localTargetX * currentScale,
-      y: wrapRect.height / 2 - localTargetY * currentScale,
-    });
-    if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-    smoothZoomTimerRef.current = setTimeout(
-      () => setIsFocusingHighlight(false),
-      380,
-    );
-  }, [selectedCloudLemma, setCanvasTransformNow]);
-
-  const scheduleCanvasTransform = useCallback((nextScale, nextTranslate) => {
-    scaleRef.current = nextScale;
-    translateRef.current = nextTranslate;
-    pendingTransformRef.current = {
-      scale: nextScale,
-      translate: nextTranslate,
-    };
-    if (transformFrameRef.current) return;
-    transformFrameRef.current = window.requestAnimationFrame(() => {
-      transformFrameRef.current = 0;
-      const pt = pendingTransformRef.current;
-      pendingTransformRef.current = null;
-      if (!pt) return;
-      setScale(pt.scale);
-      setTranslate(pt.translate);
-    });
-  }, []);
-
-  // ── Mouse handlers ──────────────────────
-
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    isDragging.current = true;
-    setIsFocusingHighlight(false);
-    setIsCanvasDragging(true);
-    userMovedCanvasRef.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-    e.preventDefault();
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e) => {
-      if (!isDragging.current) return;
-      const dx = e.clientX - lastMouse.current.x;
-      const dy = e.clientY - lastMouse.current.y;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-      scheduleCanvasTransform(scaleRef.current || 1, {
-        x: translateRef.current.x + dx,
-        y: translateRef.current.y + dy,
-      });
-    },
-    [scheduleCanvasTransform],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-    setIsCanvasDragging(false);
-  }, []);
-
-  // ── Touch handlers ────────────────────────────────────────────────────────
-
-  const getTouchDistance = useCallback((touches) => {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }, []);
-
-  const getTouchMidpoint = useCallback(
-    (touches) => ({
-      x: (touches[0].clientX + touches[1].clientX) / 2,
-      y: (touches[0].clientY + touches[1].clientY) / 2,
-    }),
-    [],
-  );
-
-  const handleTouchStart = useCallback(
-    (e) => {
-      const touches = e.touches;
-      if (touches.length === 1) {
-        touchDragStart.current = {
-          x: touches[0].clientX,
-          y: touches[0].clientY,
-        };
-        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
-        isTouchDragging.current = true;
-        touchHasMoved.current = false;
-        setIsFocusingHighlight(false);
-        userMovedCanvasRef.current = true;
-      } else if (touches.length === 2) {
-        isTouchDragging.current = false;
-        touchHasMoved.current = false;
-        setIsCanvasDragging(false);
-        pinchState.current = {
-          startDistance: getTouchDistance(touches),
-          startScale: scaleRef.current || 1,
-          startTranslate: { ...translateRef.current },
-        };
-        setIsFocusingHighlight(false);
-        userMovedCanvasRef.current = true;
-      }
-    },
-    [getTouchDistance],
-  );
-
-  const handleTouchMove = useCallback(
-    (e) => {
-      const touches = e.touches;
-      if (pinchState.current && touches.length === 2) {
-        e.preventDefault();
-        const { startDistance, startScale, startTranslate } =
-          pinchState.current;
-        const newDistance = getTouchDistance(touches);
-        if (startDistance === 0) return;
-        const nextScale = clampCanvasScale(
-          startScale * (newDistance / startDistance),
-        );
-        const wrap = canvasWrapRef.current;
-        if (!wrap) return;
-        const wrapRect = wrap.getBoundingClientRect();
-        const midpoint = getTouchMidpoint(touches);
-        const cursor = {
-          x: midpoint.x - wrapRect.left,
-          y: midpoint.y - wrapRect.top,
-        };
-        // Compute cursor-anchored translate manually (same logic as getCursorAnchoredTranslate)
-        const scaleRatio = nextScale / startScale;
-        const nextTranslate = {
-          x: cursor.x - scaleRatio * (cursor.x - startTranslate.x),
-          y: cursor.y - scaleRatio * (cursor.y - startTranslate.y),
-        };
-        scheduleCanvasTransform(nextScale, nextTranslate);
-      } else if (isTouchDragging.current && touches.length === 1) {
-        const dx = touches[0].clientX - touchDragStart.current.x;
-        const dy = touches[0].clientY - touchDragStart.current.y;
-        if (!touchHasMoved.current) {
-          if (Math.sqrt(dx * dx + dy * dy) < 6) return;
-          touchHasMoved.current = true;
-          setIsCanvasDragging(true);
-        }
-        e.preventDefault();
-        const moveDx = touches[0].clientX - lastTouch.current.x;
-        const moveDy = touches[0].clientY - lastTouch.current.y;
-        lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
-        scheduleCanvasTransform(scaleRef.current || 1, {
-          x: translateRef.current.x + moveDx,
-          y: translateRef.current.y + moveDy,
-        });
-      }
-    },
-    [getTouchDistance, getTouchMidpoint, scheduleCanvasTransform],
-  );
-
-  const handleTouchEnd = useCallback((e) => {
-    const touches = e.touches;
-    if (touches.length === 0) {
-      isTouchDragging.current = false;
-      setIsCanvasDragging(false);
-      pinchState.current = null;
-      touchHasMoved.current = false;
-    } else if (touches.length === 1 && pinchState.current) {
-      pinchState.current = null;
-      isTouchDragging.current = true;
-      touchHasMoved.current = false;
-      touchDragStart.current = { x: touches[0].clientX, y: touches[0].clientY };
-      lastTouch.current = { x: touches[0].clientX, y: touches[0].clientY };
-    } else if (touches.length < 2) {
-      pinchState.current = null;
-    }
-  }, []);
-
-  // ── Wheel zoom ─────────────────────────────────────────────────────────────
-
-  const handleWheel = useCallback(
-    (e) => {
-      e.preventDefault();
-      const wrap = canvasWrapRef.current;
-      if (!wrap) return;
-      const currentScale = scaleRef.current || 1;
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      const nextScale = clampCanvasScale(currentScale * factor);
-      if (nextScale === currentScale) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const cursor = {
-        x: e.clientX - wrapRect.left,
-        y: e.clientY - wrapRect.top,
-      };
-      const scaleRatio = nextScale / currentScale;
-      const nextTranslate = {
-        x: cursor.x - scaleRatio * (cursor.x - translateRef.current.x),
-        y: cursor.y - scaleRatio * (cursor.y - translateRef.current.y),
-      };
-      setIsFocusingHighlight(false);
-      userMovedCanvasRef.current = true;
-      scheduleCanvasTransform(nextScale, nextTranslate);
-    },
-    [scheduleCanvasTransform],
-  );
-
-  useEffect(() => {
-    const el = canvasWrapRef.current;
-    if (!el) return;
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
-
-  // ── Keyboard navigation ────────────────────────────────────────────────────
-
-  const navigateCanvas = useCallback(
-    (pos) => {
-      const wrap = canvasWrapRef.current;
-      if (!wrap) return;
-      const currentScale = scaleRef.current || 1;
-      const viewportHeight =
-        wrap.clientHeight || wrap.getBoundingClientRect().height || 0;
-      const pageStep = Math.max(120, viewportHeight * 0.8);
-      const topY = 40;
-      userMovedCanvasRef.current = true;
-      const currentTranslate = translateRef.current;
-      let nextY = currentTranslate.y;
-      if (pos === "top") {
-        nextY = topY;
-      } else if (pos === "bottom") {
-        const viewport = canvasViewportRef.current;
-        const content = articleTextRef.current || summaryWrapRef.current;
-        if (viewport && content) {
-          const viewportRect = viewport.getBoundingClientRect();
-          const contentRect = content.getBoundingClientRect();
-          const scaledContentBottom = contentRect.bottom - viewportRect.top;
-          nextY = Math.min(topY, viewportHeight - scaledContentBottom - topY);
-        } else {
-          nextY = currentTranslate.y - pageStep;
-        }
-      } else if (pos === "prev") {
-        nextY = currentTranslate.y + pageStep;
-      } else if (pos === "next") {
-        nextY = currentTranslate.y - pageStep;
-      }
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(currentScale, { ...currentTranslate, y: nextY });
-      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-      smoothZoomTimerRef.current = setTimeout(
-        () => setIsFocusingHighlight(false),
-        380,
-      );
-    },
-    [setCanvasTransformNow],
-  );
-
-  useEffect(() => {
-    const handleKeyDownGlobal = (e) => {
-      const target = e.target;
-      const tagName = target?.tagName;
-      const isEditable =
-        tagName === "INPUT" ||
-        tagName === "TEXTAREA" ||
-        tagName === "SELECT" ||
-        target?.isContentEditable;
-      if (isEditable) return;
-      if (e.key === "Home") {
-        e.preventDefault();
-        navigateCanvas("top");
-      } else if (e.key === "End") {
-        e.preventDefault();
-        navigateCanvas("bottom");
-      } else if (e.key === "PageUp") {
-        e.preventDefault();
-        navigateCanvas("prev");
-      } else if (e.key === "PageDown") {
-        e.preventDefault();
-        navigateCanvas("next");
-      } else if (
-        e.key === "ArrowUp" ||
-        e.key === "ArrowDown" ||
-        e.key === "ArrowLeft" ||
-        e.key === "ArrowRight"
-      ) {
-        e.preventDefault();
-        const step = 80;
-        const currentScale = scaleRef.current || 1;
-        const currentTranslate = translateRef.current;
-        let nextX = currentTranslate.x;
-        let nextY = currentTranslate.y;
-        if (e.key === "ArrowUp") nextY += step;
-        if (e.key === "ArrowDown") nextY -= step;
-        if (e.key === "ArrowLeft") nextX += step;
-        if (e.key === "ArrowRight") nextX -= step;
-        userMovedCanvasRef.current = true;
-        setIsFocusingHighlight(true);
-        setCanvasTransformNow(currentScale, { x: nextX, y: nextY });
-        if (smoothZoomTimerRef.current)
-          clearTimeout(smoothZoomTimerRef.current);
-        smoothZoomTimerRef.current = setTimeout(
-          () => setIsFocusingHighlight(false),
-          380,
-        );
-      }
-    };
-    window.addEventListener("keydown", handleKeyDownGlobal);
-    return () => window.removeEventListener("keydown", handleKeyDownGlobal);
-  }, [navigateCanvas, setCanvasTransformNow]);
+    // Center on the cloud without zooming in (zoomLevel=0 keeps currentScale).
+    zoomToTarget(targetEl.getBoundingClientRect(), 0);
+  }, [selectedCloudLemma, zoomToTarget]);
 
   // ── Tooltip ──────────────────────────────────────────────────────────────
 
@@ -1342,49 +941,18 @@ export default function CanvasPage() {
     const raf = window.requestAnimationFrame(() => {
       const el = activeHighlightRef.current;
       if (!el) return;
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      if (!wrap || !viewport) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const targetRect = el.getBoundingClientRect();
-      const currentScale = scaleRef.current || 1;
-      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
-      const localTargetX =
-        (targetRect.left + targetRect.width / 2 - viewportRect.left) /
-        currentScale;
-      const localTargetY =
-        (targetRect.top + targetRect.height / 2 - viewportRect.top) /
-        currentScale;
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-      smoothZoomTimerRef.current = setTimeout(
-        () => setIsFocusingHighlight(false),
-        380,
-      );
+      zoomToTarget(el.getBoundingClientRect());
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [currentHighlights, setCanvasTransformNow]);
+  }, [currentHighlights, zoomToTarget]);
 
   // ── Zoom to summary card ───────────────────────────────────────────────────
 
   const zoomToSummaryCard = useCallback(
     (topicKey) => {
       if (!topicKey) return;
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      if (!wrap || !viewport) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const currentScale = scaleRef.current || 1;
-      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
 
-      let localTargetX;
-      let localTargetY;
+      let targetRect = null;
 
       if (showSummaryMode) {
         const cardEl =
@@ -1396,13 +964,7 @@ export default function CanvasPage() {
             .map((c) => summaryCardRefs.current[c.path])
             .find(Boolean);
         if (!cardEl) return;
-        const targetRect = cardEl.getBoundingClientRect();
-        localTargetX =
-          (targetRect.left + targetRect.width / 2 - viewportRect.left) /
-          currentScale;
-        localTargetY =
-          (targetRect.top + targetRect.height / 2 - viewportRect.top) /
-          currentScale;
+        targetRect = cardEl.getBoundingClientRect();
       } else {
         const topic = submissionTopics.find((t) => t.name === topicKey);
         if (!topic) return;
@@ -1416,25 +978,10 @@ export default function CanvasPage() {
         if (!articleEl) return;
         const startRange = rangeAtOffset(articleEl, textRange.charStart);
         if (!startRange) return;
-        const startRect = startRange.getBoundingClientRect();
-        localTargetX =
-          (startRect.left + startRect.width / 2 - viewportRect.left) /
-          currentScale;
-        localTargetY =
-          (startRect.top + startRect.height / 2 - viewportRect.top) /
-          currentScale;
+        targetRect = startRange.getBoundingClientRect();
       }
 
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-      smoothZoomTimerRef.current = setTimeout(
-        () => setIsFocusingHighlight(false),
-        380,
-      );
+      zoomToTarget(targetRect);
     },
     [
       showSummaryMode,
@@ -1442,7 +989,7 @@ export default function CanvasPage() {
       submissionTopics,
       sentenceOffsets,
       submissionSentences,
-      setCanvasTransformNow,
+      zoomToTarget,
     ],
   );
 
@@ -1451,34 +998,12 @@ export default function CanvasPage() {
       const card = insightsLayout.cards.find((c) => c.key === insightKey);
       if (!card) return;
       const articleEl = articleTextRef.current;
-      const wrap = canvasWrapRef.current;
-      const viewport = canvasViewportRef.current;
-      if (!articleEl || !wrap || !viewport) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      const currentScale = scaleRef.current || 1;
-      const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
+      if (!articleEl) return;
       const startRange = rangeAtOffset(articleEl, card.charStart);
       if (!startRange) return;
-      const startRect = startRange.getBoundingClientRect();
-      const localTargetX =
-        (startRect.left + startRect.width / 2 - viewportRect.left) /
-        currentScale;
-      const localTargetY =
-        (startRect.top + startRect.height / 2 - viewportRect.top) /
-        currentScale;
-      setIsFocusingHighlight(true);
-      setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
-      });
-      if (smoothZoomTimerRef.current) clearTimeout(smoothZoomTimerRef.current);
-      smoothZoomTimerRef.current = setTimeout(
-        () => setIsFocusingHighlight(false),
-        380,
-      );
+      zoomToTarget(startRange.getBoundingClientRect());
     },
-    [insightsLayout.cards, setCanvasTransformNow],
+    [insightsLayout.cards, zoomToTarget],
   );
 
   const handleManualSelectEvent = useCallback(
@@ -1488,35 +1013,11 @@ export default function CanvasPage() {
       const raf = window.requestAnimationFrame(() => {
         const el = activeHighlightRef.current;
         if (!el) return;
-        const wrap = canvasWrapRef.current;
-        const viewport = canvasViewportRef.current;
-        if (!wrap || !viewport) return;
-        const wrapRect = wrap.getBoundingClientRect();
-        const viewportRect = viewport.getBoundingClientRect();
-        const targetRect = el.getBoundingClientRect();
-        const currentScale = scaleRef.current || 1;
-        const nextScale = clampCanvasScale(Math.max(currentScale, 1.4));
-        const localTargetX =
-          (targetRect.left + targetRect.width / 2 - viewportRect.left) /
-          currentScale;
-        const localTargetY =
-          (targetRect.top + targetRect.height / 2 - viewportRect.top) /
-          currentScale;
-        setIsFocusingHighlight(true);
-        setCanvasTransformNow(nextScale, {
-          x: wrapRect.width / 2 - localTargetX * nextScale,
-          y: wrapRect.height / 2 - localTargetY * nextScale,
-        });
-        if (smoothZoomTimerRef.current)
-          clearTimeout(smoothZoomTimerRef.current);
-        smoothZoomTimerRef.current = setTimeout(
-          () => setIsFocusingHighlight(false),
-          380,
-        );
+        zoomToTarget(el.getBoundingClientRect());
       });
       return () => window.cancelAnimationFrame(raf);
     },
-    [handleSelectEvent, setCanvasTransformNow],
+    [handleSelectEvent, zoomToTarget],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1587,7 +1088,6 @@ export default function CanvasPage() {
                     summaryViewActivePath={summaryViewActivePath}
                     summaryCardRefs={summaryCardRefs}
                     setHoveredTopicKey={setHoveredTopicKey}
-                    activeTopicKey={activeTopicKey}
                     articleTextRef={articleTextRef}
                   />
                 ) : (
