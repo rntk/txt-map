@@ -1232,6 +1232,41 @@
   color: #ffd740;
 }
 
+.canvas-tag-topics-nav {
+  position: absolute;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  width: 280px;
+  pointer-events: none;
+}
+
+.canvas-tag-topics-nav__button {
+  flex: 1;
+  border: 1px solid rgba(255, 215, 64, 0.42);
+  border-radius: 4px;
+  background: rgba(20, 28, 40, 0.94);
+  color: #fef3c7;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.canvas-tag-topics-nav__button:hover:not(:disabled) {
+  border-color: #ffd740;
+  color: #ffd740;
+}
+
+.canvas-tag-topics-nav__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .canvas-tag-topic-card {
   position: absolute;
   right: 0;

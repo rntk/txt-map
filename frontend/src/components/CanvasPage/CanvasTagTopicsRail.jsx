@@ -23,6 +23,8 @@ import { getStickyCardTop } from "./stickyCards";
  *   onCardLeave: (key: string) => void,
  *   onCardClick: (key: string) => void,
  *   onMoveToTagsCloud?: () => void,
+ *   onPrevHighlight?: () => void,
+ *   onNextHighlight?: () => void,
  *   translate: {x: number, y: number},
  *   scale: number,
  *   isAnimating: boolean,
@@ -35,6 +37,8 @@ export default function CanvasTagTopicsRail({
   onCardLeave,
   onCardClick,
   onMoveToTagsCloud,
+  onPrevHighlight,
+  onNextHighlight,
   translate,
   scale,
   isAnimating,
@@ -105,6 +109,36 @@ export default function CanvasTagTopicsRail({
           >
             move to tags cloud
           </button>
+        )}
+        {(onPrevHighlight || onNextHighlight) && cards.length > 0 && (
+          <div
+            className="canvas-tag-topics-nav"
+            style={{
+              top: `${returnButtonTop + 40}px`,
+              transition: isAnimating ? "top 320ms ease" : undefined,
+            }}
+          >
+            <button
+              type="button"
+              className="canvas-tag-topics-nav__button"
+              onClick={onPrevHighlight}
+              disabled={!onPrevHighlight}
+              aria-label="Previous highlight"
+              title="Previous highlight"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="canvas-tag-topics-nav__button"
+              onClick={onNextHighlight}
+              disabled={!onNextHighlight}
+              aria-label="Next highlight"
+              title="Next highlight"
+            >
+              ↓
+            </button>
+          </div>
         )}
         {cards.map((card) => {
           const effectiveTop = getStickyCardTop(card, viewportTop, scale);

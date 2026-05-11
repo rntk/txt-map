@@ -354,8 +354,11 @@ export default function CanvasPage() {
     setCloudRangesMap(nextRangesMap);
   }, []);
 
+  const tagTopicNavKeyRef = useRef(null);
+
   useEffect(() => {
     setActiveTagTopicKey(null);
+    tagTopicNavKeyRef.current = null;
   }, [selectedCloudLemma]);
 
   const cancelPendingCanvasTransform = useCallback(() => {
@@ -975,9 +978,41 @@ export default function CanvasPage() {
         (entry) => entry.key === cardKey,
       );
       if (!card) return;
+      tagTopicNavKeyRef.current = cardKey;
       focusArticleOffset(card.charStart);
     },
     [focusArticleOffset, selectedTagTopicEntries],
+  );
+
+  const navigateTagHighlight = useCallback(
+    (direction) => {
+      if (selectedTagTopicEntries.length === 0) return;
+      const anchorKey = tagTopicNavKeyRef.current ?? activeTagTopicKey;
+      const currentIdx = selectedTagTopicEntries.findIndex(
+        (entry) => entry.key === anchorKey,
+      );
+      const length = selectedTagTopicEntries.length;
+      let nextIdx;
+      if (currentIdx === -1) {
+        nextIdx = direction > 0 ? 0 : length - 1;
+      } else {
+        nextIdx = (currentIdx + direction + length) % length;
+      }
+      const card = selectedTagTopicEntries[nextIdx];
+      tagTopicNavKeyRef.current = card.key;
+      setActiveTagTopicKey(null);
+      focusArticleOffset(card.charStart);
+    },
+    [activeTagTopicKey, focusArticleOffset, selectedTagTopicEntries],
+  );
+
+  const handlePrevTagHighlight = useCallback(
+    () => navigateTagHighlight(-1),
+    [navigateTagHighlight],
+  );
+  const handleNextTagHighlight = useCallback(
+    () => navigateTagHighlight(1),
+    [navigateTagHighlight],
   );
 
   const summaryEntries = useMemo(() => {
@@ -1604,7 +1639,10 @@ export default function CanvasPage() {
                   <CanvasTagTopicsRail
                     tagTopicsLayout={tagTopicsLayout}
                     activeTopicKey={activeTagTopicKey}
-                    onCardEnter={setActiveTagTopicKey}
+                    onCardEnter={(key) => {
+                      tagTopicNavKeyRef.current = key;
+                      setActiveTagTopicKey(key);
+                    }}
                     onCardLeave={(key) =>
                       setActiveTagTopicKey((current) =>
                         current === key ? null : current,
@@ -1612,6 +1650,8 @@ export default function CanvasPage() {
                     }
                     onCardClick={zoomToTagTopic}
                     onMoveToTagsCloud={moveToTagsCloud}
+                    onPrevHighlight={handlePrevTagHighlight}
+                    onNextHighlight={handleNextTagHighlight}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}
