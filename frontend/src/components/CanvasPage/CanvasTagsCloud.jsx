@@ -1,5 +1,50 @@
-import React, { useEffect, useMemo, useRef } from "react";
-import { buildArticleWordCloud } from "../../utils/wordCloud";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { buildArticleWordCloud, naiveLemmatize } from "../../utils/wordCloud";
+
+const MIN_RANKED_TAG_SCORE = 50;
+const MAX_CLOUD_WORDS = 120;
+const MAX_RANKED_TAGS = 60;
+
+/**
+ * @typedef {{tag: string, score: number}} TopicTagRankingEntry
+ */
+
+/**
+ * Aggregates ranked tags from all topics, keeping the highest score per tag.
+ *
+ * @param {Record<string, Array<TopicTagRankingEntry>> | undefined} topicTagRankings
+ * @returns {Array<{tag: string, lemma: string, score: number}>}
+ */
+function aggregateRankedTags(topicTagRankings) {
+  if (!topicTagRankings || typeof topicTagRankings !== "object") {
+    return [];
+  }
+
+  /** @type {Map<string, {tag: string, lemma: string, score: number}>} */
+  const byLemma = new Map();
+  Object.values(topicTagRankings).forEach((entries) => {
+    if (!Array.isArray(entries)) return;
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const rawTag = typeof entry.tag === "string" ? entry.tag.trim() : "";
+      const score = Math.max(0, Math.min(100, Math.round(Number(entry.score))));
+      if (!rawTag || !Number.isFinite(score)) return;
+      if (score < MIN_RANKED_TAG_SCORE) return;
+
+      const lowerTag = rawTag.toLowerCase();
+      const lemma = naiveLemmatize(lowerTag) || lowerTag;
+      const existing = byLemma.get(lemma);
+      if (!existing || score > existing.score) {
+        byLemma.set(lemma, { tag: lowerTag, lemma, score });
+      }
+    });
+  });
+
+  return Array.from(byLemma.values()).sort(
+    (left, right) =>
+      right.score - left.score || left.tag.localeCompare(right.tag),
+  );
+}
 
 function wordHash(word) {
   let hash = 0;
@@ -39,7 +84,7 @@ function buildCloudLayout(items, maxHeight) {
     const bh = tw * Math.sin(rad) + th * Math.cos(rad) + 8;
 
     let pos = null;
-    for (let step = 0; step < 6000; step += 1) {
+    for (let step = 0; step < 1500; step += 1) {
       const angle = step * 0.31;
       const r = step * 2.3;
       const x = CX + r * Math.cos(angle) - bw / 2;
@@ -83,6 +128,7 @@ function buildCloudLayout(items, maxHeight) {
  *   onSizeChange?: (size: {width: number, height: number}) => void,
  *   selectedLemma?: string | null,
  *   cloudRef?: React.RefObject<HTMLDivElement>,
+ *   topicTagRankings?: Record<string, Array<{tag: string, score: number}>>,
  * }} props
  */
 export default function CanvasTagsCloud({
@@ -94,11 +140,28 @@ export default function CanvasTagsCloud({
   onSizeChange,
   selectedLemma,
   cloudRef,
+  topicTagRankings,
 }) {
   const { words, ranges } = useMemo(
     () => buildArticleWordCloud(articleText || ""),
     [articleText],
   );
+
+  const rankedTags = useMemo(
+    () => aggregateRankedTags(topicTagRankings),
+    [topicTagRankings],
+  );
+
+  const [wordLimit, setWordLimit] = useState(MAX_CLOUD_WORDS);
+  const [rankedLimit, setRankedLimit] = useState(MAX_RANKED_TAGS);
+
+  useEffect(() => {
+    setWordLimit(MAX_CLOUD_WORDS);
+  }, [articleText]);
+
+  useEffect(() => {
+    setRankedLimit(MAX_RANKED_TAGS);
+  }, [topicTagRankings]);
 
   const onWordsComputedRef = useRef(onWordsComputed);
   useEffect(() => {
@@ -112,13 +175,15 @@ export default function CanvasTagsCloud({
   const layout = useMemo(() => {
     if (words.length === 0) return { items: [], totalW: 0, totalH: 0 };
 
-    const maxFreq = Math.max(...words.map((w) => w.frequency));
-    const minFreq = Math.min(...words.map((w) => w.frequency));
+    const topWords =
+      words.length > wordLimit ? words.slice(0, wordLimit) : words;
+    const maxFreq = Math.max(...topWords.map((w) => w.frequency));
+    const minFreq = Math.min(...topWords.map((w) => w.frequency));
     const norm = (freq) =>
       maxFreq === minFreq ? 0.5 : (freq - minFreq) / (maxFreq - minFreq);
     const getSize = (freq) => 18 + norm(freq) * 78;
 
-    const items = words.map(({ word, frequency, lemma }) => {
+    const items = topWords.map(({ word, frequency, lemma }) => {
       const h = wordHash(lemma);
       const n = norm(frequency);
       const rotationDeg = ((h % 7) - 3) * 1.6;
@@ -137,7 +202,37 @@ export default function CanvasTagsCloud({
     });
 
     return buildCloudLayout(items, articleHeight || 600);
-  }, [words, articleHeight]);
+  }, [words, articleHeight, wordLimit]);
+
+  const rankedTagItems = useMemo(() => {
+    if (rankedTags.length === 0) return [];
+
+    const visibleRanked =
+      rankedTags.length > rankedLimit
+        ? rankedTags.slice(0, rankedLimit)
+        : rankedTags;
+    const maxScore = Math.max(...visibleRanked.map((t) => t.score));
+    const minScore = Math.min(...visibleRanked.map((t) => t.score));
+    const norm = (score) =>
+      maxScore === minScore ? 0.5 : (score - minScore) / (maxScore - minScore);
+
+    return visibleRanked.map(({ tag, lemma, score }) => {
+      const h = wordHash(lemma);
+      const n = norm(score);
+      const hue = (h % 260) + 20;
+      return {
+        tag,
+        lemma,
+        score,
+        fontSize: 14 + n * 14,
+        color: `hsl(${hue}, 65%, ${n > 0.5 ? 75 : 60}%)`,
+        fontWeight: n > 0.65 ? 700 : n > 0.3 ? 500 : 400,
+      };
+    });
+  }, [rankedTags, rankedLimit]);
+
+  const hasMoreWords = words.length > wordLimit;
+  const hasMoreRanked = rankedTags.length > rankedLimit;
 
   const outerWidth = layout.totalW + 32;
   const outerHeight = layout.totalH + 32;
@@ -151,7 +246,7 @@ export default function CanvasTagsCloud({
     onSizeChangeRef.current?.({ width: outerWidth, height: outerHeight });
   }, [outerWidth, outerHeight]);
 
-  if (layout.items.length === 0) return null;
+  if (layout.items.length === 0 && rankedTagItems.length === 0) return null;
 
   const handleMouseOver = (e) => {
     const el = e.target.closest?.("[data-cloud-lemma]");
@@ -219,6 +314,66 @@ export default function CanvasTagsCloud({
           </button>
         ))}
       </div>
+      {hasMoreWords && (
+        <button
+          type="button"
+          className="canvas-tags-cloud__load-more"
+          onClick={() =>
+            setWordLimit((prev) =>
+              Math.min(prev + MAX_CLOUD_WORDS, words.length),
+            )
+          }
+        >
+          Show more words ({words.length - wordLimit} hidden)
+        </button>
+      )}
+      {rankedTagItems.length > 0 && (
+        <div className="canvas-tags-cloud__ranked">
+          <div className="canvas-tags-cloud__ranked-title">Scored tags</div>
+          <div className="canvas-tags-cloud__ranked-list">
+            {rankedTagItems.map((item) => (
+              <button
+                key={item.lemma}
+                type="button"
+                data-cloud-lemma={item.lemma}
+                title={`${item.tag}: score ${item.score}`}
+                aria-pressed={selectedLemma === item.lemma}
+                className={[
+                  "canvas-tags-cloud__ranked-item",
+                  selectedLemma === item.lemma ? "is-selected" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={handleWordSelect}
+                onKeyDown={handleWordKeyDown}
+                style={{
+                  fontSize: `${item.fontSize}px`,
+                  fontWeight: item.fontWeight,
+                  color: item.color,
+                }}
+              >
+                {item.tag}
+                <span className="canvas-tags-cloud__ranked-score">
+                  {item.score}
+                </span>
+              </button>
+            ))}
+          </div>
+          {hasMoreRanked && (
+            <button
+              type="button"
+              className="canvas-tags-cloud__load-more"
+              onClick={() =>
+                setRankedLimit((prev) =>
+                  Math.min(prev + MAX_RANKED_TAGS, rankedTags.length),
+                )
+              }
+            >
+              Show more tags ({rankedTags.length - rankedLimit} hidden)
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

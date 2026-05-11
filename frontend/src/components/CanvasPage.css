@@ -954,6 +954,78 @@
   filter: brightness(1.25);
 }
 
+.canvas-tags-cloud__ranked {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #2d3748;
+}
+
+.canvas-tags-cloud__ranked-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.canvas-tags-cloud__ranked-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: baseline;
+}
+
+.canvas-tags-cloud__ranked-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  padding: 2px 6px;
+  font-family: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    opacity 150ms ease,
+    filter 150ms ease;
+}
+
+.canvas-tags-cloud__ranked-item:hover {
+  opacity: 0.8;
+  filter: brightness(1.25);
+}
+
+.canvas-tags-cloud__ranked-item.is-selected {
+  text-shadow: 0 0 14px rgba(255, 215, 64, 0.72);
+}
+
+.canvas-tags-cloud__ranked-score {
+  font-size: 10px;
+  font-weight: 500;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.canvas-tags-cloud__load-more {
+  align-self: center;
+  margin-top: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.canvas-tags-cloud__load-more:hover {
+  background: rgba(148, 163, 184, 0.22);
+}
+
 @keyframes canvas-tags-cloud-enter {
   from {
     max-width: 0;

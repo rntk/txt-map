@@ -133,6 +133,7 @@ export default function CanvasPage() {
     readTopics,
     setReadTopics,
     topicTemperatures,
+    topicTagRankings,
     insights,
     markup,
   } = useArticleData(articleId);
@@ -1541,6 +1542,7 @@ export default function CanvasPage() {
                     onWordsComputed={handleCloudWordsComputed}
                     onSizeChange={setCloudSize}
                     selectedLemma={selectedCloudLemma}
+                    topicTagRankings={topicTagRankings}
                   />
                 )}
 

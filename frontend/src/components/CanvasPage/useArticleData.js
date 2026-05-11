@@ -17,6 +17,7 @@ import { extractArticleImages } from "./articleImages";
  *   readTopics: string[],
  *   setReadTopics: React.Dispatch<React.SetStateAction<string[]>>,
  *   topicTemperatures: Object,
+ *   topicTagRankings: Record<string, Array<{tag: string, score: number}>>,
  *   insights: Array<Object>,
  *   markup: Object,
  * }}
@@ -33,6 +34,7 @@ export function useArticleData(articleId) {
   const [submissionTopics, setSubmissionTopics] = useState([]);
   const [readTopics, setReadTopics] = useState([]);
   const [topicTemperatures, setTopicTemperatures] = useState({});
+  const [topicTagRankings, setTopicTagRankings] = useState({});
   const [insights, setInsights] = useState([]);
   const [markup, setMarkup] = useState({});
 
@@ -43,6 +45,7 @@ export function useArticleData(articleId) {
     setArticleLoading(true);
     setArticleError(null);
     setArticleImages([]);
+    setTopicTagRankings({});
 
     const loadArticle = async () => {
       try {
@@ -62,6 +65,7 @@ export function useArticleData(articleId) {
         setTopicSummaries(data.topic_summaries || {});
         setTopicSummaryIndex(data.topic_summary_index || {});
         setTopicTemperatures(data.topic_temperatures || {});
+        setTopicTagRankings(data.topic_tag_rankings || {});
         setInsights(data.insights || []);
         setMarkup(data.markup || {});
         setArticleLoading(false);
@@ -126,6 +130,7 @@ export function useArticleData(articleId) {
     readTopics,
     setReadTopics,
     topicTemperatures,
+    topicTagRankings,
     insights,
     markup,
   };

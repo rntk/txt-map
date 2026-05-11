@@ -1058,6 +1058,7 @@ def get_topic_analysis(
         "topic_model": results.get("topic_model", {}),
         "subtopics": results.get("subtopics", []),
         "topic_summaries": results.get("topic_summaries", {}),
+        "topic_tag_rankings": results.get("topic_tag_rankings", {}),
         "task_status": {
             "clustering_generation": tasks.get("clustering_generation", {}).get(
                 "status"

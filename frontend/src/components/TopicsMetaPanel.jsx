@@ -8,8 +8,9 @@ import "../styles/text-reading.css";
  * @typedef {{ cluster_id: number, keywords: string[], sentence_indices: number[] }} Cluster
  * @typedef {{ name: string, sentences: number[] }} Topic
  * @typedef {{ name: string, sentences: number[], parent_topic: string }} Subtopic
+ * @typedef {{ tag: string, score: number }} RankedTag
  * @typedef {{ latent_topics: LatentTopic[], topic_mapping: TopicMapping[] }} TopicModel
- * @typedef {{ topics: Topic[], clusters: Cluster[], sentences: string[], topic_model: TopicModel, subtopics: Subtopic[], topic_summaries: Record<string, string> }} TopicAnalysisData
+ * @typedef {{ topics: Topic[], clusters: Cluster[], sentences: string[], topic_model: TopicModel, subtopics: Subtopic[], topic_summaries: Record<string, string>, topic_tag_rankings: Record<string, RankedTag[]> }} TopicAnalysisData
  * @typedef {{ ranges: Array<{ marker_spans: Array<{ start_word: number, end_word: number, text: string }>, summary_text: string }> }} MarkerTopicSummary
  */
 
@@ -156,6 +157,41 @@ function PanelTagCloud({ submissionId, sentences, sentenceIndices }) {
 }
 
 /**
+ * @param {{ submissionId: string, rankedTags: RankedTag[] }} props
+ */
+function PanelScoredTags({ submissionId, rankedTags }) {
+  const tags = useMemo(() => {
+    return (rankedTags || [])
+      .filter((t) => t && typeof t.score === "number" && t.score > 50)
+      .slice()
+      .sort((a, b) => b.score - a.score || a.tag.localeCompare(b.tag));
+  }, [rankedTags]);
+
+  if (tags.length === 0) {
+    return (
+      <p className="topics-meta-panel__empty">
+        No scored tags for this topic.
+      </p>
+    );
+  }
+
+  return (
+    <div className="topics-meta-panel__tag-cloud">
+      {tags.map(({ tag, score }) => (
+        <a
+          key={tag}
+          href={`/page/word/${submissionId}/${encodeURIComponent(tag)}`}
+          className="topics-meta-panel__tag-cloud-item topics-meta-panel__tag-cloud-item--interactive"
+        >
+          {tag}
+          <span className="topics-meta-panel__tag-cloud-freq">{score}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/**
  * @param {{ submissionId: string, keywords: string[] }} props
  */
 function PanelSummaryKeywords({ submissionId, keywords }) {
@@ -295,6 +331,11 @@ export default function TopicsMetaPanel({
     return data.topic_summaries[selectedTopic.name] || null;
   }, [data, selectedTopic]);
 
+  const rankedTags = useMemo(() => {
+    if (!selectedTopic || !data?.topic_tag_rankings) return [];
+    return data.topic_tag_rankings[selectedTopic.name] || [];
+  }, [data, selectedTopic]);
+
   const filteredSubtopics = useMemo(() => {
     if (!selectedTopic || !data?.subtopics) return [];
     return data.subtopics.filter(
@@ -404,6 +445,16 @@ export default function TopicsMetaPanel({
               submissionId={submissionId}
               sentences={data.sentences}
               sentenceIndices={selectedTopic.sentences || []}
+            />
+          </section>
+        )}
+
+        {selectedTopic && (
+          <section className="topics-meta-panel__section">
+            <div className="topics-meta-panel__section-title">Scored Tags</div>
+            <PanelScoredTags
+              submissionId={submissionId}
+              rankedTags={rankedTags}
             />
           </section>
         )}
