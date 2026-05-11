@@ -82,6 +82,7 @@ class SubmissionsStorage:
                 "markup": {},
                 "topic_marker_summaries": {},
                 "topic_temperatures": {},
+                "topic_tag_rankings": {},
                 "clusters": [],
                 "topic_model": {},
             },
@@ -191,6 +192,9 @@ class SubmissionsStorage:
 
         if "topic_temperature_generation" in names:
             update_fields["results.topic_temperatures"] = {}
+
+        if "topic_tag_ranking_generation" in names:
+            update_fields["results.topic_tag_rankings"] = {}
 
         if "clustering_generation" in names:
             update_fields["results.clusters"] = []

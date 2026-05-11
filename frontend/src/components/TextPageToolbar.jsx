@@ -53,6 +53,7 @@ const RECALCULATE_ACTIONS = [
       "insights_generation",
       "topic_marker_summary_generation",
       "topic_temperature_generation",
+      "topic_tag_ranking_generation",
     ],
     message: "Topic-related tasks queued.",
   },
@@ -86,6 +87,11 @@ const RECALCULATE_ACTIONS = [
     label: "Temperature",
     tasks: ["topic_temperature_generation"],
     message: "Temperature generation queued.",
+  },
+  {
+    label: "Tag Ranking",
+    tasks: ["topic_tag_ranking_generation"],
+    message: "Tag ranking generation queued.",
   },
   {
     label: "Clustering",

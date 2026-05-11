@@ -204,6 +204,32 @@ def test_canvas_prompt_describes_granular_article_pieces() -> None:
     assert "not always complete sentences" in CANVAS_SYSTEM_PROMPT
 
 
+def test_get_canvas_article_includes_topic_tag_rankings(client: Any) -> None:
+    test_client, _, submissions_storage = client
+    submissions_storage.get_by_id.return_value = {
+        "results": {
+            "sentences": ["Alpha beta."],
+            "topics": [{"name": "Topic", "sentences": [1]}],
+            "topic_tag_rankings": {
+                "Topic": [
+                    {"tag": "alpha", "score": 80},
+                    {"tag": "beta", "score": 45},
+                ]
+            },
+        }
+    }
+
+    response = test_client.get("/api/canvas/article-1/article")
+
+    assert response.status_code == 200
+    assert response.json()["topic_tag_rankings"] == {
+        "Topic": [
+            {"tag": "alpha", "score": 80},
+            {"tag": "beta", "score": 45},
+        ]
+    }
+
+
 def _make_pieces(texts: list[str]) -> list[ArticlePiece]:
     pieces: list[ArticlePiece] = []
     offset = 0

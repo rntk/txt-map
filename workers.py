@@ -36,6 +36,9 @@ from lib.tasks.topic_marker_summary_generation import (
 from lib.tasks.topic_temperature_generation import (
     process_topic_temperature_generation,
 )
+from lib.tasks.topic_tag_ranking_generation import (
+    process_topic_tag_ranking_generation,
+)
 from lib.tasks.clustering_generation import process_clustering_generation
 from lib.tasks.topic_modeling_generation import process_topic_modeling_generation
 
@@ -56,6 +59,7 @@ TASK_DEPENDENCIES = {
     "markup_generation": ["split_topic_generation"],
     "topic_marker_summary_generation": ["split_topic_generation"],
     "topic_temperature_generation": ["split_topic_generation"],
+    "topic_tag_ranking_generation": ["split_topic_generation"],
     "clustering_generation": ["split_topic_generation"],
     "topic_modeling_generation": ["split_topic_generation"],
 }
@@ -71,6 +75,7 @@ TASK_PRIORITIES = {
     "markup_generation": 4,
     "topic_marker_summary_generation": 4,
     "topic_temperature_generation": 4,
+    "topic_tag_ranking_generation": 4,
     "clustering_generation": 4,
     "topic_modeling_generation": 4,
 }
@@ -86,6 +91,7 @@ TASK_HANDLERS = {
     "markup_generation": process_markup_generation,
     "topic_marker_summary_generation": process_topic_marker_summary_generation,
     "topic_temperature_generation": process_topic_temperature_generation,
+    "topic_tag_ranking_generation": process_topic_tag_ranking_generation,
     "clustering_generation": process_clustering_generation,
     "topic_modeling_generation": process_topic_modeling_generation,
 }
@@ -263,6 +269,7 @@ class Worker:
                 "markup_generation",
                 "topic_marker_summary_generation",
                 "topic_temperature_generation",
+                "topic_tag_ranking_generation",
             }
             if task_type in cache_tasks:
                 handler(submission, self.db, llm, cache_store=self.cache_store)

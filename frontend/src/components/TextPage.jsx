@@ -500,6 +500,40 @@ function TextPageContent() {
     });
     return map;
   }, [results.topic_temperatures]);
+  const topicTagRankingMap = useMemo(() => {
+    const rawRankings = results.topic_tag_rankings;
+    if (!rawRankings || typeof rawRankings !== "object") {
+      return new Map();
+    }
+
+    const map = new Map();
+    Object.entries(rawRankings).forEach(([topicName, value]) => {
+      if (!Array.isArray(value)) {
+        return;
+      }
+      const entries = value
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") {
+            return null;
+          }
+          const tag = typeof entry.tag === "string" ? entry.tag.trim() : "";
+          const score = Math.max(
+            0,
+            Math.min(100, Math.round(Number(entry.score))),
+          );
+          if (!tag || !Number.isFinite(score)) {
+            return null;
+          }
+          return { tag, score };
+        })
+        .filter(Boolean);
+      if (entries.length > 0) {
+        map.set(topicName, entries);
+      }
+    });
+    return map;
+  }, [results.topic_tag_rankings]);
+  const tagRankingAvailable = topicTagRankingMap.size > 0;
   const temperatureAvailable = topicTemperatureMap.size > 0;
   const temperatureModeActive = showTemperature && temperatureAvailable;
   const temperatureTopicColorMap = useMemo(() => {
@@ -1128,6 +1162,8 @@ function TextPageContent() {
                 onToggleHighlightInsightTopics={toggleHighlightInsightTopics}
                 topicTemperatureMap={topicTemperatureMap}
                 temperatureModeActive={temperatureModeActive}
+                topicTagRankingMap={topicTagRankingMap}
+                tagRankingAvailable={tagRankingAvailable}
               />
             </div>
             <div className="right-column" ref={rightColumnRef}>

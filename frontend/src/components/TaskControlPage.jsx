@@ -33,6 +33,7 @@ const TASK_TYPES = [
   "markup_generation",
   "topic_marker_summary_generation",
   "topic_temperature_generation",
+  "topic_tag_ranking_generation",
   "clustering_generation",
   "topic_modeling_generation",
 ];
