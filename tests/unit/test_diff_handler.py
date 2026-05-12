@@ -1976,7 +1976,7 @@ class TestResponseStructures:
         assert "force_recalculate" in result
 
 
-class TestPostDiffCalculate:
+class TestPostDiffCalculateForce:
     """Tests for post_diff_calculate endpoint."""
 
     def test_force_recalculate_sets_flag_on_existing_job(

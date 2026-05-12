@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 import uuid
 
+from lib.constants import TASK_DEPENDENCIES, TASK_NAMES
+
 # Note: main.py mocks are set up in test_main_app.py module-level code
 
 
@@ -88,29 +90,10 @@ def mock_submissions_storage(mock_db):
     """Create a mock SubmissionsStorage instance."""
     storage = MagicMock()
     storage._db = mock_db
-    storage.task_names = [
-        "split_topic_generation",
-        "subtopics_generation",
-        "summarization",
-        "mindmap",
-        "prefix_tree",
-        "insights_generation",
-        "markup_generation",
-        "topic_marker_summary_generation",
-        "clustering_generation",
-        "topic_modeling_generation",
-    ]
+    storage.task_names = TASK_NAMES.copy()
     storage.task_dependencies = {
-        "split_topic_generation": [],
-        "subtopics_generation": ["split_topic_generation"],
-        "summarization": ["split_topic_generation"],
-        "mindmap": ["subtopics_generation"],
-        "prefix_tree": ["split_topic_generation"],
-        "insights_generation": ["split_topic_generation"],
-        "markup_generation": ["split_topic_generation"],
-        "topic_marker_summary_generation": ["split_topic_generation"],
-        "clustering_generation": ["split_topic_generation"],
-        "topic_modeling_generation": ["split_topic_generation"],
+        task_name: dependencies.copy()
+        for task_name, dependencies in TASK_DEPENDENCIES.items()
     }
     return storage
 

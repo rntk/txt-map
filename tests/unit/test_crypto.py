@@ -1,5 +1,7 @@
 """Unit tests for crypto module."""
 
+import builtins
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -38,14 +40,10 @@ def test_decrypt_token_without_secret_raises() -> None:
             decrypt_token("encrypted")
 
 
-import builtins
-import sys
-
-
 _real_import = builtins.__import__
 
 
-def _mock_import_no_cryptography(name, *args, **kwargs):
+def _mock_import_no_cryptography(name: str, *args: Any, **kwargs: Any) -> Any:
     if name == "cryptography" or name.startswith("cryptography."):
         raise ImportError("No module named 'cryptography'")
     return _real_import(name, *args, **kwargs)

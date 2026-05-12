@@ -4,7 +4,7 @@ from typing import Optional, List, Any, Dict
 from datetime import datetime, UTC
 
 from pymongo.database import Database
-from lib.constants import AUTO_TASKS, TASK_NAMES, filter_known_tasks
+from lib.constants import AUTO_TASKS, TASK_DEPENDENCIES, TASK_NAMES, filter_known_tasks
 
 
 class SubmissionsStorage:
@@ -12,17 +12,8 @@ class SubmissionsStorage:
     task_names: List[str] = TASK_NAMES.copy()
     auto_task_names: List[str] = AUTO_TASKS.copy()
     task_dependencies: Dict[str, List[str]] = {
-        "split_topic_generation": [],
-        "subtopics_generation": ["split_topic_generation"],
-        "summarization": ["split_topic_generation"],
-        "mindmap": ["subtopics_generation"],
-        "prefix_tree": ["split_topic_generation"],
-        "insights_generation": ["split_topic_generation"],
-        "markup_generation": ["split_topic_generation"],
-        "topic_marker_summary_generation": ["split_topic_generation"],
-        "topic_temperature_generation": ["split_topic_generation"],
-        "clustering_generation": ["split_topic_generation"],
-        "topic_modeling_generation": ["split_topic_generation"],
+        task_name: dependencies.copy()
+        for task_name, dependencies in TASK_DEPENDENCIES.items()
     }
 
     def __init__(self, db: Database) -> None:

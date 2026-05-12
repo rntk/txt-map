@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from bson import ObjectId
 from main import app
 from handlers.dependencies import get_submissions_storage, get_task_queue_storage
+from lib.constants import TASK_NAMES
 
 
 # Mock dependencies before importing app
@@ -23,18 +24,7 @@ def client():
 @pytest.fixture
 def mock_storage():
     storage = MagicMock()
-    storage.task_names = [
-        "split_topic_generation",
-        "subtopics_generation",
-        "summarization",
-        "mindmap",
-        "prefix_tree",
-        "insights_generation",
-        "markup_generation",
-        "topic_marker_summary_generation",
-        "clustering_generation",
-        "topic_modeling_generation",
-    ]
+    storage.task_names = TASK_NAMES.copy()
     return storage
 
 

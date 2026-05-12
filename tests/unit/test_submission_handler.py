@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import uuid
 import re
 from handlers.submission_handler import _extract_content_from_upload
+from lib.constants import TASK_NAMES
 
 
 # Mock dependencies before importing app - must be at module level to catch import-time operations
@@ -32,18 +33,7 @@ def client(app):
 @pytest.fixture
 def mock_storage():
     storage = MagicMock()
-    storage.task_names = [
-        "split_topic_generation",
-        "subtopics_generation",
-        "summarization",
-        "mindmap",
-        "prefix_tree",
-        "insights_generation",
-        "markup_generation",
-        "topic_marker_summary_generation",
-        "clustering_generation",
-        "topic_modeling_generation",
-    ]
+    storage.task_names = TASK_NAMES.copy()
     storage.get_known_tasks.side_effect = lambda submission: submission.get("tasks", {})
     return storage
 

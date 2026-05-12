@@ -6,7 +6,13 @@ from typing import Any
 
 import pytest
 
-from lib.llm.provider_config import load_remote_provider_config
+from lib.llm.provider_config import (
+    RemoteProviderConfig,
+    RemoteProviderConfigEntry,
+    _parse_provider,
+    _require_string,
+    load_remote_provider_config,
+)
 
 
 def _write_config(tmp_path: Path, payload: dict[str, Any]) -> str:
@@ -129,15 +135,6 @@ def test_create_openai_and_anthropic_clients_preserve_remote_identity(
 
     assert openai_client.model_id == "openai-remote:gpt-5.4"
     assert anthropic_client.model_id == "anthropic-remote:claude-haiku-4-5"
-
-
-from lib.llm.provider_config import (
-    RemoteProviderConfig,
-    RemoteProviderConfigEntry,
-    _parse_provider,
-    _require_string,
-    load_remote_provider_config,
-)
 
 
 def test_empty_providers_raises() -> None:

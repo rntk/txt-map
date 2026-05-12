@@ -21,7 +21,7 @@ Also tests constants:
 from unittest.mock import MagicMock, patch
 from datetime import datetime, UTC
 
-from lib.constants import AUTO_TASKS
+from lib.constants import AUTO_TASKS, TASK_DEPENDENCIES, TASK_NAMES
 from lib.storage.submissions import SubmissionsStorage
 
 
@@ -41,38 +41,11 @@ class TestConstants:
 
     def test_task_names_contains_all_task_types(self):
         """task_names contains all task types."""
-        expected_tasks = [
-            "split_topic_generation",
-            "subtopics_generation",
-            "summarization",
-            "mindmap",
-            "prefix_tree",
-            "insights_generation",
-            "markup_generation",
-            "topic_marker_summary_generation",
-            "topic_temperature_generation",
-            "clustering_generation",
-            "topic_modeling_generation",
-        ]
-        assert SubmissionsStorage.task_names == expected_tasks
-        assert len(SubmissionsStorage.task_names) == 11
+        assert SubmissionsStorage.task_names == TASK_NAMES
 
     def test_task_dependencies_correctly_defined(self):
         """task_dependencies correctly defined for all tasks."""
-        expected_deps = {
-            "split_topic_generation": [],
-            "subtopics_generation": ["split_topic_generation"],
-            "summarization": ["split_topic_generation"],
-            "mindmap": ["subtopics_generation"],
-            "prefix_tree": ["split_topic_generation"],
-            "insights_generation": ["split_topic_generation"],
-            "markup_generation": ["split_topic_generation"],
-            "topic_marker_summary_generation": ["split_topic_generation"],
-            "topic_temperature_generation": ["split_topic_generation"],
-            "clustering_generation": ["split_topic_generation"],
-            "topic_modeling_generation": ["split_topic_generation"],
-        }
-        assert SubmissionsStorage.task_dependencies == expected_deps
+        assert SubmissionsStorage.task_dependencies == TASK_DEPENDENCIES
 
 
 # =============================================================================
@@ -97,47 +70,12 @@ class TestInit:
     def test_task_names_list_contains_all_task_types(self, mock_db):
         """task_names list contains all task types."""
         storage = SubmissionsStorage(mock_db)
-        assert len(storage.task_names) == 11
-        assert "split_topic_generation" in storage.task_names
-        assert "subtopics_generation" in storage.task_names
-        assert "summarization" in storage.task_names
-        assert "mindmap" in storage.task_names
-        assert "prefix_tree" in storage.task_names
-        assert "insights_generation" in storage.task_names
-        assert "markup_generation" in storage.task_names
-        assert "topic_marker_summary_generation" in storage.task_names
-        assert "topic_temperature_generation" in storage.task_names
-        assert "clustering_generation" in storage.task_names
-        assert "topic_modeling_generation" in storage.task_names
+        assert storage.task_names == TASK_NAMES
 
     def test_task_dependencies_correctly_defined(self, mock_db):
         """task_dependencies correctly defined."""
         storage = SubmissionsStorage(mock_db)
-        assert storage.task_dependencies["split_topic_generation"] == []
-        assert storage.task_dependencies["subtopics_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["summarization"] == ["split_topic_generation"]
-        assert storage.task_dependencies["mindmap"] == ["subtopics_generation"]
-        assert storage.task_dependencies["prefix_tree"] == ["split_topic_generation"]
-        assert storage.task_dependencies["insights_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["markup_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["topic_marker_summary_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["topic_temperature_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["clustering_generation"] == [
-            "split_topic_generation"
-        ]
-        assert storage.task_dependencies["topic_modeling_generation"] == [
-            "split_topic_generation"
-        ]
+        assert storage.task_dependencies == TASK_DEPENDENCIES
 
 
 # =============================================================================
