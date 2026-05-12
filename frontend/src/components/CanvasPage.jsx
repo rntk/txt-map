@@ -35,6 +35,7 @@ import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
 import CanvasTagsCloud from "./CanvasPage/CanvasTagsCloud";
 import CanvasTagTopicsRail from "./CanvasPage/CanvasTagTopicsRail";
+import CanvasTopicTagsRail from "./CanvasPage/CanvasTopicTagsRail";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import {
   buildModalSelectionFromTopic,
@@ -50,6 +51,7 @@ import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
 import { useInsightsLayout } from "./CanvasPage/useInsightsLayout";
 import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 import { useTagTopicsLayout } from "./CanvasPage/useTagTopicsLayout";
+import { useTopicTagsLayout } from "./CanvasPage/useTopicTagsLayout";
 import { useCanvasTransform } from "./CanvasPage/useCanvasTransform";
 
 const TOOLTIP_WIDTH = 260;
@@ -244,9 +246,12 @@ export default function CanvasPage() {
   const [showInsights, setShowInsights] = useState(false);
   const [activeInsightKey, setActiveInsightKey] = useState(null);
   const [showTagsCloud, setShowTagsCloud] = useState(false);
+  const [showTopicTagsRail, setShowTopicTagsRail] = useState(false);
   const [hoveredCloudLemma, setHoveredCloudLemma] = useState(null);
   const [selectedCloudLemma, setSelectedCloudLemma] = useState(null);
   const [activeTagTopicKey, setActiveTagTopicKey] = useState(null);
+  const [activeTopicTagsKey, setActiveTopicTagsKey] = useState(null);
+  const [topicTagVisibleCounts, setTopicTagVisibleCounts] = useState({});
   const cloudRangesRef = useRef(new Map());
   const tagsCloudRef = useRef(null);
   const [cloudRangesMap, setCloudRangesMap] = useState(() => new Map());
@@ -315,6 +320,14 @@ export default function CanvasPage() {
     setActiveTagTopicKey(null);
     tagTopicNavKeyRef.current = null;
   }, [selectedCloudLemma]);
+
+  useEffect(() => {
+    if (!showTopicTagsRail) setActiveTopicTagsKey(null);
+  }, [showTopicTagsRail]);
+
+  useEffect(() => {
+    setTopicTagVisibleCounts({});
+  }, [topicTagRankings]);
 
   const focusArticleOffset = useCallback(
     (charOffset) => {
@@ -772,6 +785,23 @@ export default function CanvasPage() {
     scaleRef,
   });
 
+  const topicTagsLayout = useTopicTagsLayout({
+    show: showTopicTagsRail,
+    submissionTopics,
+    topicTagRankings,
+    visibleCounts: topicTagVisibleCounts,
+    sentenceOffsets,
+    submissionSentences,
+    articleLoading,
+    articleError,
+    articleText,
+    articlePages,
+    articleImages,
+    articleTextRef,
+    summaryWrapRef,
+    scaleRef,
+  });
+
   const topicHierarchyLayout = useTopicHierarchyLayout({
     showTopicHierarchy,
     showSummaryMode,
@@ -883,6 +913,20 @@ export default function CanvasPage() {
         });
       });
     }
+    if (showTopicTagsRail && activeTopicTagsKey) {
+      const activeCard = topicTagsLayout.cards.find(
+        (card) => card.key === activeTopicTagsKey,
+      );
+      activeCard?.sentenceNumbers.forEach((sentenceNumber) => {
+        const index = sentenceNumber - 1;
+        if (index < 0 || index >= submissionSentences.length) return;
+        base.push({
+          start: sentenceOffsets[index],
+          end: sentenceOffsets[index] + submissionSentences[index].length,
+          label: activeCard.topicName,
+        });
+      });
+    }
     return base;
   }, [
     currentHighlights,
@@ -904,6 +948,9 @@ export default function CanvasPage() {
     cloudRangesMap,
     activeTagTopicKey,
     selectedTagTopicEntries,
+    showTopicTagsRail,
+    activeTopicTagsKey,
+    topicTagsLayout.cards,
   ]);
 
   const temperatureHighlights = useMemo(() => {
@@ -1006,6 +1053,22 @@ export default function CanvasPage() {
     [insightsLayout.cards, zoomToTarget],
   );
 
+  const zoomToTopicTags = useCallback(
+    (topicKey) => {
+      const card = topicTagsLayout.cards.find((c) => c.key === topicKey);
+      if (!card) return;
+      focusArticleOffset(card.charStart);
+    },
+    [focusArticleOffset, topicTagsLayout.cards],
+  );
+
+  const handleLoadMoreTopicTags = useCallback((key, nextCount) => {
+    setTopicTagVisibleCounts((prev) => ({
+      ...prev,
+      [key]: nextCount,
+    }));
+  }, []);
+
   const handleManualSelectEvent = useCallback(
     (idx) => {
       handleSelectEvent(idx);
@@ -1062,7 +1125,7 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}${showTopicTagsRail && !showSummaryMode ? " has-topic-tags" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                   "--canvas-tags-cloud-width": `${cloudSize.width}px`,
@@ -1158,6 +1221,24 @@ export default function CanvasPage() {
                   />
                 )}
 
+                {!showSummaryMode && showTopicTagsRail && (
+                  <CanvasTopicTagsRail
+                    topicTagsLayout={topicTagsLayout}
+                    activeTopicKey={activeTopicTagsKey}
+                    onCardEnter={setActiveTopicTagsKey}
+                    onCardLeave={(key) =>
+                      setActiveTopicTagsKey((current) =>
+                        current === key ? null : current,
+                      )
+                    }
+                    onCardClick={zoomToTopicTags}
+                    onLoadMore={handleLoadMoreTopicTags}
+                    translate={translate}
+                    scale={scale}
+                    isAnimating={isFocusingHighlight}
+                  />
+                )}
+
                 <CanvasTopicHierarchyRail
                   show={showTopicHierarchy || showSummaryMode}
                   selectedLevel={selectedLevel}
@@ -1224,6 +1305,8 @@ export default function CanvasPage() {
           onToggleTooltip={() => setTooltipEnabled((v) => !v)}
           showTagsCloud={showTagsCloud}
           onToggleTagsCloud={() => setShowTagsCloud((v) => !v)}
+          showTopicTagsRail={showTopicTagsRail}
+          onToggleTopicTagsRail={() => setShowTopicTagsRail((v) => !v)}
         />
       </div>
 

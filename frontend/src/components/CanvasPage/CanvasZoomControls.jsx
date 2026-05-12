@@ -23,6 +23,8 @@ import React, { useState } from "react";
  *   onToggleInsights: () => void,
  *   showChat: boolean,
  *   onToggleChat: () => void,
+ *   showTopicTagsRail: boolean,
+ *   onToggleTopicTagsRail: () => void,
  * }} props
  */
 export default function CanvasZoomControls({
@@ -49,6 +51,8 @@ export default function CanvasZoomControls({
   onToggleTooltip,
   showTagsCloud,
   onToggleTagsCloud,
+  showTopicTagsRail,
+  onToggleTopicTagsRail,
 }) {
   const [isFolded, setIsFolded] = useState(false);
   const [isHorizontal, setIsHorizontal] = useState(false);
@@ -226,6 +230,18 @@ export default function CanvasZoomControls({
             title={showTagsCloud ? "Hide tags cloud" : "Show tags cloud"}
           >
             W
+          </button>
+          <button
+            type="button"
+            className={`canvas-read-toggle${showTopicTagsRail ? " is-active" : ""}`}
+            onClick={onToggleTopicTagsRail}
+            title={
+              showTopicTagsRail
+                ? "Hide scored topic tags"
+                : "Show scored topic tags"
+            }
+          >
+            G
           </button>
         </div>
       )}

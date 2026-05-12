@@ -76,7 +76,9 @@ export function useTopicHierarchyLayout({
       const wrapRect = wrapEl.getBoundingClientRect();
       const offsetH = articleEl.offsetHeight;
       const s =
-        offsetH > 0 ? clampCanvasScale(articleRect.height / offsetH) : scaleRef.current || 1;
+        offsetH > 0
+          ? clampCanvasScale(articleRect.height / offsetH)
+          : scaleRef.current || 1;
       const summaryRectForRow = (row) => {
         const matching = getMatchingSummaryCardsForHierarchyRow(
           row,
