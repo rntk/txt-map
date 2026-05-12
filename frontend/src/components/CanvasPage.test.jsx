@@ -877,6 +877,60 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
+  it("opens source sentences modal from summary view tooltip action", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    global.fetch = vi.fn(async (url) => {
+      if (url === "/api/canvas/article-1/article") {
+        return {
+          ok: true,
+          json: async () => ({
+            text: "Politics opens. Law follows.",
+            sentences: ["Politics opens.", "Law follows."],
+            topics: [{ name: "Politics>Campaign", sentences: [1] }],
+            topic_summary_index: {
+              "Politics>Campaign": {
+                level: 2,
+                text: "Campaign summary.",
+                bullets: ["Campaign detail."],
+                source_sentences: [1],
+              },
+            },
+          }),
+        };
+      }
+
+      if (String(url).startsWith("/api/canvas/article-1/events")) {
+        return { ok: true, json: async () => ({ events: [] }) };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    render(<CanvasPage />);
+
+    await screen.findByText("Politics opens.");
+
+    fireEvent.click(screen.getByTitle("Show summary view (per topic level)"));
+    fireEvent.click(await screen.findByRole("button", { name: "L1" }));
+
+    const summaryText = await screen.findByText("Campaign summary.");
+    const summaryBody = summaryText.closest(
+      ".canvas-summary-view__summary-tooltip-wrap",
+    );
+    const sourceButton = summaryBody?.querySelector("button");
+
+    expect(sourceButton).toHaveTextContent("Show source sentences");
+    expect(
+      screen.getAllByRole("button", { name: "Show source sentences" }),
+    ).toHaveLength(1);
+
+    fireEvent.click(sourceButton);
+
+    await screen.findByRole("heading", { name: "Politics>Campaign" });
+    expect(await screen.findByText("Politics opens.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enriched" })).toBeDisabled();
+  });
+
   it("renders interleaved sub-level topic cards in article order", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url) => {

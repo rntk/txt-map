@@ -14,6 +14,14 @@ import React from "react";
  *   summaryCardRefs: React.MutableRefObject<{[key: string]: HTMLElement | null}>,
  *   setHoveredTopicKey: React.Dispatch<React.SetStateAction<string | null>>,
  *   articleTextRef: React.RefObject<HTMLDivElement | null>,
+ *   onShowSourceSentences: (card: {
+ *     path: string,
+ *     name: string,
+ *     text: string,
+ *     bullets: string[],
+ *     sourceSentences: number[],
+ *     startSentence: number,
+ *   }) => void,
  * }} props
  */
 export default function CanvasSummaryView({
@@ -22,6 +30,7 @@ export default function CanvasSummaryView({
   summaryCardRefs,
   setHoveredTopicKey,
   articleTextRef,
+  onShowSourceSentences,
 }) {
   if (summaryViewCards.length === 0) {
     return (
@@ -38,6 +47,9 @@ export default function CanvasSummaryView({
       <div className="canvas-summary-view__cards">
         {summaryViewCards.map((card) => {
           const isActive = summaryViewActivePath === card.path;
+          const hasSummaryContent =
+            Boolean(card.text) || card.bullets.length > 0;
+          const canShowSourceSentences = card.sourceSentences.length > 0;
           return (
             <article
               key={card.path}
@@ -65,15 +77,39 @@ export default function CanvasSummaryView({
                   </span>
                 )}
               </header>
-              {card.text && (
-                <p className="canvas-summary-view__card-text">{card.text}</p>
-              )}
-              {card.bullets.length > 0 && (
-                <ul className="canvas-summary-view__card-bullets">
-                  {card.bullets.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
+              {hasSummaryContent && (
+                <div className="canvas-summary-view__summary-tooltip-wrap">
+                  {card.text && (
+                    <p className="canvas-summary-view__card-text">
+                      {card.text}
+                    </p>
+                  )}
+                  {card.bullets.length > 0 && (
+                    <ul className="canvas-summary-view__card-bullets">
+                      {card.bullets.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {canShowSourceSentences && (
+                    <div
+                      className="canvas-summary-view__summary-tooltip"
+                      role="tooltip"
+                    >
+                      <button
+                        type="button"
+                        className="canvas-summary-view__summary-tooltip-button"
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onShowSourceSentences(card);
+                        }}
+                      >
+                        Show source sentences
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </article>
           );

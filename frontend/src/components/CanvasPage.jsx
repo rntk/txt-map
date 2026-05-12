@@ -492,6 +492,52 @@ export default function CanvasPage() {
     [submissionTopics, submissionSentences, topicSummaries],
   );
 
+  /**
+   * @param {{
+   *   path: string,
+   *   name: string,
+   *   text: string,
+   *   bullets: string[],
+   *   sourceSentences: number[],
+   * }} card
+   * @returns {void}
+   */
+  const handleShowSummarySourceSentences = useCallback(
+    (card) => {
+      if (!card) return;
+      const matchingTopic = (submissionTopics || []).find(
+        (topic) => topic.name === card.path || topic.fullPath === card.path,
+      );
+      const summarySentence = [card.text, ...card.bullets]
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter(Boolean)
+        .join("\n");
+
+      setSummaryModalTopic(
+        buildTopicModalSelection(
+          {
+            kind: "summary_source",
+            name: card.path,
+            fullPath: card.path,
+            displayName: card.path || card.name || "Summary source",
+            sentenceIndices: card.sourceSentences,
+            ranges: Array.isArray(matchingTopic?.ranges)
+              ? matchingTopic.ranges
+              : [],
+            canonicalTopicNames: matchingTopic?.name
+              ? [matchingTopic.name]
+              : undefined,
+            primaryTopicName: matchingTopic?.name || card.path,
+            _sentences: submissionSentences,
+            _summarySentence: summarySentence || undefined,
+          },
+          submissionTopics,
+        ),
+      );
+    },
+    [submissionSentences, submissionTopics],
+  );
+
   const closeSummaryModal = useCallback(() => {
     setSummaryModalTopic(null);
   }, []);
@@ -1180,6 +1226,7 @@ export default function CanvasPage() {
                     summaryCardRefs={summaryCardRefs}
                     setHoveredTopicKey={setHoveredTopicKey}
                     articleTextRef={articleTextRef}
+                    onShowSourceSentences={handleShowSummarySourceSentences}
                   />
                 ) : (
                   <ArticleText
