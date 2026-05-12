@@ -427,20 +427,34 @@ export function useCanvasTransform({ contentRef } = {}) {
       const currentScale = scaleRef.current || 1;
       const nextScale = clampCanvasScale(Math.max(currentScale, zoomLevel));
 
-      const localTargetX =
-        (targetRect.left + targetRect.width / 2 - viewportRect.left) /
-        currentScale;
       const localTargetY =
         (targetRect.top + targetRect.height / 2 - viewportRect.top) /
         currentScale;
 
+      let nextX;
+      const content = contentRef?.current;
+      if (content) {
+        // Deterministic horizontal positioning: align the article/content
+        // left edge to a fixed margin (e.g. 40px) so it's always ready to read.
+        const contentRect = content.getBoundingClientRect();
+        const localContentX =
+          (contentRect.left - viewportRect.left) / currentScale;
+        nextX = 40 - localContentX * nextScale;
+      } else {
+        // Fallback: center horizontally on the target
+        const localTargetX =
+          (targetRect.left + targetRect.width / 2 - viewportRect.left) /
+          currentScale;
+        nextX = wrapRect.width / 2 - localTargetX * nextScale;
+      }
+
       setCanvasTransformNow(nextScale, {
-        x: wrapRect.width / 2 - localTargetX * nextScale,
-        y: wrapRect.height / 2 - localTargetY * nextScale,
+        x: nextX,
+        y: wrapRect.height * 0.2 - localTargetY * nextScale,
       });
       flashFocus();
     },
-    [setCanvasTransformNow, flashFocus],
+    [setCanvasTransformNow, flashFocus, contentRef],
   );
 
   return {
