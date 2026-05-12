@@ -1,33 +1,18 @@
 import React from "react";
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import TopicsTagCloud from "./TopicsTagCloud";
 
 describe("TopicsTagCloud", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          words: [{ word: "theta", frequency: 2 }],
-          sentence_count: 1,
-        }),
-      }),
-    );
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
   it("renders the shared breadcrumb chrome and clickable cloud words", async () => {
     render(
       <TopicsTagCloud
         submissionId="submission-1"
         topics={[{ name: "Alpha>Beta", sentences: [1, 2] }]}
-        sentences={["First sentence", "Second sentence"]}
+        sentences={[
+          "The theta function computes theta values.",
+          "Another theta example with theta.",
+        ]}
       />,
     );
 

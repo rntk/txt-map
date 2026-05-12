@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import TopicSentencesModal from "./shared/TopicSentencesModal";
 import { buildModalSelectionFromKeyword } from "../utils/topicModalSelection";
+import { buildArticleWordCloud } from "../utils/wordCloud";
 import "./TopicNavigation.css";
 
 /**
@@ -279,10 +280,10 @@ function getSentenceIndicesForPath(topics, navPath) {
  * @returns {React.ReactElement}
  */
 function TopicsTagCloud({
-  submissionId,
+  submissionId: _submissionId,
   topics,
   sentences,
-  forcedPathQuery,
+  forcedPathQuery: _forcedPathQuery,
   readTopics,
   onToggleRead,
   markup,
@@ -290,9 +291,6 @@ function TopicsTagCloud({
 }) {
   const [navPath, setNavPath] = useState([]);
   const [selectedKeyword, setSelectedKeyword] = useState(null);
-  const [sentenceWords, setSentenceWords] = useState([]);
-  const [sentenceCount, setSentenceCount] = useState(0);
-  const [loadingCloud, setLoadingCloud] = useState(false);
 
   const topicWords = useMemo(
     () => buildTopicWordCloud(topics, navPath),
@@ -311,50 +309,21 @@ function TopicsTagCloud({
     [scopedSentenceIndices, sentences],
   );
 
+  const sentenceCount = scopedSentences.length;
+
+  const sentenceWords = useMemo(() => {
+    if (scopedSentences.length === 0) return [];
+    const combined = scopedSentences.map((s) => s.text).join(" ");
+    const { words } = buildArticleWordCloud(combined);
+    return words.map(({ word, frequency }) => ({ word, frequency }));
+  }, [scopedSentences]);
+
   const keywordSentences = useMemo(() => {
     if (!selectedKeyword) return [];
     const safeKeyword = selectedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(`\\b${safeKeyword}\\b`, "i");
     return scopedSentences.filter(({ text }) => pattern.test(text));
   }, [selectedKeyword, scopedSentences]);
-
-  const fetchWordCloud = useCallback(
-    async (path) => {
-      setLoadingCloud(true);
-      try {
-        let queryStr = "";
-        if (forcedPathQuery) {
-          queryStr = forcedPathQuery;
-        } else {
-          const params = new URLSearchParams();
-          path.forEach((seg) => params.append("path", seg));
-          queryStr = params.toString();
-        }
-        const res = await fetch(
-          `/api/submission/${submissionId}/word-cloud?${queryStr}`,
-        );
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setSentenceWords(data.words || []);
-        setSentenceCount(data.sentence_count || 0);
-      } catch (err) {
-        console.error("word-cloud fetch failed:", err);
-        setSentenceWords([]);
-        setSentenceCount(0);
-      } finally {
-        setLoadingCloud(false);
-      }
-    },
-    [submissionId, forcedPathQuery],
-  );
-
-  useEffect(() => {
-    fetchWordCloud(navPath);
-  }, [fetchWordCloud, navPath]);
-
-  useEffect(() => {
-    setSelectedKeyword(null);
-  }, [navPath]);
 
   const isRoot = navPath.length === 0;
 
@@ -426,30 +395,21 @@ function TopicsTagCloud({
       <section className="topics-tag-cloud__panel">
         <div className="topics-tag-cloud__panel-header">
           {isRoot ? "All text" : navPath.join(" › ")} - key words
-          {!loadingCloud && sentenceWords.length > 0 && (
+          {sentenceWords.length > 0 && (
             <span className="topics-tag-cloud__panel-note">
               click a keyword to see matching sentences
             </span>
           )}
-          {!loadingCloud && (
-            <span className="topics-tag-cloud__panel-note">
-              from {sentenceCount} sentence{sentenceCount !== 1 ? "s" : ""}
-            </span>
-          )}
-          {loadingCloud && (
-            <span className="topics-tag-cloud__panel-note">computing…</span>
-          )}
+          <span className="topics-tag-cloud__panel-note">
+            from {sentenceCount} sentence{sentenceCount !== 1 ? "s" : ""}
+          </span>
         </div>
 
-        {loadingCloud ? (
-          <div className="topics-tag-cloud__loading">Loading word cloud…</div>
-        ) : (
-          <WordCloudDisplay
-            words={sentenceWords}
-            onWordClick={handleKeywordClick}
-            emptyMessage="No sentences found for this topic."
-          />
-        )}
+        <WordCloudDisplay
+          words={sentenceWords}
+          onWordClick={handleKeywordClick}
+          emptyMessage="No sentences found for this topic."
+        />
       </section>
 
       {selectedKeyword && (
