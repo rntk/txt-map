@@ -1,6 +1,7 @@
 import React from "react";
 import { getStickyCardTop } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
+import { getZoomAdjustedFontSize } from "./utils";
 import {
   DEFAULT_TOPIC_TAG_VISIBLE_COUNT,
   TOPIC_TAGS_PER_LOAD,
@@ -48,6 +49,11 @@ export default function CanvasTopicTagsRail({
   isAnimating,
 }) {
   const { cards = [], articleRight = 0, articleHeight = 0 } = topicTagsLayout;
+  const railLeft = articleRight + 83;
+  const railWidth = getZoomAdjustedFontSize(scale, 320);
+  const nameFontSize = getZoomAdjustedFontSize(scale, 10);
+  const metaFontSize = getZoomAdjustedFontSize(scale, 9);
+  const tagFontSize = getZoomAdjustedFontSize(scale, 10);
 
   if (!cards || cards.length === 0) return null;
 
@@ -77,6 +83,13 @@ export default function CanvasTopicTagsRail({
       />
       <div
         className="canvas-topic-tags-rail"
+        style={{
+          left: `${railLeft}px`,
+          "--canvas-topic-tags-rail-width": `${railWidth}px`,
+          "--canvas-topic-tags-name-font-size": `${nameFontSize}px`,
+          "--canvas-topic-tags-meta-font-size": `${metaFontSize}px`,
+          "--canvas-topic-tags-tag-font-size": `${tagFontSize}px`,
+        }}
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >

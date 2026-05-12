@@ -38,6 +38,16 @@ export function getZoomAdjustedTopicTitleFontSize(scale) {
 
 /**
  * @param {number} scale
+ * @param {number} baseSize
+ * @returns {number}
+ */
+export function getZoomAdjustedFontSize(scale, baseSize) {
+  const safeScale = clampCanvasScale(scale || 1);
+  return baseSize * Math.max(1, 1 / safeScale);
+}
+
+/**
+ * @param {number} scale
  * @returns {number}
  */
 export function getZoomAdjustedTopicCardWidth(scale) {

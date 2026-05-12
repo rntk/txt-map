@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   clampCanvasScale,
+  getZoomAdjustedFontSize,
   getZoomAdjustedTopicTitleFontSize,
   getZoomAdjustedTopicCardWidth,
   getTopicTitleFontSize,
@@ -55,6 +56,16 @@ describe("getZoomAdjustedTopicTitleFontSize", () => {
     expect(getZoomAdjustedTopicTitleFontSize(null)).toBe(
       getZoomAdjustedTopicTitleFontSize(1),
     );
+  });
+});
+
+describe("getZoomAdjustedFontSize", () => {
+  it("scales a base font size up at zoomed-out levels", () => {
+    expect(getZoomAdjustedFontSize(0.5, 10)).toBe(20);
+  });
+
+  it("does not scale a base font size below 1x at zoomed-in levels", () => {
+    expect(getZoomAdjustedFontSize(2, 10)).toBe(10);
   });
 });
 
