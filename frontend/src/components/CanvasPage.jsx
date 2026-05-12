@@ -929,7 +929,8 @@ export default function CanvasPage() {
           const index = sentenceNumber - 1;
           if (index < 0 || index >= submissionSentences.length) return;
           const start = sentenceOffsets[index];
-          const end = sentenceOffsets[index] + submissionSentences[index].length;
+          const end =
+            sentenceOffsets[index] + submissionSentences[index].length;
           base.push({ start, end, label: activeCard.topicName });
           sentenceBounds.push({ start, end });
         });

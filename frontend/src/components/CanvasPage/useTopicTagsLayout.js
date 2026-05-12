@@ -6,7 +6,6 @@ import {
 } from "./utils";
 import { useRailLayout } from "./useRailLayout";
 
-const MIN_TOPIC_TAG_SCORE = 80;
 export const DEFAULT_TOPIC_TAG_VISIBLE_COUNT = 4;
 export const TOPIC_TAGS_PER_LOAD = 4;
 
@@ -28,7 +27,7 @@ function normalizeRankedTags(value) {
       const tag =
         typeof entry.tag === "string" ? entry.tag.trim().toLowerCase() : "";
       const score = Math.max(0, Math.min(100, Math.round(Number(entry.score))));
-      if (!tag || !Number.isFinite(score) || score < MIN_TOPIC_TAG_SCORE) {
+      if (!tag || !Number.isFinite(score)) {
         return null;
       }
       return { tag, score };

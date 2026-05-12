@@ -103,11 +103,6 @@ export default function CanvasTopicTagsRail({
             card.tags.length - visibleTags.length,
           );
           const isActive = activeTopicKey === card.key;
-          const sentenceLabel =
-            card.sentenceStart === card.sentenceEnd
-              ? `Sentence ${card.sentenceStart}`
-              : `Sentences ${card.sentenceStart}-${card.sentenceEnd}`;
-
           return (
             <div
               key={card.key}
@@ -127,13 +122,10 @@ export default function CanvasTopicTagsRail({
                 event.preventDefault();
                 onCardClick(card.key);
               }}
-              title={`${card.fullPath}: ${sentenceLabel}`}
+              title={card.fullPath}
             >
               <span className="canvas-topic-tags-card__name">
                 {card.topicName}
-              </span>
-              <span className="canvas-topic-tags-card__meta">
-                {sentenceLabel}
               </span>
               <span className="canvas-topic-tags-card__tags">
                 {visibleTags.map(({ tag, score }) => (

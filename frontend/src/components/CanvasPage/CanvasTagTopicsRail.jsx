@@ -114,10 +114,6 @@ export default function CanvasTagTopicsRail({
         {cards.map((card) => {
           const effectiveTop = getStickyCardTop(card, viewportTop, scale);
           const isActive = activeTopicKey === card.key;
-          const sentenceLabel =
-            card.sentences.length === 1
-              ? `Sentence ${card.sentences[0]}`
-              : `${card.sentences.length} matching sentences`;
           const summaryText = card.summaryText || card.preview;
 
           return (
@@ -133,13 +129,10 @@ export default function CanvasTagTopicsRail({
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}
               onClick={() => onCardClick(card.key)}
-              title={`${card.fullPath}: ${sentenceLabel}`}
+              title={card.fullPath}
             >
               <span className="canvas-tag-topic-card__name">
                 {card.topicName}
-              </span>
-              <span className="canvas-tag-topic-card__meta">
-                {sentenceLabel}
               </span>
               <span className="canvas-tag-topic-card__preview">
                 {summaryText}
