@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getTopicParts } from "../../utils/topicHierarchy";
 import { TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX } from "./constants";
 import {
+  clampCanvasScale,
   getTopicDisplayName,
   getTopicSentenceNumbers,
   getTopicTextRange,
@@ -75,8 +76,7 @@ export function useTopicHierarchyLayout({
       const wrapRect = wrapEl.getBoundingClientRect();
       const offsetH = articleEl.offsetHeight;
       const s =
-        offsetH > 0 ? articleRect.height / offsetH : scaleRef.current || 1;
-
+        offsetH > 0 ? clampCanvasScale(articleRect.height / offsetH) : scaleRef.current || 1;
       const summaryRectForRow = (row) => {
         const matching = getMatchingSummaryCardsForHierarchyRow(
           row,

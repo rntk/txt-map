@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rangeAtOffset } from "./utils";
+import { clampCanvasScale, rangeAtOffset } from "./utils";
 
 const DEFAULT_CARD_HEIGHT = 92;
 const GAP = 10;
@@ -84,8 +84,7 @@ export function useRailLayout({
       // that don't match what the browser is currently painting.
       const offsetH = articleEl.offsetHeight;
       const s =
-        offsetH > 0 ? articleRect.height / offsetH : scaleRef.current || 1;
-
+        offsetH > 0 ? clampCanvasScale(articleRect.height / offsetH) : scaleRef.current || 1;
       const positioned = entries
         .map((entry) => {
           const midOff = Math.floor((entry.charStart + entry.charEnd) / 2);
@@ -141,7 +140,8 @@ export function useRailLayout({
       resizeObserver = new window.ResizeObserver(schedule);
       if (articleTextRef.current)
         resizeObserver.observe(articleTextRef.current);
-      if (summaryWrapRef.current) resizeObserver.observe(summaryWrapRef.current);
+      if (summaryWrapRef.current)
+        resizeObserver.observe(summaryWrapRef.current);
     }
 
     return () => {
