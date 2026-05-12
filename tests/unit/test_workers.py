@@ -1,5 +1,6 @@
 """Unit tests for workers module."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -153,6 +154,7 @@ def test_claim_task_found(mock_db: MagicMock) -> None:
         "_id": ObjectId(),
         "task_type": "split_topic_generation",
         "submission_id": "sub-1",
+        "lease_id": "lease-1",
     }
     mock_db.task_queue.find_one_and_update.return_value = task
     w.submissions_storage.get_by_id.return_value = {"tasks": {}}
@@ -160,10 +162,13 @@ def test_claim_task_found(mock_db: MagicMock) -> None:
     assert result == task
     query = mock_db.task_queue.find_one_and_update.call_args.args[0]
     update = mock_db.task_queue.find_one_and_update.call_args.args[1]
-    assert query["status"] == "pending"
     assert query["task_type"] == "split_topic_generation"
+    assert query["$or"][0]["status"] == "pending"
+    assert query["$or"][1]["status"] == "processing"
     assert update["$set"]["status"] == "processing"
     assert update["$set"]["worker_id"] == w.worker_id
+    assert "lease_id" in update["$set"]
+    assert "lease_expires_at" in update["$set"]
 
 
 def test_claim_task_tries_task_types_in_priority_order(mock_db: MagicMock) -> None:
@@ -202,8 +207,11 @@ def test_claim_task_dependencies_not_met(mock_db: MagicMock) -> None:
         "_id": ObjectId(),
         "task_type": "subtopics_generation",
         "submission_id": "sub-1",
+        "lease_id": "lease-1",
     }
-    mock_db.task_queue.find_one_and_update.return_value = task
+    mock_db.task_queue.find_one_and_update.side_effect = [task] + [None] * len(
+        TASK_HANDLERS
+    )
     w.submissions_storage.get_by_id.return_value = {
         "tasks": {"split_topic_generation": {"status": "pending"}}
     }
@@ -211,10 +219,17 @@ def test_claim_task_dependencies_not_met(mock_db: MagicMock) -> None:
     assert result is None
     query = mock_db.task_queue.update_one.call_args.args[0]
     update = mock_db.task_queue.update_one.call_args.args[1]
-    assert query == {"_id": task["_id"]}
+    assert query == {
+        "_id": task["_id"],
+        "worker_id": w.worker_id,
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
     assert update["$set"]["status"] == "pending"
     assert update["$set"]["started_at"] is None
     assert update["$set"]["worker_id"] is None
+    assert update["$set"]["lease_id"] is None
+    assert update["$set"]["lease_expires_at"] is None
     assert "blocked_until" in update["$set"]
 
 
@@ -255,17 +270,62 @@ def test_mark_task_completed(mock_db: MagicMock) -> None:
         mock_sub.return_value = MagicMock()
         mock_diff.return_value = MagicMock()
         w = Worker(mock_db)
-    task = {"_id": ObjectId(), "submission_id": "sub-1", "task_type": "split"}
+    task: dict[str, Any] = {
+        "_id": ObjectId(),
+        "submission_id": "sub-1",
+        "task_type": "split",
+        "lease_id": "lease-1",
+    }
+    mock_db.task_queue.update_one.return_value.matched_count = 1
+    mock_db.task_queue.delete_one.return_value.deleted_count = 1
     w._mark_task_completed(task)
     update_query = mock_db.task_queue.update_one.call_args.args[0]
-    update_doc = mock_db.task_queue.update_one.call_args.args[1]
-    assert update_query == {"_id": task["_id"]}
-    assert update_doc["$set"]["status"] == "completed"
-    assert "completed_at" in update_doc["$set"]
-    mock_db.task_queue.delete_one.assert_called_once_with({"_id": task["_id"]})
+    assert update_query == {
+        "_id": task["_id"],
+        "worker_id": w.worker_id,
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
+    mock_db.task_queue.delete_one.assert_called_once_with(
+        {
+            "_id": task["_id"],
+            "worker_id": w.worker_id,
+            "lease_id": "lease-1",
+            "status": "completed",
+        }
+    )
     w.submissions_storage.update_task_status.assert_called_once_with(
         "sub-1", "split", "completed"
     )
+
+
+def test_mark_task_completed_does_not_delete_when_submission_update_fails(
+    mock_db: MagicMock,
+) -> None:
+    with (
+        patch("workers.signal.signal"),
+        patch("workers.SubmissionsStorage") as mock_sub,
+        patch("workers.SemanticDiffsStorage") as mock_diff,
+    ):
+        mock_sub.return_value = MagicMock()
+        mock_diff.return_value = MagicMock()
+        w = Worker(mock_db)
+
+    task: dict[str, Any] = {
+        "_id": ObjectId(),
+        "submission_id": "sub-1",
+        "task_type": "split",
+        "lease_id": "lease-1",
+    }
+    mock_db.task_queue.update_one.return_value.matched_count = 1
+    w.submissions_storage.update_task_status.side_effect = RuntimeError(
+        "submission write failed"
+    )
+
+    with pytest.raises(RuntimeError, match="submission write failed"):
+        w._mark_task_completed(task)
+
+    mock_db.task_queue.delete_one.assert_not_called()
 
 
 def test_mark_task_failed(mock_db: MagicMock) -> None:
@@ -277,11 +337,22 @@ def test_mark_task_failed(mock_db: MagicMock) -> None:
         mock_sub.return_value = MagicMock()
         mock_diff.return_value = MagicMock()
         w = Worker(mock_db)
-    task = {"_id": ObjectId(), "submission_id": "sub-1", "task_type": "split"}
+    task = {
+        "_id": ObjectId(),
+        "submission_id": "sub-1",
+        "task_type": "split",
+        "lease_id": "lease-1",
+    }
+    mock_db.task_queue.update_one.return_value.matched_count = 1
     w._mark_task_failed(task, "boom")
     update_query = mock_db.task_queue.update_one.call_args.args[0]
     update_doc = mock_db.task_queue.update_one.call_args.args[1]
-    assert update_query == {"_id": task["_id"]}
+    assert update_query == {
+        "_id": task["_id"],
+        "worker_id": w.worker_id,
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
     assert update_doc["$set"]["status"] == "failed"
     assert update_doc["$set"]["error"] == "boom"
     assert update_doc["$inc"] == {"retry_count": 1}
@@ -365,6 +436,7 @@ def test_process_task_no_handler(mock_db: MagicMock) -> None:
                 "_id": ObjectId(),
                 "task_type": "unknown_task",
                 "submission_id": "sub-1",
+                "lease_id": "lease-1",
             }
         )
     w.submissions_storage.update_task_status.assert_any_call(
@@ -391,6 +463,7 @@ def test_process_task_submission_not_found(mock_db: MagicMock) -> None:
                 "_id": ObjectId(),
                 "task_type": "split_topic_generation",
                 "submission_id": "sub-1",
+                "lease_id": "lease-1",
             }
         )
     w.submissions_storage.update_task_status.assert_any_call(

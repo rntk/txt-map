@@ -11,9 +11,10 @@ import os
 import signal
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from types import FrameType
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 import requests
 from pymongo import MongoClient
@@ -64,19 +65,47 @@ class WorkerBackend(Protocol):
     ) -> bool: ...
 
 
+class CacheWriter(Protocol):
+    """Writes successful worker responses to an LLM cache."""
+
+    def write(self, request: dict[str, Any], response: str, model_id: str) -> None: ...
+
+
+class LocalLLMCacheWriter:
+    """MongoDB-backed cache writer for locally completed LLM queue requests."""
+
+    def __init__(self, cache_store: MongoLLMCacheStore) -> None:
+        self._cache_store = cache_store
+
+    def write(self, request: dict[str, Any], response: str, model_id: str) -> None:
+        cache_key = request.get("cache_key")
+        if not cache_key:
+            return
+
+        self._cache_store.set(
+            CacheEntry(
+                key=cache_key,
+                response=response,
+                created_at=time.time(),
+                namespace=request.get("cache_namespace") or "",
+                model_id=model_id,
+                prompt_version=request.get("prompt_version"),
+                temperature=float(request.get("temperature", 0.0)),
+            )
+        )
+
+
 class LocalQueueBackend:
     """Direct MongoDB-backed queue operations."""
 
     def __init__(
         self,
         store: LLMQueueStore,
-        cache_store: MongoLLMCacheStore,
         *,
         lease_seconds: int,
         supported_model_ids: Optional[list[str]] = None,
     ) -> None:
         self._store = store
-        self._cache_store = cache_store
         self._lease_seconds = lease_seconds
         self._supported_model_ids = supported_model_ids
 
@@ -131,25 +160,6 @@ class LocalQueueBackend:
             lease_id=lease_id,
         )
 
-    def write_cache(
-        self, request: dict[str, Any], response: str, model_id: str
-    ) -> None:
-        cache_key = request.get("cache_key")
-        if not cache_key:
-            return
-
-        self._cache_store.set(
-            CacheEntry(
-                key=cache_key,
-                response=response,
-                created_at=time.time(),
-                namespace=request.get("cache_namespace") or "",
-                model_id=model_id,
-                prompt_version=request.get("prompt_version"),
-                temperature=float(request.get("temperature", 0.0)),
-            )
-        )
-
 
 class RemoteQueueBackend:
     """HTTP-backed queue transport for remote workers."""
@@ -186,8 +196,7 @@ class RemoteQueueBackend:
         payload: dict[str, Any] = {"worker_id": worker_id}
         if self._supported_model_ids:
             payload["supported_model_ids"] = self._supported_model_ids
-        response = self._post("/api/llm-workers/claim", payload)
-        return response.get("task")
+        return self._post("/api/llm-workers/claim", payload).get("task")
 
     def heartbeat(self, request_id: str, worker_id: str, lease_id: str) -> bool:
         try:
@@ -323,6 +332,7 @@ class LLMWorker:
         heartbeat_file: str | None = None,
         worker_id: str | None = None,
         remote_provider_config: RemoteProviderConfig | None = None,
+        cache_writer: CacheWriter | None = None,
         register_signal_handlers: bool = True,
     ) -> None:
         self._db = db
@@ -330,6 +340,7 @@ class LLMWorker:
         self._poll_interval = poll_interval
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
         self._remote_provider_config = remote_provider_config
+        self._cache_writer = cache_writer
         self._worker_id = worker_id or f"llm-worker-{os.getpid()}"
         self._running = True
         self._heartbeat_file = heartbeat_file
@@ -460,9 +471,9 @@ class LLMWorker:
             return
 
         logger.info("Worker %s completed request %s", self._worker_id, request_id)
-        if isinstance(self._backend, LocalQueueBackend):
+        if self._cache_writer is not None:
             try:
-                self._backend.write_cache(request, response, executed_model_id)
+                self._cache_writer.write(request, response, executed_model_id)
             except Exception:
                 logger.warning(
                     "Failed to write cache entry for request %s",
@@ -476,159 +487,299 @@ def _parse_supported_model_ids(value: str) -> Optional[list[str]]:
     return model_ids or None
 
 
-def main() -> None:
-    backend_name = os.getenv("LLM_WORKER_BACKEND", "local").lower()
-    poll_interval = float(os.getenv("LLM_WORKER_POLL_INTERVAL", "0.5"))
-    heartbeat_file = os.getenv("LLM_WORKER_HEARTBEAT_FILE")
-    concurrency = max(1, int(os.getenv("LLM_WORKER_CONCURRENCY", "1")))
+@dataclass(frozen=True)
+class LLMWorkerEnvironment:
+    backend_name: str
+    poll_interval: float
+    heartbeat_file: str | None
+    concurrency: int
+    lease_seconds: int
+    heartbeat_interval_seconds: float
+    supported_model_ids: list[str] | None
+    worker_prefix: str
+    mongodb_url: str
+    api_url: str
+    token: str
+    provider_config_path: str
+
+
+@dataclass
+class BackendRuntime:
+    backend_factory: Callable[[], WorkerBackend]
+    db: Database | None
+    remote_provider_config: RemoteProviderConfig | None
+    cache_writer: CacheWriter | None
+    maintenance_loop: "MaintenanceLoop | None"
+    client: MongoClient | None
+
+
+def load_worker_environment() -> LLMWorkerEnvironment:
+    backend_name = (os.getenv("LLM_WORKER_BACKEND", "local") or "local").lower()
     lease_seconds = max(
         10, int(os.getenv("LLM_WORKER_LEASE_SECONDS", str(DEFAULT_LEASE_SECONDS)))
     )
-    heartbeat_interval_seconds = float(
-        os.getenv(
-            "LLM_WORKER_HEARTBEAT_INTERVAL_SECONDS",
-            str(min(DEFAULT_HEARTBEAT_INTERVAL_SECONDS, max(1, lease_seconds // 3))),
-        )
+    default_heartbeat_interval = float(
+        min(DEFAULT_HEARTBEAT_INTERVAL_SECONDS, max(1, lease_seconds // 3))
     )
-    supported_model_ids = _parse_supported_model_ids(
-        os.getenv("LLM_WORKER_SUPPORTED_MODEL_IDS", "")
+    heartbeat_env = os.getenv("LLM_WORKER_HEARTBEAT_INTERVAL_SECONDS")
+    heartbeat_interval_seconds = (
+        float(heartbeat_env) if heartbeat_env else default_heartbeat_interval
     )
-    remote_provider_config: RemoteProviderConfig | None = None
+    worker_prefix = os.getenv("LLM_WORKER_ID") or f"llm-worker-{os.getpid()}"
 
-    workers: list[LLMWorker]
-    client: MongoClient | None = None
-    db: Database | None = None
-    maintenance_stop_event = threading.Event()
+    return LLMWorkerEnvironment(
+        backend_name=backend_name,
+        poll_interval=float(os.getenv("LLM_WORKER_POLL_INTERVAL", "0.5")),
+        heartbeat_file=os.getenv("LLM_WORKER_HEARTBEAT_FILE"),
+        concurrency=max(1, int(os.getenv("LLM_WORKER_CONCURRENCY", "1"))),
+        lease_seconds=lease_seconds,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+        supported_model_ids=_parse_supported_model_ids(
+            os.getenv("LLM_WORKER_SUPPORTED_MODEL_IDS", "")
+        ),
+        worker_prefix=worker_prefix,
+        mongodb_url=os.getenv("MONGODB_URL", "mongodb://localhost:8765/"),
+        api_url=(os.getenv("LLM_WORKER_API_URL", "") or "").strip(),
+        token=(os.getenv("LLM_WORKER_TOKEN", "") or "").strip(),
+        provider_config_path=(
+            os.getenv("LLM_WORKER_PROVIDER_CONFIG", "") or ""
+        ).strip(),
+    )
 
-    if backend_name == "local":
-        mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
-        logger.info("Connecting to MongoDB: %s", mongodb_url)
-        client = MongoClient(mongodb_url)
-        db = client["rss"]
 
-        AppSettingsStorage(db).prepare()
-        queue_store = LLMQueueStore(db)
-        queue_store.prepare()
+class MaintenanceLoop:
+    """Periodically reclaims stale LLM queue requests for local workers."""
 
-        def run_maintenance_loop() -> None:
-            logger.info("LLM maintenance loop started")
-            while not maintenance_stop_event.wait(DEFAULT_MAINTENANCE_INTERVAL_SECONDS):
-                try:
-                    reclaimed = queue_store.reclaim_stale_processing(
-                        lease_seconds=lease_seconds
-                    )
-                    if reclaimed:
-                        logger.info(
-                            "Reclaimed %s stale 'processing' LLM queue requests",
-                            reclaimed,
-                        )
-                except Exception:
-                    logger.exception("Unexpected error in LLM maintenance loop")
-            logger.info("LLM maintenance loop stopped")
+    def __init__(
+        self,
+        queue_store: LLMQueueStore,
+        *,
+        lease_seconds: int,
+        interval_seconds: float = DEFAULT_MAINTENANCE_INTERVAL_SECONDS,
+    ) -> None:
+        self._queue_store = queue_store
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
 
-        reclaimed_count = queue_store.reclaim_stale_processing(
-            lease_seconds=lease_seconds
+    def start(self) -> None:
+        self.reclaim_once(initial=True)
+        self._thread = threading.Thread(
+            target=self._run,
+            name="llm-maintenance",
+            daemon=True,
         )
-        if reclaimed_count:
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._stop_event.is_set():
+            return
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join()
+
+    def reclaim_once(self, *, initial: bool = False) -> None:
+        reclaimed_count = self._queue_store.reclaim_stale_processing(
+            lease_seconds=self._lease_seconds
+        )
+        if not reclaimed_count:
+            return
+
+        if initial:
             logger.info(
                 "Reclaimed %s stale 'processing' LLM queue requests back to 'pending'",
                 reclaimed_count,
             )
+            return
 
-        maintenance_thread = threading.Thread(
-            target=run_maintenance_loop, name="llm-maintenance", daemon=True
-        )
-        maintenance_thread.start()
-
-        cache_store = MongoLLMCacheStore(db)
-        cache_store.prepare()
-
-        llm = create_llm_client(db=db)
         logger.info(
-            "Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name
+            "Reclaimed %s stale 'processing' LLM queue requests",
+            reclaimed_count,
         )
 
-        backend: WorkerBackend = LocalQueueBackend(
-            queue_store,
-            cache_store,
-            lease_seconds=lease_seconds,
-            supported_model_ids=supported_model_ids,
-        )
-    elif backend_name == "remote":
-        api_url = os.getenv("LLM_WORKER_API_URL", "").strip()
-        token = os.getenv("LLM_WORKER_TOKEN", "").strip()
-        provider_config_path = os.getenv("LLM_WORKER_PROVIDER_CONFIG", "").strip()
-        if not api_url:
-            raise RuntimeError("LLM_WORKER_API_URL is required for remote backend")
-        if not token:
-            raise RuntimeError("LLM_WORKER_TOKEN is required for remote backend")
-        if not provider_config_path:
-            raise RuntimeError(
-                "LLM_WORKER_PROVIDER_CONFIG is required for remote backend"
-            )
-        remote_provider_config = load_remote_provider_config(provider_config_path)
-        supported_model_ids = remote_provider_config.supported_model_ids
-        logger.info(
-            "Loaded remote LLM provider config with supported models: %s",
-            ", ".join(supported_model_ids),
-        )
-        backend = RemoteQueueBackend(
-            api_url,
-            token,
-            supported_model_ids=supported_model_ids,
-        )
-    else:
-        raise RuntimeError(f"Unsupported LLM worker backend: {backend_name}")
+    def _run(self) -> None:
+        logger.info("LLM maintenance loop started")
+        while not self._stop_event.wait(self._interval_seconds):
+            try:
+                self.reclaim_once()
+            except Exception:
+                logger.exception("Unexpected error in LLM maintenance loop")
+        logger.info("LLM maintenance loop stopped")
 
-    worker_prefix = os.getenv("LLM_WORKER_ID") or f"llm-worker-{os.getpid()}"
-    workers = [
-        LLMWorker(
-            backend=backend,
-            db=db,
-            poll_interval=poll_interval,
-            heartbeat_interval_seconds=heartbeat_interval_seconds,
-            heartbeat_file=heartbeat_file,
-            worker_id=f"{worker_prefix}-{index + 1}"
-            if concurrency > 1
-            else worker_prefix,
-            remote_provider_config=remote_provider_config,
-            register_signal_handlers=False,
-        )
-        for index in range(concurrency)
-    ]
 
-    def handle_stop(signum: int, frame: FrameType | None) -> None:  # noqa: ARG001
-        logger.info(
-            "Received signal %s, stopping %s LLM worker(s)", signum, len(workers)
-        )
-        maintenance_stop_event.set()
-        for worker in workers:
-            worker.stop()
+class WorkerPool:
+    """Owns signal handling and thread orchestration for LLM workers."""
 
-    signal.signal(signal.SIGINT, handle_stop)
-    signal.signal(signal.SIGTERM, handle_stop)
+    def __init__(
+        self,
+        workers: list[LLMWorker],
+        *,
+        maintenance_loop: MaintenanceLoop | None = None,
+    ) -> None:
+        self._workers = workers
+        self._maintenance_loop = maintenance_loop
 
-    try:
-        if concurrency == 1:
-            workers[0].run()
-        else:
-            logger.info("Starting %s LLM worker threads", concurrency)
-            threads = [
+    def run(self) -> None:
+        self._register_signal_handlers()
+        if self._maintenance_loop is not None:
+            self._maintenance_loop.start()
+
+        try:
+            if len(self._workers) == 1:
+                self._workers[0].run()
+                return
+
+            logger.info("Starting %s LLM worker threads", len(self._workers))
+            threads: list[threading.Thread] = [
                 threading.Thread(target=worker.run, name=worker.worker_id)
-                for worker in workers
+                for worker in self._workers
             ]
             for thread in threads:
                 thread.start()
             for thread in threads:
                 thread.join()
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt, shutting down")
-        maintenance_stop_event.set()
-        for worker in workers:
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt, shutting down")
+            self.stop()
+        finally:
+            if self._maintenance_loop is not None:
+                self._maintenance_loop.stop()
+
+    def stop(self) -> None:
+        if self._maintenance_loop is not None:
+            self._maintenance_loop.stop()
+        for worker in self._workers:
             worker.stop()
+
+    def _register_signal_handlers(self) -> None:
+        signal.signal(signal.SIGINT, self._handle_stop)
+        signal.signal(signal.SIGTERM, self._handle_stop)
+
+    def _handle_stop(self, signum: int, frame: FrameType | None) -> None:  # noqa: ARG002
+        logger.info(
+            "Received signal %s, stopping %s LLM worker(s)",
+            signum,
+            len(self._workers),
+        )
+        self.stop()
+
+
+def build_backend_runtime(config: LLMWorkerEnvironment) -> BackendRuntime:
+    if config.backend_name == "local":
+        return _build_local_backend_runtime(config)
+    if config.backend_name == "remote":
+        return _build_remote_backend_runtime(config)
+    raise RuntimeError(f"Unsupported LLM worker backend: {config.backend_name}")
+
+
+def _build_local_backend_runtime(config: LLMWorkerEnvironment) -> BackendRuntime:
+    logger.info("Connecting to MongoDB: %s", config.mongodb_url)
+    client: MongoClient = MongoClient(config.mongodb_url)
+    db = client["rss"]
+
+    AppSettingsStorage(db).prepare()
+    queue_store = LLMQueueStore(db)
+    queue_store.prepare()
+
+    cache_store = MongoLLMCacheStore(db)
+    cache_store.prepare()
+    cache_writer = LocalLLMCacheWriter(cache_store)
+
+    llm = create_llm_client(db=db)
+    logger.info(
+        "Initial LLM provider: %s, model: %s", llm.provider_name, llm.model_name
+    )
+
+    def create_backend() -> WorkerBackend:
+        return LocalQueueBackend(
+            queue_store,
+            lease_seconds=config.lease_seconds,
+            supported_model_ids=config.supported_model_ids,
+        )
+
+    return BackendRuntime(
+        backend_factory=create_backend,
+        db=db,
+        remote_provider_config=None,
+        cache_writer=cache_writer,
+        maintenance_loop=MaintenanceLoop(
+            queue_store,
+            lease_seconds=config.lease_seconds,
+        ),
+        client=client,
+    )
+
+
+def _build_remote_backend_runtime(config: LLMWorkerEnvironment) -> BackendRuntime:
+    if not config.api_url:
+        raise RuntimeError("LLM_WORKER_API_URL is required for remote backend")
+    if not config.token:
+        raise RuntimeError("LLM_WORKER_TOKEN is required for remote backend")
+    if not config.provider_config_path:
+        raise RuntimeError("LLM_WORKER_PROVIDER_CONFIG is required for remote backend")
+
+    remote_provider_config = load_remote_provider_config(config.provider_config_path)
+    supported_model_ids = remote_provider_config.supported_model_ids
+    logger.info(
+        "Loaded remote LLM provider config with supported models: %s",
+        ", ".join(supported_model_ids),
+    )
+
+    def create_backend() -> WorkerBackend:
+        return RemoteQueueBackend(
+            config.api_url,
+            config.token,
+            supported_model_ids=supported_model_ids,
+        )
+
+    return BackendRuntime(
+        backend_factory=create_backend,
+        db=None,
+        remote_provider_config=remote_provider_config,
+        cache_writer=None,
+        maintenance_loop=None,
+        client=None,
+    )
+
+
+def build_workers(
+    config: LLMWorkerEnvironment,
+    runtime: BackendRuntime,
+) -> list[LLMWorker]:
+    workers: list[LLMWorker] = []
+    for index in range(config.concurrency):
+        worker_id = (
+            f"{config.worker_prefix}-{index + 1}"
+            if config.concurrency > 1
+            else config.worker_prefix
+        )
+        workers.append(
+            LLMWorker(
+                backend=runtime.backend_factory(),
+                db=runtime.db,
+                poll_interval=config.poll_interval,
+                heartbeat_interval_seconds=config.heartbeat_interval_seconds,
+                heartbeat_file=config.heartbeat_file,
+                worker_id=worker_id,
+                remote_provider_config=runtime.remote_provider_config,
+                cache_writer=runtime.cache_writer,
+                register_signal_handlers=False,
+            )
+        )
+    return workers
+
+
+def main() -> None:
+    config = load_worker_environment()
+    runtime = build_backend_runtime(config)
+    workers = build_workers(config, runtime)
+    pool = WorkerPool(workers, maintenance_loop=runtime.maintenance_loop)
+    try:
+        pool.run()
     finally:
-        if client is not None:
-            client.close()
+        if runtime.client is not None:
+            runtime.client.close()
 
 
 if __name__ == "__main__":

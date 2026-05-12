@@ -15,7 +15,7 @@ def test_process_task_without_queue_store() -> None:
         mock_sub.return_value = MagicMock()
         mock_diff.return_value = MagicMock()
         db = MagicMock()
-        w = Worker(db, llm=MagicMock(), cache_store=MagicMock())
+        w = Worker(db, cache_store=MagicMock())
 
     w.submissions_storage.get_by_id.return_value = {
         "submission_id": "sub-1",
@@ -33,6 +33,7 @@ def test_process_task_without_queue_store() -> None:
                     "_id": "t1",
                     "task_type": "split_topic_generation",
                     "submission_id": "sub-1",
+                    "lease_id": "lease-1",
                 }
             )
     finally:
@@ -53,7 +54,7 @@ def test_process_task_non_cache_task() -> None:
         mock_sub.return_value = MagicMock()
         mock_diff.return_value = MagicMock()
         db = MagicMock()
-        w = Worker(db, llm=MagicMock())
+        w = Worker(db)
 
     w.submissions_storage.get_by_id.return_value = {
         "submission_id": "sub-1",
@@ -70,6 +71,7 @@ def test_process_task_non_cache_task() -> None:
                     "_id": "t1",
                     "task_type": "clustering_generation",
                     "submission_id": "sub-1",
+                    "lease_id": "lease-1",
                 }
             )
     finally:

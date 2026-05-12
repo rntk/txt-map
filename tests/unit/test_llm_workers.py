@@ -7,6 +7,7 @@ import requests
 
 from llm_workers import (
     LLMWorker,
+    LocalLLMCacheWriter,
     LocalQueueBackend,
     RemoteQueueBackend,
     _parse_supported_model_ids,
@@ -30,8 +31,7 @@ class FakeLLM:
 def test_local_queue_backend_claim() -> None:
     store = MagicMock()
     store.claim.return_value = {"request_id": "r1"}
-    cache = MagicMock()
-    backend = LocalQueueBackend(store, cache, lease_seconds=30)
+    backend = LocalQueueBackend(store, lease_seconds=30)
     result = backend.claim("worker-1")
     assert result == {"request_id": "r1"}
     store.claim.assert_called_once_with(
@@ -42,36 +42,35 @@ def test_local_queue_backend_claim() -> None:
 def test_local_queue_backend_heartbeat() -> None:
     store = MagicMock()
     store.heartbeat.return_value = {"request_id": "r1"}
-    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    backend = LocalQueueBackend(store, lease_seconds=30)
     assert backend.heartbeat("r1", "worker-1", "lease-1") is True
 
 
 def test_local_queue_backend_heartbeat_none() -> None:
     store = MagicMock()
     store.heartbeat.return_value = None
-    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    backend = LocalQueueBackend(store, lease_seconds=30)
     assert backend.heartbeat("r1", "worker-1", "lease-1") is False
 
 
 def test_local_queue_backend_complete() -> None:
     store = MagicMock()
     store.complete.return_value = True
-    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    backend = LocalQueueBackend(store, lease_seconds=30)
     assert backend.complete("r1", "w1", "l1", "resp", "p", "m", "mid") is True
 
 
 def test_local_queue_backend_fail() -> None:
     store = MagicMock()
     store.fail.return_value = True
-    backend = LocalQueueBackend(store, MagicMock(), lease_seconds=30)
+    backend = LocalQueueBackend(store, lease_seconds=30)
     assert backend.fail("r1", "w1", "l1", "error") is True
 
 
-def test_local_queue_backend_write_cache() -> None:
-    store = MagicMock()
+def test_local_llm_cache_writer_write() -> None:
     cache = MagicMock()
-    backend = LocalQueueBackend(store, cache, lease_seconds=30)
-    backend.write_cache(
+    writer = LocalLLMCacheWriter(cache)
+    writer.write(
         {
             "cache_key": "key1",
             "cache_namespace": "ns1",
@@ -85,10 +84,9 @@ def test_local_queue_backend_write_cache() -> None:
 
 
 def test_local_queue_backend_write_cache_no_key() -> None:
-    store = MagicMock()
     cache = MagicMock()
-    backend = LocalQueueBackend(store, cache, lease_seconds=30)
-    backend.write_cache({"temperature": 0.5}, "response", "model-1")
+    writer = LocalLLMCacheWriter(cache)
+    writer.write({"temperature": 0.5}, "response", "model-1")
     cache.set.assert_not_called()
 
 
@@ -296,7 +294,13 @@ def test_llm_worker_process_complete_lost_lease() -> None:
 def test_llm_worker_process_writes_cache() -> None:
     backend = MagicMock()
     backend.complete.return_value = True
-    worker = LLMWorker(backend=backend, db=MagicMock(), register_signal_handlers=False)
+    cache_writer = MagicMock()
+    worker = LLMWorker(
+        backend=backend,
+        db=MagicMock(),
+        cache_writer=cache_writer,
+        register_signal_handlers=False,
+    )
     with patch.object(worker, "_get_llm_client", return_value=FakeLLM()):
         worker._process(
             {
@@ -308,6 +312,7 @@ def test_llm_worker_process_writes_cache() -> None:
             }
         )
     backend.complete.assert_called_once()
+    cache_writer.write.assert_called_once()
 
 
 # =============================================================================

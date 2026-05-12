@@ -106,8 +106,52 @@ def test_main_local_backend_starts_multiple_worker_threads(
     assert mock_thread_cls.call_args_list[0].kwargs["daemon"] is True
     for thread in thread_instances:
         thread.start.assert_called_once_with()
-    for thread in thread_instances[1:]:
+    for thread in thread_instances:
         thread.join.assert_called_once_with()
+
+
+@patch("llm_workers.threading.Thread")
+@patch("llm_workers.os.getenv")
+@patch("llm_workers.load_remote_provider_config")
+@patch("llm_workers.RemoteQueueBackend")
+@patch("llm_workers.LLMWorker")
+def test_main_remote_backend_creates_backend_per_worker(
+    mock_worker_cls: MagicMock,
+    mock_remote_backend_cls: MagicMock,
+    mock_load_config: MagicMock,
+    mock_getenv: MagicMock,
+    mock_thread_cls: MagicMock,
+) -> None:
+    env = {
+        "LLM_WORKER_BACKEND": "remote",
+        "LLM_WORKER_API_URL": "http://api",
+        "LLM_WORKER_TOKEN": "token",
+        "LLM_WORKER_PROVIDER_CONFIG": "/tmp/providers.json",
+        "LLM_WORKER_CONCURRENCY": "2",
+        "LLM_WORKER_ID": "remote-worker",
+    }
+    mock_getenv.side_effect = env.get
+    config = MagicMock()
+    config.supported_model_ids = ["custom:p:gpt"]
+    mock_load_config.return_value = config
+    backend_instances = [MagicMock(), MagicMock()]
+    mock_remote_backend_cls.side_effect = backend_instances
+    worker_instances = [MagicMock(), MagicMock()]
+    mock_worker_cls.side_effect = worker_instances
+    thread_instances = [MagicMock(), MagicMock()]
+    mock_thread_cls.side_effect = thread_instances
+
+    with patch("llm_workers.signal.signal"):
+        main()
+
+    mock_load_config.assert_called_once_with("/tmp/providers.json")
+    assert mock_remote_backend_cls.call_count == 2
+    worker_backends = [
+        call.kwargs["backend"] for call in mock_worker_cls.call_args_list
+    ]
+    assert worker_backends == backend_instances
+    worker_ids = [call.kwargs["worker_id"] for call in mock_worker_cls.call_args_list]
+    assert worker_ids == ["remote-worker-1", "remote-worker-2"]
 
 
 @patch("llm_workers.os.getenv")

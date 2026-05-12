@@ -2,14 +2,21 @@
 Background worker for processing submission tasks
 """
 
-import time
-import signal
 import logging
 import os
+import signal
+import threading
+import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timedelta, UTC
-from pymongo import MongoClient
+from types import FrameType
+from typing import Any, Callable
+from uuid import uuid4
 
+from pymongo import MongoClient
+from pymongo.database import Database
+
+from lib.constants import TASK_DEPENDENCIES, TASK_PRIORITIES, TASKS_USING_LLM_CACHE
 from lib.diff.semantic_diff import (
     ALGORITHM_VERSION,
     check_submission_topic_readiness,
@@ -21,6 +28,12 @@ from lib.llm_queue import LLMQueueStore, QueuedLLMClient
 from lib.storage.llm_cache import MongoLLMCacheStore
 from lib.storage.semantic_diffs import SemanticDiffsStorage
 from lib.storage.submissions import SubmissionsStorage
+from lib.storage.task_queue import (
+    DEFAULT_TASK_LEASE_SECONDS,
+    DEPENDENCY_BLOCK_SECONDS,
+    TaskDocument,
+    TaskQueueStorage,
+)
 
 # Task handlers
 from lib.tasks.split_topic_generation import process_split_topic_generation
@@ -48,40 +61,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("worker")
 
-# Task dependencies - tasks can only run if their dependencies are completed
-TASK_DEPENDENCIES = {
-    "split_topic_generation": [],
-    "subtopics_generation": ["split_topic_generation"],
-    "summarization": ["split_topic_generation"],
-    "mindmap": ["subtopics_generation"],
-    "prefix_tree": ["split_topic_generation"],
-    "insights_generation": ["split_topic_generation"],
-    "markup_generation": ["split_topic_generation"],
-    "topic_marker_summary_generation": ["split_topic_generation"],
-    "topic_temperature_generation": ["split_topic_generation"],
-    "topic_tag_ranking_generation": ["split_topic_generation"],
-    "clustering_generation": ["split_topic_generation"],
-    "topic_modeling_generation": ["split_topic_generation"],
-}
-
-# Task priorities (lower = higher priority)
-TASK_PRIORITIES = {
-    "split_topic_generation": 1,
-    "subtopics_generation": 2,
-    "summarization": 3,
-    "mindmap": 3,
-    "prefix_tree": 3,
-    "insights_generation": 4,
-    "markup_generation": 4,
-    "topic_marker_summary_generation": 4,
-    "topic_temperature_generation": 4,
-    "topic_tag_ranking_generation": 4,
-    "clustering_generation": 4,
-    "topic_modeling_generation": 4,
-}
-
 # Task handlers mapping
-TASK_HANDLERS = {
+TaskHandler = Callable[..., Any]
+TASK_HANDLERS: dict[str, TaskHandler] = {
     "split_topic_generation": process_split_topic_generation,
     "subtopics_generation": process_subtopics_generation,
     "summarization": process_summarization,
@@ -97,30 +79,97 @@ TASK_HANDLERS = {
 }
 
 
+class _TaskLeaseHeartbeat:
+    """Renews task_queue.lease_expires_at while a task is running."""
+
+    def __init__(
+        self,
+        task_queue_storage: TaskQueueStorage,
+        task_id: Any,
+        worker_id: str,
+        lease_id: str,
+        *,
+        lease_seconds: int,
+        interval_seconds: float,
+    ) -> None:
+        self._task_queue_storage = task_queue_storage
+        self._task_id = task_id
+        self._worker_id = worker_id
+        self._lease_id = lease_id
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop_event = threading.Event()
+        self._lost_lease = False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    @property
+    def lost_lease(self) -> bool:
+        return self._lost_lease
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        self._thread.join()
+
+    def _run(self) -> None:
+        while not self._stop_event.wait(self._interval_seconds):
+            try:
+                renewed = self._task_queue_storage.renew_lease(
+                    self._task_id,
+                    self._worker_id,
+                    self._lease_id,
+                    lease_seconds=self._lease_seconds,
+                )
+                if not renewed:
+                    logger.warning(
+                        "Worker %s lost lease for task %s",
+                        self._worker_id,
+                        self._task_id,
+                    )
+                    self._lost_lease = True
+                    self._stop_event.set()
+                    return
+            except Exception:
+                logger.warning(
+                    "Failed to renew task lease for %s", self._task_id, exc_info=True
+                )
+
+
 class Worker:
     def __init__(
-        self, db, llm=None, cache_store=None, queue_store=None, heartbeat_file=None
-    ):
+        self,
+        db: Database,
+        cache_store: MongoLLMCacheStore | None = None,
+        queue_store: LLMQueueStore | None = None,
+        heartbeat_file: str | None = None,
+        task_queue_storage: TaskQueueStorage | None = None,
+        task_lease_seconds: int = DEFAULT_TASK_LEASE_SECONDS,
+        register_signal_handlers: bool = True,
+    ) -> None:
         self.db = db
-        self.llm = llm
         self.cache_store = cache_store
         self.queue_store = queue_store
         self.running = True
-        self.worker_id = f"worker-{os.getpid()}"
+        self.worker_id = f"worker-{os.getpid()}-{uuid4().hex[:8]}"
         self.submissions_storage = SubmissionsStorage(db)
         self.semantic_diffs_storage = SemanticDiffsStorage(db)
+        self.task_queue_storage = task_queue_storage or TaskQueueStorage(db)
         self.heartbeat_file = heartbeat_file
+        self.task_lease_seconds = task_lease_seconds
+        self.lease_renewal_interval = max(1.0, task_lease_seconds / 3)
 
-        # Setup signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        if register_signal_handlers:
+            signal.signal(signal.SIGINT, self._signal_handler)
+            signal.signal(signal.SIGTERM, self._signal_handler)
 
-    def _signal_handler(self, signum, frame):
+    def _signal_handler(self, signum: int, frame: FrameType | None) -> None:
         """Handle shutdown signals gracefully"""
         logger.info(f"Received signal {signum}, shutting down gracefully...")
         self.running = False
 
-    def _record_heartbeat(self):
+    def _record_heartbeat(self) -> None:
         """Update the heartbeat file timestamp."""
         if self.heartbeat_file:
             try:
@@ -128,7 +177,7 @@ class Worker:
             except Exception:
                 logger.warning(f"Failed to record heartbeat at {self.heartbeat_file}")
 
-    def _dependencies_met(self, task):
+    def _dependencies_met(self, task: TaskDocument) -> bool:
         """Check if all dependency tasks are completed"""
         deps = TASK_DEPENDENCIES.get(task["task_type"], [])
         if not deps:
@@ -149,69 +198,50 @@ class Worker:
 
         return True
 
-    def claim_task(self):
+    def claim_task(self) -> TaskDocument | None:
         """
         Atomically claim a pending task from the queue.
         Returns the task document if claimed, None otherwise.
         """
-        now = datetime.now(UTC)
-        # Try to claim tasks in priority order
-        for task_type in sorted(
+        task_types = sorted(
             TASK_HANDLERS.keys(), key=lambda t: TASK_PRIORITIES.get(t, 99)
-        ):
-            # Skip tasks that are in a dependency-cooldown window.
-            task = self.db.task_queue.find_one_and_update(
-                {
-                    "status": "pending",
-                    "task_type": task_type,
-                    "$or": [
-                        {"blocked_until": {"$exists": False}},
-                        {"blocked_until": {"$lte": now}},
-                    ],
-                },
-                {
-                    "$set": {
-                        "status": "processing",
-                        "started_at": now,
-                        "worker_id": self.worker_id,
-                    }
-                },
-                sort=[("priority", 1), ("created_at", 1)],
+        )
+
+        while True:
+            now = datetime.now(UTC)
+            task = self.task_queue_storage.claim_next_task(
+                self.worker_id,
+                task_types,
+                lease_seconds=self.task_lease_seconds,
+                now=now,
             )
 
-            if task:
-                # Check if dependencies are met
-                if self._dependencies_met(task):
-                    logger.info(
-                        f"Claimed task {task['task_type']} for submission {task['submission_id']}"
-                    )
-                    return task
-                else:
-                    # Dependencies not met — put back with a short cooldown so
-                    # this task isn't re-claimed on the very next poll cycle,
-                    # and tasks of the same type with met deps aren't starved.
-                    self.db.task_queue.update_one(
-                        {"_id": task["_id"]},
-                        {
-                            "$set": {
-                                "status": "pending",
-                                "started_at": None,
-                                "worker_id": None,
-                                "blocked_until": now + timedelta(seconds=10),
-                            }
-                        },
-                    )
+            if not task:
+                return None
 
-        return None
+            if self._dependencies_met(task):
+                logger.info(
+                    f"Claimed task {task['task_type']} for submission {task['submission_id']}"
+                )
+                return task
 
-    def claim_diff_job(self):
+            # Dependencies not met — put back with a short cooldown so this task
+            # isn't re-claimed on the very next poll cycle.
+            self.task_queue_storage.release_claim(
+                task["_id"],
+                self.worker_id,
+                task["lease_id"],
+                now + timedelta(seconds=DEPENDENCY_BLOCK_SECONDS),
+            )
+
+    def claim_diff_job(self) -> dict[str, Any] | None:
         """
         Atomically claim a pending semantic diff job.
         Returns the job document if claimed, None otherwise.
         """
         return self.semantic_diffs_storage.claim_job(self.worker_id)
 
-    def process_task(self, task):
+    def process_task(self, task: TaskDocument) -> None:
         """Execute the task handler"""
         task_type = task["task_type"]
         submission_id = task["submission_id"]
@@ -222,10 +252,20 @@ class Worker:
             self._mark_task_failed(task, f"No handler for task type: {task_type}")
             return
 
+        lease_heartbeat = _TaskLeaseHeartbeat(
+            self.task_queue_storage,
+            task["_id"],
+            self.worker_id,
+            task["lease_id"],
+            lease_seconds=self.task_lease_seconds,
+            interval_seconds=self.lease_renewal_interval,
+        )
+        lease_heartbeat.start()
+
         try:
             logger.info(f"Processing {task_type} for submission {submission_id}")
             llm_meta = create_llm_client(db=self.db)
-            logger.info(
+            logger.debug(
                 f"Using LLM provider: {llm_meta.provider_name}, model: {llm_meta.model_name}"
             )
 
@@ -242,41 +282,34 @@ class Worker:
                     cache_store=self.cache_store,
                 )
             else:
-                # Synchronous fallback: no llm_worker infrastructure present.
-                # Calls are made directly (blocking) inside this process.
                 logger.warning(
                     "No queue_store configured — falling back to synchronous LLM calls. "
                     "Start llm_workers.py for parallel execution."
                 )
                 llm = llm_meta
 
-            # Update submission task status to processing
             self.submissions_storage.update_task_status(
                 submission_id, task_type, "processing"
             )
 
-            # Get submission document
             submission = self.submissions_storage.get_by_id(submission_id)
             if not submission:
                 raise ValueError(f"Submission {submission_id} not found")
 
-            # Execute the handler (pass cache_store to LLM-using tasks)
-            cache_tasks = {
-                "split_topic_generation",
-                "subtopics_generation",
-                "summarization",
-                "insights_generation",
-                "markup_generation",
-                "topic_marker_summary_generation",
-                "topic_temperature_generation",
-                "topic_tag_ranking_generation",
-            }
-            if task_type in cache_tasks:
+            if task_type in TASKS_USING_LLM_CACHE:
                 handler(submission, self.db, llm, cache_store=self.cache_store)
             else:
                 handler(submission, self.db, llm)
 
-            # Mark task as completed
+            lease_heartbeat.stop()
+            if lease_heartbeat.lost_lease:
+                logger.warning(
+                    "Skipping completion for %s on submission %s because the lease was lost",
+                    task_type,
+                    submission_id,
+                )
+                return
+
             self._mark_task_completed(task)
             logger.info(f"Completed {task_type} for submission {submission_id}")
 
@@ -285,44 +318,62 @@ class Worker:
                 f"Error processing {task_type} for submission {submission_id}: {e}",
                 exc_info=True,
             )
+            lease_heartbeat.stop()
+            if lease_heartbeat.lost_lease:
+                logger.warning(
+                    "Skipping failure update for %s on submission %s because the lease was lost",
+                    task_type,
+                    submission_id,
+                )
+                return
             self._mark_task_failed(task, str(e))
+        finally:
+            lease_heartbeat.stop()
 
-    def _mark_task_completed(self, task):
+    def _mark_task_completed(self, task: TaskDocument) -> None:
         """Mark task as completed in both task_queue and submission, then remove from DB"""
-        now = datetime.now(UTC)
-
-        # Update task queue
-        self.db.task_queue.update_one(
-            {"_id": task["_id"]}, {"$set": {"status": "completed", "completed_at": now}}
+        marked = self.task_queue_storage.mark_completed(
+            task["_id"],
+            self.worker_id,
+            task["lease_id"],
         )
+        if not marked:
+            logger.warning(
+                "Could not mark task %s completed because the lease is no longer valid",
+                task["_id"],
+            )
+            return
 
-        # Update submission
         self.submissions_storage.update_task_status(
             task["submission_id"], task["task_type"], "completed"
         )
-
-        # Remove the completed task from the database
-        self.db.task_queue.delete_one({"_id": task["_id"]})
-
-    def _mark_task_failed(self, task, error_msg):
-        """Mark task as failed in both task_queue and submission"""
-        now = datetime.now(UTC)
-
-        # Update task queue
-        self.db.task_queue.update_one(
-            {"_id": task["_id"]},
-            {
-                "$set": {"status": "failed", "completed_at": now, "error": error_msg},
-                "$inc": {"retry_count": 1},
-            },
+        self.task_queue_storage.delete_completed(
+            task["_id"],
+            self.worker_id,
+            task["lease_id"],
         )
+
+    def _mark_task_failed(self, task: TaskDocument, error_msg: str) -> None:
+        """Mark task as failed in both task_queue and submission"""
+        marked = self.task_queue_storage.mark_failed(
+            task["_id"],
+            self.worker_id,
+            task["lease_id"],
+            error_msg,
+        )
+        if not marked:
+            logger.warning(
+                "Could not mark task %s failed because the lease is no longer valid",
+                task["_id"],
+            )
+            return
 
         # Update submission
         self.submissions_storage.update_task_status(
             task["submission_id"], task["task_type"], "failed", error=error_msg
         )
 
-    def process_diff_job(self, job):
+    def process_diff_job(self, job: dict[str, Any]) -> None:
         """Compute and persist a topic-aware semantic diff job."""
         pair_key = job.get("pair_key")
         submission_a_id = job.get("submission_a_id")
@@ -395,20 +446,19 @@ class Worker:
             )
             self._mark_diff_job_failed(job, str(exc))
 
-    def _mark_diff_job_completed(self, job):
+    def _mark_diff_job_completed(self, job: dict[str, Any]) -> None:
         self.semantic_diffs_storage.mark_job_completed(job["_id"])
 
-    def _mark_diff_job_failed(self, job, error_msg):
+    def _mark_diff_job_failed(self, job: dict[str, Any], error_msg: str) -> None:
         self.semantic_diffs_storage.mark_job_failed(job["_id"], error_msg)
 
-    def run(self, poll_interval=2):
+    def run(self, poll_interval: int = 2) -> None:
         """Main worker loop"""
         logger.info(f"Worker {self.worker_id} started")
 
         while self.running:
             self._record_heartbeat()
             try:
-                # Try to claim and process a task
                 task = self.claim_task()
 
                 if task:
@@ -428,33 +478,30 @@ class Worker:
         logger.info(f"Worker {self.worker_id} stopped")
 
 
-def main():
+def main() -> None:
     """Main entry point for the worker process"""
-    # Get configuration from environment
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:8765/")
     heartbeat_file = os.getenv("WORKER_HEARTBEAT_FILE")
 
     logger.info(f"Connecting to MongoDB: {mongodb_url}")
 
-    # Initialize connections
-    client = MongoClient(mongodb_url)
+    client: MongoClient = MongoClient(mongodb_url)
     db = client["rss"]
-    llm = create_llm_client(db=db)
-    logger.info(f"Initial LLM provider: {llm.provider_name}, model: {llm.model_name}")
 
-    # Create and run worker
     SubmissionsStorage(db).prepare()
     SemanticDiffsStorage(db).prepare()
+    task_queue_storage = TaskQueueStorage(db)
+    task_queue_storage.prepare()
     cache_store = MongoLLMCacheStore(db)
     cache_store.prepare()
     queue_store = LLMQueueStore(db)
     queue_store.prepare()
     worker = Worker(
         db,
-        llm,
         cache_store=cache_store,
         queue_store=queue_store,
         heartbeat_file=heartbeat_file,
+        task_queue_storage=task_queue_storage,
     )
 
     try:

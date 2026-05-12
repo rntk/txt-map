@@ -45,7 +45,9 @@ function buildInsightEntries(insights, sentenceOffsets, submissionSentences) {
       ? insight.source_sentences.filter(
           (s) => typeof s === "string" && s.trim(),
         )
-      : indices.map((idx) => submissionSentences[idx - 1] || "").filter(Boolean);
+      : indices
+          .map((idx) => submissionSentences[idx - 1] || "")
+          .filter(Boolean);
 
     entries.push({
       key: String(index),

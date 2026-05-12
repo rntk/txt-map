@@ -169,9 +169,7 @@ function PanelScoredTags({ submissionId, rankedTags }) {
 
   if (tags.length === 0) {
     return (
-      <p className="topics-meta-panel__empty">
-        No scored tags for this topic.
-      </p>
+      <p className="topics-meta-panel__empty">No scored tags for this topic.</p>
     );
   }
 

@@ -3,7 +3,7 @@
 import time
 from unittest.mock import MagicMock
 
-from llm_workers import HeartbeatLoop, LocalQueueBackend
+from llm_workers import HeartbeatLoop, LocalLLMCacheWriter
 
 
 def test_heartbeat_loop_lost_lease() -> None:
@@ -26,19 +26,17 @@ def test_heartbeat_loop_exception() -> None:
     assert loop.lost_lease is False
 
 
-def test_local_queue_backend_write_cache_none() -> None:
-    store = MagicMock()
+def test_local_llm_cache_writer_skips_when_no_key() -> None:
     cache = MagicMock()
-    backend = LocalQueueBackend(store, cache, lease_seconds=30)
-    backend.write_cache({"temperature": 0.5}, "response", "model")
+    writer = LocalLLMCacheWriter(cache)
+    writer.write({"temperature": 0.5}, "response", "model")
     cache.set.assert_not_called()
 
 
-def test_local_queue_backend_write_cache_with_namespace() -> None:
-    store = MagicMock()
+def test_local_llm_cache_writer_with_namespace() -> None:
     cache = MagicMock()
-    backend = LocalQueueBackend(store, cache, lease_seconds=30)
-    backend.write_cache(
+    writer = LocalLLMCacheWriter(cache)
+    writer.write(
         {
             "cache_key": "key1",
             "cache_namespace": "ns1",

@@ -1,118 +1,130 @@
-from fastapi import Depends, FastAPI, HTTPException
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 from handlers import (
+    auth_handler,
     canvas_handler,
-    submission_handler,
-    task_queue_handler,
     diff_handler,
-    llm_cache_handler,
-    settings_handler,
     extension_handler,
+    llm_cache_handler,
+    llm_providers_handler,
     llm_queue_handler,
     llm_worker_handler,
+    settings_handler,
+    submission_handler,
+    task_queue_handler,
+    tokens_handler,
 )
 from handlers.auth_handler import require_auth
-from handlers import auth_handler, tokens_handler, llm_providers_handler
 from lifespan import lifespan
-
-app: FastAPI = FastAPI(
-    title="My FastAPI App",
-    description="A simple FastAPI application with separate handlers",
-    lifespan=lifespan,
-)
-
-# Allow extension/background fetches (OPTIONS preflight for JSON POST).
-# Note: allow_credentials=False since frontend is same-origin;
-# cookies work without CORS. allow_credentials=True with wildcard origins
-# is invalid per CORS spec and breaks cookie auth for cross-origin requests.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 frontend_build_dir: Path = Path("frontend/build")
 legacy_static_dir: Path = frontend_build_dir / "static"
 vite_assets_dir: Path = frontend_build_dir / "assets"
-
-# Support both legacy CRA output (`build/static`) and Vite output (`build/assets`).
-if legacy_static_dir.is_dir():
-    app.mount("/static", StaticFiles(directory=str(legacy_static_dir)), name="static")
-if vite_assets_dir.is_dir():
-    app.mount("/assets", StaticFiles(directory=str(vite_assets_dir)), name="assets")
-
-# Auth routes (no auth required for login)
-app.include_router(auth_handler.router, prefix="/api")
-
-# Token management routes (superuser only, base auth required at router level)
-app.include_router(
-    tokens_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-
-# LLM providers management routes (superuser only)
-app.include_router(
-    llm_providers_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-
-# Protected API routes
-app.include_router(
-    submission_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    task_queue_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    llm_queue_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    llm_worker_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    diff_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    llm_cache_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    settings_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    extension_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-app.include_router(
-    canvas_handler.router,
-    prefix="/api",
-    dependencies=[Depends(require_auth)],
-)
-
-
 FRONTEND_INDEX: str = "frontend/build/index.html"
+
+
+@dataclass(frozen=True)
+class RouterRegistration:
+    router: APIRouter
+    requires_auth: bool = True
+
+
+ROUTERS: tuple[RouterRegistration, ...] = (
+    RouterRegistration(auth_handler.router, requires_auth=False),
+    RouterRegistration(tokens_handler.router),
+    RouterRegistration(llm_providers_handler.router),
+    RouterRegistration(submission_handler.router),
+    RouterRegistration(task_queue_handler.router),
+    RouterRegistration(llm_queue_handler.router),
+    RouterRegistration(llm_worker_handler.router),
+    RouterRegistration(diff_handler.router),
+    RouterRegistration(llm_cache_handler.router),
+    RouterRegistration(settings_handler.router),
+    RouterRegistration(extension_handler.router),
+    RouterRegistration(canvas_handler.router),
+)
+
+FRONTEND_ROUTES: tuple[str, ...] = (
+    "/",
+    "/page/menu",
+    "/page/text/{submission_id}",
+    "/page/word/{submission_id}/{word}",
+    "/page/tasks",
+    "/page/llm-tasks",
+    "/page/texts",
+    "/page/diff",
+    "/page/cache",
+    "/page/topics",
+    "/page/topic-analysis/{submission_id}",
+    "/page/topic-hierarchy/{submission_id}",
+    "/page/canvas/{submission_id}",
+    "/page/login",
+    "/page/tokens",
+    "/page/llm-providers",
+)
+
+
+def configure_cors(fastapi_app: FastAPI) -> None:
+    # Allow extension/background fetches (OPTIONS preflight for JSON POST).
+    # allow_credentials=False because the frontend is same-origin.
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+def mount_frontend_assets(fastapi_app: FastAPI) -> None:
+    # Support both legacy CRA output (`build/static`) and Vite output (`build/assets`).
+    if legacy_static_dir.is_dir():
+        fastapi_app.mount(
+            "/static",
+            StaticFiles(directory=str(legacy_static_dir)),
+            name="static",
+        )
+    if vite_assets_dir.is_dir():
+        fastapi_app.mount(
+            "/assets",
+            StaticFiles(directory=str(vite_assets_dir)),
+            name="assets",
+        )
+
+
+def include_api_routers(fastapi_app: FastAPI) -> None:
+    for registration in ROUTERS:
+        dependencies = [Depends(require_auth)] if registration.requires_auth else []
+        fastapi_app.include_router(
+            registration.router,
+            prefix="/api",
+            dependencies=dependencies,
+        )
+
+
+def _frontend_route_name(route: str) -> str:
+    if route == "/":
+        return "frontend_root"
+    slug = route.strip("/").replace("/", "_").replace("{", "").replace("}", "")
+    return f"frontend_{slug}"
+
+
+def register_frontend_routes(fastapi_app: FastAPI, routes: Sequence[str]) -> None:
+    for route in routes:
+        fastapi_app.add_api_route(
+            route,
+            serve_frontend_page,
+            methods=["GET"],
+            response_class=FileResponse,
+            name=_frontend_route_name(route),
+        )
 
 
 def get_frontend_index_response() -> FileResponse:
@@ -121,24 +133,24 @@ def get_frontend_index_response() -> FileResponse:
     return FileResponse(FRONTEND_INDEX)
 
 
-@app.get("/")
-@app.get("/page/menu")
-@app.get("/page/text/{submission_id}")
-@app.get("/page/word/{submission_id}/{word}")
-@app.get("/page/tasks")
-@app.get("/page/llm-tasks")
-@app.get("/page/texts")
-@app.get("/page/diff")
-@app.get("/page/cache")
-@app.get("/page/topics")
-@app.get("/page/topic-analysis/{submission_id}")
-@app.get("/page/topic-hierarchy/{submission_id}")
-@app.get("/page/canvas/{submission_id}")
-@app.get("/page/login")
-@app.get("/page/tokens")
-@app.get("/page/llm-providers")
 def serve_frontend_page() -> FileResponse:
     return get_frontend_index_response()
+
+
+def create_app() -> FastAPI:
+    fastapi_app: FastAPI = FastAPI(
+        title="My FastAPI App",
+        description="A simple FastAPI application with separate handlers",
+        lifespan=lifespan,
+    )
+    configure_cors(fastapi_app)
+    mount_frontend_assets(fastapi_app)
+    include_api_routers(fastapi_app)
+    register_frontend_routes(fastapi_app, FRONTEND_ROUTES)
+    return fastapi_app
+
+
+app: FastAPI = create_app()
 
 
 if __name__ == "__main__":

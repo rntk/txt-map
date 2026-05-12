@@ -1,6 +1,6 @@
 """Unit tests for previously uncovered storage modules."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -107,6 +107,8 @@ def test_make_task_document() -> None:
         "started_at": None,
         "completed_at": None,
         "worker_id": None,
+        "lease_id": None,
+        "lease_expires_at": None,
         "retry_count": 0,
         "error": None,
     }
@@ -221,6 +223,131 @@ def test_task_queue_storage_delete_by_submission_with_filters() -> None:
             "status": {"$in": ["pending"]},
         }
     )
+
+
+def test_task_queue_storage_claim_next_task_recovers_stale_processing() -> None:
+    db = MagicMock()
+    storage = TaskQueueStorage(db)
+    now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+    task = {"_id": ObjectId(), "task_type": "summarize"}
+    db.task_queue.find_one_and_update.return_value = task
+
+    result = storage.claim_next_task(
+        "worker-1",
+        ["summarize"],
+        lease_seconds=60,
+        now=now,
+    )
+
+    assert result == task
+    query = db.task_queue.find_one_and_update.call_args.args[0]
+    update = db.task_queue.find_one_and_update.call_args.args[1]
+    assert query["task_type"] == "summarize"
+    assert query["$or"][0]["status"] == "pending"
+    assert query["$or"][1]["status"] == "processing"
+    assert query["$or"][1]["$or"][0] == {"lease_expires_at": {"$lte": now}}
+    assert query["$or"][1]["$or"][1] == {
+        "lease_expires_at": {"$exists": False},
+        "started_at": {"$lte": now - timedelta(seconds=60)},
+    }
+    assert update["$set"]["status"] == "processing"
+    assert update["$set"]["worker_id"] == "worker-1"
+    assert "lease_id" in update["$set"]
+    assert update["$set"]["lease_expires_at"] == now + timedelta(seconds=60)
+    assert db.task_queue.find_one_and_update.call_args.kwargs["return_document"] is True
+
+
+def test_task_queue_storage_release_claim_blocks_until() -> None:
+    db = MagicMock()
+    storage = TaskQueueStorage(db)
+    task_id = ObjectId()
+    blocked_until = datetime(2024, 1, 1, 12, 0, 10, tzinfo=UTC)
+
+    storage.release_claim(task_id, "worker-1", "lease-1", blocked_until)
+
+    query = db.task_queue.update_one.call_args.args[0]
+    update = db.task_queue.update_one.call_args.args[1]
+    assert query == {
+        "_id": task_id,
+        "worker_id": "worker-1",
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
+    assert update["$set"]["status"] == "pending"
+    assert update["$set"]["worker_id"] is None
+    assert update["$set"]["lease_id"] is None
+    assert update["$set"]["lease_expires_at"] is None
+    assert update["$set"]["blocked_until"] == blocked_until
+
+
+def test_task_queue_storage_renew_lease_guards_owner_and_lease() -> None:
+    db = MagicMock()
+    storage = TaskQueueStorage(db)
+    task_id = ObjectId()
+    now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+    db.task_queue.update_one.return_value.matched_count = 1
+
+    assert (
+        storage.renew_lease(
+            task_id,
+            "worker-1",
+            "lease-1",
+            lease_seconds=60,
+            now=now,
+        )
+        is True
+    )
+
+    query = db.task_queue.update_one.call_args.args[0]
+    update = db.task_queue.update_one.call_args.args[1]
+    assert query == {
+        "_id": task_id,
+        "worker_id": "worker-1",
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
+    assert update["$set"]["lease_expires_at"] == now + timedelta(seconds=60)
+
+
+def test_task_queue_storage_mark_completed_guards_owner_and_lease() -> None:
+    db = MagicMock()
+    storage = TaskQueueStorage(db)
+    task_id = ObjectId()
+    db.task_queue.update_one.return_value.matched_count = 1
+
+    assert storage.mark_completed(task_id, "worker-1", "lease-1") is True
+
+    query = db.task_queue.update_one.call_args.args[0]
+    update = db.task_queue.update_one.call_args.args[1]
+    assert query == {
+        "_id": task_id,
+        "worker_id": "worker-1",
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
+    assert update["$set"]["status"] == "completed"
+    assert update["$set"]["lease_expires_at"] is None
+
+
+def test_task_queue_storage_mark_failed_guards_owner_and_lease() -> None:
+    db = MagicMock()
+    storage = TaskQueueStorage(db)
+    task_id = ObjectId()
+    db.task_queue.update_one.return_value.matched_count = 1
+
+    assert storage.mark_failed(task_id, "worker-1", "lease-1", "boom") is True
+
+    query = db.task_queue.update_one.call_args.args[0]
+    update = db.task_queue.update_one.call_args.args[1]
+    assert query == {
+        "_id": task_id,
+        "worker_id": "worker-1",
+        "lease_id": "lease-1",
+        "status": "processing",
+    }
+    assert update["$set"]["status"] == "failed"
+    assert update["$set"]["error"] == "boom"
+    assert update["$set"]["lease_expires_at"] is None
 
 
 # =============================================================================

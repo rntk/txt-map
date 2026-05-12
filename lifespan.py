@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     canvas_chats_storage.prepare()
 
     task_queue_storage = TaskQueueStorage(db)
+    task_queue_storage.prepare()
     llm_queue_store = LLMQueueStore(db)
     llm_queue_store.prepare()
 
