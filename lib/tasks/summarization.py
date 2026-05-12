@@ -153,6 +153,45 @@ _SENTENCE_SUMMARY_PROMPT_TEMPLATE = (
 )
 
 
+_SENTENCE_SUMMARY_SKIP_WORD_THRESHOLD = 15
+_ARTICLE_SUMMARY_SKIP_WORD_THRESHOLD = 30
+_ARTICLE_SUMMARY_MIN_SOURCE_SENTENCES = 3
+
+
+def _count_words(text: str) -> int:
+    return len(re.findall(r"\S+", text or ""))
+
+
+def _is_short_sentence_source(sentence: str) -> bool:
+    return _count_words(sentence) <= _SENTENCE_SUMMARY_SKIP_WORD_THRESHOLD
+
+
+def _is_short_article_source(sentences: List[str]) -> bool:
+    if len(sentences) < _ARTICLE_SUMMARY_MIN_SOURCE_SENTENCES:
+        return True
+    total_words = sum(_count_words(s) for s in sentences)
+    return total_words <= _ARTICLE_SUMMARY_SKIP_WORD_THRESHOLD
+
+
+def _short_article_source_summary(sentences: List[str]) -> Dict[str, Any]:
+    """Build an article-summary payload directly from the source sentences.
+
+    Used when the source is short enough that an LLM-generated summary would
+    not be shorter than the input. Guarantees no fabricated content by reusing
+    the source verbatim.
+    """
+    cleaned: List[str] = []
+    seen: set[str] = set()
+    for sentence in sentences:
+        normalized = re.sub(r"\s+", " ", sentence or "").strip()
+        if normalized and normalized not in seen:
+            cleaned.append(normalized)
+            seen.add(normalized)
+    if not cleaned:
+        return {"text": "", "bullets": []}
+    return {"text": cleaned[0], "bullets": cleaned}
+
+
 def _build_sentence_summary_prompt(sentence: str) -> str:
     return _SENTENCE_SUMMARY_PROMPT_TEMPLATE.format(sentence=sentence)
 
@@ -182,10 +221,12 @@ def summarize_by_sentence_groups(
     summary_mappings: List[Dict[str, Any]] = []
 
     for idx, s in enumerate(sent_list):
-        prompt = _build_sentence_summary_prompt(s)
-        resp = cached_llm.call(prompt, 0.8)
+        if _is_short_sentence_source(s):
+            summary_text = s.strip()
+        else:
+            prompt = _build_sentence_summary_prompt(s)
+            summary_text = cached_llm.call(prompt, 0.8).strip()
 
-        summary_text = resp.strip()
         if summary_text:
             summary_idx = len(all_summary_sentences)
             all_summary_sentences.append(summary_text)
@@ -210,12 +251,17 @@ def _parallel_summarize_sentence_groups(
     Parallel version of summarize_by_sentence_groups.
     Submits all prompts to the LLM queue at once, then gathers in order.
     """
-    futures = [llm.submit(_build_sentence_summary_prompt(s), 0.8) for s in sent_list]
+    pending: List[Any] = []
+    for s in sent_list:
+        if _is_short_sentence_source(s):
+            pending.append(s.strip())
+        else:
+            pending.append(llm.submit(_build_sentence_summary_prompt(s), 0.8))
 
     all_summary_sentences: List[str] = []
     summary_mappings: List[Dict[str, Any]] = []
-    for idx, future in enumerate(futures):
-        summary_text = future.result().strip()
+    for idx, item in enumerate(pending):
+        summary_text = item if isinstance(item, str) else item.result().strip()
         if summary_text:
             summary_idx = len(all_summary_sentences)
             all_summary_sentences.append(summary_text)
@@ -249,6 +295,16 @@ def _parallel_generate_article_summary(
     # Submit all first-attempt chunk prompts in parallel.
     chunk_states = []
     for chunk in chunks:
+        if _is_short_article_source(chunk["sentences"]):
+            chunk_states.append(
+                {
+                    "chunk": chunk,
+                    "base_prompt": None,
+                    "future": None,
+                    "skip_summary": _short_article_source_summary(chunk["sentences"]),
+                }
+            )
+            continue
         chunk_text = "\n".join(chunk["sentences"]).strip()
         base_prompt = _build_article_summary_prompt(chunk_text)
         chunk_states.append(
@@ -256,6 +312,7 @@ def _parallel_generate_article_summary(
                 "chunk": chunk,
                 "base_prompt": base_prompt,
                 "future": llm.submit(base_prompt, 0.8),
+                "skip_summary": None,
             }
         )
 
@@ -263,6 +320,15 @@ def _parallel_generate_article_summary(
     chunk_summaries = []
     for state in chunk_states:
         chunk = state["chunk"]
+        if state["skip_summary"] is not None:
+            chunk_summaries.append(
+                {
+                    "start_sentence": chunk["start_sentence"],
+                    "end_sentence": chunk["end_sentence"],
+                    "summary": state["skip_summary"],
+                }
+            )
+            continue
         base_prompt = state["base_prompt"]
         response_text = state["future"].result()
         last_response_text = response_text
@@ -590,6 +656,16 @@ def generate_article_summary(
 
     chunk_summaries = []
     for chunk in chunks:
+        if _is_short_article_source(chunk["sentences"]):
+            chunk_summaries.append(
+                {
+                    "start_sentence": chunk["start_sentence"],
+                    "end_sentence": chunk["end_sentence"],
+                    "summary": _short_article_source_summary(chunk["sentences"]),
+                }
+            )
+            continue
+
         chunk_text = "\n".join(chunk["sentences"]).strip()
         base_prompt = _build_article_summary_prompt(chunk_text)
         parsed_summary = {"text": "", "bullets": []}
