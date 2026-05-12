@@ -53,6 +53,7 @@ import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 import { useTagTopicsLayout } from "./CanvasPage/useTagTopicsLayout";
 import { useTopicTagsLayout } from "./CanvasPage/useTopicTagsLayout";
 import { useCanvasTransform } from "./CanvasPage/useCanvasTransform";
+import { buildArticleWordCloud, naiveLemmatize } from "../utils/wordCloud";
 
 const TOOLTIP_WIDTH = 260;
 const TOOLTIP_HEIGHT_ESTIMATE = 100;
@@ -834,6 +835,11 @@ export default function CanvasPage() {
     [scale, topicHierarchyCardWidth, topicHierarchyLayout.topicCards],
   );
 
+  const articleLemmaRanges = useMemo(() => {
+    if (!articleText) return new Map();
+    return buildArticleWordCloud(articleText).ranges;
+  }, [articleText]);
+
   // ── Article highlights ─────────────────────────────────────────────────────
 
   const articleHighlights = useMemo(() => {
@@ -917,15 +923,35 @@ export default function CanvasPage() {
       const activeCard = topicTagsLayout.cards.find(
         (card) => card.key === activeTopicTagsKey,
       );
-      activeCard?.sentenceNumbers.forEach((sentenceNumber) => {
-        const index = sentenceNumber - 1;
-        if (index < 0 || index >= submissionSentences.length) return;
-        base.push({
-          start: sentenceOffsets[index],
-          end: sentenceOffsets[index] + submissionSentences[index].length,
-          label: activeCard.topicName,
+      if (activeCard) {
+        const sentenceBounds = [];
+        activeCard.sentenceNumbers.forEach((sentenceNumber) => {
+          const index = sentenceNumber - 1;
+          if (index < 0 || index >= submissionSentences.length) return;
+          const start = sentenceOffsets[index];
+          const end = sentenceOffsets[index] + submissionSentences[index].length;
+          base.push({ start, end, label: activeCard.topicName });
+          sentenceBounds.push({ start, end });
         });
-      });
+        const visibleCount =
+          activeCard.visibleTagCount || activeCard.tags.length;
+        activeCard.tags.slice(0, visibleCount).forEach(({ tag }) => {
+          const lemma = naiveLemmatize(tag) || tag;
+          const ranges = articleLemmaRanges.get(lemma) || [];
+          ranges.forEach((r) => {
+            if (
+              sentenceBounds.some((s) => r.start >= s.start && r.end <= s.end)
+            ) {
+              base.push({
+                start: r.start,
+                end: r.end,
+                label: tag,
+                variant: "tag",
+              });
+            }
+          });
+        });
+      }
     }
     return base;
   }, [
@@ -951,6 +977,7 @@ export default function CanvasPage() {
     showTopicTagsRail,
     activeTopicTagsKey,
     topicTagsLayout.cards,
+    articleLemmaRanges,
   ]);
 
   const temperatureHighlights = useMemo(() => {

@@ -151,11 +151,14 @@ function ArticleText({
           sentenceIdx !== undefined ? String(sentenceIdx) : undefined;
 
         if (seg.highlighted) {
+          const highlightClass = seg.variant
+            ? `canvas-highlight canvas-highlight--${seg.variant}`
+            : "canvas-highlight";
           return [
             ...imagesBeforeSegment,
             <mark
               key={idx}
-              className="canvas-highlight"
+              className={highlightClass}
               ref={isActiveHighlightTarget ? activeHighlightRef : undefined}
               title={seg.label || undefined}
               data-char-start={seg.start}

@@ -164,10 +164,10 @@ export async function pollCanvasChatReply(articleId, requestId, signal) {
  * Build text segments with highlights, optional read ranges, and optional
  * temperature color ranges applied.
  * @param {string} text
- * @param {{start: number, end: number, label?: string}[]} highlights
+ * @param {{start: number, end: number, label?: string, variant?: string}[]} highlights
  * @param {{start: number, end: number}[]} [readRanges]
  * @param {{start: number, end: number, color: string}[]} [temperatureHighlights]
- * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
+ * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, variant?: string, temperatureColor?: string}[]}
  */
 export function buildSegments(
   text,
@@ -237,6 +237,7 @@ export function buildSegments(
     const matchingTemp = hasTemp
       ? temperatureHighlights.filter((t) => t.start <= start && t.end >= end)
       : [];
+    const variantMatch = matching.find((h) => h.variant);
     segments.push({
       text: chunk,
       start,
@@ -244,6 +245,7 @@ export function buildSegments(
       highlighted: matching.length > 0,
       read: matchingRead.length > 0,
       label: matching.length > 0 ? matching[0].label : undefined,
+      variant: variantMatch ? variantMatch.variant : undefined,
       temperatureColor:
         matchingTemp.length > 0 ? matchingTemp[0].color : undefined,
     });
@@ -303,6 +305,7 @@ export function buildSegmentsWithPages(
         start: Math.max(0, h.start - page.start),
         end: Math.min(page.end - page.start, h.end - page.start),
         label: h.label,
+        variant: h.variant,
       }))
       .filter((h) => h.start < h.end && h.end > 0 && h.start < pageText.length);
 
