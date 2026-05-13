@@ -15,6 +15,7 @@ from txt_splitt.sentences import (
     BracketMarker,
     LLMRepairingGapHandler,
     MappingOffsetRestorer,
+    OptimizingMarker,
     OverlapChunker,
     SparseRegexSentenceSplitter,
     TopicRangeLLM,
@@ -464,8 +465,10 @@ def split_article(
     article: str,
     llm: Optional[Any] = None,
     tracer: Optional[Tracer] = None,
-    anchor_every_words: int = 5,
-    max_chunk_chars: int = 12_000,
+    anchor_every_words: int = 12,
+    max_chunk_chars: int = 84_000,
+    long_sentence_word_threshold: int = 24,
+    min_sentence_words: int = 4,
     cache_store: Optional[Any] = None,
     temperature: float = 0.0,
     retry_policy: Optional[RetryConfig] = None,
@@ -491,7 +494,10 @@ def split_article(
         return ArticleSplitResult(sentences=[], topics=[])
 
     splitter = SparseRegexSentenceSplitter(
-        anchor_every_words=anchor_every_words, html_aware=True
+        anchor_every_words=anchor_every_words,
+        long_sentence_word_threshold=long_sentence_word_threshold,
+        min_sentence_words=min_sentence_words,
+        html_aware=True,
     )
     html_cleaner = HTMLParserTagStripCleaner(strip_tags={"style", "script"})
     offset_restorer = MappingOffsetRestorer()
@@ -545,7 +551,7 @@ def split_article(
 
     pipeline = build_pipeline(
         splitter=splitter,
-        marker=BracketMarker(),
+        marker=OptimizingMarker(BracketMarker()),
         llm=TopicRangeLLM(
             client=llm_callable,
             temperature=temperature,
@@ -580,8 +586,10 @@ def split_article_with_markers(
     article: str,
     llm: Optional[Any] = None,
     tracer: Optional[Tracer] = None,
-    anchor_every_words: int = 5,
-    max_chunk_chars: int = 12_000,
+    anchor_every_words: int = 12,
+    max_chunk_chars: int = 84_000,
+    long_sentence_word_threshold: int = 24,
+    min_sentence_words: int = 4,
     cache_store: Optional[Any] = None,
     temperature: float = 0.0,
     retry_policy: Optional[RetryConfig] = None,
@@ -594,6 +602,8 @@ def split_article_with_markers(
         tracer=tracer,
         anchor_every_words=anchor_every_words,
         max_chunk_chars=max_chunk_chars,
+        long_sentence_word_threshold=long_sentence_word_threshold,
+        min_sentence_words=min_sentence_words,
         cache_store=cache_store,
         temperature=temperature,
         retry_policy=retry_policy,

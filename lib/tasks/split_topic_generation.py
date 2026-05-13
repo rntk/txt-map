@@ -124,7 +124,7 @@ def process_split_topic_generation(
     source_preview = source[:500] + "..." if len(source) > 500 else source
     logger.info(f"Source preview: {source_preview}")
 
-    max_chunk_chars = submission.get("max_chunk_chars", 12_000)
+    max_chunk_chars = submission.get("max_chunk_chars", 84_000)
     temperature = submission.get("temperature", 0.0)
     logger.info(f"Max chunk chars: {max_chunk_chars}, temperature: {temperature}")
 
