@@ -28,10 +28,11 @@ describe("buildTopicTagsEntries", () => {
       sentenceEnd: 2,
       charStart: 0,
       charEnd: 24,
-      visibleTagCount: 2,
+      visibleTagCount: 3,
       tags: [
         { tag: "gamma", score: 95 },
         { tag: "beta", score: 80 },
+        { tag: "alpha", score: 79 },
       ],
     });
     expect(entries[1].tags).toEqual([{ tag: "delta", score: 88 }]);

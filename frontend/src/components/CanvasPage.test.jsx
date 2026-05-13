@@ -145,6 +145,10 @@ describe("CanvasPage highlight focusing", () => {
             : makeRect({ left: 140, top: 540, width: 80, height: 20 });
         }
 
+        if (this.classList.contains("canvas-article-text")) {
+          return makeRect({ left: 40, top: 40, width: 752, height: 200 });
+        }
+
         return makeRect({ left: 0, top: 0, width: 0, height: 0 });
       };
 
@@ -165,10 +169,10 @@ describe("CanvasPage highlight focusing", () => {
     await waitFor(() => {
       expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.4");
       expect(viewport.style.getPropertyValue("--canvas-translate-x")).toBe(
-        "435px",
+        "40px",
       );
       expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
-        "330px",
+        "90px",
       );
     });
   });
@@ -288,6 +292,15 @@ describe("CanvasPage highlight focusing", () => {
           });
         }
 
+        if (this.classList.contains("canvas-article-text")) {
+          return makeRect({
+            left: translateX,
+            top: translateY,
+            width: 752 * currentScale,
+            height: 400 * currentScale,
+          });
+        }
+
         return makeRect({ left: 0, top: 0, width: 0, height: 0 });
       };
 
@@ -307,7 +320,7 @@ describe("CanvasPage highlight focusing", () => {
     });
     await waitFor(() => {
       expect(viewport.style.getPropertyValue("--canvas-translate-y")).toBe(
-        "-818px",
+        "-1058px",
       );
     });
 
@@ -318,7 +331,7 @@ describe("CanvasPage highlight focusing", () => {
         Number.parseFloat(
           viewport.style.getPropertyValue("--canvas-translate-y"),
         ),
-      ).toBeGreaterThan(250);
+      ).toBeGreaterThan(60);
       expect(
         screen.getByRole("button", { name: "move to tags cloud" }),
       ).toBeInTheDocument();
@@ -611,6 +624,10 @@ describe("CanvasPage highlight focusing", () => {
           return makeRect({ left: 0, top: 0, width: 1000, height: 800 });
         }
 
+        if (this.classList.contains("canvas-article-text")) {
+          return makeRect({ left: 0, top: 0, width: 752, height: 200 });
+        }
+
         return makeRect({ left: 0, top: 0, width: 0, height: 0 });
       };
 
@@ -659,10 +676,10 @@ describe("CanvasPage highlight focusing", () => {
       expect(viewport.style.getPropertyValue("--canvas-scale")).toBe("1.4");
       expect(
         parseFloat(viewport.style.getPropertyValue("--canvas-translate-x")),
-      ).toBeCloseTo(-28.889, 3);
+      ).toBeCloseTo(40, 3);
       expect(
         parseFloat(viewport.style.getPropertyValue("--canvas-translate-y")),
-      ).toBeCloseTo(213.333, 3);
+      ).toBeCloseTo(-26.667, 3);
     });
   });
 
