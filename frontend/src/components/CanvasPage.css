@@ -614,6 +614,23 @@
   -webkit-line-clamp: 2;
 }
 
+.canvas-topic-hierarchy__card.is-read::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  pointer-events: none;
+  border-radius: 4px;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.13) 0,
+    rgba(0, 0, 0, 0.13) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+  opacity: 0.72;
+  z-index: 1;
+}
+
 /* ── Page splitter ── */
 .canvas-page-splitter {
   display: flex;

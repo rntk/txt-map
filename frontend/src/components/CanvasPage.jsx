@@ -1340,6 +1340,8 @@ export default function CanvasPage() {
                     );
                     zoomToSummaryCard(topicKey);
                   }}
+                  readTopics={readTopics}
+                  onToggleRead={(topicKey) => toggleTopicRead(topicKey)}
                 />
               </div>
             )}
