@@ -386,6 +386,100 @@ function UploadCard() {
 /**
  * @returns {React.JSX.Element}
  */
+function PasteTextCard() {
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  /**
+   * @param {React.FormEvent<HTMLFormElement>} event
+   * @returns {Promise<void>}
+   */
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setStatus("submitting");
+    setErrorMsg("");
+
+    try {
+      const form = new FormData();
+      const file = new File([trimmed], "pasted-text.txt", {
+        type: "text/plain",
+      });
+      form.append("file", file);
+      form.append("embed_images", "false");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Server error ${res.status}`);
+      }
+      const { redirect_url } = await res.json();
+      window.location.href = redirect_url;
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err.message || "Text submission failed");
+    }
+  };
+
+  const isSubmitting = status === "submitting";
+  const cardClassName = [
+    "main-page-card",
+    "main-page-card--text",
+    isSubmitting ? "main-page-card--uploading" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className={cardClassName}>
+      <span className="main-page-card__eyebrow">Paste</span>
+      <span className="main-page-card__title">Paste Text</span>
+      <span className="main-page-card__description">
+        Submit copied text directly without saving it as a file first.
+      </span>
+      <form className="main-page-text-form" onSubmit={handleSubmit}>
+        <textarea
+          className="main-page-text-input"
+          placeholder="Paste text here"
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value);
+            if (status !== "idle") {
+              setStatus("idle");
+              setErrorMsg("");
+            }
+          }}
+          disabled={isSubmitting}
+          aria-label="Text to submit"
+          rows={5}
+        />
+        <button
+          type="submit"
+          className="main-page-text-submit"
+          disabled={isSubmitting || !text.trim()}
+        >
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </button>
+      </form>
+      {status === "error" && (
+        <span className="main-page-url-error">{errorMsg}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * @returns {React.JSX.Element}
+ */
 function UrlCard() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("idle");
@@ -582,6 +676,7 @@ function MainPage({ isSuperuser = false, isAuthenticated = false, onLogout }) {
         </div>
         <div className="main-page-grid">
           <UploadCard />
+          <PasteTextCard />
           <UrlCard />
           <ExtensionCard />
         </div>
