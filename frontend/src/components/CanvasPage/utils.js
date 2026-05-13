@@ -7,6 +7,7 @@ import {
   TOPIC_HIERARCHY_TITLE_FONT_SIZE_PX,
   TOPIC_HIERARCHY_TITLE_LINE_HEIGHT,
   TOPIC_HIERARCHY_TITLE_MAX_LINES,
+  SUMMARY_CARD_BASE_HEIGHT_PX,
   SUMMARY_RAIL_BASE_WIDTH_PX,
   SUMMARY_RAIL_MAX_SCALE_FACTOR,
   CHAT_POLL_MAX_ATTEMPTS,
@@ -74,6 +75,14 @@ export function getSummaryRailScaleFactor(scale) {
  */
 export function getZoomAdjustedSummaryRailWidth(scale) {
   return SUMMARY_RAIL_BASE_WIDTH_PX * getSummaryRailScaleFactor(scale);
+}
+
+/**
+ * @param {number} scale
+ * @returns {number}
+ */
+export function getZoomAdjustedSummaryCardHeight(scale) {
+  return SUMMARY_CARD_BASE_HEIGHT_PX * getSummaryRailScaleFactor(scale);
 }
 
 /**

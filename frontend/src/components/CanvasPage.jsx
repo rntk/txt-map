@@ -808,6 +808,7 @@ export default function CanvasPage() {
     articleTextRef,
     summaryWrapRef,
     scaleRef,
+    scale,
   });
 
   const insightsLayout = useInsightsLayout({

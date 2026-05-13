@@ -322,7 +322,7 @@
   border: 1px solid rgba(120, 200, 230, 0.35);
   border-radius: 4px;
   padding: 8px 12px;
-  font-size: clamp(11px, calc(11px / var(--canvas-scale, 1)), 22px);
+  font-size: clamp(11px, calc(11px / var(--canvas-scale, 1)), 55px);
   line-height: 1.5;
   color: #cbd5e0;
   cursor: pointer;
@@ -369,7 +369,7 @@
 }
 
 .canvas-summary-card-topic {
-  font-size: clamp(10px, calc(10px / var(--canvas-scale, 1)), 20px);
+  font-size: clamp(10px, calc(10px / var(--canvas-scale, 1)), 50px);
   font-weight: 700;
   color: #7be0ff;
   text-transform: uppercase;
