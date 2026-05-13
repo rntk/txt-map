@@ -14,6 +14,7 @@ from lib.tasks.summarization import (
     _build_article_summary_merge_prompt,
     _build_article_summary_prompt,
     _build_sentence_summary_prompt,
+    _is_short_article_source,
     _parallel_generate_article_summary,
     _ValidatedCachingLLMCallable,
     build_article_summary_chunks,
@@ -22,6 +23,14 @@ from lib.tasks.summarization import (
     parse_article_summary_response,
     summarize_by_sentence_groups,
     process_summarization,
+)
+
+
+LONG_SINGLE_SECTION = (
+    "AI Accelerator is a broad category of chips built specifically for AI "
+    "workloads rather than general computing. Purpose-built accelerators can "
+    "deliver better performance and efficiency than general-purpose chips for "
+    "training and inference workloads."
 )
 
 
@@ -151,7 +160,7 @@ class TestSummarizeBySentenceGroupsBasic:
 
     def test_summary_mapping_structure(self, mock_llm):
         """Function creates mappings with correct structure."""
-        sentences = ["Test sentence."]
+        sentences = [LONG_SINGLE_SECTION]
 
         mock_llm.call.return_value = "Test summary"
 
@@ -268,6 +277,14 @@ class TestArticleSummaryHelpers:
             ["S3", "S4"],
         ]
 
+    def test_long_single_section_is_not_treated_as_short_article_source(self):
+        """Long formatted sections still go through LLM summarization."""
+        assert not _is_short_article_source([LONG_SINGLE_SECTION])
+
+    def test_tiny_single_section_is_treated_as_short_article_source(self):
+        """Very small snippets keep the no-LLM verbatim shortcut."""
+        assert _is_short_article_source(["S1"])
+
     def test_generate_article_summary_merges_chunk_summaries(self, mock_llm):
         cached_llm = MagicMock()
         cached_llm.call.side_effect = [
@@ -280,8 +297,16 @@ class TestArticleSummaryHelpers:
             "lib.tasks.summarization.build_article_summary_chunks"
         ) as mock_chunks:
             mock_chunks.return_value = [
-                {"sentences": ["S1", "S2"], "start_sentence": 1, "end_sentence": 2},
-                {"sentences": ["S2", "S3"], "start_sentence": 2, "end_sentence": 3},
+                {
+                    "sentences": [LONG_SINGLE_SECTION],
+                    "start_sentence": 1,
+                    "end_sentence": 1,
+                },
+                {
+                    "sentences": [f"{LONG_SINGLE_SECTION} Additional details."],
+                    "start_sentence": 2,
+                    "end_sentence": 2,
+                },
             ]
 
             summary = generate_article_summary(["S1", "S2", "S3"], cached_llm, mock_llm)
@@ -300,11 +325,15 @@ class TestArticleSummaryHelpers:
             "lib.tasks.summarization.build_article_summary_chunks"
         ) as mock_chunks:
             mock_chunks.return_value = [
-                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+                {
+                    "sentences": [LONG_SINGLE_SECTION],
+                    "start_sentence": 1,
+                    "end_sentence": 1,
+                },
             ]
 
             summary = generate_article_summary(
-                ["S1"], cached_llm, mock_llm, max_attempts=3
+                [LONG_SINGLE_SECTION], cached_llm, mock_llm, max_attempts=3
             )
 
         assert summary == {"text": "Recovered", "bullets": ["Detail A"]}
@@ -322,14 +351,19 @@ class TestArticleSummaryHelpers:
             "lib.tasks.summarization.build_article_summary_chunks"
         ) as mock_chunks:
             mock_chunks.return_value = [
-                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+                {
+                    "sentences": [LONG_SINGLE_SECTION],
+                    "start_sentence": 1,
+                    "end_sentence": 1,
+                },
             ]
 
             summary = generate_article_summary(
-                ["S1"], cached_llm, mock_llm, max_attempts=3
+                [LONG_SINGLE_SECTION], cached_llm, mock_llm, max_attempts=3
             )
 
-        assert summary == {"text": "S1", "bullets": ["S1"]}
+        assert summary["text"].startswith("AI Accelerator is a broad category")
+        assert len(summary["text"].split()) <= 30
 
     def test_generate_article_summary_defaults_to_ten_attempts_before_fallback(
         self, mock_llm
@@ -342,12 +376,19 @@ class TestArticleSummaryHelpers:
             "lib.tasks.summarization.build_article_summary_chunks"
         ) as mock_chunks:
             mock_chunks.return_value = [
-                {"sentences": ["S1"], "start_sentence": 1, "end_sentence": 1},
+                {
+                    "sentences": [LONG_SINGLE_SECTION],
+                    "start_sentence": 1,
+                    "end_sentence": 1,
+                },
             ]
 
-            summary = generate_article_summary(["S1"], cached_llm, mock_llm)
+            summary = generate_article_summary(
+                [LONG_SINGLE_SECTION], cached_llm, mock_llm
+            )
 
-        assert summary == {"text": "S1", "bullets": ["S1"]}
+        assert summary["text"].startswith("AI Accelerator is a broad category")
+        assert len(summary["text"].split()) <= 30
         assert ARTICLE_SUMMARY_MAX_ATTEMPTS == 10
         cached_llm.call.assert_called_once()
         assert mock_llm.call.call_count == ARTICLE_SUMMARY_MAX_ATTEMPTS - 1
@@ -370,26 +411,16 @@ class TestArticleSummaryHelpers:
 
         summary = _parallel_generate_article_summary(
             [
-                "Sentence one about Python programming.",
-                "Sentence two about data structures.",
-                "Sentence three about algorithms.",
+                LONG_SINGLE_SECTION,
+                f"{LONG_SINGLE_SECTION} Additional details.",
+                f"{LONG_SINGLE_SECTION} More details.",
             ],
             llm,
             max_attempts=3,
         )
 
-        assert summary == {
-            "text": (
-                "Sentence one about Python programming. "
-                "Sentence two about data structures. "
-                "Sentence three about algorithms."
-            ),
-            "bullets": [
-                "Sentence one about Python programming.",
-                "Sentence two about data structures.",
-                "Sentence three about algorithms.",
-            ],
-        }
+        assert summary["text"].startswith("AI Accelerator is a broad category")
+        assert summary["bullets"]
         assert llm.call.call_count == 9
 
 

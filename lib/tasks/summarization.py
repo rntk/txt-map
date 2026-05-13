@@ -108,7 +108,7 @@ ARTICLE_SUMMARY_PROMPT_TEMPLATE = (
     "Rules:\n"
     "- `text` must be objective and very brief (one sentence, max 30 words).\n"
     "- Only include facts explicitly stated in the text. Do not infer, speculate, or add external knowledge.\n"
-    "- Use language and terminology from the source text where possible.\n"
+    "- Preserve names, numbers, and technical terms, but compress into concise wording instead of copying full source sentences.\n"
     "- `bullets` must contain 3 to 6 concise bullet strings.\n"
     "- Each bullet must be a verifiable fact from the article, not an opinion or interpretation.\n"
     "- Do not include duplicate bullets.\n"
@@ -155,7 +155,6 @@ _SENTENCE_SUMMARY_PROMPT_TEMPLATE = (
 
 _SENTENCE_SUMMARY_SKIP_WORD_THRESHOLD = 15
 _ARTICLE_SUMMARY_SKIP_WORD_THRESHOLD = 30
-_ARTICLE_SUMMARY_MIN_SOURCE_SENTENCES = 3
 
 
 def _count_words(text: str) -> int:
@@ -167,8 +166,6 @@ def _is_short_sentence_source(sentence: str) -> bool:
 
 
 def _is_short_article_source(sentences: List[str]) -> bool:
-    if len(sentences) < _ARTICLE_SUMMARY_MIN_SOURCE_SENTENCES:
-        return True
     total_words = sum(_count_words(s) for s in sentences)
     return total_words <= _ARTICLE_SUMMARY_SKIP_WORD_THRESHOLD
 

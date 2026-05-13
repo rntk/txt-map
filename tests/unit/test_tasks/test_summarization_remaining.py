@@ -35,6 +35,14 @@ from lib.tasks.summarization import (
 )
 
 
+LONG_SINGLE_SECTION = (
+    "AI Accelerator is a broad category of chips built specifically for AI "
+    "workloads rather than general computing. Purpose-built accelerators can "
+    "deliver better performance and efficiency than general-purpose chips for "
+    "training and inference workloads."
+)
+
+
 class MockFuture:
     def __init__(self, value: str) -> None:
         self._value = value
@@ -406,7 +414,7 @@ def test_parallel_summarize_sentence_groups_basic() -> None:
 def test_parallel_summarize_sentence_groups_skips_empty_response() -> None:
     llm = MagicMock()
     llm.submit = MagicMock(side_effect=[MockFuture(""), MockFuture("Valid")])
-    sentences = ["First.", "Second."]
+    sentences = [LONG_SINGLE_SECTION, f"{LONG_SINGLE_SECTION} Additional details."]
     summaries, mappings = _parallel_summarize_sentence_groups(sentences, llm)
     assert len(summaries) == 1
     assert len(mappings) == 1
@@ -434,7 +442,9 @@ def test_parallel_generate_article_summary_single_chunk() -> None:
     llm.submit = MagicMock(return_value=MockFuture('{"text":"Chunk","bullets":["A"]}'))
     llm.call = MagicMock(return_value='{"text":"Chunk","bullets":["A"]}')
 
-    result = _parallel_generate_article_summary(["S1", "S2"], llm, max_attempts=2)
+    result = _parallel_generate_article_summary(
+        [LONG_SINGLE_SECTION], llm, max_attempts=2
+    )
     assert result == {"text": "Chunk", "bullets": ["A"]}
 
 
@@ -481,10 +491,14 @@ def test_generate_article_summary_low_source_overlap_warning(
 
     with patch("lib.tasks.summarization.build_article_summary_chunks") as mock_chunks:
         mock_chunks.return_value = [
-            {"sentences": ["S1 about python"], "start_sentence": 1, "end_sentence": 1},
+            {
+                "sentences": [LONG_SINGLE_SECTION],
+                "start_sentence": 1,
+                "end_sentence": 1,
+            },
         ]
         with caplog.at_level(logging.WARNING):
-            generate_article_summary(["S1 about python"], cached_llm, mock_llm)
+            generate_article_summary([LONG_SINGLE_SECTION], cached_llm, mock_llm)
 
     assert "low source overlap" in caplog.text.lower()
 
@@ -711,7 +725,7 @@ def test_parallel_summarize_topic_tree_leaf_only() -> None:
     llm.submit = MagicMock(return_value=MockFuture('{"text":"Leaf","bullets":["A"]}'))
     llm.call = MagicMock(return_value='{"text":"Leaf","bullets":["A"]}')
 
-    _parallel_summarize_topic_tree(root, ["Sentence one."], llm)
+    _parallel_summarize_topic_tree(root, [LONG_SINGLE_SECTION], llm)
     assert leaf.summary == {"text": "Leaf", "bullets": ["A"]}
 
 
@@ -784,7 +798,7 @@ def test_process_summarization_parallel_path(mock_db: MagicMock) -> None:
     submission = {
         "submission_id": "test-123",
         "results": {
-            "sentences": ["S1", "S2"],
+            "sentences": [LONG_SINGLE_SECTION, f"{LONG_SINGLE_SECTION} More details."],
             "topics": [{"name": "Topic", "sentences": [1, 2]}],
         },
     }
