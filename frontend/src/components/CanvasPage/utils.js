@@ -7,6 +7,8 @@ import {
   TOPIC_HIERARCHY_TITLE_FONT_SIZE_PX,
   TOPIC_HIERARCHY_TITLE_LINE_HEIGHT,
   TOPIC_HIERARCHY_TITLE_MAX_LINES,
+  SUMMARY_RAIL_BASE_WIDTH_PX,
+  SUMMARY_RAIL_MAX_SCALE_FACTOR,
   CHAT_POLL_MAX_ATTEMPTS,
   POLL_INTERVAL_MS,
   WHEEL_ZOOM_IN_FACTOR,
@@ -53,6 +55,25 @@ export function getZoomAdjustedFontSize(scale, baseSize) {
 export function getZoomAdjustedTopicCardWidth(scale) {
   const safeScale = clampCanvasScale(scale || 1);
   return TOPIC_HIERARCHY_CARD_WIDTH * Math.max(1, 1 / safeScale);
+}
+
+/**
+ * Scale factor for summary rail elements (width + font), capped to keep
+ * cards from overwhelming the layout on heavy zoom-out.
+ * @param {number} scale
+ * @returns {number}
+ */
+export function getSummaryRailScaleFactor(scale) {
+  const safeScale = clampCanvasScale(scale || 1);
+  return Math.min(SUMMARY_RAIL_MAX_SCALE_FACTOR, Math.max(1, 1 / safeScale));
+}
+
+/**
+ * @param {number} scale
+ * @returns {number}
+ */
+export function getZoomAdjustedSummaryRailWidth(scale) {
+  return SUMMARY_RAIL_BASE_WIDTH_PX * getSummaryRailScaleFactor(scale);
 }
 
 /**

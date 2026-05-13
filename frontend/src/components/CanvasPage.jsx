@@ -18,6 +18,7 @@ import {
 import {
   clampCanvasScale,
   getTopicTitleFontSize,
+  getZoomAdjustedSummaryRailWidth,
   getZoomAdjustedTopicCardWidth,
   getTopicDisplayName,
   getTopicSentenceNumbers,
@@ -788,6 +789,11 @@ export default function CanvasPage() {
     [selectedLevel, topicHierarchyCardWidth],
   );
 
+  const summaryRailWidth = useMemo(
+    () => getZoomAdjustedSummaryRailWidth(scale),
+    [scale],
+  );
+
   // ── Layout hooks ───────────────────────────────────────────────────────────
 
   const summaryLayout = useSummaryLayout({
@@ -1202,6 +1208,7 @@ export default function CanvasPage() {
                 className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}${showTopicTagsRail && !showSummaryMode ? " has-topic-tags" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
+                  "--canvas-summary-rail-width": `${summaryRailWidth}px`,
                   "--canvas-tags-cloud-width": `${cloudSize.width}px`,
                 }}
               >
@@ -1252,6 +1259,7 @@ export default function CanvasPage() {
                     onCardLeave={(key) =>
                       setHoveredSummaryKey((k) => (k === key ? null : k))
                     }
+                    onCardClick={(card) => zoomToSummaryCard(card.topicName)}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}

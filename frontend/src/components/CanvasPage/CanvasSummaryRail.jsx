@@ -13,6 +13,7 @@ import RailConnectors from "./RailConnectors";
  *   activeSummaryKey: string | null,
  *   onCardEnter: (key: string) => void,
  *   onCardLeave: (key: string) => void,
+ *   onCardClick?: (card: {key: string, topicName: string}) => void,
  *   translate: {x: number, y: number},
  *   scale: number,
  *   isAnimating: boolean,
@@ -23,6 +24,7 @@ export default function CanvasSummaryRail({
   activeSummaryKey,
   onCardEnter,
   onCardLeave,
+  onCardClick,
   translate,
   scale,
   isAnimating,
@@ -59,6 +61,7 @@ export default function CanvasSummaryRail({
               }}
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}
+              onClick={onCardClick ? () => onCardClick(card) : undefined}
               title={card.topicName}
             >
               <div className="canvas-summary-card-topic">{card.topicName}</div>
