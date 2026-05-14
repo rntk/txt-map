@@ -114,8 +114,6 @@ export default function CanvasPage() {
     scaleRef,
     translateRef,
     handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
@@ -1184,9 +1182,6 @@ export default function CanvasPage() {
           ref={canvasWrapRef}
           className={`canvas-area${isCanvasDragging ? " is-dragging" : ""}`}
           onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}

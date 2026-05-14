@@ -22,6 +22,11 @@
   cursor: grabbing;
 }
 
+body.canvas-global-dragging,
+body.canvas-global-dragging * {
+  cursor: grabbing !important;
+}
+
 .canvas-viewport {
   position: absolute;
   transform: translate(

@@ -30,6 +30,7 @@ export function useCanvasTransform({ contentRef } = {}) {
   const pendingTransformRef = useRef(null);
   const userMovedCanvasRef = useRef(false);
   const smoothZoomTimerRef = useRef(null);
+  const cleanupDragRef = useRef(null);
 
   // Touch / pinch state
   const isTouchDragging = useRef(false);
@@ -43,6 +44,10 @@ export function useCanvasTransform({ contentRef } = {}) {
       if (transformFrameRef.current) {
         window.cancelAnimationFrame(transformFrameRef.current);
       }
+      if (cleanupDragRef.current) {
+        cleanupDragRef.current();
+        cleanupDragRef.current = null;
+      }
     };
   }, []);
 
@@ -53,6 +58,17 @@ export function useCanvasTransform({ contentRef } = {}) {
   useEffect(() => {
     translateRef.current = translate;
   }, [translate]);
+
+  useEffect(() => {
+    if (isCanvasDragging) {
+      document.body.classList.add("canvas-global-dragging");
+    } else {
+      document.body.classList.remove("canvas-global-dragging");
+    }
+    return () => {
+      document.body.classList.remove("canvas-global-dragging");
+    };
+  }, [isCanvasDragging]);
 
   useEffect(() => {
     const viewport = canvasViewportRef.current;
@@ -107,34 +123,49 @@ export function useCanvasTransform({ contentRef } = {}) {
     });
   }, []);
 
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    setIsFocusingHighlight(false);
-    setIsCanvasDragging(true);
-    isDragging.current = true;
-    userMovedCanvasRef.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-    e.preventDefault();
-  }, []);
-
-  const handleMouseMove = useCallback(
+  const handleMouseDown = useCallback(
     (e) => {
-      if (!isDragging.current) return;
-      const dx = e.clientX - lastMouse.current.x;
-      const dy = e.clientY - lastMouse.current.y;
+      if (e.button !== 0) return;
+      if (cleanupDragRef.current) {
+        cleanupDragRef.current();
+        cleanupDragRef.current = null;
+      }
+
+      setIsFocusingHighlight(false);
+      setIsCanvasDragging(true);
+      isDragging.current = true;
+      userMovedCanvasRef.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
-      scheduleCanvasTransform(scaleRef.current || 1, {
-        x: translateRef.current.x + dx,
-        y: translateRef.current.y + dy,
-      });
+      e.preventDefault();
+
+      const onWindowMouseMove = (moveEvent) => {
+        if (!isDragging.current) return;
+        const dx = moveEvent.clientX - lastMouse.current.x;
+        const dy = moveEvent.clientY - lastMouse.current.y;
+        lastMouse.current = { x: moveEvent.clientX, y: moveEvent.clientY };
+        scheduleCanvasTransform(scaleRef.current || 1, {
+          x: translateRef.current.x + dx,
+          y: translateRef.current.y + dy,
+        });
+      };
+
+      const onWindowMouseUp = () => {
+        isDragging.current = false;
+        setIsCanvasDragging(false);
+        window.removeEventListener("mousemove", onWindowMouseMove);
+        window.removeEventListener("mouseup", onWindowMouseUp);
+        cleanupDragRef.current = null;
+      };
+
+      window.addEventListener("mousemove", onWindowMouseMove);
+      window.addEventListener("mouseup", onWindowMouseUp);
+      cleanupDragRef.current = () => {
+        window.removeEventListener("mousemove", onWindowMouseMove);
+        window.removeEventListener("mouseup", onWindowMouseUp);
+      };
     },
     [scheduleCanvasTransform],
   );
-
-  const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-    setIsCanvasDragging(false);
-  }, []);
 
   const handleWheel = useCallback(
     (e) => {
@@ -471,8 +502,6 @@ export function useCanvasTransform({ contentRef } = {}) {
     translateRef,
     // Mouse handlers
     handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
     // Touch handlers
     handleTouchStart,
     handleTouchMove,
