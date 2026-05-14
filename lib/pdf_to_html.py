@@ -262,7 +262,6 @@ class PDFToSemanticHTML:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Conversion</title>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }}
         h1 {{ font-size: 2em; margin-top: 1em; margin-bottom: 0.5em; }}
