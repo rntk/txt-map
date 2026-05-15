@@ -49,8 +49,7 @@ describe("buildTopicStateRanges", () => {
       topics,
       [{ name: "A" }],
       null,
-      new Set(),
-      100,
+      { readTopics: new Set(), textLength: 100 },
     );
     expect(highlightRanges).toEqual([{ start: 0, end: 5 }]);
     expect(fadeRanges).toHaveLength(0);
@@ -61,8 +60,7 @@ describe("buildTopicStateRanges", () => {
       topics,
       [],
       { name: "B" },
-      new Set(),
-      100,
+      { readTopics: new Set(), textLength: 100 },
     );
     expect(highlightRanges).toEqual([{ start: 10, end: 20 }]);
   });
@@ -72,8 +70,7 @@ describe("buildTopicStateRanges", () => {
       topics,
       [],
       null,
-      new Set(["C"]),
-      100,
+      { readTopics: new Set(["C"]), textLength: 100 },
     );
     expect(fadeRanges).toEqual([{ start: 30, end: 40 }]);
     expect(highlightRanges).toHaveLength(0);
@@ -84,8 +81,7 @@ describe("buildTopicStateRanges", () => {
       topics,
       [{ name: "A" }],
       null,
-      new Set(["A"]),
-      100,
+      { readTopics: new Set(["A"]), textLength: 100 },
     );
     expect(highlightRanges).toHaveLength(1);
     expect(fadeRanges).toHaveLength(0);
@@ -97,15 +93,17 @@ describe("buildTopicStateRanges", () => {
       topicsNoRanges,
       [{ name: "X" }],
       null,
-      new Set(),
-      100,
+      { readTopics: new Set(), textLength: 100 },
     );
     expect(highlightRanges).toHaveLength(0);
     expect(fadeRanges).toHaveLength(0);
   });
 
   test("handles array readTopics (non-Set)", () => {
-    const { fadeRanges } = buildTopicStateRanges(topics, [], null, ["C"], 100);
+    const { fadeRanges } = buildTopicStateRanges(topics, [], null, {
+      readTopics: ["C"],
+      textLength: 100,
+    });
     expect(fadeRanges).toEqual([{ start: 30, end: 40 }]);
   });
 });

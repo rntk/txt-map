@@ -16,20 +16,7 @@ export default function MarkupRenderer({ html, highlightWords }) {
     Array.isArray(highlightWords) && highlightWords.length > 0;
 
   const safeHtml = shouldHighlight
-    ? buildHighlightedRawHtml(
-        html,
-        [],
-        0,
-        [],
-        [],
-        [],
-        [],
-        [],
-        "",
-        [],
-        "",
-        highlightWords,
-      )
+    ? buildHighlightedRawHtml(html, [], 0, { highlightWords })
     : sanitizeHTML(html);
 
   if (!safeHtml) {

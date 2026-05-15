@@ -150,7 +150,7 @@ describe("readJsonSafe", () => {
 
 describe("buildSegments", () => {
   it("returns single segment when no highlights", () => {
-    const segments = buildSegments("hello world", [], [], [], []);
+    const segments = buildSegments("hello world", []);
     expect(segments).toEqual([
       {
         text: "hello world",
@@ -163,13 +163,7 @@ describe("buildSegments", () => {
   });
 
   it("splits text at highlight boundaries", () => {
-    const segments = buildSegments(
-      "hello world",
-      [{ start: 0, end: 5 }],
-      [],
-      [],
-      [],
-    );
+    const segments = buildSegments("hello world", [{ start: 0, end: 5 }]);
     expect(segments).toHaveLength(2);
     expect(segments[0]).toEqual(
       expect.objectContaining({
@@ -190,42 +184,28 @@ describe("buildSegments", () => {
   });
 
   it("marks read ranges", () => {
-    const segments = buildSegments(
-      "hello world",
-      [],
-      [{ start: 0, end: 5 }],
-      [],
-      [],
-    );
+    const segments = buildSegments("hello world", [], {
+      readRanges: [{ start: 0, end: 5 }],
+    });
     expect(segments[0].read).toBe(true);
     expect(segments[1].read).toBe(false);
   });
 
   it("applies temperature colors", () => {
-    const segments = buildSegments(
-      "hello world",
-      [],
-      [],
-      [{ start: 0, end: 5, color: "red" }],
-      [],
-    );
+    const segments = buildSegments("hello world", [], {
+      temperatureHighlights: [{ start: 0, end: 5, color: "red" }],
+    });
     expect(segments[0].temperatureColor).toBe("red");
     expect(segments[1].temperatureColor).toBeUndefined();
   });
 
   it("carries highlight labels", () => {
-    const segments = buildSegments(
-      "hello",
-      [{ start: 0, end: 5, label: "topic" }],
-      [],
-      [],
-      [],
-    );
+    const segments = buildSegments("hello", [{ start: 0, end: 5, label: "topic" }]);
     expect(segments[0].label).toBe("topic");
   });
 
   it("splits at sentence boundaries", () => {
-    const segments = buildSegments("hello world", [], [], [], [5]);
+    const segments = buildSegments("hello world", [], { sentenceBoundaries: [5] });
     expect(segments).toHaveLength(2);
     expect(segments[0].text).toBe("hello");
     expect(segments[1].text).toBe(" world");
@@ -234,7 +214,7 @@ describe("buildSegments", () => {
 
 describe("buildSegmentsWithPages", () => {
   it("delegates to buildSegments when no pages", () => {
-    const result = buildSegmentsWithPages("hello", [], [], [], [], []);
+    const result = buildSegmentsWithPages("hello", [], []);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("segment");
     expect(result[0].text).toBe("hello");
@@ -244,13 +224,10 @@ describe("buildSegmentsWithPages", () => {
     const result = buildSegmentsWithPages(
       "hello world",
       [],
-      [],
-      [],
       [
         { page_number: 1, start: 0, end: 5 },
         { page_number: 2, start: 5, end: 11 },
       ],
-      [],
     );
     expect(result).toHaveLength(3);
     expect(result[0].type).toBe("segment");

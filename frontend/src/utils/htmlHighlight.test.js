@@ -188,22 +188,12 @@ describe("htmlHighlight", () => {
     const noRanges = [];
 
     it("returns plain word when not in any range", () => {
-      expect(
-        wrapWord("hello", 0, 0, noRanges, noRanges, noRanges, noRanges),
-      ).toBe("hello");
+      expect(wrapWord("hello", 0, 0)).toBe("hello");
     });
 
     it("wraps word in span when in a topic range", () => {
       const topicRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 0, { allTopicRanges: topicRanges });
       expect(result).toContain('<span class="word-token"');
       expect(result).toContain("hello");
     });
@@ -211,30 +201,20 @@ describe("htmlHighlight", () => {
     it("adds 'highlighted' class when in highlightRanges", () => {
       const highlight = [{ start: 0, end: 5 }];
       const topicRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        highlight,
-        noRanges,
-        noRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 0, {
+        highlightRanges: highlight,
+        allTopicRanges: topicRanges,
+      });
       expect(result).toContain("highlighted");
     });
 
     it("adds 'faded' class when in fadeRanges but not highlightRanges", () => {
       const fade = [{ start: 0, end: 5 }];
       const topicRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        fade,
-        noRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 0, {
+        fadeRanges: fade,
+        allTopicRanges: topicRanges,
+      });
       expect(result).toContain("faded");
     });
 
@@ -242,121 +222,56 @@ describe("htmlHighlight", () => {
       const highlight = [{ start: 0, end: 5 }];
       const fade = [{ start: 0, end: 5 }];
       const topicRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        highlight,
-        fade,
-        noRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 0, {
+        highlightRanges: highlight,
+        fadeRanges: fade,
+        allTopicRanges: topicRanges,
+      });
       expect(result).toContain("highlighted");
       expect(result).not.toContain("faded");
     });
 
     it("adds word-highlight class for matching highlightWords", () => {
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        noRanges,
-        [],
-        [],
-        "",
-        [],
-        "",
-        ["hello"],
-      );
+      const result = wrapWord("hello", 0, 0, { highlightWords: ["hello"] });
       expect(result).toContain("word-highlight");
     });
 
     it("highlights word case-insensitively via highlightWords", () => {
-      const result = wrapWord(
-        "Hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        noRanges,
-        [],
-        [],
-        "",
-        [],
-        "",
-        ["hello"],
-      );
+      const result = wrapWord("Hello", 0, 0, { highlightWords: ["hello"] });
       expect(result).toContain("word-highlight");
     });
 
     it("wraps word with colored range cssClass", () => {
       const coloredRanges = [{ start: 0, end: 5, cssClass: "color-red" }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        noRanges,
-        coloredRanges,
-      );
+      const result = wrapWord("hello", 0, 0, { coloredRanges });
       expect(result).toContain("color-red");
     });
 
     it("adds interactive class when in interactiveRanges", () => {
       const topicRanges = [{ start: 0, end: 5 }];
       const interactiveRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        topicRanges,
-        [],
+      const result = wrapWord("hello", 0, 0, {
+        allTopicRanges: topicRanges,
         interactiveRanges,
-        "my-interactive",
-      );
+        interactiveClassName: "my-interactive",
+      });
       expect(result).toContain("my-interactive");
     });
 
     it("adds dimmed class when in dimmedRanges", () => {
       const topicRanges = [{ start: 0, end: 5 }];
       const dimmedRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        topicRanges,
-        [],
-        [],
-        "",
+      const result = wrapWord("hello", 0, 0, {
+        allTopicRanges: topicRanges,
         dimmedRanges,
-        "my-dimmed",
-      );
+        dimmedClassName: "my-dimmed",
+      });
       expect(result).toContain("my-dimmed");
     });
 
     it("includes data attributes in wrapped span", () => {
       const topicRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        2,
-        noRanges,
-        noRanges,
-        noRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 2, { allTopicRanges: topicRanges });
       expect(result).toContain('data-article-index="2"');
       expect(result).toContain('data-char-start="0"');
       expect(result).toContain('data-char-end="5"');
@@ -370,70 +285,47 @@ describe("htmlHighlight", () => {
           markerWords: new Set(["hello"]),
         },
       ];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        noRanges,
-        topicRanges,
-        [],
-        [],
-        "",
-        [],
-        "",
-        [],
+      const result = wrapWord("hello", 0, 0, {
+        allTopicRanges: topicRanges,
         topicMarkerData,
-      );
+      });
       expect(result).toContain("reading-article__summary-word-highlight");
     });
 
     it("adds summary highlight class via summaryHighlightRanges", () => {
       const topicRanges = [{ start: 0, end: 5 }];
       const summaryRanges = [{ start: 0, end: 5 }];
-      const result = wrapWord(
-        "hello",
-        0,
-        0,
-        noRanges,
-        noRanges,
-        summaryRanges,
-        topicRanges,
-      );
+      const result = wrapWord("hello", 0, 0, {
+        summaryHighlightRanges: summaryRanges,
+        allTopicRanges: topicRanges,
+      });
       expect(result).toContain("reading-article__summary-word-highlight");
     });
   });
 
   describe("buildHighlightedRawHtml", () => {
     it("returns empty string for null input", () => {
-      expect(buildHighlightedRawHtml(null, [], 0, [], [])).toBe("");
+      expect(buildHighlightedRawHtml(null, [], 0)).toBe("");
     });
 
     it("returns empty string for undefined input", () => {
-      expect(buildHighlightedRawHtml(undefined, [], 0, [], [])).toBe("");
+      expect(buildHighlightedRawHtml(undefined, [], 0)).toBe("");
     });
 
     it("returns sanitized HTML when no ranges or highlights are provided", () => {
-      const result = buildHighlightedRawHtml("hello world", [], 0, [], []);
+      const result = buildHighlightedRawHtml("hello world", [], 0);
       expect(result).toBe("hello world");
     });
 
     it("wraps words that fall within topic ranges", () => {
       const topics = [{ ranges: [{ start: 0, end: 5 }] }];
-      const result = buildHighlightedRawHtml("hello world", topics, 0, [], []);
+      const result = buildHighlightedRawHtml("hello world", topics, 0);
       expect(result).toContain("word-token");
     });
 
     it("preserves HTML tags in the output", () => {
       const topics = [{ ranges: [{ start: 0, end: 5 }] }];
-      const result = buildHighlightedRawHtml(
-        "<b>hello</b> world",
-        topics,
-        0,
-        [],
-        [],
-      );
+      const result = buildHighlightedRawHtml("<b>hello</b> world", topics, 0);
       expect(result).toContain("<b>");
       expect(result).toContain("</b>");
     });
@@ -441,45 +333,24 @@ describe("htmlHighlight", () => {
     it("wraps words based on highlight ranges", () => {
       const topics = [{ ranges: [{ start: 0, end: 11 }] }];
       const highlight = [{ start: 6, end: 11 }];
-      const result = buildHighlightedRawHtml(
-        "hello world",
-        topics,
-        0,
-        highlight,
-        [],
-      );
+      const result = buildHighlightedRawHtml("hello world", topics, 0, {
+        highlightRanges: highlight,
+      });
       expect(result).toContain("highlighted");
     });
 
     it("handles colored ranges", () => {
       const coloredRanges = [{ start: 0, end: 5, cssClass: "my-color" }];
-      const result = buildHighlightedRawHtml(
-        "hello world",
-        [],
-        0,
-        [],
-        [],
-        [],
+      const result = buildHighlightedRawHtml("hello world", [], 0, {
         coloredRanges,
-      );
+      });
       expect(result).toContain("my-color");
     });
 
     it("handles highlightWords parameter", () => {
-      const result = buildHighlightedRawHtml(
-        "hello world",
-        [],
-        0,
-        [],
-        [],
-        [],
-        [],
-        [],
-        "",
-        [],
-        "",
-        ["hello"],
-      );
+      const result = buildHighlightedRawHtml("hello world", [], 0, {
+        highlightWords: ["hello"],
+      });
       expect(result).toContain("word-highlight");
     });
   });

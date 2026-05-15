@@ -308,13 +308,8 @@ function stopTileClickPropagation(event) {
  * @param {Map<string, {ranges: Array<{marker_spans: Array<{text: string}>, summary_text: string}>}>} markerSummariesByTopic
  * @returns {TopicIndexMetaCategory[]}
  */
-function buildTopicTileMetaCategories(
-  topic,
-  topicKeyPhrasesMap,
-  topicTagCloudMap,
-  subtopicsByParent,
-  markerSummariesByTopic,
-) {
+function buildTopicTileMetaCategories(topic, maps) {
+  const { topicKeyPhrasesMap, topicTagCloudMap, subtopicsByParent, markerSummariesByTopic } = maps;
   /** @type {Record<string, TopicIndexMetaCategory|null>} */
   const categoriesByKey = {
     key_phrases: null,
@@ -502,13 +497,12 @@ function TopicIndexView({
     deduplicatedTopics.forEach((topic) => {
       categoriesByTopicName.set(
         topic.name,
-        buildTopicTileMetaCategories(
-          topic,
+        buildTopicTileMetaCategories(topic, {
           topicKeyPhrasesMap,
           topicTagCloudMap,
           subtopicsByParent,
-          topicMarkerSummariesByTopic,
-        ),
+          markerSummariesByTopic: topicMarkerSummariesByTopic,
+        }),
       );
     });
     return categoriesByTopicName;

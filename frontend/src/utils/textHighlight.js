@@ -22,9 +22,9 @@ export function buildTopicStateRanges(
   topics,
   selectedTopics,
   hoveredTopic,
-  readTopics,
-  textLength,
+  options = {},
 ) {
+  const { readTopics, textLength } = options;
   const highlightRanges = [];
   const fadeRanges = [];
   const selectedNames = new Set(

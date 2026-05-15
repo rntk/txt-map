@@ -79,7 +79,8 @@ function wrapLines(label, maxWidth, fontSize) {
   return lines;
 }
 
-function renderCenteredLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
+function renderCenteredLabel(g, x, y, style, lines) {
+  const { fontSize, fontWeight, textColor } = style;
   const lineHeight = fontSize * 1.2;
   const totalHeight = lines.length * lineHeight;
   const baseY = y - totalHeight / 2 + lineHeight * 0.8;
@@ -121,7 +122,8 @@ function renderCenteredLabel(g, x, y, fontSize, fontWeight, textColor, lines) {
   });
 }
 
-function renderHeaderLabel(g, x, y, width, fontSize, textColor, label) {
+function renderHeaderLabel(g, x, y, style, label) {
+  const { width, fontSize, textColor } = style;
   const maxChars = Math.max(
     1,
     Math.floor(
@@ -425,9 +427,7 @@ export default function TreemapChart({
             group,
             node.x0 + rectWidth / 2,
             node.y0 + rectHeight / 2,
-            fontSize,
-            "600",
-            getContrastingTextColor(fillColor),
+            { fontSize, fontWeight: "600", textColor: getContrastingTextColor(fillColor) },
             lines,
           );
         }
@@ -440,9 +440,7 @@ export default function TreemapChart({
           group,
           node.x0,
           node.y0,
-          rectWidth,
-          12,
-          getContrastingTextColor(fillColor),
+          { width: rectWidth, fontSize: 12, textColor: getContrastingTextColor(fillColor) },
           node.data.name,
         );
       }

@@ -523,21 +523,18 @@ function TextDisplay({
 
   const highlightedRawHtml = useMemo(
     () =>
-      buildHighlightedRawHtml(
-        rawHtml,
-        safeArticleTopics,
-        articleIndex,
-        effectiveHighlightRanges,
+      buildHighlightedRawHtml(rawHtml, safeArticleTopics, articleIndex, {
+        highlightRanges: effectiveHighlightRanges,
         fadeRanges,
-        activeSummaryHighlightRanges,
+        summaryHighlightRanges: activeSummaryHighlightRanges,
         coloredRanges,
-        safeInteractiveHighlightRanges,
-        interactiveHighlightClassName,
-        safeDimmedHighlightRanges,
-        dimmedHighlightClassName,
-        effectiveHighlightWords,
+        interactiveRanges: safeInteractiveHighlightRanges,
+        interactiveClassName: interactiveHighlightClassName,
+        dimmedRanges: safeDimmedHighlightRanges,
+        dimmedClassName: dimmedHighlightClassName,
+        highlightWords: effectiveHighlightWords,
         topicMarkerData,
-      ),
+      }),
     [
       rawHtml,
       safeArticleTopics,

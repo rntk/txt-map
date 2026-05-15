@@ -160,7 +160,7 @@ const SubtopicsRiverChart = ({
 
     // Use shared utils for binning across the effective article length
     const binCount = Math.max(20, Math.min(60, Math.floor(innerWidth / 30)));
-    let bins = calculateBins(binCount, orderedSubtopics, 0, effectiveLength);
+    let bins = calculateBins(binCount, orderedSubtopics, { start: 0, end: effectiveLength });
     bins = smoothBins(bins, orderedSubtopics);
     bins = estimateCharacterCounts(bins, orderedSubtopics);
 

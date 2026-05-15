@@ -199,13 +199,8 @@ export async function pollCanvasChatReply(articleId, requestId, signal) {
  * @param {{start: number, end: number, color: string}[]} [temperatureHighlights]
  * @returns {{text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, variant?: string, temperatureColor?: string}[]}
  */
-export function buildSegments(
-  text,
-  highlights,
-  readRanges,
-  temperatureHighlights,
-  sentenceBoundaries,
-) {
+export function buildSegments(text, highlights, options = {}) {
+  const { readRanges, temperatureHighlights, sentenceBoundaries } = options;
   const hasRead = Array.isArray(readRanges) && readRanges.length > 0;
   const hasTemp =
     Array.isArray(temperatureHighlights) && temperatureHighlights.length > 0;
@@ -294,23 +289,15 @@ export function buildSegments(
  * @param {{page_number: number, start: number, end: number}[]} [pages]
  * @returns {{type: "page-splitter", page_number: number, start: number} | {type: "segment", text: string, start?: number, end?: number, highlighted: boolean, read: boolean, label?: string, temperatureColor?: string}[]}
  */
-export function buildSegmentsWithPages(
-  text,
-  highlights,
-  readRanges,
-  temperatureHighlights,
-  pages,
-  sentenceOffsets,
-) {
+export function buildSegmentsWithPages(text, highlights, pages, options = {}) {
+  const { readRanges, temperatureHighlights, sentenceOffsets } = options;
   const hasPages = Array.isArray(pages) && pages.length > 0;
   if (!hasPages) {
-    return buildSegments(
-      text,
-      highlights,
+    return buildSegments(text, highlights, {
       readRanges,
       temperatureHighlights,
-      sentenceOffsets,
-    ).map((s) => ({
+      sentenceBoundaries: sentenceOffsets,
+    }).map((s) => ({
       ...s,
       type: "segment",
     }));
@@ -354,13 +341,11 @@ export function buildSegmentsWithPages(
       .map((off) => off - page.start)
       .filter((off) => off > 0 && off < page.end - page.start);
 
-    const segments = buildSegments(
-      pageText,
-      pageHighlights,
-      pageRead,
-      pageTemp,
-      pageSentences,
-    );
+    const segments = buildSegments(pageText, pageHighlights, {
+      readRanges: pageRead,
+      temperatureHighlights: pageTemp,
+      sentenceBoundaries: pageSentences,
+    });
     for (const seg of segments) {
       result.push({
         ...seg,

@@ -8,20 +8,20 @@ import {
 describe("calculateBins", () => {
   it("creates the requested number of bins", () => {
     const items = [{ name: "A", sentences: [1, 2, 3] }];
-    const bins = calculateBins(5, items, 1, 6);
+    const bins = calculateBins(5, items, { start: 1, end: 6 });
     expect(bins).toHaveLength(5);
   });
 
   it("counts sentences that fall within each bin range", () => {
     const items = [{ name: "A", sentences: [1, 2, 3, 4, 5] }];
-    const bins = calculateBins(5, items, 1, 6);
+    const bins = calculateBins(5, items, { start: 1, end: 6 });
     expect(bins[0].A).toBe(1);
     expect(bins[4].A).toBe(1);
   });
 
   it("uses start-exclusive end-inclusive semantics (s >= start && s < end)", () => {
     const items = [{ name: "X", sentences: [2, 4] }];
-    const bins = calculateBins(2, items, 1, 5);
+    const bins = calculateBins(2, items, { start: 1, end: 5 });
     expect(bins[0].rangeStart).toBe(1);
     expect(bins[0].rangeEnd).toBe(3);
     expect(bins[0].X).toBe(1);
@@ -30,13 +30,13 @@ describe("calculateBins", () => {
 
   it("uses custom nameKey when provided", () => {
     const items = [{ label: "Z", sentences: [1] }];
-    const bins = calculateBins(3, items, 1, 4, "label");
+    const bins = calculateBins(3, items, { start: 1, end: 4 }, "label");
     expect(bins[0].Z).toBe(1);
   });
 
   it("returns 0 count for bins with no matching sentences", () => {
     const items = [{ name: "A", sentences: [10] }];
-    const bins = calculateBins(3, items, 1, 4);
+    const bins = calculateBins(3, items, { start: 1, end: 4 });
     bins.forEach((bin) => {
       expect(bin.A).toBe(0);
     });

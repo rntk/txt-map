@@ -441,9 +441,9 @@ function getTopicMarkerSummaryHighlightRanges(
   rawText,
   resultSentences,
   sentenceCharacterRanges,
-  topicRanges,
-  topicMarkerSummary,
+  context = {},
 ) {
+  const { topicRanges, topicMarkerSummary } = context;
   if (
     typeof rawText !== "string" ||
     !rawText ||
@@ -620,8 +620,7 @@ export function useTextPageData(
           rawText,
           resultSentences,
           sentenceCharacterRanges,
-          sourceRanges,
-          topicMarkerSummary,
+          { topicRanges: sourceRanges, topicMarkerSummary },
         ),
       };
     });
@@ -774,13 +773,10 @@ export function useTextPageData(
     fadeRanges: rawTextFadeRanges,
   } = useMemo(
     () =>
-      buildTopicStateRanges(
-        safeTopics,
-        selectedTopics,
-        hoveredTopic,
+      buildTopicStateRanges(safeTopics, selectedTopics, hoveredTopic, {
         readTopics,
-        rawText.length,
-      ),
+        textLength: rawText.length,
+      }),
     [safeTopics, selectedTopics, hoveredTopic, readTopics, rawText.length],
   );
 

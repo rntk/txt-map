@@ -138,7 +138,8 @@ export function buildTopicHierarchyFlowData(topics) {
    * @param {string} colorKey
    * @returns {TopicHierarchyFlowNode & { orderValues: number[] }}
    */
-  function ensureHierarchyNode(path, label, depth, column, colorKey) {
+  function ensureHierarchyNode(path, label, nodeAttrs) {
+    const { depth, column, colorKey } = nodeAttrs;
     const nodeId = `hierarchy:${path}`;
     const existing = nodeMap.get(nodeId);
     if (existing) {
@@ -204,7 +205,7 @@ export function buildTopicHierarchyFlowData(topics) {
     parts.forEach((part, depth) => {
       const path = parts.slice(0, depth + 1).join(">");
       const column = maxDepth - depth;
-      const node = ensureHierarchyNode(path, part, depth, column, colorKey);
+      const node = ensureHierarchyNode(path, part, { depth, column, colorKey });
       node.weight += weight;
       node.orderValues.push(topicIndex);
       node.canonicalTopicNameSet.add(topicName);

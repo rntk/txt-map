@@ -48,14 +48,11 @@ function ArticleText({
       ...(Array.isArray(sentenceOffsets) ? sentenceOffsets : []),
       ...sortedImages.map((image) => Number(image.anchorOffset)),
     ];
-    return buildSegmentsWithPages(
-      text,
-      highlights,
-      showReadStatus ? readRanges : undefined,
+    return buildSegmentsWithPages(text, highlights, pages, {
+      readRanges: showReadStatus ? readRanges : undefined,
       temperatureHighlights,
-      pages,
-      segmentBoundaries,
-    );
+      sentenceOffsets: segmentBoundaries,
+    });
   }, [
     text,
     highlights,

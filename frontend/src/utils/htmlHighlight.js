@@ -107,34 +107,33 @@ export function buildTopicMarkerData(
  * @param {string} htmlWord
  * @param {number} wordStart
  * @param {number} articleIndex
- * @param {Array<{start: number, end: number}>} highlightRanges
- * @param {Array<{start: number, end: number}>} fadeRanges
- * @param {Array<{start: number, end: number}>} summaryHighlightRanges
- * @param {Array<{start: number, end: number}>} allTopicRanges
- * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
- * @param {Array<{start: number, end: number}>} [interactiveRanges]
- * @param {string} [interactiveClassName]
- * @param {Array<{start: number, end: number}>} [dimmedRanges]
- * @param {string} [dimmedClassName]
- * @param {string[]} [highlightWords]
- * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [topicMarkerData] - Topic-specific marker data
+ * @param {object} [options]
+ * @param {Array<{start: number, end: number}>} [options.highlightRanges]
+ * @param {Array<{start: number, end: number}>} [options.fadeRanges]
+ * @param {Array<{start: number, end: number}>} [options.summaryHighlightRanges]
+ * @param {Array<{start: number, end: number}>} [options.allTopicRanges]
+ * @param {Array<{start: number, end: number, cssClass: string}>} [options.coloredRanges]
+ * @param {Array<{start: number, end: number}>} [options.interactiveRanges]
+ * @param {string} [options.interactiveClassName]
+ * @param {Array<{start: number, end: number}>} [options.dimmedRanges]
+ * @param {string} [options.dimmedClassName]
+ * @param {string[]} [options.highlightWords]
+ * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [options.topicMarkerData]
  */
-export function wrapWord(
-  htmlWord,
-  wordStart,
-  articleIndex,
-  highlightRanges,
-  fadeRanges,
-  summaryHighlightRanges,
-  allTopicRanges,
-  coloredRanges = [],
-  interactiveRanges = [],
-  interactiveClassName = "",
-  dimmedRanges = [],
-  dimmedClassName = "",
-  highlightWords = [],
-  topicMarkerData = null,
-) {
+export function wrapWord(htmlWord, wordStart, articleIndex, options = {}) {
+  const {
+    highlightRanges = [],
+    fadeRanges = [],
+    summaryHighlightRanges = [],
+    allTopicRanges = [],
+    coloredRanges = [],
+    interactiveRanges = [],
+    interactiveClassName = "",
+    dimmedRanges = [],
+    dimmedClassName = "",
+    highlightWords = [],
+    topicMarkerData = null,
+  } = options;
   const wordEnd = wordStart + htmlWord.length;
 
   const classes = ["word-token"];
@@ -219,32 +218,32 @@ export function wrapWord(
  * @param {string} rawHtml
  * @param {Array} articleTopics
  * @param {number} articleIndex
- * @param {Array<{start: number, end: number}>} highlightRanges
- * @param {Array<{start: number, end: number}>} fadeRanges
- * @param {Array<{start: number, end: number}>} [summaryHighlightRanges]
- * @param {Array<{start: number, end: number, cssClass: string}>} [coloredRanges]
- * @param {Array<{start: number, end: number}>} [interactiveRanges]
- * @param {string} [interactiveClassName]
- * @param {Array<{start: number, end: number}>} [dimmedRanges]
- * @param {string} [dimmedClassName]
- * @param {string[]} [highlightWords]
- * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [topicMarkerData] - Topic-specific marker data
+ * @param {object} [options]
+ * @param {Array<{start: number, end: number}>} [options.highlightRanges]
+ * @param {Array<{start: number, end: number}>} [options.fadeRanges]
+ * @param {Array<{start: number, end: number}>} [options.summaryHighlightRanges]
+ * @param {Array<{start: number, end: number, cssClass: string}>} [options.coloredRanges]
+ * @param {Array<{start: number, end: number}>} [options.interactiveRanges]
+ * @param {string} [options.interactiveClassName]
+ * @param {Array<{start: number, end: number}>} [options.dimmedRanges]
+ * @param {string} [options.dimmedClassName]
+ * @param {string[]} [options.highlightWords]
+ * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [options.topicMarkerData]
  */
-export function buildHighlightedRawHtml(
-  rawHtml,
-  articleTopics,
-  articleIndex,
-  highlightRanges,
-  fadeRanges,
-  summaryHighlightRanges = [],
-  coloredRanges = [],
-  interactiveRanges = [],
-  interactiveClassName = "",
-  dimmedRanges = [],
-  dimmedClassName = "",
-  highlightWords = [],
-  topicMarkerData = null,
-) {
+export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, options = {}) {
+  const {
+    highlightRanges = [],
+    fadeRanges = [],
+    summaryHighlightRanges = [],
+    coloredRanges = [],
+    interactiveRanges = [],
+    interactiveClassName = "",
+    dimmedRanges = [],
+    dimmedClassName = "",
+    highlightWords = [],
+    topicMarkerData = null,
+  } = options;
+
   if (!rawHtml) return "";
   const safeSummaryHighlightRanges = Array.isArray(summaryHighlightRanges)
     ? summaryHighlightRanges
@@ -278,6 +277,20 @@ export function buildHighlightedRawHtml(
     return sanitizeHTML(rawHtml);
   }
 
+  const wordRanges = {
+    highlightRanges,
+    fadeRanges,
+    summaryHighlightRanges: safeSummaryHighlightRanges,
+    allTopicRanges,
+    coloredRanges,
+    interactiveRanges,
+    interactiveClassName,
+    dimmedRanges,
+    dimmedClassName,
+    highlightWords: safeHighlightWords,
+    topicMarkerData: safeTopicMarkerData,
+  };
+
   let result = "";
   let inTag = false;
   let wordBuffer = "";
@@ -293,22 +306,7 @@ export function buildHighlightedRawHtml(
       result += ch;
     } else if (ch === "<") {
       if (wordBuffer) {
-        result += wrapWord(
-          wordBuffer,
-          wordStart,
-          articleIndex,
-          highlightRanges,
-          fadeRanges,
-          safeSummaryHighlightRanges,
-          allTopicRanges,
-          coloredRanges,
-          interactiveRanges,
-          interactiveClassName,
-          dimmedRanges,
-          dimmedClassName,
-          safeHighlightWords,
-          safeTopicMarkerData,
-        );
+        result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
         wordBuffer = "";
         wordStart = -1;
       }
@@ -317,22 +315,7 @@ export function buildHighlightedRawHtml(
     } else {
       if (/\s/.test(ch)) {
         if (wordBuffer) {
-          result += wrapWord(
-            wordBuffer,
-            wordStart,
-            articleIndex,
-            highlightRanges,
-            fadeRanges,
-            safeSummaryHighlightRanges,
-            allTopicRanges,
-            coloredRanges,
-            interactiveRanges,
-            interactiveClassName,
-            dimmedRanges,
-            dimmedClassName,
-            safeHighlightWords,
-            safeTopicMarkerData,
-          );
+          result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
           wordBuffer = "";
           wordStart = -1;
         }
@@ -345,22 +328,7 @@ export function buildHighlightedRawHtml(
   }
 
   if (wordBuffer) {
-    result += wrapWord(
-      wordBuffer,
-      wordStart,
-      articleIndex,
-      highlightRanges,
-      fadeRanges,
-      safeSummaryHighlightRanges,
-      allTopicRanges,
-      coloredRanges,
-      interactiveRanges,
-      interactiveClassName,
-      dimmedRanges,
-      dimmedClassName,
-      safeHighlightWords,
-      safeTopicMarkerData,
-    );
+    result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
   }
 
   return sanitizeHTML(result);

@@ -119,7 +119,7 @@ const TopicsRiverChart = ({
       15,
       Math.min(60, Math.floor(containerWidth / 40)),
     );
-    let data = calculateBins(binCount, scopedData, 0, effectiveLength);
+    let data = calculateBins(binCount, scopedData, { start: 0, end: effectiveLength });
     data = smoothBins(data, scopedData);
     data = estimateCharacterCounts(data, scopedData);
 

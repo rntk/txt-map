@@ -407,7 +407,8 @@ function computeSubtreeHeight(node) {
  * For "right": child.x = parent.x + parent.textWidth + H_GAP  (x = left edge)
  * For "left":  child.x = parent.x - H_GAP - child.textWidth   (x = left edge)
  */
-function assignPositions(node, x, y, parent, direction) {
+function assignPositions(node, pos, parent, direction) {
+  const { x, y } = pos;
   const stack = [{ node, x, y, parent }];
   const visited = new WeakSet();
 
@@ -502,7 +503,7 @@ function computeOneSideLayout(hierarchy, pivotTextWidth, direction) {
   pivotRoot.subtreeHeight = totalH + Math.max(0, children.length - 1) * V_GAP;
 
   // Pivot is at (0, 0); assign positions from there
-  assignPositions(pivotRoot, 0, 0, null, direction);
+  assignPositions(pivotRoot, { x: 0, y: 0 }, null, direction);
 
   // Return only the real nodes (not the virtual root)
   const nodes = [];
