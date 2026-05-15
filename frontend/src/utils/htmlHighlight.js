@@ -4,6 +4,11 @@ export function isInAnyRange(start, end, ranges) {
   return ranges.some((r) => start < r.end && end > r.start);
 }
 
+function buildTokenSpan(token, classes) {
+  const { htmlWord, articleIndex, wordStart, wordEnd } = token;
+  return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
+}
+
 /**
  * Normalize a word for comparison by removing punctuation and lowercasing
  * @param {string} word
@@ -34,6 +39,38 @@ function extractNormalizedWords(text) {
     .filter(Boolean);
 }
 
+function getTopicNamesToHighlight(selectedTopics, hoveredTopic) {
+  const topicNamesToHighlight = new Set();
+
+  if (Array.isArray(selectedTopics)) {
+    selectedTopics.forEach((topic) => {
+      if (topic?.name) {
+        topicNamesToHighlight.add(topic.name);
+      }
+    });
+  }
+
+  if (hoveredTopic?.name) {
+    topicNamesToHighlight.add(hoveredTopic.name);
+  }
+
+  return topicNamesToHighlight;
+}
+
+function getMarkerWords(markerSpans) {
+  const markerWords = new Set();
+
+  markerSpans.forEach((span) => {
+    if (span?.text) {
+      extractNormalizedWords(span.text).forEach((word) => {
+        markerWords.add(word);
+      });
+    }
+  });
+
+  return markerWords;
+}
+
 /**
  * Build topic-specific marker word data for highlighting
  * Each entry contains the topic's ranges and its marker words
@@ -47,60 +84,269 @@ export function buildTopicMarkerData(
   selectedTopics,
   hoveredTopic,
 ) {
-  const topicMarkerData = [];
-
   if (!Array.isArray(articleTopics) || articleTopics.length === 0) {
-    return topicMarkerData;
+    return [];
   }
 
-  // Determine which topics should have their markers highlighted
-  const topicNamesToHighlight = new Set();
-
-  if (Array.isArray(selectedTopics)) {
-    selectedTopics.forEach((t) => {
-      if (t?.name) topicNamesToHighlight.add(t.name);
-    });
-  }
-
-  if (hoveredTopic?.name) {
-    topicNamesToHighlight.add(hoveredTopic.name);
-  }
+  const topicNamesToHighlight = getTopicNamesToHighlight(
+    selectedTopics,
+    hoveredTopic,
+  );
 
   if (topicNamesToHighlight.size === 0) {
-    return topicMarkerData;
+    return [];
   }
 
-  // Extract marker words and ranges from matching topics
-  articleTopics.forEach((topic) => {
+  return articleTopics.reduce((topicMarkerData, topic) => {
     if (!topicNamesToHighlight.has(topic.name)) {
-      return;
+      return topicMarkerData;
     }
 
     const markerSpans = topic.marker_spans;
     if (!Array.isArray(markerSpans) || markerSpans.length === 0) {
-      return;
+      return topicMarkerData;
     }
 
-    const markerWords = new Set();
-    markerSpans.forEach((span) => {
-      if (span?.text) {
-        extractNormalizedWords(span.text).forEach((word) => {
-          markerWords.add(word);
-        });
-      }
-    });
+    const markerWords = getMarkerWords(markerSpans);
 
     if (markerWords.size > 0) {
-      // Get the topic's ranges - use the processed ranges from useTextPageData
       const ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
       topicMarkerData.push({
         ranges,
         markerWords,
       });
     }
-  });
 
-  return topicMarkerData;
+    return topicMarkerData;
+  }, []);
+}
+
+function hasWordHighlight(htmlWord, highlightWords) {
+  if (!Array.isArray(highlightWords) || highlightWords.length === 0) {
+    return false;
+  }
+
+  const cleanWord = htmlWord.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "").toLowerCase();
+  return (
+    cleanWord.length > 0 &&
+    highlightWords.some((word) => word.toLowerCase() === cleanWord)
+  );
+}
+
+function isTopicSummaryWord(wordStart, wordEnd, htmlWord, options) {
+  const { topicMarkerData, summaryHighlightRanges } = options;
+  const normalizedWord = normalizeWordForMatch(htmlWord);
+  const hasMarkerMatch =
+    normalizedWord.length > 0 &&
+    Array.isArray(topicMarkerData) &&
+    topicMarkerData.some(
+      (topicData) =>
+        topicData.markerWords.has(normalizedWord) &&
+        isInAnyRange(wordStart, wordEnd, topicData.ranges),
+    );
+
+  return (
+    hasMarkerMatch ||
+    isInAnyRange(wordStart, wordEnd, summaryHighlightRanges || [])
+  );
+}
+
+function getMatchingColoredClass(wordStart, wordEnd, coloredRanges) {
+  if (!Array.isArray(coloredRanges) || coloredRanges.length === 0) {
+    return null;
+  }
+
+  const matchingColoredRange = coloredRanges.find((range) =>
+    isInAnyRange(wordStart, wordEnd, [range]),
+  );
+  return matchingColoredRange?.cssClass || null;
+}
+
+function getToneClass(wordStart, wordEnd, options) {
+  const { highlightRanges = [], fadeRanges = [] } = options;
+
+  if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
+    return "highlighted";
+  }
+
+  if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
+    return "faded";
+  }
+
+  return null;
+}
+
+function getOptionalRangeClasses(wordStart, wordEnd, options) {
+  return [
+    {
+      className: options.interactiveClassName,
+      ranges: options.interactiveRanges,
+    },
+    {
+      className: options.dimmedClassName,
+      ranges: options.dimmedRanges,
+    },
+  ]
+    .filter(
+      (entry) =>
+        entry.className && isInAnyRange(wordStart, wordEnd, entry.ranges || []),
+    )
+    .map((entry) => entry.className);
+}
+
+function shouldWrapWord(token, options, classes, isSummaryWord) {
+  const { wordStart, wordEnd } = token;
+  return (
+    isInAnyRange(wordStart, wordEnd, options.allTopicRanges || []) ||
+    classes.includes("word-highlight") ||
+    isSummaryWord
+  );
+}
+
+function getAllTopicRanges(articleTopics) {
+  return (Array.isArray(articleTopics) ? articleTopics : []).flatMap((topic) =>
+    (Array.isArray(topic.ranges) ? topic.ranges : [])
+      .map((range) => ({
+        start: Number(range.start),
+        end: Number(range.end),
+      }))
+      .filter(
+        (range) => Number.isFinite(range.start) && Number.isFinite(range.end),
+      ),
+  );
+}
+
+function getArrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getArrayOrNull(value) {
+  return Array.isArray(value) ? value : null;
+}
+
+function normalizeHighlightOptions(articleTopics, options) {
+  return {
+    highlightRanges: getArrayOrEmpty(options.highlightRanges),
+    fadeRanges: getArrayOrEmpty(options.fadeRanges),
+    summaryHighlightRanges: getArrayOrEmpty(options.summaryHighlightRanges),
+    allTopicRanges:
+      getArrayOrEmpty(options.allTopicRanges).length > 0
+        ? getArrayOrEmpty(options.allTopicRanges)
+        : getAllTopicRanges(articleTopics),
+    coloredRanges: getArrayOrEmpty(options.coloredRanges),
+    interactiveRanges: getArrayOrEmpty(options.interactiveRanges),
+    interactiveClassName: options.interactiveClassName || "",
+    dimmedRanges: getArrayOrEmpty(options.dimmedRanges),
+    dimmedClassName: options.dimmedClassName || "",
+    highlightWords: getArrayOrEmpty(options.highlightWords),
+    topicMarkerData: getArrayOrNull(options.topicMarkerData),
+  };
+}
+
+function hasRenderableHighlights(options) {
+  return !(
+    options.allTopicRanges.length === 0 &&
+    options.coloredRanges.length === 0 &&
+    options.summaryHighlightRanges.length === 0 &&
+    options.highlightWords.length === 0 &&
+    (!options.topicMarkerData || options.topicMarkerData.length === 0)
+  );
+}
+
+function flushWordBuffer(state, articleIndex, options) {
+  if (!state.wordBuffer) {
+    return { ...state, wordBuffer: "", wordStart: -1 };
+  }
+
+  return {
+    ...state,
+    result:
+      state.result +
+      wrapWord(state.wordBuffer, state.wordStart, articleIndex, options),
+    wordBuffer: "",
+    wordStart: -1,
+  };
+}
+
+function tokenizeAndWrapHtml(rawHtml, articleIndex, options) {
+  let state = {
+    result: "",
+    wordBuffer: "",
+    wordStart: -1,
+  };
+  let inTag = false;
+
+  for (let i = 0; i < rawHtml.length; i += 1) {
+    const ch = rawHtml[i];
+
+    if (inTag) {
+      if (ch === ">") {
+        inTag = false;
+      }
+      state.result += ch;
+      continue;
+    }
+
+    if (ch === "<") {
+      state = flushWordBuffer(state, articleIndex, options);
+      inTag = true;
+      state.result += ch;
+      continue;
+    }
+
+    if (/\s/.test(ch)) {
+      state = flushWordBuffer(state, articleIndex, options);
+      state.result += ch;
+      continue;
+    }
+
+    if (state.wordStart === -1) {
+      state.wordStart = i;
+    }
+    state.wordBuffer += ch;
+  }
+
+  return flushWordBuffer(state, articleIndex, options).result;
+}
+
+function buildBaseClasses(token, highlightWords) {
+  const classes = ["word-token"];
+  if (hasWordHighlight(token.htmlWord, highlightWords)) {
+    classes.push("word-highlight");
+  }
+  return classes;
+}
+
+function addSupplementalClasses(classes, token, options, isSummaryWord) {
+  const toneClass = getToneClass(token.wordStart, token.wordEnd, options);
+  if (isSummaryWord) {
+    classes.push("reading-article__summary-word-highlight");
+  }
+  if (toneClass) {
+    classes.push(toneClass);
+  }
+
+  classes.push(
+    ...getOptionalRangeClasses(token.wordStart, token.wordEnd, options),
+  );
+}
+
+function buildWrappedWordMarkup(token, options, classes, isSummaryWord) {
+  const coloredClassName = getMatchingColoredClass(
+    token.wordStart,
+    token.wordEnd,
+    options.coloredRanges,
+  );
+  if (coloredClassName) {
+    return buildTokenSpan(token, [...classes, coloredClassName]);
+  }
+
+  if (!shouldWrapWord(token, options, classes, isSummaryWord)) {
+    return token.htmlWord;
+  }
+
+  addSupplementalClasses(classes, token, options, isSummaryWord);
+  return buildTokenSpan(token, classes);
 }
 
 /**
@@ -121,97 +367,23 @@ export function buildTopicMarkerData(
  * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [options.topicMarkerData]
  */
 export function wrapWord(htmlWord, wordStart, articleIndex, options = {}) {
-  const {
-    highlightRanges = [],
-    fadeRanges = [],
-    summaryHighlightRanges = [],
-    allTopicRanges = [],
-    coloredRanges = [],
-    interactiveRanges = [],
-    interactiveClassName = "",
-    dimmedRanges = [],
-    dimmedClassName = "",
-    highlightWords = [],
-    topicMarkerData = null,
-  } = options;
   const wordEnd = wordStart + htmlWord.length;
+  const token = { htmlWord, articleIndex, wordStart, wordEnd };
+  const normalizedOptions = normalizeHighlightOptions([], options);
+  const classes = buildBaseClasses(token, normalizedOptions.highlightWords);
+  const isSummaryWord = isTopicSummaryWord(
+    wordStart,
+    wordEnd,
+    htmlWord,
+    normalizedOptions,
+  );
 
-  const classes = ["word-token"];
-  let isSummaryWord = false;
-
-  // Word-based highlighting (URL param)
-  if (Array.isArray(highlightWords) && highlightWords.length > 0) {
-    const cleanWord = htmlWord.replace(/[^a-zA-ZÀ-ÿ0-9]/g, "").toLowerCase();
-    if (
-      cleanWord.length > 0 &&
-      highlightWords.some((w) => w.toLowerCase() === cleanWord)
-    ) {
-      classes.push("word-highlight");
-    }
-  }
-
-  // Marker word highlighting (from topic_marker_summaries) - topic-specific
-  if (Array.isArray(topicMarkerData) && topicMarkerData.length > 0) {
-    const normalizedWord = normalizeWordForMatch(htmlWord);
-    if (normalizedWord.length > 0) {
-      // Check if word matches a marker word AND is within that topic's ranges
-      for (const topicData of topicMarkerData) {
-        if (
-          topicData.markerWords.has(normalizedWord) &&
-          isInAnyRange(wordStart, wordEnd, topicData.ranges)
-        ) {
-          isSummaryWord = true;
-          break;
-        }
-      }
-    }
-  }
-
-  // Fallback: also check using character ranges for backward compatibility
-  if (
-    !isSummaryWord &&
-    isInAnyRange(wordStart, wordEnd, summaryHighlightRanges)
-  ) {
-    isSummaryWord = true;
-  }
-
-  if (coloredRanges.length > 0) {
-    const matchingColored = coloredRanges.find(
-      (r) => wordStart < r.end && wordEnd > r.start,
-    );
-    if (matchingColored) {
-      classes.push(matchingColored.cssClass);
-      return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
-    }
-  }
-
-  if (
-    isInAnyRange(wordStart, wordEnd, allTopicRanges) ||
-    classes.includes("word-highlight") ||
-    isSummaryWord
-  ) {
-    if (isSummaryWord) {
-      classes.push("reading-article__summary-word-highlight");
-    }
-    if (isInAnyRange(wordStart, wordEnd, highlightRanges)) {
-      classes.push("highlighted");
-    } else if (isInAnyRange(wordStart, wordEnd, fadeRanges)) {
-      classes.push("faded");
-    }
-    if (
-      interactiveClassName &&
-      isInAnyRange(wordStart, wordEnd, interactiveRanges)
-    ) {
-      classes.push(interactiveClassName);
-    }
-    if (dimmedClassName && isInAnyRange(wordStart, wordEnd, dimmedRanges)) {
-      classes.push(dimmedClassName);
-    }
-
-    return `<span class="${classes.join(" ")}" data-article-index="${articleIndex}" data-char-start="${wordStart}" data-char-end="${wordEnd}">${htmlWord}</span>`;
-  }
-
-  return htmlWord;
+  return buildWrappedWordMarkup(
+    token,
+    normalizedOptions,
+    classes,
+    isSummaryWord,
+  );
 }
 
 /**
@@ -230,106 +402,22 @@ export function wrapWord(htmlWord, wordStart, articleIndex, options = {}) {
  * @param {string[]} [options.highlightWords]
  * @param {Array<{ranges: Array<{start: number, end: number}>, markerWords: Set<string>}>} [options.topicMarkerData]
  */
-export function buildHighlightedRawHtml(rawHtml, articleTopics, articleIndex, options = {}) {
-  const {
-    highlightRanges = [],
-    fadeRanges = [],
-    summaryHighlightRanges = [],
-    coloredRanges = [],
-    interactiveRanges = [],
-    interactiveClassName = "",
-    dimmedRanges = [],
-    dimmedClassName = "",
-    highlightWords = [],
-    topicMarkerData = null,
-  } = options;
+export function buildHighlightedRawHtml(
+  rawHtml,
+  articleTopics,
+  articleIndex,
+  options = {},
+) {
+  if (!rawHtml) {
+    return "";
+  }
 
-  if (!rawHtml) return "";
-  const safeSummaryHighlightRanges = Array.isArray(summaryHighlightRanges)
-    ? summaryHighlightRanges
-    : [];
-  const safeHighlightWords = Array.isArray(highlightWords)
-    ? highlightWords
-    : [];
-  const safeTopicMarkerData = Array.isArray(topicMarkerData)
-    ? topicMarkerData
-    : null;
-
-  const safeTopics = Array.isArray(articleTopics) ? articleTopics : [];
-  const allTopicRanges = [];
-  safeTopics.forEach((topic) => {
-    (Array.isArray(topic.ranges) ? topic.ranges : []).forEach((range) => {
-      const s = Number(range.start);
-      const e = Number(range.end);
-      if (Number.isFinite(s) && Number.isFinite(e)) {
-        allTopicRanges.push({ start: s, end: e });
-      }
-    });
-  });
-
-  if (
-    allTopicRanges.length === 0 &&
-    coloredRanges.length === 0 &&
-    safeSummaryHighlightRanges.length === 0 &&
-    safeHighlightWords.length === 0 &&
-    (!safeTopicMarkerData || safeTopicMarkerData.length === 0)
-  ) {
+  const normalizedOptions = normalizeHighlightOptions(articleTopics, options);
+  if (!hasRenderableHighlights(normalizedOptions)) {
     return sanitizeHTML(rawHtml);
   }
 
-  const wordRanges = {
-    highlightRanges,
-    fadeRanges,
-    summaryHighlightRanges: safeSummaryHighlightRanges,
-    allTopicRanges,
-    coloredRanges,
-    interactiveRanges,
-    interactiveClassName,
-    dimmedRanges,
-    dimmedClassName,
-    highlightWords: safeHighlightWords,
-    topicMarkerData: safeTopicMarkerData,
-  };
-
-  let result = "";
-  let inTag = false;
-  let wordBuffer = "";
-  let wordStart = -1;
-
-  for (let i = 0; i < rawHtml.length; i++) {
-    const ch = rawHtml[i];
-
-    if (inTag) {
-      if (ch === ">") {
-        inTag = false;
-      }
-      result += ch;
-    } else if (ch === "<") {
-      if (wordBuffer) {
-        result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
-        wordBuffer = "";
-        wordStart = -1;
-      }
-      inTag = true;
-      result += ch;
-    } else {
-      if (/\s/.test(ch)) {
-        if (wordBuffer) {
-          result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
-          wordBuffer = "";
-          wordStart = -1;
-        }
-        result += ch;
-      } else {
-        if (wordStart === -1) wordStart = i;
-        wordBuffer += ch;
-      }
-    }
-  }
-
-  if (wordBuffer) {
-    result += wrapWord(wordBuffer, wordStart, articleIndex, wordRanges);
-  }
-
-  return sanitizeHTML(result);
+  return sanitizeHTML(
+    tokenizeAndWrapHtml(rawHtml, articleIndex, normalizedOptions),
+  );
 }

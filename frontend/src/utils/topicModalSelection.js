@@ -42,6 +42,97 @@ function getSafeTopics(allTopics) {
   return Array.isArray(allTopics) ? allTopics : [];
 }
 
+function getFirstNonEmptyName(values) {
+  return values.map((value) => normalizeName(value)).find(Boolean) || "";
+}
+
+function getCanonicalTopicNames(canonicalTopics, selection) {
+  return canonicalTopics.length > 0
+    ? canonicalTopics.map((topic) => topic.name)
+    : getTopicSelectionCanonicalTopicNames(selection);
+}
+
+function getSelectionRanges(selection, canonicalRanges) {
+  return Array.isArray(selection.ranges) && selection.ranges.length > 0
+    ? selection.ranges
+    : canonicalRanges;
+}
+
+function getSelectionKind(selectionKind, canonicalTopicNames) {
+  if (selectionKind) {
+    return selectionKind;
+  }
+
+  if (canonicalTopicNames.length > 1) {
+    return "topic_group";
+  }
+
+  if (canonicalTopicNames.length === 1) {
+    return "topic";
+  }
+
+  return "keyword";
+}
+
+function resolveSelectionLabels(selection, canonicalTopicNames) {
+  const fallbackPrimary =
+    canonicalTopicNames.length > 0 ? canonicalTopicNames[0] : null;
+  const primaryTopicName =
+    getFirstNonEmptyName([selection.primaryTopicName, fallbackPrimary]) || null;
+  const displayName =
+    getFirstNonEmptyName([
+      selection.displayName,
+      selection.name,
+      primaryTopicName,
+    ]) || "Source Sentences";
+  const fullPath =
+    getFirstNonEmptyName([
+      selection.fullPath,
+      primaryTopicName,
+      selection.name,
+      displayName,
+    ]) || displayName;
+  const name =
+    getFirstNonEmptyName([
+      selection.name,
+      primaryTopicName,
+      fullPath,
+      displayName,
+    ]) || displayName;
+
+  return {
+    name,
+    fullPath,
+    displayName,
+    primaryTopicName,
+  };
+}
+
+function collectCanonicalTopicData(canonicalTopics) {
+  return {
+    canonicalSentenceIndices: canonicalTopics.flatMap(
+      (topic) => topic.sentences || [],
+    ),
+    canonicalRanges: canonicalTopics.flatMap((topic) =>
+      Array.isArray(topic?.ranges) ? topic.ranges : [],
+    ),
+  };
+}
+
+function getTopicSelectionCanonicalNames(topic) {
+  return Array.isArray(topic?.canonicalTopicNames)
+    ? topic.canonicalTopicNames
+    : undefined;
+}
+
+function getTopicPrimaryName(topic) {
+  return getFirstNonEmptyName([
+    topic?.primaryTopicName,
+    topic?.fullPath,
+    topic?.name,
+  ]);
+}
+
 /**
  * @param {TopicModalSelection | null | undefined} selection
  * @returns {string[]}
@@ -93,61 +184,25 @@ export function buildTopicModalSelection(selection, allTopics = []) {
 
   const safeTopics = getSafeTopics(allTopics);
   const canonicalTopics = resolveCanonicalTopics(selection, safeTopics);
-  const canonicalTopicNames =
-    canonicalTopics.length > 0
-      ? canonicalTopics.map((topic) => topic.name)
-      : getTopicSelectionCanonicalTopicNames(selection);
-
-  const canonicalSentenceIndices =
-    canonicalTopics.length > 0
-      ? canonicalTopics.flatMap((topic) => topic.sentences || [])
-      : [];
-  const canonicalRanges =
-    canonicalTopics.length > 0
-      ? canonicalTopics.flatMap((topic) =>
-          Array.isArray(topic?.ranges) ? topic.ranges : [],
-        )
-      : [];
+  const canonicalTopicNames = getCanonicalTopicNames(
+    canonicalTopics,
+    selection,
+  );
+  const { canonicalSentenceIndices, canonicalRanges } =
+    collectCanonicalTopicData(canonicalTopics);
 
   const sentenceIndices = uniqueSortedNumbers(
     selection.sentenceIndices?.length
       ? selection.sentenceIndices
       : canonicalSentenceIndices,
   );
-  const ranges =
-    Array.isArray(selection.ranges) && selection.ranges.length > 0
-      ? selection.ranges
-      : canonicalRanges;
-
-  const fallbackPrimary =
-    canonicalTopicNames.length > 0 ? canonicalTopicNames[0] : null;
-  const primaryTopicName =
-    normalizeName(selection.primaryTopicName) || fallbackPrimary;
-  const displayName =
-    normalizeName(selection.displayName) ||
-    normalizeName(selection.name) ||
-    normalizeName(primaryTopicName) ||
-    "Source Sentences";
-  const fullPath =
-    normalizeName(selection.fullPath) ||
-    normalizeName(primaryTopicName) ||
-    normalizeName(selection.name) ||
-    displayName;
-  const name =
-    normalizeName(selection.name) ||
-    normalizeName(primaryTopicName) ||
-    fullPath ||
-    displayName;
+  const ranges = getSelectionRanges(selection, canonicalRanges);
+  const { name, fullPath, displayName, primaryTopicName } =
+    resolveSelectionLabels(selection, canonicalTopicNames);
 
   return {
     ...selection,
-    kind:
-      selection.kind ||
-      (canonicalTopicNames.length > 1
-        ? "topic_group"
-        : canonicalTopicNames.length === 1
-          ? "topic"
-          : "keyword"),
+    kind: getSelectionKind(selection.kind, canonicalTopicNames),
     name,
     fullPath,
     displayName,
@@ -169,10 +224,8 @@ export function buildModalSelectionFromTopic(topic) {
     sentenceIndices: uniqueSortedNumbers(
       topic?.sentenceIndices || topic?.sentences,
     ),
-    canonicalTopicNames: Array.isArray(topic?.canonicalTopicNames)
-      ? topic.canonicalTopicNames
-      : undefined,
-    primaryTopicName: topic?.primaryTopicName || topic?.fullPath || topic?.name,
+    canonicalTopicNames: getTopicSelectionCanonicalNames(topic),
+    primaryTopicName: getTopicPrimaryName(topic),
   };
 }
 

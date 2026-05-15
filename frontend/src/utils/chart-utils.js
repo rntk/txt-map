@@ -14,7 +14,12 @@ import * as d3 from "d3";
  * @param {string} nameKey - Key to use for the item name in bins
  * @returns {Array} Array of bin objects
  */
-export const calculateBins = (binCount, items, range = {}, nameKey = "name") => {
+export const calculateBins = (
+  binCount,
+  items,
+  range = {},
+  nameKey = "name",
+) => {
   const { start: startRange, end: endRange } = range;
   const rangeSize = endRange - startRange;
   const binSize = Math.max(1, rangeSize / binCount);

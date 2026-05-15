@@ -1,6 +1,123 @@
 import { useEffect, useState } from "react";
 import { extractArticleImages } from "./articleImages";
 
+function getSafeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getSafeObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+/**
+ * @param {Response} response
+ * @returns {Promise<unknown>}
+ */
+async function parseJsonResponse(response) {
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * @param {string} articleId
+ * @param {AbortSignal} signal
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function fetchArticlePayload(articleId, signal) {
+  const response = await fetch(`/api/canvas/${articleId}/article`, {
+    credentials: "include",
+    signal,
+  });
+  return parseJsonResponse(response);
+}
+
+/**
+ * @param {string} articleId
+ * @param {AbortSignal} signal
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+async function fetchSubmissionPayload(articleId, signal) {
+  const response = await fetch(`/api/submission/${articleId}`, {
+    credentials: "include",
+    signal,
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
+
+/**
+ * @param {Record<string, unknown>} data
+ * @returns {{
+ *   articleText: string,
+ *   articlePages: Array<{page_number: number, start: number, end: number}>,
+ *   submissionSentences: string[],
+ *   submissionTopics: Array<{name: string, sentences: number[]}>,
+ *   readTopics: string[],
+ *   topicSummaries: Record<string, unknown>,
+ *   topicSummaryIndex: Record<string, unknown>,
+ *   topicTemperatures: Record<string, unknown>,
+ *   topicTagRankings: Record<string, Array<{tag: string, score: number}>>,
+ *   insights: Array<Record<string, unknown>>,
+ *   markup: Record<string, unknown>,
+ * }}
+ */
+function normalizeArticlePayload(data) {
+  return {
+    articleText: typeof data.text === "string" ? data.text : "",
+    articlePages: getSafeArray(data.pages),
+    submissionSentences: getSafeArray(data.sentences),
+    submissionTopics: getSafeArray(data.topics),
+    readTopics: getSafeArray(data.read_topics),
+    topicSummaries: getSafeObject(data.topic_summaries),
+    topicSummaryIndex: getSafeObject(data.topic_summary_index),
+    topicTemperatures: getSafeObject(data.topic_temperatures),
+    topicTagRankings: getSafeObject(data.topic_tag_rankings),
+    insights: getSafeArray(data.insights),
+    markup: getSafeObject(data.markup),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} data
+ * @param {string} fallbackText
+ * @param {string} fallbackSourceUrl
+ * @returns {Array<{src: string, alt: string, title?: string, anchorOffset: number}>}
+ */
+function extractPayloadImages(data, fallbackText, fallbackSourceUrl = "") {
+  if (!data?.html_content) {
+    return [];
+  }
+
+  return extractArticleImages(
+    data.html_content,
+    typeof data.source_url === "string" ? data.source_url : fallbackSourceUrl,
+    fallbackText,
+  );
+}
+
+/**
+ * @param {string} articleId
+ * @param {AbortSignal} signal
+ * @param {string} articleText
+ * @param {Record<string, unknown>} articleData
+ * @returns {Promise<Array<{src: string, alt: string, title?: string, anchorOffset: number}>>}
+ */
+async function loadArticleImages(articleId, signal, articleText, articleData) {
+  const articleImages = extractPayloadImages(articleData, articleText);
+  if (articleImages.length > 0) {
+    return articleImages;
+  }
+
+  const submissionData = await fetchSubmissionPayload(articleId, signal);
+  const articleSourceUrl =
+    typeof articleData.source_url === "string" ? articleData.source_url : "";
+  return extractPayloadImages(submissionData, articleText, articleSourceUrl);
+}
+
 /**
  * Loads all article data needed for the canvas page.
  * @param {string} articleId
@@ -49,54 +166,33 @@ export function useArticleData(articleId) {
 
     const loadArticle = async () => {
       try {
-        const response = await fetch(`/api/canvas/${articleId}/article`, {
-          credentials: "include",
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        const data = await fetchArticlePayload(articleId, controller.signal);
         if (cancelled) return;
 
-        setArticleText(data.text || "");
-        setArticlePages(data.pages || []);
-        setSubmissionSentences(data.sentences || []);
-        setSubmissionTopics(data.topics || []);
-        setReadTopics(data.read_topics || []);
-        setTopicSummaries(data.topic_summaries || {});
-        setTopicSummaryIndex(data.topic_summary_index || {});
-        setTopicTemperatures(data.topic_temperatures || {});
-        setTopicTagRankings(data.topic_tag_rankings || {});
-        setInsights(data.insights || []);
-        setMarkup(data.markup || {});
+        const normalizedData = normalizeArticlePayload(data);
+        setArticleText(normalizedData.articleText);
+        setArticlePages(normalizedData.articlePages);
+        setSubmissionSentences(normalizedData.submissionSentences);
+        setSubmissionTopics(normalizedData.submissionTopics);
+        setReadTopics(normalizedData.readTopics);
+        setTopicSummaries(normalizedData.topicSummaries);
+        setTopicSummaryIndex(normalizedData.topicSummaryIndex);
+        setTopicTemperatures(normalizedData.topicTemperatures);
+        setTopicTagRankings(normalizedData.topicTagRankings);
+        setInsights(normalizedData.insights);
+        setMarkup(normalizedData.markup);
         setArticleLoading(false);
 
         let images = [];
-        if (data.html_content) {
-          images = extractArticleImages(
-            data.html_content,
-            data.source_url || "",
-            data.text || "",
+        try {
+          images = await loadArticleImages(
+            articleId,
+            controller.signal,
+            normalizedData.articleText,
+            data,
           );
-        } else {
-          try {
-            const submissionResponse = await fetch(
-              `/api/submission/${articleId}`,
-              { credentials: "include", signal: controller.signal },
-            );
-            const submissionData = submissionResponse.ok
-              ? await submissionResponse.json()
-              : null;
-            if (cancelled) return;
-            if (submissionData?.html_content) {
-              images = extractArticleImages(
-                submissionData.html_content,
-                submissionData.source_url || data.source_url || "",
-                data.text || "",
-              );
-            }
-          } catch (err) {
-            if (err?.name === "AbortError") return;
-          }
+        } catch (err) {
+          if (err?.name === "AbortError") return;
         }
 
         if (cancelled) return;

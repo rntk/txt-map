@@ -427,7 +427,11 @@ export default function TreemapChart({
             group,
             node.x0 + rectWidth / 2,
             node.y0 + rectHeight / 2,
-            { fontSize, fontWeight: "600", textColor: getContrastingTextColor(fillColor) },
+            {
+              fontSize,
+              fontWeight: "600",
+              textColor: getContrastingTextColor(fillColor),
+            },
             lines,
           );
         }
@@ -440,7 +444,11 @@ export default function TreemapChart({
           group,
           node.x0,
           node.y0,
-          { width: rectWidth, fontSize: 12, textColor: getContrastingTextColor(fillColor) },
+          {
+            width: rectWidth,
+            fontSize: 12,
+            textColor: getContrastingTextColor(fillColor),
+          },
           node.data.name,
         );
       }

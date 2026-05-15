@@ -309,7 +309,12 @@ function stopTileClickPropagation(event) {
  * @returns {TopicIndexMetaCategory[]}
  */
 function buildTopicTileMetaCategories(topic, maps) {
-  const { topicKeyPhrasesMap, topicTagCloudMap, subtopicsByParent, markerSummariesByTopic } = maps;
+  const {
+    topicKeyPhrasesMap,
+    topicTagCloudMap,
+    subtopicsByParent,
+    markerSummariesByTopic,
+  } = maps;
   /** @type {Record<string, TopicIndexMetaCategory|null>} */
   const categoriesByKey = {
     key_phrases: null,

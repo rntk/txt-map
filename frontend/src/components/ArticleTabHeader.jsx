@@ -2,6 +2,35 @@ import React from "react";
 import ReadProgress from "./ReadProgress";
 import "../styles/text-reading.css";
 
+const ARTICLE_TABS = [
+  { key: "article", label: "Article" },
+  { key: "article_summary", label: "Summary" },
+  { key: "raw_text", label: "Raw Text" },
+  { key: "markup", label: "Markup" },
+];
+
+function renderToggleControl({
+  key,
+  visible,
+  checked,
+  onChange,
+  label,
+  className = "grouped-topics-toggle reading-toggle article-tab-header__controls",
+  extraContent = null,
+}) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <label key={key} className={className}>
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      {label}
+      {extraContent}
+    </label>
+  );
+}
+
 /**
  * @typedef {Object} ArticleTabHeaderProps
  * @property {string} activeTab
@@ -41,99 +70,69 @@ function ArticleTabHeader({
     activeTab === "article" ||
     activeTab === "raw_text" ||
     activeTab === "markup";
+  const supportsGroupedTopics =
+    activeTab === "article" || activeTab === "raw_text";
+  const controls = [
+    {
+      key: "grouped",
+      visible: supportsGroupedTopics,
+      checked: groupedByTopics,
+      onChange: onToggleGrouped,
+      label: "Grouped by topics",
+    },
+    {
+      key: "tooltip",
+      visible: supportsMinimap,
+      checked: tooltipEnabled,
+      onChange: onToggleTooltip,
+      label: "Show tooltips",
+    },
+    {
+      key: "minimap",
+      visible: supportsMinimap,
+      checked: showMinimap,
+      onChange: onToggleMinimap,
+      label: "Show minimap",
+    },
+    {
+      key: "topics-meta",
+      visible: supportsMinimap,
+      checked: showTopicsMeta,
+      onChange: onToggleTopicsMeta,
+      label: "Show topics meta",
+    },
+    {
+      key: "temperature",
+      visible: supportsMinimap && temperatureAvailable,
+      checked: showTemperature,
+      onChange: onToggleTemperature,
+      label: "Temperature",
+      className:
+        "grouped-topics-toggle reading-toggle article-tab-header__controls article-tab-header__temperature",
+      extraContent: (
+        <span
+          className="article-tab-header__temperature-legend"
+          aria-hidden="true"
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="article-header-sticky article-tab-header">
       <div className="article-tab-header__tabs">
-        <button
-          type="button"
-          className={`article-tab-header__tab${activeTab === "article" ? " article-tab-header__tab--active" : ""}`}
-          onClick={() => onTabClick("article")}
-        >
-          Article
-        </button>
-        <button
-          type="button"
-          className={`article-tab-header__tab${activeTab === "article_summary" ? " article-tab-header__tab--active" : ""}`}
-          onClick={() => onTabClick("article_summary")}
-        >
-          Summary
-        </button>
-        <button
-          type="button"
-          className={`article-tab-header__tab${activeTab === "raw_text" ? " article-tab-header__tab--active" : ""}`}
-          onClick={() => onTabClick("raw_text")}
-        >
-          Raw Text
-        </button>
-        <button
-          type="button"
-          className={`article-tab-header__tab${activeTab === "markup" ? " article-tab-header__tab--active" : ""}`}
-          onClick={() => onTabClick("markup")}
-        >
-          Markup
-        </button>
+        {ARTICLE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`article-tab-header__tab${activeTab === tab.key ? " article-tab-header__tab--active" : ""}`}
+            onClick={() => onTabClick(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
-      {(activeTab === "article" || activeTab === "raw_text") && (
-        <>
-          <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
-            <input
-              type="checkbox"
-              checked={groupedByTopics}
-              onChange={onToggleGrouped}
-            />
-            Grouped by topics
-          </label>
-        </>
-      )}
-      {(activeTab === "article" ||
-        activeTab === "raw_text" ||
-        activeTab === "markup") && (
-        <>
-          <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
-            <input
-              type="checkbox"
-              checked={tooltipEnabled}
-              onChange={onToggleTooltip}
-            />
-            Show tooltips
-          </label>
-        </>
-      )}
-      {supportsMinimap && (
-        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
-          <input
-            type="checkbox"
-            checked={showMinimap}
-            onChange={onToggleMinimap}
-          />
-          Show minimap
-        </label>
-      )}
-      {supportsMinimap && (
-        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls">
-          <input
-            type="checkbox"
-            checked={showTopicsMeta}
-            onChange={onToggleTopicsMeta}
-          />
-          Show topics meta
-        </label>
-      )}
-      {supportsMinimap && temperatureAvailable && (
-        <label className="grouped-topics-toggle reading-toggle article-tab-header__controls article-tab-header__temperature">
-          <input
-            type="checkbox"
-            checked={showTemperature}
-            onChange={onToggleTemperature}
-          />
-          Temperature
-          <span
-            className="article-tab-header__temperature-legend"
-            aria-hidden="true"
-          />
-        </label>
-      )}
+      {controls.map((control) => renderToggleControl(control))}
 
       <div className="article-tab-header__progress">
         <ReadProgress percentage={readPercentage} size={45} label="" />

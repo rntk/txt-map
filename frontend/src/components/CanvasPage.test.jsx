@@ -403,7 +403,7 @@ describe("CanvasPage highlight focusing", () => {
     });
   });
 
-  it("renders images from the original article html", async () => {
+  it("resolves fallback submission images against the article source URL", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn(async (url) => {
       if (url === "/api/canvas/article-1/article") {
@@ -423,7 +423,6 @@ describe("CanvasPage highlight focusing", () => {
           json: async () => ({
             html_content:
               '<article><p>Alpha</p><img src="/media/chart.png" alt="Article chart" /><p>Beta gamma.</p></article>',
-            source_url: "https://example.com/articles/story.html",
           }),
         };
       }

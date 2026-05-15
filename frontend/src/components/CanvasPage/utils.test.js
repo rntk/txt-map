@@ -200,12 +200,16 @@ describe("buildSegments", () => {
   });
 
   it("carries highlight labels", () => {
-    const segments = buildSegments("hello", [{ start: 0, end: 5, label: "topic" }]);
+    const segments = buildSegments("hello", [
+      { start: 0, end: 5, label: "topic" },
+    ]);
     expect(segments[0].label).toBe("topic");
   });
 
   it("splits at sentence boundaries", () => {
-    const segments = buildSegments("hello world", [], { sentenceBoundaries: [5] });
+    const segments = buildSegments("hello world", [], {
+      sentenceBoundaries: [5],
+    });
     expect(segments).toHaveLength(2);
     expect(segments[0].text).toBe("hello");
     expect(segments[1].text).toBe(" world");

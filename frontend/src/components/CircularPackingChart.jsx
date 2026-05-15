@@ -358,7 +358,13 @@ export default function CircularPackingChart({
 
         if (totalH > node.r * 1.8) return;
 
-        renderLabel(g, node.x, node.y, { fontSize, fontWeight: "500", textColor: "#222" }, lines);
+        renderLabel(
+          g,
+          node.x,
+          node.y,
+          { fontSize, fontWeight: "500", textColor: "#222" },
+          lines,
+        );
         return;
       }
 
@@ -373,7 +379,13 @@ export default function CircularPackingChart({
           : node.data.name;
       const labelY = node.y - node.r + fontSize + 5;
 
-      renderLabel(g, node.x, labelY, { fontSize, fontWeight: "700", textColor: "#333" }, [label]);
+      renderLabel(
+        g,
+        node.x,
+        labelY,
+        { fontSize, fontWeight: "700", textColor: "#333" },
+        [label],
+      );
     });
 
     const zoom = d3
