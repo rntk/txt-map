@@ -543,12 +543,7 @@ function getTopicMarkerSummaryHighlightRanges(
   return normalizeCharacterRanges(highlightRanges);
 }
 
-export function useTextPageData(
-  submission,
-  selectedTopics,
-  hoveredTopic,
-  readTopics,
-) {
+function useBaseData(submission) {
   const results = useMemo(() => submission?.results || {}, [submission]);
   const rawText = submission?.text_content || "";
   const resultSentences = useMemo(
@@ -559,7 +554,11 @@ export function useTextPageData(
     () => buildSentenceCharacterRanges(rawText, resultSentences),
     [rawText, resultSentences],
   );
-  const safeTopics = useMemo(() => {
+  return { results, rawText, resultSentences, sentenceCharacterRanges };
+}
+
+function useSafeTopics(results, rawText, resultSentences, sentenceCharacterRanges) {
+  return useMemo(() => {
     const rawTopics = Array.isArray(results.topics) ? results.topics : [];
     const claimedSentences = new Set();
 
@@ -579,7 +578,6 @@ export function useTextPageData(
 
       let ranges;
       if (sentenceSpans.length > 0) {
-        // Build exact character ranges for each exclusive sentence to avoid spanning gaps
         ranges = sentenceSpans
           .filter((span) => exclusiveSentenceSet.has(span.sentence))
           .map((span) => ({
@@ -593,11 +591,9 @@ export function useTextPageData(
               Number.isFinite(range.start) && Number.isFinite(range.end),
           );
       } else {
-        // Fallback for older backend data without sentence_spans
         ranges = Array.isArray(topic.ranges) ? topic.ranges : [];
       }
 
-      // Extract marker_spans from topic_marker_summaries for word-based highlighting
       const topicMarkerSummary = results.topic_marker_summaries?.[topic.name];
       const markerSpans = [];
       if (topicMarkerSummary?.ranges) {
@@ -631,6 +627,9 @@ export function useTextPageData(
     results.topics,
     results.topic_marker_summaries,
   ]);
+}
+
+function useInsightData(results, resultSentences, safeTopics) {
   const insights = useMemo(() => {
     const rawInsights = Array.isArray(results.insights) ? results.insights : [];
     return rawInsights.map((insight) => ({
@@ -644,12 +643,10 @@ export function useTextPageData(
         if (explicitTopics.length > 0) {
           return [...new Set(explicitTopics)];
         }
-
         const alignedSentenceIndices = resolveInsightSentenceIndices(
           insight,
           resultSentences,
         );
-
         return mapInsightSentenceIndicesToTopics(
           { ...insight, source_sentence_indices: alignedSentenceIndices },
           safeTopics,
@@ -657,6 +654,7 @@ export function useTextPageData(
       })(),
     }));
   }, [resultSentences, results.insights, safeTopics]);
+
   const insightNavItems = useMemo(() => {
     return insights
       .map((insight, index) => {
@@ -691,7 +689,6 @@ export function useTextPageData(
           typeof insight?.name === "string" && insight.name.trim()
             ? insight.name.trim()
             : `Insight ${index + 1}`;
-
         return {
           id: `${displayName}-${index}`,
           index,
@@ -711,6 +708,7 @@ export function useTextPageData(
         return left.index - right.index;
       });
   }, [insights, resultSentences, safeTopics]);
+
   const insightTopicNameSet = useMemo(() => {
     const names = new Set();
     insightNavItems.forEach((insight) => {
@@ -718,6 +716,11 @@ export function useTextPageData(
     });
     return names;
   }, [insightNavItems]);
+
+  return { insights, insightNavItems, insightTopicNameSet };
+}
+
+function useArticleSummaryData(results) {
   const articleSummary =
     results.article_summary && typeof results.article_summary === "object"
       ? results.article_summary
@@ -733,7 +736,10 @@ export function useTextPageData(
         : [],
     [articleSummary.bullets],
   );
+  return { articleSummaryText, articleSummaryBullets };
+}
 
+function useTopicSummaryData(results, safeTopics) {
   const topicSummaryParaMap = useMemo(() => {
     const mappings = results.summary_mappings;
     if (!Array.isArray(mappings) || mappings.length === 0) return {};
@@ -768,6 +774,17 @@ export function useTextPageData(
     [safeTopics, results.topic_summaries],
   );
 
+  return { topicSummaryParaMap, allTopics };
+}
+
+function useHighlightData(
+  safeTopics,
+  selectedTopics,
+  hoveredTopic,
+  readTopics,
+  rawText,
+  topicSummaryParaMap,
+) {
   const {
     highlightRanges: rawTextHighlightRanges,
     fadeRanges: rawTextFadeRanges,
@@ -791,6 +808,16 @@ export function useTextPageData(
     return set;
   }, [selectedTopics, topicSummaryParaMap]);
 
+  return { rawTextHighlightRanges, rawTextFadeRanges, highlightedSummaryParas };
+}
+
+function useArticleData(
+  submission,
+  results,
+  safeTopics,
+  articleSummaryText,
+  articleSummaryBullets,
+) {
   const articles = useMemo(() => {
     const safeSentences = Array.isArray(results.sentences)
       ? results.sentences
@@ -834,6 +861,52 @@ export function useTextPageData(
     return matchSummaryToTopics(articleSummaryText, safeTopics, sentences);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articleSummaryText, safeTopics, results.sentences]);
+
+  return { articles, summaryTimelineItems, articleBulletMatches, articleTextMatches };
+}
+
+export function useTextPageData(
+  submission,
+  selectedTopics,
+  hoveredTopic,
+  readTopics,
+) {
+  const { results, rawText, resultSentences, sentenceCharacterRanges } =
+    useBaseData(submission);
+  const safeTopics = useSafeTopics(
+    results,
+    rawText,
+    resultSentences,
+    sentenceCharacterRanges,
+  );
+  const { insights, insightNavItems, insightTopicNameSet } = useInsightData(
+    results,
+    resultSentences,
+    safeTopics,
+  );
+  const { articleSummaryText, articleSummaryBullets } =
+    useArticleSummaryData(results);
+  const { topicSummaryParaMap, allTopics } = useTopicSummaryData(
+    results,
+    safeTopics,
+  );
+  const { rawTextHighlightRanges, rawTextFadeRanges, highlightedSummaryParas } =
+    useHighlightData(
+      safeTopics,
+      selectedTopics,
+      hoveredTopic,
+      readTopics,
+      rawText,
+      topicSummaryParaMap,
+    );
+  const { articles, summaryTimelineItems, articleBulletMatches, articleTextMatches } =
+    useArticleData(
+      submission,
+      results,
+      safeTopics,
+      articleSummaryText,
+      articleSummaryBullets,
+    );
 
   return {
     safeTopics,

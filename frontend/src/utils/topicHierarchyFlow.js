@@ -89,6 +89,165 @@ export function getTopicHierarchyFlowWeight(topic) {
   return FALLBACK_WEIGHT;
 }
 
+function getOrCreateHierarchyNode(nodeMap, path, label, { depth, column, colorKey }) {
+  const nodeId = `hierarchy:${path}`;
+  const existing = nodeMap.get(nodeId);
+  if (existing) return existing;
+  const node = {
+    id: nodeId,
+    type: "hierarchy",
+    label,
+    fullPath: path,
+    column,
+    depth,
+    weight: 0,
+    sentenceIndices: [],
+    canonicalTopicNames: [],
+    ranges: [],
+    colorKey,
+    order: 0,
+    orderValues: [],
+    sentenceIndexSet: new Set(),
+    canonicalTopicNameSet: new Set(),
+  };
+  nodeMap.set(nodeId, node);
+  return node;
+}
+
+function processTopic(nodeMap, linkMap, maxDepth, topic, topicIndex) {
+  const topicName = topic.name.trim();
+  const parts = getTopicParts(topicName);
+  if (parts.length === 0) return;
+
+  const weight = getTopicHierarchyFlowWeight(topic);
+  const sentenceIndices = getSentenceIndices(topic);
+  const ranges = getRanges(topic);
+  const colorKey = parts[0];
+  const leafId = `leaf:${topicName}`;
+
+  nodeMap.set(leafId, {
+    id: leafId,
+    type: "leaf",
+    label: topicName,
+    fullPath: topicName,
+    column: 0,
+    depth: parts.length - 1,
+    weight,
+    sentenceIndices,
+    canonicalTopicNames: [topicName],
+    ranges,
+    colorKey,
+    order: topicIndex,
+    orderValues: [topicIndex],
+    sentenceIndexSet: new Set(sentenceIndices),
+    canonicalTopicNameSet: new Set([topicName]),
+  });
+
+  const hierarchyNodeIds = [];
+  parts.forEach((part, depth) => {
+    const path = parts.slice(0, depth + 1).join(">");
+    const column = maxDepth - depth;
+    const node = getOrCreateHierarchyNode(nodeMap, path, part, { depth, column, colorKey });
+    node.weight += weight;
+    node.orderValues.push(topicIndex);
+    node.canonicalTopicNameSet.add(topicName);
+    sentenceIndices.forEach((value) => node.sentenceIndexSet.add(value));
+    node.ranges.push(...ranges);
+    hierarchyNodeIds.push(node.id);
+  });
+
+  const deepestHierarchyId = hierarchyNodeIds[hierarchyNodeIds.length - 1];
+  if (deepestHierarchyId) {
+    const leafLinkId = `${leafId}->${deepestHierarchyId}`;
+    const leafLink = linkMap.get(leafLinkId) || {
+      id: leafLinkId, sourceId: leafId, targetId: deepestHierarchyId,
+      weight: 0, sentenceIndices: [], canonicalTopicNames: [], ranges: [],
+      colorKey, order: topicIndex, orderValues: [],
+      sentenceIndexSet: new Set(), canonicalTopicNameSet: new Set(),
+    };
+    leafLink.weight += weight;
+    leafLink.orderValues.push(topicIndex);
+    leafLink.canonicalTopicNameSet.add(topicName);
+    sentenceIndices.forEach((value) => leafLink.sentenceIndexSet.add(value));
+    leafLink.ranges.push(...ranges);
+    linkMap.set(leafLinkId, leafLink);
+  }
+
+  for (let i = hierarchyNodeIds.length - 1; i > 0; i -= 1) {
+    const linkId = `${hierarchyNodeIds[i]}->${hierarchyNodeIds[i - 1]}`;
+    const link = linkMap.get(linkId) || {
+      id: linkId, sourceId: hierarchyNodeIds[i], targetId: hierarchyNodeIds[i - 1],
+      weight: 0, sentenceIndices: [], canonicalTopicNames: [], ranges: [],
+      colorKey, order: topicIndex, orderValues: [],
+      sentenceIndexSet: new Set(), canonicalTopicNameSet: new Set(),
+    };
+    link.weight += weight;
+    link.orderValues.push(topicIndex);
+    link.canonicalTopicNameSet.add(topicName);
+    sentenceIndices.forEach((value) => link.sentenceIndexSet.add(value));
+    link.ranges.push(...ranges);
+    linkMap.set(linkId, link);
+  }
+}
+
+function buildNodeAndLinkMaps(sortedTopics, maxDepth) {
+  const nodeMap = new Map();
+  const linkMap = new Map();
+  sortedTopics.forEach((topic, topicIndex) =>
+    processTopic(nodeMap, linkMap, maxDepth, topic, topicIndex),
+  );
+  return { nodeMap, linkMap };
+}
+
+function finalizeNodes(nodeMap) {
+  return Array.from(nodeMap.values())
+    .map((node) => ({
+      ...node,
+      sentenceIndices: Array.from(node.sentenceIndexSet).sort((l, r) => l - r),
+      canonicalTopicNames: Array.from(node.canonicalTopicNameSet).sort(),
+      order:
+        node.orderValues.reduce((sum, v) => sum + v, 0) /
+        Math.max(1, node.orderValues.length),
+    }))
+    .sort(
+      (l, r) =>
+        l.column - r.column ||
+        l.order - r.order ||
+        l.fullPath.localeCompare(r.fullPath),
+    );
+}
+
+function finalizeLinks(linkMap) {
+  return Array.from(linkMap.values())
+    .map((link) => ({
+      ...link,
+      sentenceIndices: Array.from(link.sentenceIndexSet).sort((l, r) => l - r),
+      canonicalTopicNames: Array.from(link.canonicalTopicNameSet).sort(),
+      order:
+        link.orderValues.reduce((sum, v) => sum + v, 0) /
+        Math.max(1, link.orderValues.length),
+    }))
+    .sort((l, r) => l.order - r.order || l.id.localeCompare(r.id));
+}
+
+function buildColumns(nodes, maxDepth) {
+  const columnLabels = Array.from({ length: maxDepth + 1 }, (_, index) => {
+    if (index === 0) return "Leaf Topics";
+    if (index === maxDepth) return "Top-Level Topics";
+    return "Subtopics";
+  });
+  return columnLabels.map((label, index) => ({
+    index,
+    label,
+    nodes: nodes
+      .filter((node) => node.column === index)
+      .sort(
+        (l, r) =>
+          l.order - r.order || l.fullPath.localeCompare(r.fullPath),
+      ),
+  }));
+}
+
 /**
  * @param {TopicHierarchyFlowTopic[]} topics
  * @returns {TopicHierarchyFlowData}
@@ -101,231 +260,20 @@ export function buildTopicHierarchyFlowData(topics) {
     : [];
 
   if (safeTopics.length === 0) {
-    return {
-      maxDepth: 0,
-      columns: [],
-      nodes: [],
-      links: [],
-    };
+    return { maxDepth: 0, columns: [], nodes: [], links: [] };
   }
 
-  const sortedTopics = [...safeTopics].sort((left, right) =>
-    left.name.localeCompare(right.name),
+  const sortedTopics = [...safeTopics].sort((l, r) =>
+    l.name.localeCompare(r.name),
   );
   const maxDepth = Math.max(
     ...sortedTopics.map((topic) => getTopicParts(topic).length),
   );
 
-  /** @type {Map<string, TopicHierarchyFlowNode & { orderValues: number[] }>} */
-  const nodeMap = new Map();
-  /**
-   * @type {Map<
-   *   string,
-   *   TopicHierarchyFlowLink & {
-   *     sentenceIndexSet: Set<number>,
-   *     canonicalTopicNameSet: Set<string>,
-   *     orderValues: number[],
-   *   }
-   * >}
-   */
-  const linkMap = new Map();
+  const { nodeMap, linkMap } = buildNodeAndLinkMaps(sortedTopics, maxDepth);
+  const nodes = finalizeNodes(nodeMap);
+  const links = finalizeLinks(linkMap);
+  const columns = buildColumns(nodes, maxDepth);
 
-  /**
-   * @param {string} path
-   * @param {string} label
-   * @param {number} depth
-   * @param {number} column
-   * @param {string} colorKey
-   * @returns {TopicHierarchyFlowNode & { orderValues: number[] }}
-   */
-  function ensureHierarchyNode(path, label, nodeAttrs) {
-    const { depth, column, colorKey } = nodeAttrs;
-    const nodeId = `hierarchy:${path}`;
-    const existing = nodeMap.get(nodeId);
-    if (existing) {
-      return existing;
-    }
-
-    const node = {
-      id: nodeId,
-      type: "hierarchy",
-      label,
-      fullPath: path,
-      column,
-      depth,
-      weight: 0,
-      sentenceIndices: [],
-      canonicalTopicNames: [],
-      ranges: [],
-      colorKey,
-      order: 0,
-      orderValues: [],
-      sentenceIndexSet: new Set(),
-      canonicalTopicNameSet: new Set(),
-    };
-    nodeMap.set(nodeId, node);
-    return node;
-  }
-
-  sortedTopics.forEach((topic, topicIndex) => {
-    const topicName = topic.name.trim();
-    const parts = getTopicParts(topicName);
-    if (parts.length === 0) {
-      return;
-    }
-
-    const weight = getTopicHierarchyFlowWeight(topic);
-    const sentenceIndices = getSentenceIndices(topic);
-    const ranges = getRanges(topic);
-    const colorKey = parts[0];
-    const leafId = `leaf:${topicName}`;
-
-    const leafNode = {
-      id: leafId,
-      type: "leaf",
-      label: topicName,
-      fullPath: topicName,
-      column: 0,
-      depth: parts.length - 1,
-      weight,
-      sentenceIndices,
-      canonicalTopicNames: [topicName],
-      ranges,
-      colorKey,
-      order: topicIndex,
-      orderValues: [topicIndex],
-      sentenceIndexSet: new Set(sentenceIndices),
-      canonicalTopicNameSet: new Set([topicName]),
-    };
-    nodeMap.set(leafId, leafNode);
-
-    /** @type {string[]} */
-    const hierarchyNodeIds = [];
-
-    parts.forEach((part, depth) => {
-      const path = parts.slice(0, depth + 1).join(">");
-      const column = maxDepth - depth;
-      const node = ensureHierarchyNode(path, part, { depth, column, colorKey });
-      node.weight += weight;
-      node.orderValues.push(topicIndex);
-      node.canonicalTopicNameSet.add(topicName);
-      sentenceIndices.forEach((value) => node.sentenceIndexSet.add(value));
-      node.ranges.push(...ranges);
-      hierarchyNodeIds.push(node.id);
-    });
-
-    const deepestHierarchyId = hierarchyNodeIds[hierarchyNodeIds.length - 1];
-    if (deepestHierarchyId) {
-      const leafLinkId = `${leafId}->${deepestHierarchyId}`;
-      const leafLink = linkMap.get(leafLinkId) || {
-        id: leafLinkId,
-        sourceId: leafId,
-        targetId: deepestHierarchyId,
-        weight: 0,
-        sentenceIndices: [],
-        canonicalTopicNames: [],
-        ranges: [],
-        colorKey,
-        order: topicIndex,
-        orderValues: [],
-        sentenceIndexSet: new Set(),
-        canonicalTopicNameSet: new Set(),
-      };
-      leafLink.weight += weight;
-      leafLink.orderValues.push(topicIndex);
-      leafLink.canonicalTopicNameSet.add(topicName);
-      sentenceIndices.forEach((value) => leafLink.sentenceIndexSet.add(value));
-      leafLink.ranges.push(...ranges);
-      linkMap.set(leafLinkId, leafLink);
-    }
-
-    for (let index = hierarchyNodeIds.length - 1; index > 0; index -= 1) {
-      const sourceId = hierarchyNodeIds[index];
-      const targetId = hierarchyNodeIds[index - 1];
-      const linkId = `${sourceId}->${targetId}`;
-      const link = linkMap.get(linkId) || {
-        id: linkId,
-        sourceId,
-        targetId,
-        weight: 0,
-        sentenceIndices: [],
-        canonicalTopicNames: [],
-        ranges: [],
-        colorKey,
-        order: topicIndex,
-        orderValues: [],
-        sentenceIndexSet: new Set(),
-        canonicalTopicNameSet: new Set(),
-      };
-      link.weight += weight;
-      link.orderValues.push(topicIndex);
-      link.canonicalTopicNameSet.add(topicName);
-      sentenceIndices.forEach((value) => link.sentenceIndexSet.add(value));
-      link.ranges.push(...ranges);
-      linkMap.set(linkId, link);
-    }
-  });
-
-  const nodes = Array.from(nodeMap.values())
-    .map((node) => ({
-      ...node,
-      sentenceIndices: Array.from(node.sentenceIndexSet).sort(
-        (left, right) => left - right,
-      ),
-      canonicalTopicNames: Array.from(node.canonicalTopicNameSet).sort(),
-      order:
-        node.orderValues.reduce((sum, value) => sum + value, 0) /
-        Math.max(1, node.orderValues.length),
-    }))
-    .sort(
-      (left, right) =>
-        left.column - right.column ||
-        left.order - right.order ||
-        left.fullPath.localeCompare(right.fullPath),
-    );
-
-  const links = Array.from(linkMap.values())
-    .map((link) => ({
-      ...link,
-      sentenceIndices: Array.from(link.sentenceIndexSet).sort(
-        (left, right) => left - right,
-      ),
-      canonicalTopicNames: Array.from(link.canonicalTopicNameSet).sort(),
-      order:
-        link.orderValues.reduce((sum, value) => sum + value, 0) /
-        Math.max(1, link.orderValues.length),
-    }))
-    .sort(
-      (left, right) =>
-        left.order - right.order || left.id.localeCompare(right.id),
-    );
-
-  const columnLabels = Array.from({ length: maxDepth + 1 }, (_, index) => {
-    if (index === 0) {
-      return "Leaf Topics";
-    }
-    if (index === maxDepth) {
-      return "Top-Level Topics";
-    }
-    return "Subtopics";
-  });
-
-  const columns = columnLabels.map((label, index) => ({
-    index,
-    label,
-    nodes: nodes
-      .filter((node) => node.column === index)
-      .sort(
-        (left, right) =>
-          left.order - right.order ||
-          left.fullPath.localeCompare(right.fullPath),
-      ),
-  }));
-
-  return {
-    maxDepth,
-    columns,
-    nodes,
-    links,
-  };
+  return { maxDepth, columns, nodes, links };
 }

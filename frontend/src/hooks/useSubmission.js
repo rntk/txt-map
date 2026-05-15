@@ -13,10 +13,7 @@ function getSelectionTopicNames(selection) {
   return [];
 }
 
-export function useSubmission(submissionId) {
-  const [submission, setSubmission] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+function useReadTopics(submissionId) {
   const [readTopics, setReadTopics] = useState(new Set());
   const hasLoadedRef = useRef(false);
   const lastSyncedRef = useRef("");
@@ -43,78 +40,13 @@ export function useSubmission(submissionId) {
     [submissionId],
   );
 
-  const fetchSubmission = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/submission/${submissionId}`);
-
-      if (!response.ok) {
-        throw new Error("Submission not found");
-      }
-
-      const data = await response.json();
-      setSubmission(data);
-      if (!hasLoadedRef.current && data.read_topics?.length) {
-        setReadTopics(new Set(data.read_topics));
-        lastSyncedRef.current = JSON.stringify([...data.read_topics].sort());
-      }
-      hasLoadedRef.current = true;
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  const syncFromSubmission = useCallback((data) => {
+    if (!hasLoadedRef.current && data.read_topics?.length) {
+      setReadTopics(new Set(data.read_topics));
+      lastSyncedRef.current = JSON.stringify([...data.read_topics].sort());
     }
-  }, [submissionId]);
-
-  useEffect(() => {
-    fetchSubmission();
-
-    const interval = setInterval(async () => {
-      if (!submissionId) return;
-
-      try {
-        const response = await fetch(`/api/submission/${submissionId}/status`);
-        if (response.ok) {
-          const data = await response.json();
-
-          setSubmission((prev) => {
-            if (!prev) return null;
-
-            // If any task that was not completed before is now completed, refetch full data
-            const prevTasks = prev.status?.tasks || {};
-            const newTasks = data.tasks || {};
-            const anyNewCompleted = Object.keys(newTasks).some(
-              (t) =>
-                newTasks[t].status === "completed" &&
-                prevTasks[t]?.status !== "completed",
-            );
-
-            if (anyNewCompleted) {
-              // Trigger a full refetch in the next tick
-              setTimeout(fetchSubmission, 0);
-            }
-
-            return {
-              ...prev,
-              status: { tasks: data.tasks, overall: data.overall_status },
-            };
-          });
-
-          if (
-            data.overall_status === "completed" ||
-            data.overall_status === "failed"
-          ) {
-            clearInterval(interval);
-            fetchSubmission();
-          }
-        }
-      } catch (error) {
-        console.error("Error polling status:", error);
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [fetchSubmission, submissionId]);
+    hasLoadedRef.current = true;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -182,6 +114,92 @@ export function useSubmission(submissionId) {
     },
     [readTopics],
   );
+
+  return {
+    readTopics,
+    setReadTopics,
+    toggleRead,
+    setSelectionReadState,
+    toggleReadAll,
+    syncFromSubmission,
+  };
+}
+
+export function useSubmission(submissionId) {
+  const [submission, setSubmission] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { readTopics, setReadTopics, toggleRead, setSelectionReadState, toggleReadAll, syncFromSubmission } =
+    useReadTopics(submissionId);
+
+  const fetchSubmission = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/submission/${submissionId}`);
+
+      if (!response.ok) {
+        throw new Error("Submission not found");
+      }
+
+      const data = await response.json();
+      setSubmission(data);
+      syncFromSubmission(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [submissionId, syncFromSubmission]);
+
+  useEffect(() => {
+    fetchSubmission();
+
+    const interval = setInterval(async () => {
+      if (!submissionId) return;
+
+      try {
+        const response = await fetch(`/api/submission/${submissionId}/status`);
+        if (response.ok) {
+          const data = await response.json();
+
+          setSubmission((prev) => {
+            if (!prev) return null;
+
+            // If any task that was not completed before is now completed, refetch full data
+            const prevTasks = prev.status?.tasks || {};
+            const newTasks = data.tasks || {};
+            const anyNewCompleted = Object.keys(newTasks).some(
+              (t) =>
+                newTasks[t].status === "completed" &&
+                prevTasks[t]?.status !== "completed",
+            );
+
+            if (anyNewCompleted) {
+              // Trigger a full refetch in the next tick
+              setTimeout(fetchSubmission, 0);
+            }
+
+            return {
+              ...prev,
+              status: { tasks: data.tasks, overall: data.overall_status },
+            };
+          });
+
+          if (
+            data.overall_status === "completed" ||
+            data.overall_status === "failed"
+          ) {
+            clearInterval(interval);
+            fetchSubmission();
+          }
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [fetchSubmission, submissionId]);
 
   const getSimilarWords = useCallback(
     async (word) => {

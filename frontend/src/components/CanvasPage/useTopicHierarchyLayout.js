@@ -13,6 +13,133 @@ import {
 } from "./utils";
 
 /**
+ * Returns the bounding rect that spans all matching summary cards for a row.
+ * @param {unknown} row
+ * @param {Array<{path: string}>} summaryViewCards
+ * @param {React.MutableRefObject<Record<string, HTMLElement>>} summaryCardRefs
+ * @returns {{top: number, bottom: number}|null}
+ */
+function getSummaryRectForRow(row, summaryViewCards, summaryCardRefs) {
+  const matching = getMatchingSummaryCardsForHierarchyRow(row, summaryViewCards);
+  if (matching.length === 0) return null;
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const c of matching) {
+    const el = summaryCardRefs.current[c.path];
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top < top) top = r.top;
+    if (r.bottom > bottom) bottom = r.bottom;
+  }
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
+  return { top, bottom };
+}
+
+/**
+ * Converts a hierarchy row into a positioned card object.
+ * Returns null if the position cannot be determined.
+ */
+function toPositionedCard({
+  row,
+  levelIndex,
+  showSummaryMode,
+  summaryViewCards,
+  summaryCardRefs,
+  sentenceOffsets,
+  submissionSentences,
+  articleEl,
+  wrapRect,
+  s,
+}) {
+  let rawTop;
+  let rawBottom;
+
+  if (showSummaryMode) {
+    const rect = getSummaryRectForRow(row, summaryViewCards, summaryCardRefs);
+    if (!rect) return null;
+    rawTop = (rect.top - wrapRect.top) / s;
+    rawBottom = (rect.bottom - wrapRect.top) / s;
+  } else {
+    const textRange = getTopicTextRange(row, sentenceOffsets, submissionSentences);
+    if (!textRange) return null;
+    const startRange = rangeAtOffset(articleEl, textRange.charStart);
+    const endRange = rangeAtOffset(articleEl, Math.max(0, textRange.charEnd - 1));
+    if (!startRange || !endRange) return null;
+    const startRect = startRange.getBoundingClientRect();
+    const endRect = endRange.getBoundingClientRect();
+    rawTop = (startRect.top - wrapRect.top) / s;
+    rawBottom = (endRect.bottom - wrapRect.top) / s;
+  }
+
+  const sentenceNumbers = getTopicSentenceNumbers(row);
+  const startSentence = sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
+  const endSentence = sentenceNumbers.length > 0 ? Math.max(...sentenceNumbers) : 0;
+  const height = Math.max(TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX, rawBottom - rawTop);
+
+  return {
+    key: `${levelIndex}:${row.occurrenceKey || row.fullPath}`,
+    fullPath: row.fullPath,
+    displayName: getTopicDisplayName(row),
+    sentenceCount: sentenceNumbers.length,
+    startSentence,
+    endSentence,
+    top: rawTop,
+    height,
+    depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
+    levelIndex,
+  };
+}
+
+/**
+ * Builds all positioned topic cards from DOM measurements.
+ */
+function computeTopicCards({
+  articleEl,
+  wrapEl,
+  scaleRef,
+  showSummaryMode,
+  summaryViewCards,
+  summaryCardRefs,
+  sentenceOffsets,
+  submissionSentences,
+  topicHierarchyRowsByLevel,
+}) {
+  const articleRect = articleEl.getBoundingClientRect();
+  const wrapRect = wrapEl.getBoundingClientRect();
+  const offsetH = articleEl.offsetHeight;
+  const s = offsetH > 0 ? clampCanvasScale(articleRect.height / offsetH) : scaleRef.current || 1;
+
+  const layoutRowsByLevel = showSummaryMode
+    ? topicHierarchyRowsByLevel.map((rows) =>
+        splitTopicHierarchyRowsForSummaryOrder(rows, summaryViewCards),
+      )
+    : topicHierarchyRowsByLevel.map(splitTopicHierarchyRowsForArticleOrder);
+
+  return layoutRowsByLevel
+    .flatMap((rows, levelIndex) =>
+      rows.map((row) =>
+        toPositionedCard({
+          row,
+          levelIndex,
+          showSummaryMode,
+          summaryViewCards,
+          summaryCardRefs,
+          sentenceOffsets,
+          submissionSentences,
+          articleEl,
+          wrapRect,
+          s,
+        }),
+      ),
+    )
+    .filter(Boolean)
+    .sort(
+      (left, right) =>
+        left.levelIndex - right.levelIndex || left.top - right.top,
+    );
+}
+
+/**
  * Computes positioned topic cards for the hierarchy rail.
  * @param {{
  *   showTopicHierarchy: boolean,
@@ -72,100 +199,17 @@ export function useTopicHierarchyLayout({
       const articleEl = articleTextRef.current;
       const wrapEl = summaryWrapRef.current;
       if (!articleEl || !wrapEl) return;
-      const articleRect = articleEl.getBoundingClientRect();
-      const wrapRect = wrapEl.getBoundingClientRect();
-      const offsetH = articleEl.offsetHeight;
-      const s =
-        offsetH > 0
-          ? clampCanvasScale(articleRect.height / offsetH)
-          : scaleRef.current || 1;
-      const summaryRectForRow = (row) => {
-        const matching = getMatchingSummaryCardsForHierarchyRow(
-          row,
-          summaryViewCards,
-        );
-        if (matching.length === 0) return null;
-        let top = Number.POSITIVE_INFINITY;
-        let bottom = Number.NEGATIVE_INFINITY;
-        for (const c of matching) {
-          const el = summaryCardRefs.current[c.path];
-          if (!el) continue;
-          const r = el.getBoundingClientRect();
-          if (r.top < top) top = r.top;
-          if (r.bottom > bottom) bottom = r.bottom;
-        }
-        if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
-        return { top, bottom };
-      };
-
-      const toPositionedCard = (row, levelIndex) => {
-        let rawTop;
-        let rawBottom;
-
-        if (showSummaryMode) {
-          const rect = summaryRectForRow(row);
-          if (!rect) return null;
-          rawTop = (rect.top - wrapRect.top) / s;
-          rawBottom = (rect.bottom - wrapRect.top) / s;
-        } else {
-          const textRange = getTopicTextRange(
-            row,
-            sentenceOffsets,
-            submissionSentences,
-          );
-          if (!textRange) return null;
-          const startRange = rangeAtOffset(articleEl, textRange.charStart);
-          const endRange = rangeAtOffset(
-            articleEl,
-            Math.max(0, textRange.charEnd - 1),
-          );
-          if (!startRange || !endRange) return null;
-          const startRect = startRange.getBoundingClientRect();
-          const endRect = endRange.getBoundingClientRect();
-          rawTop = (startRect.top - wrapRect.top) / s;
-          rawBottom = (endRect.bottom - wrapRect.top) / s;
-        }
-
-        const sentenceNumbers = getTopicSentenceNumbers(row);
-        const startSentence =
-          sentenceNumbers.length > 0 ? Math.min(...sentenceNumbers) : 0;
-        const endSentence =
-          sentenceNumbers.length > 0 ? Math.max(...sentenceNumbers) : 0;
-        const height = Math.max(
-          TOPIC_HIERARCHY_CARD_MIN_HEIGHT_PX,
-          rawBottom - rawTop,
-        );
-
-        return {
-          key: `${levelIndex}:${row.occurrenceKey || row.fullPath}`,
-          fullPath: row.fullPath,
-          displayName: getTopicDisplayName(row),
-          sentenceCount: sentenceNumbers.length,
-          startSentence,
-          endSentence,
-          top: rawTop,
-          height,
-          depth: Math.max(0, getTopicParts(row.fullPath).length - 1),
-          levelIndex,
-        };
-      };
-
-      const layoutRowsByLevel = showSummaryMode
-        ? topicHierarchyRowsByLevel.map((rows) =>
-            splitTopicHierarchyRowsForSummaryOrder(rows, summaryViewCards),
-          )
-        : topicHierarchyRowsByLevel.map(splitTopicHierarchyRowsForArticleOrder);
-
-      const topicCards = layoutRowsByLevel
-        .flatMap((rows, levelIndex) =>
-          rows.map((row) => toPositionedCard(row, levelIndex)),
-        )
-        .filter(Boolean)
-        .sort(
-          (left, right) =>
-            left.levelIndex - right.levelIndex || left.top - right.top,
-        );
-
+      const topicCards = computeTopicCards({
+        articleEl,
+        wrapEl,
+        scaleRef,
+        showSummaryMode,
+        summaryViewCards,
+        summaryCardRefs,
+        sentenceOffsets,
+        submissionSentences,
+        topicHierarchyRowsByLevel,
+      });
       setTopicHierarchyLayout({ topicCards });
     };
 
@@ -180,12 +224,8 @@ export function useTopicHierarchyLayout({
     let resizeObserver = null;
     if (typeof window.ResizeObserver !== "undefined") {
       resizeObserver = new window.ResizeObserver(schedule);
-      if (articleTextRef.current) {
-        resizeObserver.observe(articleTextRef.current);
-      }
-      if (summaryWrapRef.current) {
-        resizeObserver.observe(summaryWrapRef.current);
-      }
+      if (articleTextRef.current) resizeObserver.observe(articleTextRef.current);
+      if (summaryWrapRef.current) resizeObserver.observe(summaryWrapRef.current);
     }
 
     return () => {
