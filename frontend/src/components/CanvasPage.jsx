@@ -1070,7 +1070,7 @@ export default function CanvasPage() {
       zoomToTarget(el.getBoundingClientRect());
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [currentHighlights, zoomToTarget]);
+  }, [currentHighlights, zoomToTarget, userMovedCanvasRef]);
 
   // ── Zoom to summary card ───────────────────────────────────────────────────
 
