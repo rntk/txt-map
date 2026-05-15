@@ -89,6 +89,35 @@ const SAFE_DISPLAY = new Set([
   "table-caption",
 ]);
 const SAFE_WHITESPACE = new Set(["normal", "pre", "pre-wrap", "pre-line"]);
+const BLOCKED_TAGS = new Set([
+  "script",
+  "style",
+  "iframe",
+  "object",
+  "embed",
+  "link",
+  "meta",
+  "base",
+  "svg",
+  "form",
+  "input",
+  "button",
+]);
+const ALLOWED_ATTRS = new Set([
+  "href",
+  "src",
+  "alt",
+  "title",
+  "class",
+  "id",
+  "rel",
+  "target",
+  "aria-label",
+  "role",
+  "width",
+  "height",
+  "style",
+]);
 
 // Map of CSS property → handler(value) → transformed value string | null (strip)
 const styleHandlers = {
@@ -127,76 +156,114 @@ const styleHandlers = {
   //   list-style, border-color, border-width, border-style
 };
 
+function removeBlockedTags(template) {
+  BLOCKED_TAGS.forEach((tag) => {
+    template.content.querySelectorAll(tag).forEach((el) => el.remove());
+  });
+}
+
+function isSafeDataImageUrl(val) {
+  return /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(
+    String(val).trim(),
+  );
+}
+
+function isUnsafeUrl(val) {
+  if (!val) return false;
+  const v = String(val).trim().toLowerCase();
+  const jsProto = `java${"script:"}`;
+  const vbsProto = `vb${"script:"}`;
+  if (isSafeDataImageUrl(val)) return false;
+  return (
+    v.startsWith(jsProto) || v.startsWith("data:") || v.startsWith(vbsProto)
+  );
+}
+
+function sanitizeStyle(styleValue) {
+  if (!styleValue) return "";
+  return String(styleValue)
+    .split(";")
+    .map((decl) => decl.trim())
+    .filter(Boolean)
+    .map((decl) => {
+      const splitIdx = decl.indexOf(":");
+      if (splitIdx <= 0) return "";
+      const prop = decl.slice(0, splitIdx).trim().toLowerCase();
+      const val = decl.slice(splitIdx + 1).trim();
+      const lowerVal = val.toLowerCase();
+      if (
+        lowerVal.includes("expression(") ||
+        lowerVal.includes(`java${"script:"}`) ||
+        lowerVal.includes("@import") ||
+        lowerVal.includes("url(")
+      ) {
+        return "";
+      }
+      const handler = styleHandlers[prop];
+      if (!handler) return "";
+      const result = handler(val);
+      if (result === null) return "";
+      return `${prop}: ${result}`;
+    })
+    .filter(Boolean)
+    .join("; ");
+}
+
+function ensureSafeTargetRel(node) {
+  const rel = node.getAttribute("rel") || "";
+  const current = new Set(rel.split(/\s+/).filter(Boolean));
+  ["noopener", "noreferrer"].forEach((value) => current.add(value));
+  node.setAttribute("rel", Array.from(current).join(" "));
+}
+
+function shouldSkipAttribute(name) {
+  return name.startsWith("data-");
+}
+
+function shouldRemoveAttribute(name, val) {
+  return (
+    name.startsWith("on") ||
+    !ALLOWED_ATTRS.has(name) ||
+    ((name === "href" || name === "src") && isUnsafeUrl(val))
+  );
+}
+
+function applySanitizedStyle(node, attrName, val) {
+  const safeStyle = sanitizeStyle(val);
+  if (!safeStyle) {
+    node.removeAttribute(attrName);
+  } else {
+    node.setAttribute("style", safeStyle);
+  }
+}
+
+function sanitizeElementAttributes(node) {
+  const attrs = Array.from(node.attributes || []);
+  for (const attr of attrs) {
+    const name = attr.name.toLowerCase();
+    const val = attr.value;
+    if (shouldSkipAttribute(name)) {
+      continue;
+    }
+    if (shouldRemoveAttribute(name, val)) {
+      node.removeAttribute(attr.name);
+      continue;
+    }
+    if (name === "style") {
+      applySanitizedStyle(node, attr.name, val);
+      continue;
+    }
+    if (name === "target" && val === "_blank") {
+      ensureSafeTargetRel(node);
+    }
+  }
+}
+
 export function sanitizeHTML(html) {
   if (!html || typeof document === "undefined") return "";
   const template = document.createElement("template");
   template.innerHTML = html;
-
-  const blockedTags = new Set([
-    "script",
-    "style",
-    "iframe",
-    "object",
-    "embed",
-    "link",
-    "meta",
-    "base",
-    "svg",
-    "form",
-    "input",
-    "button",
-  ]);
-
-  // Remove all blocked tags
-  blockedTags.forEach((tag) => {
-    template.content.querySelectorAll(tag).forEach((el) => el.remove());
-  });
-
-  const isSafeDataImageUrl = (val) =>
-    /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(
-      String(val).trim(),
-    );
-
-  const isUnsafeUrl = (val) => {
-    if (!val) return false;
-    const v = String(val).trim().toLowerCase();
-    const jsProto = `java${"script:"}`;
-    const vbsProto = `vb${"script:"}`;
-    if (isSafeDataImageUrl(val)) return false;
-    return (
-      v.startsWith(jsProto) || v.startsWith("data:") || v.startsWith(vbsProto)
-    );
-  };
-
-  const sanitizeStyle = (styleValue) => {
-    if (!styleValue) return "";
-    return String(styleValue)
-      .split(";")
-      .map((decl) => decl.trim())
-      .filter(Boolean)
-      .map((decl) => {
-        const splitIdx = decl.indexOf(":");
-        if (splitIdx <= 0) return "";
-        const prop = decl.slice(0, splitIdx).trim().toLowerCase();
-        const val = decl.slice(splitIdx + 1).trim();
-        const lowerVal = val.toLowerCase();
-        if (
-          lowerVal.includes("expression(") ||
-          lowerVal.includes(`java${"script:"}`) ||
-          lowerVal.includes("@import") ||
-          lowerVal.includes("url(")
-        ) {
-          return "";
-        }
-        const handler = styleHandlers[prop];
-        if (!handler) return "";
-        const result = handler(val);
-        if (result === null) return "";
-        return `${prop}: ${result}`;
-      })
-      .filter(Boolean)
-      .join("; ");
-  };
+  removeBlockedTags(template);
 
   const walker = document.createTreeWalker(
     template.content,
@@ -206,57 +273,7 @@ export function sanitizeHTML(html) {
   // TreeWalker starts at the root (DocumentFragment), which has no attributes.
   let node = walker.nextNode();
   while (node) {
-    const allowedAttrs = new Set([
-      "href",
-      "src",
-      "alt",
-      "title",
-      "class",
-      "id",
-      "rel",
-      "target",
-      "aria-label",
-      "role",
-      "width",
-      "height",
-      "style",
-    ]);
-    const attrs = Array.from(node.attributes || []);
-    for (const attr of attrs) {
-      const name = attr.name.toLowerCase();
-      const val = attr.value;
-      if (name.startsWith("on")) {
-        node.removeAttribute(attr.name);
-        continue;
-      }
-      if (name.startsWith("data-")) {
-        continue;
-      }
-      if (!allowedAttrs.has(name)) {
-        node.removeAttribute(attr.name);
-        continue;
-      }
-      if ((name === "href" || name === "src") && isUnsafeUrl(val)) {
-        node.removeAttribute(attr.name);
-        continue;
-      }
-      if (name === "style") {
-        const safeStyle = sanitizeStyle(val);
-        if (!safeStyle) {
-          node.removeAttribute(attr.name);
-        } else {
-          node.setAttribute("style", safeStyle);
-        }
-        continue;
-      }
-      if (name === "target" && val === "_blank") {
-        const rel = node.getAttribute("rel") || "";
-        const needed = ["noopener", "noreferrer"];
-        const current = new Set(rel.split(/\s+/).filter(Boolean));
-        needed.forEach((n) => current.add(n));
-        node.setAttribute("rel", Array.from(current).join(" "));
-      }
-    }
+    sanitizeElementAttributes(node);
     node = walker.nextNode();
   }
 
