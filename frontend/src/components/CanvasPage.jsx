@@ -278,7 +278,7 @@ export default function CanvasPage() {
   const { selectedLevel, setSelectedLevel, maxLevel } =
     useTopicLevel(submissionTopics);
 
-  const { toggleTopicRead, readSentenceIndices, readRanges } =
+  const { toggleTopicRead, readRanges } =
     useTopicReadStatus({
       articleId,
       submissionTopics,
@@ -290,7 +290,6 @@ export default function CanvasPage() {
   const {
     showTemperature,
     toggleTemperature,
-    topicTemperatureMap,
     temperatureAvailable,
     temperatureTopicColorMap,
   } = useTopicTemperature(topicTemperatures);

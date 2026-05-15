@@ -1084,7 +1084,6 @@ describe("CanvasPage highlight focusing", () => {
 
     await waitFor(() => {
       const evalCards = screen.getAllByRole("button", { name: /Evaluation/ });
-      const newsCard = screen.getByRole("button", { name: /News/ });
       const agentPerfCard = screen.getByRole("button", { name: /AgentPerf/ });
       const articleCard = screen.getByRole("button", { name: /Article/ });
       const deepSeekCard = screen.getByRole("button", { name: /DeepSeek/ });
