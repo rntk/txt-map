@@ -33,6 +33,17 @@ function isBoundaryBeyondThreshold(direction, boundary, threshold) {
   );
 }
 
+function highlightGroupedSection(
+  name,
+  selectedTopics,
+  setHighlightedGroupedTopic,
+) {
+  setHighlightedGroupedTopic(name);
+  if (!selectedTopics.some((candidate) => candidate.name === name)) {
+    setTimeout(() => setHighlightedGroupedTopic(null), 1500);
+  }
+}
+
 function findVisibleTargetIndex(targets, resolveElement, direction, viewport) {
   const { viewportTop, viewportBottom, margin } = viewport;
   const indexes =
@@ -174,18 +185,15 @@ function handleGroupedNavigation({
   selectedTopics,
   setHighlightedGroupedTopic,
 }) {
-  const highlightSection = (name) => {
-    setHighlightedGroupedTopic(name);
-    if (!selectedTopics.some((candidate) => candidate.name === name)) {
-      setTimeout(() => setHighlightedGroupedTopic(null), 1500);
-    }
-  };
-
   if (direction === "focus") {
     const element = document.getElementById(`grouped-topic-${topic.name}`);
     if (element) {
       scrollElementIntoView(element);
-      highlightSection(topic.name);
+      highlightGroupedSection(
+        topic.name,
+        selectedTopics,
+        setHighlightedGroupedTopic,
+      );
     }
     return;
   }
@@ -201,8 +209,23 @@ function handleGroupedNavigation({
   const targetEl = allSections[targetIdx];
   if (targetEl) {
     scrollElementIntoView(targetEl);
-    highlightSection(targetEl.id.replace("grouped-topic-", ""));
+    highlightGroupedSection(
+      targetEl.id.replace("grouped-topic-", ""),
+      selectedTopics,
+      setHighlightedGroupedTopic,
+    );
   }
+}
+
+function getSummaryParagraphBoundary(element, direction) {
+  const rect = element.getBoundingClientRect();
+  return direction === "next"
+    ? rect.top + window.scrollY
+    : rect.bottom + window.scrollY;
+}
+
+function getSummaryThreshold(direction, viewportBottom, viewportTop, margin) {
+  return direction === "next" ? viewportBottom - margin : viewportTop + margin;
 }
 
 function findSummaryParagraphElement(paraIndices, direction) {
@@ -218,13 +241,13 @@ function findSummaryParagraphElement(paraIndices, direction) {
     if (!element) {
       continue;
     }
-    const rect = element.getBoundingClientRect();
-    const boundary =
-      direction === "next"
-        ? rect.top + window.scrollY
-        : rect.bottom + window.scrollY;
-    const threshold =
-      direction === "next" ? viewportBottom - margin : viewportTop + margin;
+    const boundary = getSummaryParagraphBoundary(element, direction);
+    const threshold = getSummaryThreshold(
+      direction,
+      viewportBottom,
+      viewportTop,
+      margin,
+    );
     if (isBoundaryBeyondThreshold(direction, boundary, threshold)) {
       return element;
     }
