@@ -26,4 +26,15 @@ export default [
       "react-hooks/exhaustive-deps": "error",
     },
   },
+  {
+    files: ["src/**/*.test.{js,jsx}"],
+    rules: {
+      complexity: "off",
+      "max-lines-per-function": "off",
+      "max-statements": "off",
+      "max-params": "off",
+      "max-depth": "off",
+      "max-nested-callbacks": "off",
+    },
+  },
 ];

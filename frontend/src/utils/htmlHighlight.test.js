@@ -185,8 +185,6 @@ describe("htmlHighlight", () => {
   });
 
   describe("wrapWord", () => {
-    const noRanges = [];
-
     it("returns plain word when not in any range", () => {
       expect(wrapWord("hello", 0, 0)).toBe("hello");
     });
