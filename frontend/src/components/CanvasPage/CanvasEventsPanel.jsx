@@ -11,6 +11,8 @@ import { eventLabel } from "./utils";
  *   onSelectEvent: (idx: number) => void,
  *   onGoLive: () => void,
  *   onDeleteEvent: (seq: any) => Promise<void>,
+ *   showEvents: boolean,
+ *   onToggleEvents: () => void,
  * }} props
  */
 export default function CanvasEventsPanel({
@@ -22,6 +24,8 @@ export default function CanvasEventsPanel({
   onSelectEvent,
   onGoLive,
   onDeleteEvent,
+  showEvents,
+  onToggleEvents,
 }) {
   return (
     <div className="canvas-tab-content is-active">
@@ -76,6 +80,15 @@ export default function CanvasEventsPanel({
           title="Follow latest events"
         >
           ● Live
+        </button>
+        <button
+          type="button"
+          className={`canvas-timeline-live${showEvents ? " is-active" : ""}`}
+          onClick={onToggleEvents}
+          title="Show events alongside the article"
+          aria-pressed={showEvents}
+        >
+          {showEvents ? "Hide" : "Show"}
         </button>
       </div>
     </div>

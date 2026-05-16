@@ -19,6 +19,12 @@ const RAIL_CLASSES = {
     connector: "canvas-insights-connector",
     bulb: "canvas-insights-bulb",
   },
+  events: {
+    connectors: "canvas-events-connectors",
+    anchor: "canvas-events-anchor",
+    connector: "canvas-events-connector",
+    bulb: "canvas-events-bulb",
+  },
   "tag-topics": {
     connectors: "canvas-tag-topics-connectors",
     anchor: "canvas-tag-topics-anchor",
@@ -41,7 +47,7 @@ const activeCls = (base, isActive) => (isActive ? `${base} is-active` : base);
  * CanvasTagTopicsRail.
  *
  * @param {{
- *   name: "summary" | "insights" | "tag-topics" | "topic-tags",
+ *   name: "summary" | "insights" | "events" | "tag-topics" | "topic-tags",
  *   cards: Array<{key: string, cardY: number, cardHeight: number, startY: number, endY: number}>,
  *   articleHeight: number,
  *   anchorX: number,

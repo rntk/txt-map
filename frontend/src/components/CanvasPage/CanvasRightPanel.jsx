@@ -35,6 +35,8 @@ import CanvasEventsPanel from "./CanvasEventsPanel";
  *   onSelectEvent: (index: number) => void,
  *   onGoLive: () => void,
  *   onDeleteEvent: (index: number) => void,
+ *   showEvents: boolean,
+ *   onToggleEvents: () => void,
  * }} props
  */
 export default function CanvasRightPanel({
@@ -64,6 +66,8 @@ export default function CanvasRightPanel({
   onSelectEvent,
   onGoLive,
   onDeleteEvent,
+  showEvents,
+  onToggleEvents,
 }) {
   const [activeTab, setActiveTab] = useState("chat");
 
@@ -121,6 +125,8 @@ export default function CanvasRightPanel({
           onSelectEvent={onSelectEvent}
           onGoLive={onGoLive}
           onDeleteEvent={onDeleteEvent}
+          showEvents={showEvents}
+          onToggleEvents={onToggleEvents}
         />
       )}
     </div>

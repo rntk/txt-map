@@ -34,6 +34,7 @@ import CanvasArticleTooltip from "./CanvasPage/CanvasArticleTooltip";
 import CanvasSummaryRail from "./CanvasPage/CanvasSummaryRail";
 import CanvasRightPanel from "./CanvasPage/CanvasRightPanel";
 import CanvasInsightsRail from "./CanvasPage/CanvasInsightsRail";
+import CanvasEventsRail from "./CanvasPage/CanvasEventsRail";
 import CanvasTagsCloud from "./CanvasPage/CanvasTagsCloud";
 import CanvasTagTopicsRail from "./CanvasPage/CanvasTagTopicsRail";
 import CanvasTopicTagsRail from "./CanvasPage/CanvasTopicTagsRail";
@@ -50,6 +51,7 @@ import { useTopicReadStatus } from "./CanvasPage/useTopicReadStatus";
 import { useTopicTemperature } from "./CanvasPage/useTopicTemperature";
 import { useSummaryLayout } from "./CanvasPage/useSummaryLayout";
 import { useInsightsLayout } from "./CanvasPage/useInsightsLayout";
+import { useEventsLayout } from "./CanvasPage/useEventsLayout";
 import { useTopicHierarchyLayout } from "./CanvasPage/useTopicHierarchyLayout";
 import { useTagTopicsLayout } from "./CanvasPage/useTagTopicsLayout";
 import { useTopicTagsLayout } from "./CanvasPage/useTopicTagsLayout";
@@ -245,6 +247,8 @@ export default function CanvasPage() {
   const [showReadStatus, setShowReadStatus] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [activeInsightKey, setActiveInsightKey] = useState(null);
+  const [showEvents, setShowEvents] = useState(false);
+  const [activeEventKey, setActiveEventKey] = useState(null);
   const [showTagsCloud, setShowTagsCloud] = useState(false);
   const [showTopicTagsRail, setShowTopicTagsRail] = useState(false);
   const [hoveredCloudLemma, setHoveredCloudLemma] = useState(null);
@@ -822,6 +826,19 @@ export default function CanvasPage() {
     scaleRef,
   });
 
+  const eventsLayout = useEventsLayout({
+    showEvents,
+    events,
+    articleLoading,
+    articleError,
+    articleText,
+    articlePages,
+    articleImages,
+    articleTextRef,
+    summaryWrapRef,
+    scaleRef,
+  });
+
   const tagTopicsLayout = useTagTopicsLayout({
     show: showTagsCloud && Boolean(selectedCloudLemma),
     entries: selectedTagTopicEntries,
@@ -1199,10 +1216,11 @@ export default function CanvasPage() {
             {!articleLoading && !articleError && (
               <div
                 ref={summaryWrapRef}
-                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}${showTopicTagsRail && !showSummaryMode ? " has-topic-tags" : ""}`}
+                className={`canvas-article-with-summaries${showSummaries && !showSummaryMode ? " has-summaries" : ""}${showTopicHierarchy || showSummaryMode ? " has-topic-hierarchy" : ""}${showSummaryMode ? " is-summary-mode" : ""}${showInsights && !showSummaryMode ? " has-insights" : ""}${showEvents && !showSummaryMode ? " has-events" : ""}${showTagsCloud && !showSummaryMode ? " has-tags-cloud" : ""}${showTagsCloud && selectedCloudLemma && !showSummaryMode ? " has-tag-topics" : ""}${showTopicTagsRail && !showSummaryMode ? " has-topic-tags" : ""}`}
                 style={{
                   "--canvas-topic-hierarchy-width": `${topicHierarchyRailWidth}px`,
                   "--canvas-summary-rail-width": `${summaryRailWidth}px`,
+                  "--canvas-events-rail-width": `${summaryRailWidth}px`,
                   "--canvas-tags-cloud-width": `${cloudSize.width}px`,
                 }}
               >
@@ -1269,6 +1287,24 @@ export default function CanvasPage() {
                       setActiveInsightKey((k) => (k === key ? null : k))
                     }
                     onCardClick={zoomToInsight}
+                    translate={translate}
+                    scale={scale}
+                    isAnimating={isFocusingHighlight}
+                  />
+                )}
+
+                {!showSummaryMode && showEvents && (
+                  <CanvasEventsRail
+                    eventsLayout={eventsLayout}
+                    selectedIndex={selectedIndex}
+                    activeEventKey={activeEventKey}
+                    onCardEnter={setActiveEventKey}
+                    onCardLeave={(key) =>
+                      setActiveEventKey((current) =>
+                        current === key ? null : current,
+                      )
+                    }
+                    onCardClick={handleManualSelectEvent}
                     translate={translate}
                     scale={scale}
                     isAnimating={isFocusingHighlight}
@@ -1458,6 +1494,8 @@ export default function CanvasPage() {
         onSelectEvent={handleManualSelectEvent}
         onGoLive={handleGoLive}
         onDeleteEvent={handleDeleteEvent}
+        showEvents={showEvents}
+        onToggleEvents={() => setShowEvents((v) => !v)}
       />
     </div>
   );

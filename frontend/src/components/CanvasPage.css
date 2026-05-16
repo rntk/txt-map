@@ -1261,6 +1261,91 @@ body.canvas-global-dragging * {
   color: #c97bff;
 }
 
+/* ── Events rail (right side) ── */
+.canvas-article-with-summaries.has-events {
+  padding-right: calc(var(--canvas-events-rail-width, 360px) + 80px);
+}
+
+.canvas-events-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.canvas-events-connector {
+  fill: none;
+  stroke: rgba(90, 200, 180, 0.45);
+  stroke-width: 1;
+  transition:
+    stroke 0.15s,
+    stroke-width 0.15s;
+}
+
+.canvas-events-connector.is-active {
+  stroke: #4fd1c5;
+  stroke-width: 1.5;
+}
+
+.canvas-events-anchor {
+  fill: rgba(90, 200, 180, 0.6);
+  stroke: rgba(90, 200, 180, 0.85);
+  stroke-width: 1;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
+}
+
+.canvas-events-anchor.is-active {
+  fill: #4fd1c5;
+  stroke: #ffffff;
+}
+
+.canvas-events-bulb {
+  fill: transparent;
+  stroke: rgba(90, 200, 180, 0.6);
+  stroke-width: 1.5;
+  transition:
+    stroke 0.15s,
+    fill 0.15s;
+}
+
+.canvas-events-bulb.is-active {
+  stroke: #4fd1c5;
+  fill: rgba(79, 209, 197, 0.25);
+}
+
+.canvas-events-rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--canvas-events-rail-width, 360px);
+  height: 100%;
+  pointer-events: none;
+}
+
+.canvas-events-rail .canvas-summary-card {
+  right: 0;
+  left: auto;
+  width: var(--canvas-events-rail-width, 360px);
+  border-color: rgba(90, 200, 180, 0.35);
+  cursor: pointer;
+}
+
+.canvas-events-rail .canvas-summary-card:hover,
+.canvas-events-rail .canvas-summary-card.is-active {
+  border-color: #4fd1c5;
+  box-shadow:
+    0 0 0 1px rgba(79, 209, 197, 0.4),
+    0 4px 18px rgba(0, 0, 0, 0.6);
+}
+
+.canvas-events-rail .canvas-summary-card-topic {
+  color: #4fd1c5;
+}
+
 /* ── Tag topic rail (right side) ── */
 .canvas-tag-topics-connectors {
   position: absolute;
