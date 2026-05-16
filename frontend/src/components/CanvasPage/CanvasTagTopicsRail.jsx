@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { getRailCardPlacements } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
 
-const TAG_TOPICS_CARD_WIDTH = 280;
+const TAG_TOPICS_CARD_WIDTH = 340;
 const TAG_TOPICS_RAIL_LANE_GAP = 12;
 
 /**

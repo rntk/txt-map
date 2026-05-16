@@ -135,7 +135,7 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-tag-topics {
-  padding-right: 360px;
+  padding-right: 420px;
 }
 
 .canvas-article-with-summaries.has-topic-tags {
@@ -143,7 +143,7 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-summaries.has-tag-topics {
-  padding-right: calc(var(--canvas-summary-rail-width, 360px) + 440px);
+  padding-right: calc(var(--canvas-summary-rail-width, 360px) + 500px);
 }
 
 .canvas-article-with-summaries.has-summaries.has-topic-tags {
@@ -151,11 +151,11 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-tags {
-  padding-right: 720px;
+  padding-right: 780px;
 }
 
 .canvas-article-with-summaries.has-summaries.has-tag-topics.has-topic-tags {
-  padding-right: calc(var(--canvas-summary-rail-width, 360px) + 800px);
+  padding-right: calc(var(--canvas-summary-rail-width, 360px) + 860px);
 }
 
 .canvas-article-with-summaries.has-topic-hierarchy {
@@ -170,7 +170,7 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-hierarchy {
-  padding-right: calc(var(--canvas-topic-hierarchy-width, 430px) + 390px);
+  padding-right: calc(var(--canvas-topic-hierarchy-width, 430px) + 450px);
 }
 
 .canvas-article-with-summaries.has-topic-tags.has-topic-hierarchy {
@@ -180,7 +180,7 @@ body.canvas-global-dragging * {
 .canvas-article-with-summaries.has-summaries.has-tag-topics.has-topic-hierarchy {
   padding-right: calc(
     var(--canvas-topic-hierarchy-width, 430px) +
-      var(--canvas-summary-rail-width, 360px) + 470px
+      var(--canvas-summary-rail-width, 360px) + 530px
   );
 }
 
@@ -192,13 +192,13 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-tags.has-topic-hierarchy {
-  padding-right: calc(var(--canvas-topic-hierarchy-width, 430px) + 750px);
+  padding-right: calc(var(--canvas-topic-hierarchy-width, 430px) + 810px);
 }
 
 .canvas-article-with-summaries.has-summaries.has-tag-topics.has-topic-tags.has-topic-hierarchy {
   padding-right: calc(
     var(--canvas-topic-hierarchy-width, 430px) +
-      var(--canvas-summary-rail-width, 360px) + 830px
+      var(--canvas-summary-rail-width, 360px) + 890px
   );
 }
 
@@ -207,7 +207,7 @@ body.canvas-global-dragging * {
 }
 
 .canvas-article-with-summaries.has-tag-topics .canvas-summary-rail {
-  right: 360px;
+  right: 420px;
 }
 
 .canvas-article-with-summaries.has-topic-tags .canvas-topic-tags-rail {
@@ -216,7 +216,7 @@ body.canvas-global-dragging * {
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-tags
   .canvas-topic-tags-rail {
-  right: 360px;
+  right: 420px;
 }
 
 .canvas-article-with-summaries.has-summaries.has-topic-tags
@@ -226,12 +226,12 @@ body.canvas-global-dragging * {
 
 .canvas-article-with-summaries.has-summaries.has-tag-topics.has-topic-tags
   .canvas-topic-tags-rail {
-  right: 720px;
+  right: 780px;
 }
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-hierarchy
   .canvas-summary-rail {
-  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 390px);
+  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 450px);
 }
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-hierarchy
@@ -246,7 +246,7 @@ body.canvas-global-dragging * {
 
 .canvas-article-with-summaries.has-tag-topics.has-topic-tags.has-topic-hierarchy
   .canvas-topic-tags-rail {
-  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 390px);
+  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 450px);
 }
 
 .canvas-article-with-summaries.has-summaries.has-topic-tags.has-topic-hierarchy
@@ -256,7 +256,7 @@ body.canvas-global-dragging * {
 
 .canvas-article-with-summaries.has-summaries.has-tag-topics.has-topic-tags.has-topic-hierarchy
   .canvas-topic-tags-rail {
-  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 750px);
+  right: calc(var(--canvas-topic-hierarchy-width, 430px) + 810px);
 }
 
 .canvas-summary-connectors {
@@ -1402,7 +1402,7 @@ body.canvas-global-dragging * {
   position: absolute;
   top: 0;
   right: 0;
-  width: 280px;
+  width: 340px;
   height: 100%;
   pointer-events: none;
 }
@@ -1411,7 +1411,7 @@ body.canvas-global-dragging * {
   position: absolute;
   right: 0;
   z-index: 3;
-  width: 280px;
+  width: 340px;
   border: 1px solid rgba(255, 215, 64, 0.42);
   border-radius: 4px;
   background: rgba(20, 28, 40, 0.94);
@@ -1437,7 +1437,7 @@ body.canvas-global-dragging * {
   z-index: 3;
   display: flex;
   gap: 6px;
-  width: 280px;
+  width: 340px;
   pointer-events: none;
 }
 
@@ -1471,7 +1471,7 @@ body.canvas-global-dragging * {
   right: 0;
   display: flex;
   flex-direction: column;
-  width: 280px;
+  width: 340px;
   padding: 9px 12px;
   border: 1px solid rgba(255, 215, 64, 0.38);
   border-left: 4px solid #ffd740;

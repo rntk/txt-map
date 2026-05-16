@@ -7,8 +7,12 @@ import { useRailLayout } from "./useRailLayout";
  */
 function getTagTopicCardHeight(entry) {
   const text = entry.summaryText || entry.preview || "";
-  const estimatedLines = Math.max(1, Math.ceil(text.length / 48));
-  return Math.max(92, 50 + estimatedLines * 16);
+  // Wider cards (340px) fit ~58 chars per line.
+  const estimatedLines = Math.max(1, Math.ceil(text.length / 58));
+  // Reserve a row for the "contextualize" button so it is never clipped behind
+  // the summary text by the card's fixed height + overflow:hidden.
+  const CONTEXTUALIZE_BUTTON_HEIGHT = 30;
+  return Math.max(120, 50 + estimatedLines * 16 + CONTEXTUALIZE_BUTTON_HEIGHT);
 }
 
 /**

@@ -122,6 +122,7 @@ export default function CanvasPage() {
     setCanvasTransformNow,
     navigateCanvas,
     zoomToTarget,
+    flashFocus,
   } = useCanvasTransform({ contentRef: articleTextRef });
 
   // Article data
@@ -360,7 +361,8 @@ export default function CanvasPage() {
 
   const moveToTagsCloud = useCallback(() => {
     const cloudEl = tagsCloudRef.current;
-    if (!cloudEl) return;
+    const viewport = canvasViewportRef.current;
+    if (!cloudEl || !viewport) return;
 
     const selectedTagEl = selectedCloudLemma
       ? Array.from(cloudEl.querySelectorAll("[data-cloud-lemma]")).find(
@@ -368,9 +370,38 @@ export default function CanvasPage() {
         )
       : null;
     const targetEl = selectedTagEl || cloudEl;
-    // Center on the cloud without zooming in (zoomLevel=0 keeps currentScale).
-    zoomToTarget(targetEl.getBoundingClientRect(), 0);
-  }, [selectedCloudLemma, zoomToTarget]);
+
+    // zoomToTarget can only zoom *in* (Math.max(currentScale, zl)), so once the
+    // canvas is zoomed into a sentence it can never bring the cloud back into
+    // view. Drive the transform directly: reset to scale 1 and place the cloud's
+    // top-left near the viewport's top-left so the cloud is always shown.
+    const PAD = 40;
+    const currentScale = scaleRef.current || 1;
+    const viewportRect = viewport.getBoundingClientRect();
+    const cloudRect = cloudEl.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    const localCloudLeft = (cloudRect.left - viewportRect.left) / currentScale;
+    const localCloudTop = (cloudRect.top - viewportRect.top) / currentScale;
+    // Keep the selected tag vertically in view if it sits below the cloud top.
+    const localTargetTop = (targetRect.top - viewportRect.top) / currentScale;
+    const localTop = Math.min(localCloudTop, localTargetTop);
+
+    userMovedCanvasRef.current = true;
+    setCanvasTransformNow(1, {
+      x: PAD - localCloudLeft,
+      y: PAD - localTop,
+    });
+    // Toggle the is-focusing-highlight class so the viewport's
+    // `transition: transform 320ms` animates this move instead of jumping.
+    flashFocus();
+  }, [
+    selectedCloudLemma,
+    canvasViewportRef,
+    scaleRef,
+    userMovedCanvasRef,
+    setCanvasTransformNow,
+    flashFocus,
+  ]);
 
   // ── Tooltip ──────────────────────────────────────────────────────────────
 
