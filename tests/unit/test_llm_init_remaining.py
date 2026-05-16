@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from lib.llm import _create_custom_llm_client, create_llm_client_from_config
+from lib.llm.llamacpp import CerebrasLLamaCPP
 
 
 def test_create_llm_client_from_config_llamacpp() -> None:
@@ -52,6 +53,23 @@ def test_create_custom_llm_client_openai_comp() -> None:
     }
     with patch("lib.llm.LlmProvidersStorage", return_value=storage):
         llm = _create_custom_llm_client("abc", "custom-model", db)
+        assert llm.provider_key == "custom:abc"
+
+
+def test_create_custom_llm_client_openai_comp_cerebras() -> None:
+    db = MagicMock()
+    storage = MagicMock()
+    storage.get_provider.return_value = {
+        "_id": "abc",
+        "name": "Cerebras",
+        "type": "openai_comp",
+        "model": "custom-model",
+        "url": "https://api.cerebras.ai/v1",
+        "token_encrypted": None,
+    }
+    with patch("lib.llm.LlmProvidersStorage", return_value=storage):
+        llm = _create_custom_llm_client("abc", "custom-model", db)
+        assert isinstance(llm, CerebrasLLamaCPP)
         assert llm.provider_key == "custom:abc"
 
 

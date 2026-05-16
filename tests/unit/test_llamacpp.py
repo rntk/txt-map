@@ -17,7 +17,7 @@ import json
 # Import the module under test
 # =============================================================================
 
-from lib.llm.llamacpp import LLamaCPP
+from lib.llm.llamacpp import CerebrasLLamaCPP, LLamaCPP, is_cerebras_provider
 from lib.llm.base import LLMMessage, ToolCall, ToolDefinition
 
 
@@ -57,6 +57,12 @@ def mock_urlparse():
     """Create a mock urlparse."""
     with patch("lib.llm.llamacpp.urlparse") as mock_parse:
         yield mock_parse
+
+
+def test_is_cerebras_provider_matches_name_or_url() -> None:
+    assert is_cerebras_provider("Cerebras", None) is True
+    assert is_cerebras_provider("Custom", "https://api.cerebras.ai/v1") is True
+    assert is_cerebras_provider("Custom", "https://llm.example/v1") is False
 
 
 @pytest.fixture
@@ -1599,6 +1605,32 @@ class TestIntegrationScenarios:
         assert assistant_msg["role"] == "assistant"
         assert assistant_msg["reasoning_content"] == "internal reasoning trace"
         assert assistant_msg["tool_calls"][0]["function"]["name"] == "lookup"
+
+    def test_cerebras_complete_omits_unsupported_fields(self):
+        """Cerebras variant omits fields rejected by its OpenAI-compatible API."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "done"}}]}
+        )
+        self.mock_conn_instance.getresponse.return_value = mock_response
+        llm = CerebrasLLamaCPP("http://localhost:8989", token="test-token")
+
+        llm.complete(
+            user_prompt="final question",
+            messages=(
+                LLMMessage(
+                    role="assistant",
+                    content="thinking",
+                    reasoning="internal reasoning trace",
+                ),
+            ),
+        )
+
+        body = json.loads(self.mock_conn_instance.request.call_args[0][2])
+        assistant_msg = body["messages"][0]
+        assert "cache_prompt" not in body
+        assert "reasoning_content" not in assistant_msg
 
     def test_complete_combines_system_prompt_and_system_messages(self):
         """System prompt content is sent as a single leading system message."""

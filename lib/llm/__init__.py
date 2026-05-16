@@ -9,7 +9,7 @@ from lib.llm.base import (
     PROVIDER_DEFINITION_BY_NAME,
     ProviderDefinition,
 )
-from lib.llm.llamacpp import LLamaCPP
+from lib.llm.llamacpp import CerebrasLLamaCPP, LLamaCPP, is_cerebras_provider
 from lib.llm.openai_client import OpenAIClient
 from lib.llm.anthropic_client import AnthropicClient
 from lib.storage.app_settings import AppSettingsStorage
@@ -169,7 +169,12 @@ def _create_custom_llm_client(provider_id: str, model: str, db: Any) -> LLMClien
     url = provider_doc.get("url") or None
 
     if provider_type == "openai_comp":
-        return LLamaCPP(
+        llm_client_type: type[LLamaCPP] = (
+            CerebrasLLamaCPP
+            if is_cerebras_provider(provider_name=provider_name, url=url)
+            else LLamaCPP
+        )
+        return llm_client_type(
             host=url or "",
             token=token,
             model=model,

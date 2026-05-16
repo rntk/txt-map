@@ -13,6 +13,7 @@ from lib.llm.provider_config import (
     _require_string,
     load_remote_provider_config,
 )
+from lib.llm.llamacpp import CerebrasLLamaCPP
 
 
 def _write_config(tmp_path: Path, payload: dict[str, Any]) -> str:
@@ -90,6 +91,32 @@ def test_create_client_preserves_remote_provider_identity(tmp_path: Path) -> Non
     assert client.provider_key == "custom:abc123"
     assert client.provider_name == "Remote Llama"
     assert client.model_id == "custom:abc123:llama-3.3"
+
+
+def test_create_client_uses_cerebras_openai_compatible_variant(
+    tmp_path: Path,
+) -> None:
+    path = _write_config(
+        tmp_path,
+        {
+            "providers": [
+                {
+                    "id": "cerebras-remote",
+                    "name": "Remote Cerebras",
+                    "type": "openai_comp",
+                    "model": "llama-3.3",
+                    "token": "secret",
+                    "url": "https://api.cerebras.ai/v1",
+                }
+            ]
+        },
+    )
+    config = load_remote_provider_config(path)
+
+    client = config.create_client("cerebras-remote", "llama-3.3")
+
+    assert isinstance(client, CerebrasLLamaCPP)
+    assert client.provider_key == "cerebras-remote"
 
 
 def test_create_openai_and_anthropic_clients_preserve_remote_identity(

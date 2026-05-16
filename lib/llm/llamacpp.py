@@ -22,6 +22,13 @@ _THINK_TAG_RE = re.compile(
 )
 
 
+def is_cerebras_provider(provider_name: str, url: str | None) -> bool:
+    values: tuple[str, ...] = tuple(
+        value.lower() for value in (provider_name, url or "") if value
+    )
+    return any("cerebras" in value for value in values)
+
+
 class LLamaCPP(LLMClient):
     def __init__(
         self,
@@ -189,6 +196,9 @@ class LLamaCPP(LLMClient):
             messages = (*messages, LLMMessage(role="user", content=""))
         return messages
 
+    def _prepare_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return payload
+
     @classmethod
     def _from_provider_tool_calls(cls, tool_calls: Any) -> tuple[ToolCall, ...]:
         if not tool_calls:
@@ -243,6 +253,7 @@ class LLamaCPP(LLMClient):
             if request.parallel_tool_calls is not None:
                 payload["parallel_tool_calls"] = request.parallel_tool_calls
 
+            payload = self._prepare_payload(payload)
             body = json.dumps(payload)
             headers = {"Content-type": "application/json"}
             if self.__token:
@@ -386,3 +397,18 @@ class LLamaCPP(LLMClient):
             return None
         finally:
             conn.close()
+
+
+class CerebrasLLamaCPP(LLamaCPP):
+    """OpenAI-compatible client variant for Cerebras unsupported request fields."""
+
+    @staticmethod
+    def _to_provider_message(message: LLMMessage) -> dict[str, Any]:
+        output: dict[str, Any] = LLamaCPP._to_provider_message(message)
+        output.pop("reasoning_content", None)
+        return output
+
+    def _prepare_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        prepared_payload: dict[str, Any] = dict(payload)
+        prepared_payload.pop("cache_prompt", None)
+        return prepared_payload

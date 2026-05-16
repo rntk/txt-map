@@ -48,13 +48,22 @@ class RemoteProviderConfig:
             )
 
         if provider.type == "openai_comp":
-            from lib.llm.llamacpp import LLamaCPP
+            from lib.llm.llamacpp import (
+                CerebrasLLamaCPP,
+                LLamaCPP,
+                is_cerebras_provider,
+            )
 
             if not provider.url:
                 raise RuntimeError(
                     f"Remote provider {provider.id!r} requires url for openai_comp"
                 )
-            return LLamaCPP(
+            llm_client_type: type[LLamaCPP] = (
+                CerebrasLLamaCPP
+                if is_cerebras_provider(provider_name=provider.name, url=provider.url)
+                else LLamaCPP
+            )
+            return llm_client_type(
                 host=provider.url,
                 token=provider.token,
                 model=provider.model,
