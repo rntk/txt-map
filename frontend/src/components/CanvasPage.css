@@ -1528,6 +1528,52 @@ body.canvas-global-dragging * {
   white-space: normal;
 }
 
+/* When a contextualize result is shown the card grows to fit it. */
+.canvas-tag-topic-card.is-contextualized {
+  height: auto;
+  overflow: visible;
+}
+
+.canvas-tag-topic-card__contextualize {
+  align-self: flex-start;
+  margin-top: 7px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 215, 64, 0.45);
+  border-radius: 999px;
+  background: rgba(255, 215, 64, 0.08);
+  color: #ffd740;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.canvas-tag-topic-card__contextualize:hover {
+  background: rgba(255, 215, 64, 0.18);
+}
+
+.canvas-tag-topic-card__contextualize[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.canvas-tag-topic-card__context {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 215, 64, 0.28);
+  color: #fef3c7;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.canvas-tag-topic-card__context.is-error {
+  color: #fca5a5;
+  font-style: normal;
+}
+
 /* ── Topic scored tags rail (right side) ── */
 .canvas-topic-tags-connectors {
   position: absolute;

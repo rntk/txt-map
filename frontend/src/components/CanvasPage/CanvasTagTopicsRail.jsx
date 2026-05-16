@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { getRailCardPlacements } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
 
@@ -28,6 +28,7 @@ const TAG_TOPICS_RAIL_LANE_GAP = 12;
  *   onCardEnter: (key: string) => void,
  *   onCardLeave: (key: string) => void,
  *   onCardClick: (key: string) => void,
+ *   onContextualize?: (card: object) => Promise<string>,
  *   onMoveToTagsCloud?: () => void,
  *   onPrevHighlight?: () => void,
  *   onNextHighlight?: () => void,
@@ -42,6 +43,7 @@ export default function CanvasTagTopicsRail({
   onCardEnter,
   onCardLeave,
   onCardClick,
+  onContextualize,
   onMoveToTagsCloud,
   onPrevHighlight,
   onNextHighlight,
@@ -50,6 +52,36 @@ export default function CanvasTagTopicsRail({
   isAnimating,
 }) {
   const { cards = [], articleRight = 0, articleHeight = 0 } = tagTopicsLayout;
+
+  // Per-card contextualize state keyed by card.key:
+  // { status: "loading" | "done" | "error", text?: string, error?: string }.
+  const [contextByKey, setContextByKey] = useState({});
+
+  const handleContextualize = useCallback(
+    async (card) => {
+      if (!onContextualize) return;
+      setContextByKey((prev) => ({
+        ...prev,
+        [card.key]: { status: "loading" },
+      }));
+      try {
+        const text = await onContextualize(card);
+        setContextByKey((prev) => ({
+          ...prev,
+          [card.key]: { status: "done", text },
+        }));
+      } catch (err) {
+        setContextByKey((prev) => ({
+          ...prev,
+          [card.key]: {
+            status: "error",
+            error: err && err.message ? err.message : "Failed",
+          },
+        }));
+      }
+    },
+    [onContextualize],
+  );
 
   if (cards.length === 0 && !onMoveToTagsCloud) return null;
 
@@ -130,16 +162,21 @@ export default function CanvasTagTopicsRail({
             card.lane * (TAG_TOPICS_CARD_WIDTH + TAG_TOPICS_RAIL_LANE_GAP);
           const isActive = activeTopicKey === card.key;
           const summaryText = card.summaryText || card.preview;
+          const context = contextByKey[card.key];
+          const isLoading = context && context.status === "loading";
+          const hasContext = Boolean(context);
 
           return (
             <button
               key={card.key}
               type="button"
-              className={`canvas-tag-topic-card${isActive ? " is-active" : ""}`}
+              className={`canvas-tag-topic-card${isActive ? " is-active" : ""}${
+                hasContext ? " is-contextualized" : ""
+              }`}
               style={{
                 top: `${card.effectiveTop}px`,
                 right: laneOffset ? `-${laneOffset}px` : undefined,
-                height: `${card.cardHeight}px`,
+                [hasContext ? "minHeight" : "height"]: `${card.cardHeight}px`,
                 transition: isAnimating
                   ? "top 320ms ease, right 320ms ease"
                   : undefined,
@@ -155,6 +192,41 @@ export default function CanvasTagTopicsRail({
               <span className="canvas-tag-topic-card__preview">
                 {summaryText}
               </span>
+              {onContextualize && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="canvas-tag-topic-card__contextualize"
+                  aria-busy={isLoading ? "true" : undefined}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!isLoading) handleContextualize(card);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!isLoading) handleContextualize(card);
+                    }
+                  }}
+                >
+                  {isLoading
+                    ? "contextualizing…"
+                    : hasContext
+                      ? "contextualize again"
+                      : "contextualize"}
+                </span>
+              )}
+              {context && context.status === "done" && (
+                <span className="canvas-tag-topic-card__context">
+                  {context.text}
+                </span>
+              )}
+              {context && context.status === "error" && (
+                <span className="canvas-tag-topic-card__context is-error">
+                  Couldn’t contextualize ({context.error}).
+                </span>
+              )}
             </button>
           );
         })}

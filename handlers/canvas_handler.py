@@ -91,6 +91,20 @@ Highlighting rules (highlight_span tool):
   a normal text reply. Do not keep calling highlight_span in a loop.
 """
 
+# Kept as a module-level constant (never f-string interpolated) so the provider
+# can reuse the cached prompt prefix across every "contextualize" request.
+CONTEXTUALIZE_SYSTEM_PROMPT = """\
+You are a concise analytical assistant.
+You receive a short excerpt from an article and a single word or tag.
+In ONE very short sentence (about 25 words max) explain the context of that tag in
+the excerpt: what it refers to here, or why it is mentioned in these sentences.
+Reply in the same language as the excerpt.
+Output only that single sentence: no quotes, no prefixes, no extra commentary.
+"""
+
+# Extra sentences kept before and after the matched ones for a little more context.
+CONTEXTUALIZE_CONTEXT_SENTENCES = 2
+
 
 def _get_submissions_storage(request: Request) -> SubmissionsStorage:
     return request.app.state.submissions_storage
@@ -938,6 +952,11 @@ class UpdateChatRequest(BaseModel):
     title: Optional[str] = None
 
 
+class ContextualizeRequest(BaseModel):
+    tag: str
+    sentences: List[int]
+
+
 @router.get("/canvas/{article_id}/events")
 def get_canvas_events(
     article_id: str,
@@ -1114,6 +1133,73 @@ def post_canvas_chat(
         "reply": None,
         "chat_id": chat_id,
     }
+
+
+@router.post("/canvas/{article_id}/contextualize")
+def post_canvas_contextualize(
+    article_id: str,
+    body: ContextualizeRequest,
+    submissions_storage: SubmissionsStorage = Depends(_get_submissions_storage),
+    db: Any = Depends(get_db),
+) -> dict[str, str]:
+    submission = submissions_storage.get_by_id(article_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    tag = body.tag.strip()
+    if not tag:
+        raise HTTPException(status_code=400, detail="tag is required")
+
+    raw_sentences: list[str] = submission.get("results", {}).get("sentences") or []
+    # Mirror get_canvas_article: numbering is over the non-empty cleaned sentences,
+    # so it lines up with the sentence numbers the frontend sends.
+    clean_sentences: list[str] = [
+        s for s in (_strip_html(sentence).strip() for sentence in raw_sentences) if s
+    ]
+    total = len(clean_sentences)
+    if total == 0:
+        raise HTTPException(status_code=400, detail="Article has no sentences")
+
+    requested = sorted(
+        {n for n in body.sentences if isinstance(n, int) and 1 <= n <= total}
+    )
+    if not requested:
+        raise HTTPException(status_code=400, detail="No valid sentence numbers")
+
+    start = max(1, requested[0] - CONTEXTUALIZE_CONTEXT_SENTENCES)
+    end = min(total, requested[-1] + CONTEXTUALIZE_CONTEXT_SENTENCES)
+    excerpt = "\n".join(
+        sentence
+        for sentence in (clean_sentences[i - 1] for i in range(start, end + 1))
+        if sentence
+    )
+
+    # Only the trailing excerpt/tag vary between calls; the instruction text lives
+    # entirely in the constant system prompt above to stay KV-cache friendly.
+    user_prompt = (
+        f"<excerpt>\n{excerpt}\n</excerpt>\n\n"
+        f"Tag: {tag}\n"
+        "In one very short sentence, explain the context of this tag in the excerpt."
+    )
+
+    log.info(
+        "Canvas contextualize | article=%s tag=%r sentences=%s window=%d-%d",
+        article_id,
+        tag,
+        requested,
+        start,
+        end,
+    )
+
+    client = create_llm_client(db=db)
+    response = client.complete(
+        user_prompt=user_prompt,
+        system_prompt=CONTEXTUALIZE_SYSTEM_PROMPT,
+    )
+    summary = (response.content or "").strip()
+    if not summary:
+        raise HTTPException(status_code=502, detail="LLM returned no summary")
+    return {"summary": summary}
 
 
 # ── Chat sessions API ──────────────────────────────────────────────────────

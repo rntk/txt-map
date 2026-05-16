@@ -644,6 +644,26 @@ export default function CanvasPage() {
     [focusArticleOffset, selectedTagTopicEntries],
   );
 
+  const contextualizeTagTopic = useCallback(
+    async (card) => {
+      const response = await fetch(`/api/canvas/${articleId}/contextualize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          tag: selectedCloudLemma || "",
+          sentences: Array.isArray(card.sentences) ? card.sentences : [],
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      return (data && data.summary) || "";
+    },
+    [articleId, selectedCloudLemma],
+  );
+
   const navigateTagHighlight = useCallback(
     (direction) => {
       if (selectedTagTopicEntries.length === 0) return;
@@ -1325,6 +1345,7 @@ export default function CanvasPage() {
                       )
                     }
                     onCardClick={zoomToTagTopic}
+                    onContextualize={contextualizeTagTopic}
                     onMoveToTagsCloud={moveToTagsCloud}
                     onPrevHighlight={handlePrevTagHighlight}
                     onNextHighlight={handleNextTagHighlight}
