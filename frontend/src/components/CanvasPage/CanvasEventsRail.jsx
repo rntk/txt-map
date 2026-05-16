@@ -1,6 +1,9 @@
 import React from "react";
-import { getStickyCardTop } from "./stickyCards";
+import { getRailCardPlacements } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
+import { getZoomAdjustedSummaryRailWidth } from "./utils";
+
+const EVENTS_RAIL_LANE_GAP = 12;
 
 /**
  * Renders SVG connector lines and floating event cards on the RIGHT side of
@@ -47,6 +50,15 @@ export default function CanvasEventsRail({
   if (!cards || cards.length === 0) return null;
 
   const viewportTop = -translate.y / scale;
+  const placedCards = getRailCardPlacements(cards, viewportTop, scale);
+  const cardWidth = getZoomAdjustedSummaryRailWidth(scale);
+  const connectorCards = placedCards.map((card) => {
+    const laneOffset = card.lane * (cardWidth + EVENTS_RAIL_LANE_GAP);
+    return {
+      ...card,
+      connectorBulbX: articleRight + 80 + laneOffset,
+    };
+  });
   const connectorActiveKey =
     activeEventKey ||
     cards.find((card) => card.eventIndex === selectedIndex)?.key ||
@@ -56,7 +68,7 @@ export default function CanvasEventsRail({
     <>
       <RailConnectors
         name="events"
-        cards={cards}
+        cards={connectorCards}
         articleHeight={articleHeight}
         anchorX={articleRight}
         bulbX={articleRight + 80}
@@ -65,8 +77,8 @@ export default function CanvasEventsRail({
         activeKey={connectorActiveKey}
       />
       <div className="canvas-events-rail">
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+        {placedCards.map((card) => {
+          const laneOffset = card.lane * (cardWidth + EVENTS_RAIL_LANE_GAP);
           const isActive =
             activeEventKey === card.key || card.eventIndex === selectedIndex;
           return (
@@ -74,9 +86,12 @@ export default function CanvasEventsRail({
               key={card.key}
               className={`canvas-summary-card${isActive ? " is-active" : ""}`}
               style={{
-                top: `${effectiveTop}px`,
+                top: `${card.effectiveTop}px`,
+                right: laneOffset ? `-${laneOffset}px` : undefined,
                 height: `${card.cardHeight}px`,
-                transition: isAnimating ? "top 320ms ease" : undefined,
+                transition: isAnimating
+                  ? "top 320ms ease, right 320ms ease"
+                  : undefined,
               }}
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}

@@ -48,7 +48,7 @@ const activeCls = (base, isActive) => (isActive ? `${base} is-active` : base);
  *
  * @param {{
  *   name: "summary" | "insights" | "events" | "tag-topics" | "topic-tags",
- *   cards: Array<{key: string, cardY: number, cardHeight: number, startY: number, endY: number}>,
+ *   cards: Array<{key: string, cardY: number, cardHeight: number, startY: number, endY: number, effectiveTop?: number, connectorBulbX?: number}>,
  *   articleHeight: number,
  *   anchorX: number,
  *   bulbX: number,
@@ -80,8 +80,13 @@ export default function RailConnectors({
   return (
     <svg className={classes.connectors} style={{ height: svgHeight }}>
       {cards.map((card) => {
-        const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+        const effectiveTop =
+          typeof card.effectiveTop === "number"
+            ? card.effectiveTop
+            : getStickyCardTop(card, viewportTop, scale);
         const connectorY = effectiveTop + card.cardHeight / 2;
+        const cardBulbX =
+          typeof card.connectorBulbX === "number" ? card.connectorBulbX : bulbX;
         const isActive = activeKey === card.key;
         return (
           <g key={card.key}>
@@ -94,12 +99,12 @@ export default function RailConnectors({
             <line
               x1={anchorX}
               y1={connectorY}
-              x2={bulbX}
+              x2={cardBulbX}
               y2={connectorY}
               className={activeCls(classes.connector, isActive)}
             />
             <circle
-              cx={bulbX}
+              cx={cardBulbX}
               cy={connectorY}
               r={4}
               className={activeCls(classes.bulb, isActive)}

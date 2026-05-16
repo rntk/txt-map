@@ -1,6 +1,9 @@
 import React from "react";
-import { getStickyCardTop } from "./stickyCards";
+import { getRailCardPlacements } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
+import { getZoomAdjustedSummaryRailWidth } from "./utils";
+
+const SUMMARY_RAIL_LANE_GAP = 12;
 
 /**
  * Renders the SVG connector lines and floating summary cards for the summary rail.
@@ -34,12 +37,21 @@ export default function CanvasSummaryRail({
   if (!cards || cards.length === 0) return null;
 
   const viewportTop = -translate.y / scale;
+  const placedCards = getRailCardPlacements(cards, viewportTop, scale);
+  const cardWidth = getZoomAdjustedSummaryRailWidth(scale);
+  const connectorCards = placedCards.map((card) => {
+    const laneOffset = card.lane * (cardWidth + SUMMARY_RAIL_LANE_GAP);
+    return {
+      ...card,
+      connectorBulbX: articleRight + 80 + laneOffset,
+    };
+  });
 
   return (
     <>
       <RailConnectors
         name="summary"
-        cards={cards}
+        cards={connectorCards}
         articleHeight={articleHeight}
         anchorX={articleRight}
         bulbX={articleRight + 80}
@@ -48,16 +60,19 @@ export default function CanvasSummaryRail({
         activeKey={activeSummaryKey}
       />
       <div className="canvas-summary-rail">
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+        {placedCards.map((card) => {
+          const laneOffset = card.lane * (cardWidth + SUMMARY_RAIL_LANE_GAP);
           return (
             <div
               key={card.key}
               className={`canvas-summary-card${activeSummaryKey === card.key ? " is-active" : ""}`}
               style={{
-                top: `${effectiveTop}px`,
+                top: `${card.effectiveTop}px`,
+                right: laneOffset ? `-${laneOffset}px` : undefined,
                 height: `${card.cardHeight}px`,
-                transition: isAnimating ? "top 320ms ease" : undefined,
+                transition: isAnimating
+                  ? "top 320ms ease, right 320ms ease"
+                  : undefined,
               }}
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}

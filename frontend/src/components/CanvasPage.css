@@ -1517,10 +1517,14 @@ body.canvas-global-dragging * {
 }
 
 .canvas-tag-topic-card__preview {
+  display: -webkit-box;
   margin-top: 5px;
+  overflow: hidden;
   color: #d8e1ec;
   font-size: 11px;
   line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
   white-space: normal;
 }
 

@@ -1,11 +1,13 @@
 import React from "react";
-import { getStickyCardTop } from "./stickyCards";
+import { getRailCardPlacements } from "./stickyCards";
 import RailConnectors from "./RailConnectors";
 import { getZoomAdjustedFontSize } from "./utils";
 import {
   DEFAULT_TOPIC_TAG_VISIBLE_COUNT,
   TOPIC_TAGS_PER_LOAD,
 } from "./useTopicTagsLayout";
+
+const TOPIC_TAGS_RAIL_LANE_GAP = 12;
 
 /**
  * @param {{
@@ -58,6 +60,14 @@ export default function CanvasTopicTagsRail({
   if (!cards || cards.length === 0) return null;
 
   const viewportTop = -translate.y / scale;
+  const placedCards = getRailCardPlacements(cards, viewportTop, scale);
+  const connectorCards = placedCards.map((card) => {
+    const laneOffset = card.lane * (railWidth + TOPIC_TAGS_RAIL_LANE_GAP);
+    return {
+      ...card,
+      connectorBulbX: articleRight + 80 + laneOffset,
+    };
+  });
 
   const handleLoadMore = (event, card) => {
     event.preventDefault();
@@ -73,7 +83,7 @@ export default function CanvasTopicTagsRail({
     <>
       <RailConnectors
         name="topic-tags"
-        cards={cards}
+        cards={connectorCards}
         articleHeight={articleHeight}
         anchorX={articleRight}
         bulbX={articleRight + 80}
@@ -93,8 +103,8 @@ export default function CanvasTopicTagsRail({
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >
-        {cards.map((card) => {
-          const effectiveTop = getStickyCardTop(card, viewportTop, scale);
+        {placedCards.map((card) => {
+          const laneOffset = card.lane * (railWidth + TOPIC_TAGS_RAIL_LANE_GAP);
           const visibleCount =
             card.visibleTagCount || DEFAULT_TOPIC_TAG_VISIBLE_COUNT;
           const visibleTags = card.tags.slice(0, visibleCount);
@@ -110,9 +120,12 @@ export default function CanvasTopicTagsRail({
               tabIndex={0}
               className={`canvas-topic-tags-card${isActive ? " is-active" : ""}`}
               style={{
-                top: `${effectiveTop}px`,
-                minHeight: `${card.cardHeight}px`,
-                transition: isAnimating ? "top 320ms ease" : undefined,
+                top: `${card.effectiveTop}px`,
+                right: laneOffset ? `-${laneOffset}px` : undefined,
+                height: `${card.cardHeight}px`,
+                transition: isAnimating
+                  ? "top 320ms ease, right 320ms ease"
+                  : undefined,
               }}
               onMouseEnter={() => onCardEnter(card.key)}
               onMouseLeave={() => onCardLeave(card.key)}
